@@ -1,0 +1,17 @@
+# ESPHome-Matter 4MB partition table.
+#
+# Two NVS partitions: `nvs` is shared with ESPHome (which calls nvs_flash_erase
+# on first-mount failure, see esphome/components/esp32/preferences.cpp:92).
+# `nvs_chip` is dedicated to chip-* namespaces so Matter fabric data cannot be
+# wiped by ESPHome's recovery path.
+#
+# Name,    Type, SubType, Offset,   Size,    Flags
+nvs,       data, nvs,     0xC000,   0x6000,
+nvs_chip,  data, nvs,     0x12000,  0x6000,
+otadata,   data, ota,     0x18000,  0x2000,
+phy_init,  data, phy,     0x1A000,  0x1000,
+ota_0,     app,  ota_0,   0x20000,  0x1D0000,
+ota_1,     app,  ota_1,   0x1F0000, 0x1D0000,
+fctry,     data, nvs,     0x3C0000, 0x6000,
+esp_secure_cert, 0x3F, , 0x3C6000, 0x2000, encrypted
+nvs_keys,  data, nvs_keys,0x3C8000, 0x1000, encrypted
