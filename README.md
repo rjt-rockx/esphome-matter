@@ -1,101 +1,287 @@
 # esphome-matter
 
-Native Matter support for ESPHome as an external component.
+![GitHub stars](https://img.shields.io/github/stars/rjt-rockx/esphome-matter)
+![GitHub forks](https://img.shields.io/github/forks/rjt-rockx/esphome-matter)
+![GitHub watchers](https://img.shields.io/github/watchers/rjt-rockx/esphome-matter)
 
-**Status:** Phase 0 spike. Not on a board yet. The build path is wired up;
-end-to-end commissioning is the next milestone.
+ESPHome external component adding Matter 1.6 support.
 
-## What this is
+Derived from [DavidvtWout/esphome-matter](https://github.com/DavidvtWout/esphome-matter) (Apache-2.0), with modifications. See NOTICE.
 
-Drop a `matter:` block into an ESPHome YAML, declare a `platform: matter`
-entity, and the device commissions into Apple Home, Google Home, or Alexa
-over BLE + Wi-Fi. No bridge, no Home Assistant required, no manual ZAP /
-cluster authoring.
+> This project is still in early-development so don't expect a perfectly working setup. Both
+> matter-over-wifi and matter-over-thread are now working. It's possible to commission a
+> device to a matter controller, and lights, switches and sensors are mostly working.
+> Many other device types can also be created and interacted with using on_attribute triggers
+> and set_attribute actions.
+>
+> However, there are still some stability issues, mainly with reconnection after a restart which
+> may take up to a minute.
+>
+> Also, keep in mind that the config schema may still change and break existing configurations.
+
+That being said, esphome-matter is usable now, so give it a try!
+
+# Supported Hardware
+
+The component only supports `ESP32` targets built with the **ESP-IDF** framework. The Arduino framework is not
+supported.
+
+Connectivity depends on which ESPHome networking components are configured:
+
+- **Matter-over-Wi-Fi**: If `wifi` is configured, Matter announces itself over mDNS and can be commissioned
+  on the network.
+- **Matter-over-Thread**: Requires the `openthread` component and ESPHome **2026.6.0** or newer.
+- **Matter-over-Ethernet**: Isn't supported yet and isn't actively being worked on. Feel free to implement it ;)
+- **BLE commissioning**: Currently broken, but this is something that I want to work on. The idea is that esphome-matter falls back to BLE commissioning (the default for most matter devices) when no `wifi`, `openthread`, or `ethernet` component is configured.
+
+Binding (for example, a button to a light) is working but still has some stability issues. Sometimes it takes a few
+seconds before a command is successfully sent.
+
+So far, `ESP32-C3`, `ESP32-C5`, `ESP32-C6`, `ESP32-S3` and `ESP32-H2` have been tested and confirmed to work!
+
+# Commissioning
+
+Because ESPHome devices already have their Wi-Fi or Thread credentials from your YAML configuration, commissioning
+works differently than with most other Matter devices. You still need to commission the device to a Matter fabric, but
+this does not happen over BLE (bluetooth) like with most matter devices.
+
+After flashing, the device prints a setup code (`SetupQRCode`) to the logs on every boot:
+
+```
+[C][matter]: Matter:
+[C][matter]:   SetupQRCode: MT:Y.K904QI14-O992WI00
+[C][matter]:   QR URL: https://project-chip.github.io/connectedhomeip/qrcode.html?data=MT:Y.K904QI14-O992WI00
+[C][matter]:   Manual pairing code: 32552014321
+[C][matter]:   Commissioning window: open
+[C][matter]:   Fabrics: none
+```
+
+Copy the `SetupQRCode` or open the link and scan the QR-code to commission the device. Keep in mind that the
+commissioning window remains open for only 15 minutes. A restart of the device will re-open the window if it hasn't
+joined any fabrics yet.
+
+Once the device has joined a fabric, the commissioning window won't be opened on restarts anymore. Matter controllers
+should be able to share the device. This generates a temporary commissioning code and re-opens the commissioning window.
+If you lose access to the Matter controller, you can do a Matter factory reset (see [Example config](#example-config)).
+
+### Ecosystem specific settings
+
+- **Home Assistant / matterjs server**: Start the matterjs-server with: `matterjs-server --enable-test-net-dcl=true`. Commission the device with the `Commission existing device` option.
+- **Home Assistant Matter app (HA-OS only)**: Check the "Enable test-net DCL usage" box under Settings -> Apps -> Matter Server -> Configuration. If you do not do this, pairing will fail.
+- **Google Home**: Doesn't automatically accept devices with the "test" vendor ID. Follow the [Tasmota guide](https://tasmota.github.io/docs/Matter-with-Google/) to add esphome-matter devices.
+
+So far, **IKEA Home Smart**, **Apple Home**, and **Amazon Alexa** have been confirmed to accept esphome-matter devices
+without any special configuration steps. Keep in mind that "accepting" a device doesn't mean supporting it properly. For
+example, IKEA Home Smart only supports a very limited subset of Matter device types. To get most out of the device, share
+it with a fabric that is controlled by Home Assistant.
+
+Please [report](https://github.com/DavidvtWout/esphome-matter/discussions/44) any outdated or newly discovered information
+on compatible ecosystems, devices, and device types or issues.
+
+# Example config
 
 ```yaml
-external_components:
-  - source: github://rjt-rockx/esphome-matter
-    components: [matter]
+esphome:
+  name: matter-device
 
 esp32:
-  board: esp32-c6-devkitc-1
+  # The default toolchain in ESPHome is `esp-idf`. esphome-matter supports this
+  # toolchain starting at ESPHome version 2026.9.0. If you're still using an older
+  # version you need to set toolchain to platformio:
+  # toolchain: platformio
+  variant: ESP32C6 # Set to your variant
   framework:
     type: esp-idf
 
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+# Either:
+wifi: ...
+# Or:
+openthread: ...
+
 matter:
+  # vendor_name: defaults to ESPHome
+  # vendor_id: defaults to 0xFFF1 (test vendor)
+  # product_name: defaults to esphome.name (truncated to 32 characters)
+  # product_id: defaults to 0x8000 (test product)
+  # hardware_version: defaults to 0
+  # hardware_version_string: defaults to TEST_VERSION
 
-switch:
-  - platform: matter
-    matter_id: matter1
-    name: "Desk Plug"
+  endpoints:
+    1:
+      id: dimmer_endpoint # The id is optional. Actions can also refer to the numerical endpoint id directly.
+      dimmer_switch:
+    2:
+      temperature_sensor:
+        temperature: internal_temp
+    3:
+      on_off_light:
+        light_id: user_led
+
+# The two buttons are configured to be triggered when the GPIO pin is pulled down to GND.
+binary_sensor:
+  - name: "Button up"
+    platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command:
+        path: dimmer_endpoint.on_off.on
+    on_press:
+      # Pressing up can turn on a light. If you don't want this, remove "_with_on_off".
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move_with_on_off
+        arguments:
+          move_mode: up
+          rate: 20%/s
+    on_release:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.stop_with_on_off
+  - name: "Button down"
+    id: button_down
+    platform: gpio
+    pin:
+      number: GPIO1
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command:
+        path: dimmer_endpoint.on_off.off
+    on_press:
+      # Pressing down dims to lowest brightness but doesn't turn off
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move
+        arguments:
+          move_mode: down
+          rate: 20%/s
+    on_release:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.stop
+
+sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"
+    id: internal_temp
+
+output:
+  # On a Seeed Studio XIAO ESP32-C6, the GPIO15 pin is wired to the user LED. Pick
+  # the correct pin for your board or remove the `output` and `light` sections.
+  - platform: gpio
+    pin:
+      number: GPIO15
+      inverted: true
+    id: user_led_pin
+
+light:
+  - platform: binary
+    name: "User LED"
+    output: user_led_pin
+    id: user_led
+    internal: true
+
+# A Matter factory reset wipes all fabrics and re-opens the commissioning window.
+button:
+  - platform: template
+    name: "Matter Factory Reset"
+    on_press:
+      - matter.factory_reset:
+    disabled_by_default: True
 ```
 
-## Hardware
+More information about endpoints and a full list of supported device types can be found in [docs/endpoints.md](./docs/endpoints.md)
 
-v0 targets ESP32-C6 (Wi-Fi) and ESP32-S3. ESP32-H2 (Thread-only) and Thread
-support land in v1.
+# Lights
 
-## Roadmap
+All four Matter lights are now fully supported by esphome-matter! See [docs/lights.md](./docs/lights.md) for more information.
+Also check out [examples/extended-color-light.yaml](./examples/extended-color-light.yaml) for an example of how to configure a light in esphome-matter.
 
-- **v0.1** `switch:` (On/Off Plug-in Unit)
-- **v0.2** `light:` (on/off, dimmable, CT, RGB)
-- **v0.3** `binary_sensor:` (contact, occupancy, water leak, generic switch)
-- **v0.4** `sensor:` (temperature, humidity, illuminance, pressure)
-- **v1** covers, fans, thermostats, locks, valves; ESP32-H2 + Thread; multi-endpoint
+# Sensors
 
-The slow incremental rollout mirrors ESPHome's Zigbee component
-([PR #11553](https://github.com/esphome/esphome/pull/11553)): ship one entity
-type, prove it, expand.
+Matter can expose many ESPHome sensor values. To expose a sensor, first create a device type that supports it and then map sensor ids to it. The supported sensor device types include `temperature_sensor`, `humidity_sensor`, `light_sensor`, `pressure_sensor`, `flow_sensor`, `contact_sensor`, `occupancy_sensor`, and `air_quality_sensor`. See [docs/device-types.md](docs/device-types.md) for a more complete overview of how to configure these sensors.
 
-## Concepts (one line each)
+The [all-sensors example](examples/all-sensors.yaml) also shows how to expose all supported sensors.
 
-- **Commissioning**: pairing the device into an ecosystem the first time. Done over BLE, then handed off to Wi-Fi / Thread.
-- **Fabric**: a single ecosystem (Apple Home, Google Home, etc.). One device can join many fabrics simultaneously (multi-admin).
-- **Discriminator**: 12-bit advertised ID used during commissioning to pick the right device.
-- **Passcode**: 8-digit numeric secret entered (or scanned via QR) during commissioning.
-- **DAC / PAI / PAA**: the attestation cert chain proving the device is genuine. v0 ships a CSA test DAC; production needs a Connectivity Standards Alliance VID.
-- **Endpoint**: a Matter address (1..65534) under one node, hosting clusters.
-- **Cluster**: a typed bundle of attributes + commands (On/Off, Level Control, etc.). What HA calls "entity types," Matter calls clusters.
-- **Identify cluster**: tells the device to blink so the user can find it physically during pairing.
-- **OTA Requestor**: Matter's own firmware update channel, distinct from ESPHome HTTP OTA. Both coexist.
-- **NodeLabel**: per-fabric friendly name. A device can be "Desk Plug" in Apple Home and "Outlet" in Google Home simultaneously.
-- **ACL**: per-fabric access control. Matter manages it; not surfaced in YAML.
+# Actions
 
-## Footguns v0 deliberately rejects
+See [docs/actions.md](./docs/actions.md) for a more complete overview of available actions.
 
-- **BLE coexistence.** Any `esp32_ble_*` component in the same YAML is a compile error. esp-matter tears down BLE post-commissioning and the two stacks fight over the controller.
-- **Arduino framework.** ESP-IDF only. Matter needs IDF v5.5.4.
-- **NVS partition wipe.** ESPHome erases NVS on first-mount failure. We carve a separate `nvs_chip` partition for Matter so fabric data survives.
-- **Sensors without `device_class`.** Codegen errors rather than silently miscategorizing the entity in Apple Home.
+### OnOff
 
-## Credentials
+[OnOff commands](./docs/actions.md#onoff-cluster) are used for simple binary devices such as lights, plugs and relays.
 
-By default the device pairs with the CSA test DAC (VID `0xFFF2`, PID
-`0x8001`). Apple Home shows "Uncertified Accessory" with an "Add Anyway"
-button. Fine for development. For production you'll need a Connectivity
-Standards Alliance VID and your own DAC chain: see `scripts/mfg-tool-wrapper.sh`.
+```yaml
+# Turn off, turn on, or toggle a bound device.
+matter.send_command: some_endpoint.on_off.on
+matter.send_command: some_endpoint.on_off.on
+matter.send_command: some_endpoint.on_off.toggle
 
-## Building the spike
-
-```sh
-# Build:
-esphome compile examples/01-onoff-plug-c6.yaml
-
-# Flash firmware:
-esphome upload examples/01-onoff-plug-c6.yaml
-
-# Flash the factory NVS partition (one-time per device):
-./scripts/mfg-tool-wrapper.sh
-./scripts/flash-factory.sh out/factory/fff2_8001/<serial>-partition.bin /dev/ttyUSB0
+# Intended for motion sensors temporarily turning on a light.
+matter.send_command:
+  path: some_endpoint.on_off.on_with_timed_off
+  arguments:
+    on_time: # s - How long to turn on the light.
+    # off_wait_time: 0s  # Time before accepting another on_with_timed_off command.
+    # on_off_control: 0
 ```
 
-`dump_config` prints the QR code URL and manual pairing code on boot.
+### LevelControl
 
-## What works today
+[LevelControl commands](./docs/actions.md#levelcontrol-cluster) are used for dimming. YAML values can be percentages or raw Matter brightness levels, normally `0` to `254`.
 
-Nothing yet. This repo is the Phase 0 skeleton. First commissioning attempt
-is the next milestone; everything below it is unverified.
+The following commands also have a version without `_with_on_off`. These commands don't turn on or off the light.
 
-## License
+```yaml
+# Move directly to a brightness level.
+matter.send_command:
+  path: some_endpoint.level_control.move_to_level_with_on_off
+  arguments:
+    level: # %
+    # transition_time: 0s
 
-MIT. See `LICENSE`.
+# Move continuously up or down.
+matter.send_command:
+  path: some_endpoint.level_control.move_with_on_off
+  arguments:
+    move_mode: # either "up" or "down"
+    rate: # %/s
+
+# Step once by a fixed amount.
+matter.send_command:
+  path: some_endpoint.level_control.step_with_on_off
+  arguments:
+    step_mode: # either "up" or "down"
+    step_size: # %
+    # transition_time: 0s
+
+# Stop a previous move command.
+matter.send_command: some_endpoint.level_control.stop_with_on_off
+```
+
+# Current Limitations
+
+- As this is based on [Espressif's SDK for Matter (esp-matter)](https://components.espressif.com/components/espressif/esp_matter/) any features/functions not supported there in upstream first can not be supported in this project.
+- BLE commissioning is currently broken and if it wasn't, it cannot be combined with the `api` component because of limitations in the ESPHome `network` component.
+
+# See Also
+
+- [Espressif's SDK for Matter (esp-matter) GitHub repo](https://github.com/espressif/esp-matter)
+  - [Espressif's SDK for Matter (esp-matter) page on ESP Component Registry](https://components.espressif.com/components/espressif/esp_matter/)
+  - [Espressif's SDK for Matter (esp-matter) Programming Guide / Documentation](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/)
+- [connectedhomeip](https://github.com/DavidvtWout/connectedhomeip)
+- [Matter specification (CSA)](https://csa-iot.org/developer-resource/specifications-download-request/)
+- [CSA source code implementations for the Matter project](https://github.com/project-chip)
