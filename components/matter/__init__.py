@@ -211,6 +211,13 @@ async def to_code(config: ConfigType):
 
     add_idf_sdkconfig_option("CONFIG_MBEDTLS_HKDF_C", True)
     try:
+        from esphome.components.esp32 import require_mbedtls_tls_extras
+
+        # CHIP needs AES-CCM and deterministic ECDSA, trimmed by default since esphome#19088
+        require_mbedtls_tls_extras(("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC"))
+    except ImportError:
+        pass
+    try:
         from esphome.components.esp32 import require_certificate_bundle
 
         # Supported from ESPHome 2026.9.0
