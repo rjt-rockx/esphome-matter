@@ -1,0 +1,62 @@
+# Real esphome-matter firmware for the Espressif QEMU fork (ESP32 + OpenCores Ethernet).
+# Build/run with tools/qemu/run.sh, see docs/dev/qemu.md.
+# No Wi-Fi, BLE or Thread (not emulated): on-network commissioning over the emulated Ethernet.
+esphome:
+  name: matter-qemu
+
+esp32:
+  variant: ESP32
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+  hardware_uart: UART0
+  level: DEBUG
+
+api:
+  reboot_timeout: 0s # Matter operation does not require an ESPHome API client.
+
+network:
+  enable_ipv6: true
+
+ethernet:
+  type: OPENETH
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: qemu_light
+    2:
+      temperature_sensor:
+        temperature: qemu_temp
+
+output:
+  - platform: template
+    id: qemu_output
+    type: binary
+    write_action:
+      - logger.log:
+          format: "output state changed"
+
+light:
+  - platform: binary
+    id: qemu_light
+    name: QEMU Light
+    output: qemu_output
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: template
+    id: qemu_temp
+    name: QEMU Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      return 21.5f;
