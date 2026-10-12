@@ -9,6 +9,7 @@ from esphome.components import light
 from esphome.const import CONF_LIGHT_ID
 
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
+from ..lock_valve import extend_device_type_schema
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
@@ -184,6 +185,8 @@ class DeviceType:
             level = cv.All(percentage(), cv.int_range(min=1, max=254))
             schema[cv.Optional(CONF_MIN_LEVEL, default=1)] = level
             schema[cv.Optional(CONF_MAX_LEVEL, default=254)] = level
+
+        extend_device_type_schema(self.name, schema)
 
         # If a device type is a simple sensor with only a single sensor attribute the config may be simplified from;
         #   temperature_sensor:

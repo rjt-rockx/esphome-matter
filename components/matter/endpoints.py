@@ -23,6 +23,7 @@ from .data_model.device_types import (
     DEVICE_TYPES_BY_ID,
     DeviceType,
 )
+from .lock_valve import device_config_lines, register_entity
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -228,6 +229,9 @@ class Endpoint:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
             cg.add(var.register_light(light_, self._endpoint_id))
+        await register_entity(
+            var, self._endpoint_id, device_type.name, device_config
+        )
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
@@ -264,6 +268,15 @@ class Endpoint:
                         f"esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds());",
                     )
                 )
+
+        lines.extend(
+            device_config_lines(
+                device_type.name,
+                config_var,
+                self._endpoint_id,
+                device_config,
+            )
+        )
 
         # Configure cluster features
         for cluster in device_type.server_clusters:
