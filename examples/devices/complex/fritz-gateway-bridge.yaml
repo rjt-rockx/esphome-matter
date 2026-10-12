@@ -1,0 +1,64 @@
+# mirrors: fritz-bridge
+# Mirrors: AVM FRITZ!Box gateway (HA fixture fritz_bridge, shipping firmware): root PartsList [40,41,42]; EP40 On/Off Plug-in
+# Unit, EP41 Temperature Sensor, EP42 Bridged Node whose parts are [40,41]. There is NO Aggregator: a single Bridged Node
+# endpoint is the parent of the DECT devices' endpoints, which sit on the root PartsList as well.
+# ESPHome analogue: an ESP32 gateway relaying a remote smart plug (homeassistant/espnow entity) and its temperature.
+#
+# Expressed with the generic `parent:` (no `bridged_node` device type on the app endpoints) and a Bridged Node endpoint
+# WITHOUT an aggregator. spike-bridge's `bridged_node:` REQUIRES an aggregator parent (validate_topology: "parent X is not
+# an aggregator endpoint"), so the Bridged Node endpoint is written as a plain `bridged_node` entry with an aggregator-less
+# structure only in the aspirational block below (commented, GAP-BRIDGE-NO-AGGREGATOR). The runnable part is the closest
+# legal shape: Aggregator EP1 -> Bridged Node EP42 (own endpoint) -> app endpoints EP40/EP41 as its parts (what ble-proxy-bridge
+# does), i.e. fritz plus an aggregator. Differs from the real device: extra Aggregator endpoint.
+#
+#   aspirational (not accepted today):
+#   42: {bridged_node: {name: FRITZ!DECT 200}}      # no parent: root-level bridged node
+#   40: {parent: 42, on_off_plug_in_unit: {switch_id: remote_plug}}
+
+esphome:
+  name: matter-fritz-like
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    42:
+      bridged_node: {name: Remote plug, parent: 1}
+    40:
+      parent: 42
+      on_off_plug_in_unit:
+        switch_id: remote_plug
+    41:
+      parent: 42
+      temperature_sensor: remote_temperature
+
+switch:
+  - platform: template
+    id: remote_plug
+    name: Remote plug
+    optimistic: true
+
+sensor:
+  - platform: template
+    id: remote_temperature
+    name: Remote plug temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: return 21.0f;

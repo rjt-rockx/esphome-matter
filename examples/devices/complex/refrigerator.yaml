@@ -1,0 +1,83 @@
+# mirrors: silabs-refrigerator
+# Mirrors: a two-compartment refrigerator. Real dump: HA fixture silabs_refrigerator (EP1 Refrigerator 0x0070 with OnOff +
+# RefrigeratorAndTemperatureControlledCabinetMode + RefrigeratorAlarm, parts [2,3]; EP2/EP3 Temperature Controlled Cabinet
+# 0x0071 with TemperatureControl FM=1). sdk-chef-refrigerator-cabinets-fan adds TemperatureMeasurement per cabinet.
+# ESPHome side: two DS18B20 probes, a compressor relay and a door contact; a `climate: thermostat` (cool) per cabinet.
+#
+# Composition: the Refrigerator root endpoint and two cabinet child endpoints (`parent: 1`, PartsList of EP1 = [2,3]).
+# Differs from the dump: (1) TemperatureControl (setpoint, min/max, step) and RefrigeratorAlarm (door open) are created but
+# NOT bound to anything (no climate/binary_sensor binding exists; their attributes keep esp-matter defaults; the door
+# alarm cannot be raised except by `matter.set_attribute` of a bitmap), (2) the measured temperature is attached by
+# STACKING the temperature_sensor device type on the cabinet endpoint, which adds device type 0x0302 to the cabinet's
+# DeviceTypeList (the real dump has the TemperatureMeasurement CLUSTER only), (3) the mode cluster has no delegate.
+
+esphome:
+  name: matter-fridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      refrigerator: {}
+      clusters:
+        refrigerator_alarm: {}
+    2:
+      parent: 1
+      label: Fridge
+      temperature_controlled_cabinet:
+        with_features: [temperature_number]
+      temperature_sensor: fridge_temperature
+    3:
+      parent: 1
+      label: Freezer
+      temperature_controlled_cabinet:
+        with_features: [temperature_number]
+      temperature_sensor: freezer_temperature
+
+one_wire:
+  - platform: gpio
+    pin: GPIO3
+
+sensor:
+  - {platform: dallas_temp, id: fridge_temperature, name: Fridge temperature, address: 0x1c0000031edd2a28, update_interval: 30s}
+  - {platform: dallas_temp, id: freezer_temperature, name: Freezer temperature, address: 0x2d0000031edd2a29, update_interval: 30s}
+
+switch:
+  - {platform: gpio, id: compressor, name: Compressor, pin: GPIO10}
+
+binary_sensor:
+  - {platform: gpio, id: door, name: Door, pin: {number: GPIO4, mode: INPUT_PULLUP, inverted: true}, device_class: door}
+
+climate:
+  - platform: thermostat
+    id: fridge_climate
+    name: Fridge
+    sensor: fridge_temperature
+    min_idle_time: 180s
+    min_cooling_off_time: 180s
+    min_cooling_run_time: 180s
+    visual: {min_temperature: 1 °C, max_temperature: 10 °C, temperature_step: 0.5 °C}
+    default_preset: Normal
+    preset:
+      - name: Normal
+        default_target_temperature_high: 4 °C
+    cool_action:
+      - switch.turn_on: compressor
+    idle_action:
+      - switch.turn_off: compressor

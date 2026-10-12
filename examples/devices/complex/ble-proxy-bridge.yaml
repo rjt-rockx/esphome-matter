@@ -1,0 +1,88 @@
+# mirrors: xiaomi-lywsd03mmc-ble
+# Mirrors: ESPHome as a bridge for BLE sensors. A Xiaomi LYWSD03MMC thermometer is read by esp32_ble_tracker (the
+# ESPHome `xiaomi_lywsd03mmc` platform, the same data bluetooth_proxy forwards to HA) and re-published over Matter as
+# a *Bridged Node* with its own identity (NodeLabel, UniqueID, Reachable), so Apple/Google show the thermometer as its
+# own accessory and not as part of the ESP32.
+# Sources: research/devices/esphome-hardware.jsonl xiaomi-lywsd03mmc-ble (evidence=dump of the predicted shape),
+# HA fixtures fritz_bridge / mock_composed_bridge (nested Bridged Node shape: Bridged Node endpoint with the sensor
+# endpoints as child parts), Matter core spec 9.12 Bridged Node.
+#
+# Shape: EP1 Aggregator -> EP2 Bridged Node (BDBI only) -> EP3 Temperature Sensor, EP4 Humidity Sensor.
+# The `bridged_node:` of spike-bridge must be an Aggregator child (it validates `parent` against the aggregators), and
+# the sensor endpoints use the generic `parent:` to hang below the bridged-node endpoint. A battery is bound to EP2's
+# Power Source (`battery:` on the bridged endpoint).
+#
+# Matches: BDBI Reachable follows a binary_sensor that goes false when no advertisement arrived for 15 minutes.
+# Differs from a real bridge: static (one thermometer, MAC fixed in YAML), BDBI only has NodeLabel/UniqueID/Reachable
+# (no VendorName/ProductName/SoftwareVersion), and a BLE scanning + Matter + Wi-Fi coexistence build is unverified
+# (docs/ble-commissioning.md: BLE components are only blocked for BLE-commissioned builds).
+
+esphome:
+  name: matter-ble-bridge
+  friendly_name: Matter BLE Bridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+
+globals:
+  - id: therm_last_seen
+    type: uint32_t
+    initial_value: "0"
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    2:
+      bridged_node:
+        name: Bedroom thermometer
+        parent: 1
+        unique_id: lywsd03mmc-a4c1384e1678
+        reachable: therm_online
+      battery: therm_battery # Power Source (battery) on the bridged node
+    3:
+      parent: 2
+      temperature_sensor: therm_temperature
+    4:
+      parent: 2
+      humidity_sensor:
+        relative_humidity: therm_humidity
+
+sensor:
+  - platform: xiaomi_lywsd03mmc
+    mac_address: A4:C1:38:4E:16:78
+    bindkey: e9efaa6873f9f9c87a5e75a5f814801c
+    temperature:
+      id: therm_temperature
+      name: Bedroom temperature
+      on_value:
+        - lambda: id(therm_last_seen) = millis();
+    humidity:
+      id: therm_humidity
+      name: Bedroom humidity
+    battery_level:
+      id: therm_battery
+      name: Bedroom thermometer battery
+
+binary_sensor:
+  - platform: template
+    id: therm_online
+    name: Bedroom thermometer online
+    lambda: |-
+      return id(therm_last_seen) != 0 && (millis() - id(therm_last_seen)) < 15 * 60 * 1000;

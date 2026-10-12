@@ -1,0 +1,115 @@
+# mirrors: sdk-esp-bridge-aggregator
+# Mirrors: ESP-NOW nodes behind an ESP32 gateway. Two battery temperature nodes and one ESP-NOW controlled relay
+# plug are published as separate Matter Bridged Nodes. This is the pattern of Espressif's own esp-now_bridge_light
+# example (research/devices/sdk-reference.jsonl sdk-esp-bridge-aggregator: Aggregator + Bridged Node + app device type
+# per remote node), implemented with ESPHome's `espnow` component for the radio side and spike-bridge's static
+# `bridged_node:` for the Matter side.
+#
+# Radio caveat (not a Matter limit): ESP-NOW must share the channel of the Wi-Fi AP (`espnow` takes the channel from
+# `wifi:`), and Matter over Wi-Fi uses the same radio, so this works on classic ESP32/S3/C6 but not on Thread builds.
+# Payload format used here (6 bytes, little endian): int16 temp_centi_c, uint8 humidity, uint8 battery_pct, uint16 mv.
+#
+# Matches: one Bridged Node per remote with NodeLabel/UniqueID, Reachable driven by a "heard from recently" binary
+# sensor, battery as a Power Source on the bridged endpoint, bidirectional control for the relay (Matter -> template
+# switch -> espnow.send).
+# Differs: static topology (the three MACs are in YAML; a runtime-paired ESP-NOW network cannot add endpoints), no
+# BDBI product identity of the remotes, all values are 'last received' until Reachable flips.
+
+esphome:
+  name: matter-espnow-gateway
+  friendly_name: Matter ESP-NOW Gateway
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+globals:
+  - {id: garage_seen, type: uint32_t, initial_value: "0"}
+  - {id: shed_seen, type: uint32_t, initial_value: "0"}
+  - {id: plug_seen, type: uint32_t, initial_value: "0"}
+
+espnow:
+  auto_add_peer: false
+  peers:
+    - AA:BB:CC:00:00:01 # garage node
+    - AA:BB:CC:00:00:02 # shed node
+    - AA:BB:CC:00:00:03 # relay plug
+  on_receive:
+    - address: AA:BB:CC:00:00:01
+      then:
+        - lambda: |-
+            id(garage_seen) = millis();
+            id(garage_temp).publish_state((int16_t)(data[0] | (data[1] << 8)) / 100.0f);
+            id(garage_batt).publish_state(data[3]);
+    - address: AA:BB:CC:00:00:02
+      then:
+        - lambda: |-
+            id(shed_seen) = millis();
+            id(shed_temp).publish_state((int16_t)(data[0] | (data[1] << 8)) / 100.0f);
+            id(shed_batt).publish_state(data[3]);
+    - address: AA:BB:CC:00:00:03
+      then:
+        - lambda: |-
+            id(plug_seen) = millis();
+            id(remote_plug).publish_state(data[0] != 0);
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    2:
+      bridged_node: {name: Garage temp, parent: 1, reachable: garage_online}
+      battery: garage_batt
+      temperature_sensor: garage_temp
+    3:
+      bridged_node: {name: Shed temp, parent: 1, reachable: shed_online}
+      battery: shed_batt
+      temperature_sensor: shed_temp
+    4:
+      bridged_node: {name: Pump plug, parent: 1, reachable: plug_online}
+      on_off_plug_in_unit:
+        switch_id: remote_plug
+
+sensor:
+  - {platform: template, id: garage_temp, name: Garage temperature, unit_of_measurement: "°C", device_class: temperature, accuracy_decimals: 1}
+  - {platform: template, id: shed_temp, name: Shed temperature, unit_of_measurement: "°C", device_class: temperature, accuracy_decimals: 1}
+  - {platform: template, id: garage_batt, name: Garage battery, unit_of_measurement: "%", device_class: battery}
+  - {platform: template, id: shed_batt, name: Shed battery, unit_of_measurement: "%", device_class: battery}
+
+switch:
+  - platform: template
+    id: remote_plug
+    name: Pump plug
+    optimistic: false
+    turn_on_action:
+      - espnow.send: {address: AA:BB:CC:00:00:03, data: [0x01]}
+    turn_off_action:
+      - espnow.send: {address: AA:BB:CC:00:00:03, data: [0x00]}
+    lambda: return {};
+
+binary_sensor:
+  - platform: template
+    id: garage_online
+    internal: true
+    lambda: return id(garage_seen) != 0 && millis() - id(garage_seen) < 30 * 60 * 1000;
+  - platform: template
+    id: shed_online
+    internal: true
+    lambda: return id(shed_seen) != 0 && millis() - id(shed_seen) < 30 * 60 * 1000;
+  - platform: template
+    id: plug_online
+    internal: true
+    lambda: return id(plug_seen) != 0 && millis() - id(plug_seen) < 5 * 60 * 1000;

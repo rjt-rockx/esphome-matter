@@ -1,0 +1,92 @@
+# mirrors: airthings-wave-mini-ble
+# Variant (c) of ble-proxy-bridge.yaml: an Airthings Wave Mini (BLE) bridged as ONE endpoint = Bridged Node + Air
+# Quality Sensor (all measurements in a single endpoint, the way matter.js / most hubs publish a single sensor).
+# Source: research/devices/esphome-hardware.jsonl airthings-wave-mini-ble (evidence=dump of the predicted shape).
+#
+# Shape: EP1 Aggregator -> EP2 [Bridged Node + Air Quality Sensor] with temperature, humidity, TVOC and battery.
+# Compare ble-proxy-bridge.yaml where the Bridged Node endpoint has one child endpoint per measurement: the spec allows
+# both, and controllers differ (Apple shows the single-endpoint form as one tile; the nested form as several).
+#
+# Matches: the concentration clusters are generated from the bound sensors (air_quality_sensor schema). Differs:
+# AirQuality enum stays Unknown (no index sensor; DIRECTION §6 `options: {air_quality: <id>}` is not implemented),
+# radon has no mapping in the Wave Mini data path and is left out on purpose (Radon needs a Radon Concentration cluster
+# in air_quality_sensor, which does exist as `radon:` but the Mini has no radon sensor).
+
+esphome:
+  name: matter-airthings-bridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+
+airthings_ble:
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    2:
+      bridged_node:
+        name: Wave Mini
+        parent: 1
+        reachable: wave_online
+      battery: wave_battery
+      air_quality_sensor:
+        temperature: wave_temperature
+        relative_humidity: wave_humidity
+        total_voc: wave_voc
+
+sensor:
+  - platform: airthings_wave_mini
+    ble_client_id: wave_mini
+    update_interval: 5min
+    temperature:
+      id: wave_temperature
+      name: Wave Mini temperature
+    humidity:
+      id: wave_humidity
+      name: Wave Mini humidity
+    tvoc:
+      id: wave_voc
+      name: Wave Mini TVOC
+    battery_voltage:
+      id: wave_battery_voltage
+      name: Wave Mini battery voltage
+      internal: true
+  - platform: template
+    id: wave_battery
+    name: Wave Mini battery
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: |-
+      // CR2032-ish curve from the reported voltage
+      float v = id(wave_battery_voltage).state;
+      if (isnan(v)) return NAN;
+      return clamp((v - 2.0f) / (3.0f - 2.0f) * 100.0f, 0.0f, 100.0f);
+    update_interval: 5min
+
+ble_client:
+  - mac_address: 11:22:33:44:55:66
+    id: wave_mini
+
+binary_sensor:
+  - platform: ble_presence
+    mac_address: 11:22:33:44:55:66
+    id: wave_online
+    name: Wave Mini in range
+    timeout: 15min

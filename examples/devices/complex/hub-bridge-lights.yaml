@@ -1,0 +1,81 @@
+# mirrors: sdk-chb-bridge-aggregator-dimmable
+# Mirrors: lighting bridges (Philips Hue Bridge Pro 0x1037/0x0003, IKEA Dirigera 0x117C/0x8003, SwitchBot Hub 2 0x07e7,
+# Aqara hubs). Sources: research/devices/consumer-products.jsonl (evidence=doc: the DCL only lists the Aggregator, the
+# bridged set is dynamic and not enumerated), sdk-reference sdk-chb-bridge-aggregator-dimmable (dump of the SDK bridge
+# app), HA fixtures fritz_bridge / mock_composed_bridge (shape of bridged nodes).
+#
+# What an ESP32 can really be here: ONE controller with several separately addressable lights (a 3-zone LED
+# controller). Each zone is a Bridged Node under an Aggregator, so Apple/Google/Alexa show three separate accessories
+# (rooms) instead of one multi-endpoint device. A real Hue/Dirigera bridge discovers its lights at runtime; esp-matter
+# 1.6 can add/remove endpoints at runtime, but esphome-matter fixes the tree at compile time, so only static bridging
+# of the node's OWN entities is possible. Needs `bridged_node:` from the spike-bridge branch (DIRECTION D6, M5a).
+#
+# Matches: Aggregator (0x000E) on EP1, one Bridged Node (0x0013) + light device type per child on the same endpoint,
+# Descriptor PartsList of the aggregator filled, BDBI NodeLabel/UniqueID/Reachable.
+# Differs: only NodeLabel/UniqueID/Reachable of the BDBI cluster are settable (VendorName, ProductName, SerialNumber ...
+# are not, see repro-complex.md GAP-BRIDGE-BDBI); no dynamic add/remove.
+
+esphome:
+  name: matter-light-hub
+  friendly_name: Matter Light Hub
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    2: # Hue "white ambiance" style zone
+      bridged_node: {name: Ceiling, parent: 1}
+      color_temperature_light:
+        light_id: ceiling
+    3: # Hue "color" style zone
+      bridged_node: {name: Shelf strip, parent: 1}
+      extended_color_light:
+        light_id: shelf
+    4: # plain dimmer channel
+      bridged_node: {name: Desk lamp, parent: 1}
+      dimmable_light:
+        light_id: desk
+
+output:
+  - {platform: ledc, id: ww_out, pin: GPIO0}
+  - {platform: ledc, id: cw_out, pin: GPIO1}
+  - {platform: ledc, id: r_out, pin: GPIO2}
+  - {platform: ledc, id: g_out, pin: GPIO3}
+  - {platform: ledc, id: b_out, pin: GPIO4}
+  - {platform: ledc, id: desk_out, pin: GPIO5}
+
+light:
+  - platform: cwww
+    id: ceiling
+    name: Ceiling
+    warm_white: ww_out
+    cold_white: cw_out
+    warm_white_color_temperature: 2700 K
+    cold_white_color_temperature: 6500 K
+  - platform: rgb
+    id: shelf
+    name: Shelf strip
+    red: r_out
+    green: g_out
+    blue: b_out
+  - platform: monochromatic
+    id: desk
+    name: Desk lamp
+    output: desk_out

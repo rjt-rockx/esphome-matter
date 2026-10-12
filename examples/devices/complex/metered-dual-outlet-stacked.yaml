@@ -1,0 +1,63 @@
+# mirrors: eve-energy-20ecn4101
+# Variant (c) of metered-dual-outlet.yaml: per-outlet metering, ELECTRICAL SENSOR STACKED on each plug endpoint (the
+# DIRECTION D11 target and the Silabs EVSE/water-heater shape: plug + electrical_sensor in one DeviceTypeList). Needs two
+# meters, here two HLW8012 on separate pins. Real power strips with per-outlet meters (Meross strip, Shelly power strip,
+# TP-Link P316M in research/devices/consumer-products.jsonl/ecosystem-rendering.jsonl) are documented, not dumped.
+# With `expose:` this would be `meters:` (reserved key, not implemented), so only the explicit form exists.
+
+esphome:
+  name: matter-metered-strip
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Outlet 1
+      on_off_plug_in_unit:
+        switch_id: outlet1
+      electrical_sensor:
+        active_power: power1
+        energy_imported: energy1
+    2:
+      label: Outlet 2
+      on_off_plug_in_unit:
+        switch_id: outlet2
+      electrical_sensor:
+        active_power: power2
+        energy_imported: energy2
+
+switch:
+  - {platform: gpio, id: outlet1, name: Outlet 1, pin: GPIO4, restore_mode: ALWAYS_OFF}
+  - {platform: gpio, id: outlet2, name: Outlet 2, pin: GPIO5, restore_mode: ALWAYS_OFF}
+
+sensor:
+  - platform: hlw8012
+    sel_pin: {number: GPIO6, inverted: true}
+    cf_pin: GPIO7
+    cf1_pin: GPIO8
+    power: {id: power1, name: Power 1}
+    energy: {id: energy1, name: Energy 1, unit_of_measurement: kWh, filters: [{multiply: 0.001}], state_class: total_increasing, device_class: energy}
+    update_interval: 10s
+  - platform: hlw8012
+    sel_pin: {number: GPIO10, inverted: true}
+    cf_pin: GPIO11
+    cf1_pin: GPIO12
+    power: {id: power2, name: Power 2}
+    energy: {id: energy2, name: Energy 2, unit_of_measurement: kWh, filters: [{multiply: 0.001}], state_class: total_increasing, device_class: energy}
+    update_interval: 10s

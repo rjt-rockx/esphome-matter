@@ -1,0 +1,63 @@
+# mirrors: eve-energy-20ecn4101
+# Mirrors: a dual-outlet metered plug. Real dumps: HA fixtures eve_energy_20ecn4101 (two On/Off Plug-in Units, siblings
+# with FixedLabel, no electrical clusters) and eve_energy_plug_patched (EP1 plug, EP2 Electrical Sensor 0x0510 as a SIBLING
+# with EPM ALTC FM=2, EEM IMPE|CUME FM=5, Power Topology NODE, no parent link to the load). ESPHome analogue: BL0937
+# (`hlw8012`) metering of the whole device + two gpio relays.
+#
+# Variant (b), explicit: two plug endpoints plus one sibling meter endpoint (the 'patched' Eve shape). Matches that dump
+# closely (EPM ALTC, EEM imported+cumulative, PT NODE). The two plugs are Duplicates, so TagList (CommonNumber 1/2) is
+# generated automatically (see the generated register_endpoint_tag calls). Differs: the meter measures the whole node,
+# not per outlet; real power strips with per-outlet metering (spec-power-strip) need one meter per plug, see
+# metered-dual-outlet-stacked.yaml (stacked on the plug endpoint, DIRECTION D11).
+
+esphome:
+  name: matter-dual-outlet
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Outlet 1
+      on_off_plug_in_unit:
+        switch_id: outlet1
+    2:
+      label: Outlet 2
+      on_off_plug_in_unit:
+        switch_id: outlet2
+    3:
+      electrical_sensor:
+        active_power: total_power
+        voltage: total_voltage
+        active_current: total_current
+        energy_imported: total_energy
+
+switch:
+  - {platform: gpio, id: outlet1, name: Outlet 1, pin: GPIO4, restore_mode: ALWAYS_OFF}
+  - {platform: gpio, id: outlet2, name: Outlet 2, pin: GPIO5, restore_mode: ALWAYS_OFF}
+
+sensor:
+  - platform: hlw8012
+    sel_pin: {number: GPIO6, inverted: true}
+    cf_pin: GPIO7
+    cf1_pin: GPIO8
+    voltage: {id: total_voltage, name: Voltage}
+    current: {id: total_current, name: Current}
+    power: {id: total_power, name: Power}
+    energy: {id: total_energy, name: Energy, unit_of_measurement: kWh, filters: [{multiply: 0.001}], state_class: total_increasing, device_class: energy}
+    update_interval: 10s

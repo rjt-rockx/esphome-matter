@@ -1,0 +1,53 @@
+# mirrors: atios-knx-bridge
+# Mirrors: Atios KNX bridge (HA fixture atios_knx_bridge): root parts [1,29]; EP1 Aggregator 0x000E; EP29 = Bridged Node
+# 0x0013 + Electrical Sensor 0x0510 on ONE endpoint with BDBI (9 attrs: NodeLabel, UniqueID, Reachable, VendorName ...),
+# EPM FM=2 (ALTC), EEM FM=5, Power Topology NODE. A KNX metering actuator exposed through the gateway.
+# ESPHome analogue: an RS485 / Modbus energy meter or KNX-TP gateway read by the ESP32, published as a bridged leaf.
+#
+# Matches: Aggregator + a bridged leaf with a stacked Electrical Sensor (aggregator ep1 / bridged ep29 shape).
+# Differs: the real BDBI carries VendorName/ProductName/SerialNumber/SoftwareVersion of the KNX device; only NodeLabel,
+# UniqueID and Reachable exist here. The real endpoint number 29 is kept as a pin.
+
+esphome:
+  name: matter-knx-bridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    29:
+      bridged_node: {name: KNX meter actuator, parent: 1, unique_id: knx-1.1.17}
+      electrical_sensor:
+        active_power: knx_power
+        voltage: knx_voltage
+        active_current: knx_current
+        energy_imported: knx_energy
+
+uart:
+  tx_pin: GPIO16
+  rx_pin: GPIO17
+  baud_rate: 9600
+
+sensor:
+  - platform: pzemac
+    voltage: {id: knx_voltage, name: Voltage}
+    current: {id: knx_current, name: Current}
+    power: {id: knx_power, name: Power}
+    energy: {id: knx_energy, name: Energy, unit_of_measurement: kWh, filters: [{multiply: 0.001}], state_class: total_increasing, device_class: energy}
