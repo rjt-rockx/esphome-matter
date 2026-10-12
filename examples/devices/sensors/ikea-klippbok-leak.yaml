@@ -1,0 +1,55 @@
+# mirrors: ikea-klippbok-water-leak
+# Mirrors: IKEA KLIPPBOK water leak sensor (Thread, VID 4476 / PID 32774), HA fixture ikea_klippbok_water_leak.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/ikea_klippbok_water_leak.json
+# Real device: EP1 Water Leak Detector (0x0043) with BooleanState + BooleanStateConfiguration (VIS, AUD, SPRS);
+# the battery Power Source (BAT, REPLC) cluster lives on the ROOT endpoint and EP0 also lists the Power Source device
+# type; ICD Management on root (sleepy).
+# Variant (b): explicit endpoint. The component rejects `endpoints: 0`, so the battery becomes a cluster on EP1 (or a
+# dedicated endpoint); BooleanStateConfiguration (VIS/AUD/SPRS) cannot be created at all today: with_features on the device type
+# block errors out with an empty "required by:" list (commented out below).
+# Differs: no BooleanStateConfiguration, Power Source on EP1 instead of EP0, no EndpointList, no ICD.
+esphome:
+  name: ikea-klippbok-leak
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+binary_sensor:
+  - platform: gpio
+    id: leak
+    name: Leak
+    device_class: moisture
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 100.0f;
+
+matter:
+  endpoints:
+    1:
+      water_leak_detector:
+        boolean_state: leak
+        # with_features: [visual, audible, alarm_suppress]   # fails: "endpoint 1 does not contain the BooleanStateConfiguration cluster required by:" (empty list, see repro-sensors.md G3)
+      battery: batt

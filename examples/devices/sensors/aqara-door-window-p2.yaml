@@ -1,0 +1,61 @@
+# mirrors: aqara-door-window-p2
+# Mirrors: Aqara Door and Window Sensor P2 (Thread, VID 4447 / PID 8194), HA fixture aqara_door_window_p2.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/aqara_door_window_p2.json
+# Real device: EP1 Contact Sensor with BooleanState + BooleanStateConfiguration (SENSLVL feature), EP2 a separate
+# Power Source endpoint (BAT, REPLC, EndpointList empty), ICD Management on the root (sleepy end device).
+# Variant (b): explicit endpoints. BooleanStateConfiguration (sensitivity level) is NOT reproduced: `clusters:` raises a KeyError today.
+# Differs: no REPLC, SensitivityLevel has no ESPHome entity behind it (attribute exists but is inert), no ICD
+# Management on the root (see "ICD gap" in repro-sensors.md), 1.2 sleepy poll config only via openthread MTD.
+esphome:
+  name: aqara-door-window-p2
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+  device_type: MTD           # sleepy end device, polls its parent
+  poll_period: 2s            # NOTE: ESPHome OTA does not work while poll_period > 0
+
+binary_sensor:
+  - platform: gpio
+    id: contact
+    name: Contact
+    device_class: door
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: false
+
+sensor:
+  - platform: adc
+    pin: GPIO1
+    id: batt_v
+    attenuation: 12db
+    update_interval: 30min
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return clamp((id(batt_v).state - 2.0f) / (3.0f - 2.0f) * 100.0f, 0.0f, 100.0f);
+
+matter:
+  endpoints:
+    1:
+      contact_sensor: contact
+      # BooleanStateConfiguration (SENSLVL) cannot be added: `clusters:` crashes (KeyError) and the device type has no BSC option
+    2:
+      power_source:
+        battery: batt

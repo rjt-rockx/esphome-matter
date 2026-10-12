@@ -1,0 +1,56 @@
+# mirrors: eve-weather-sensor
+# Mirrors: Eve Weather (Thread, VID 4874 / PID 87), HA fixture eve_weather_sensor.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/eve_weather_sensor.json
+# Real device: EP0 root with a Power Source (BAT, REPLC) cluster, EP1 Temperature Sensor (rev 2), EP2 Humidity Sensor
+# (rev 2), no tags, flat PartsList, plus a manufacturer cluster 0x130AFC01 for history (not reproducible).
+# Variant (a): the `expose:` shorthand with the beginner-natural ids. The battery sensor is listed too, which the
+# current inference registry cannot map (see research/devices/repro-sensors.md, gap G1).
+esphome:
+  name: eve-weather-expose
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: weather_t
+      name: Temperature
+    humidity:
+      id: weather_h
+      name: Humidity
+  - platform: adc
+    pin: GPIO1
+    id: batt_v
+    attenuation: 12db
+    update_interval: 10min
+  - platform: template
+    id: weather_batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 10min
+    lambda: return clamp((id(batt_v).state - 2.0f) / (3.0f - 2.0f) * 100.0f, 0.0f, 100.0f);
+
+matter:
+  expose:
+    - weather_t
+    - weather_h
+    - {id: weather_batt, as: power_source}

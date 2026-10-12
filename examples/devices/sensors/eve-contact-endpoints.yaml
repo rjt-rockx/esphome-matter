@@ -1,0 +1,49 @@
+# mirrors: eve-contact-sensor
+# Mirrors: Eve Door & Window (Thread, VID 4874 / PID 77), HA fixture eve_contact_sensor.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/eve_contact_sensor.json
+# Real device: EP1 Contact Sensor (rev 1) with BooleanState AND a Power Source (BAT, REPLC) cluster on the same endpoint
+# (no Power Source device type), plus a manufacturer cluster; root has PowerSourceConfiguration.
+# Variant (b): explicit endpoint, endpoint-level `battery:`. This is the closest match of the three patterns.
+# Differs: no REPLC feature (replaceable), BatChargeLevel stays OK, PowerSourceConfiguration (0x002E) on root missing.
+esphome:
+  name: eve-contact-endpoints
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+binary_sensor:
+  - platform: gpio
+    id: door
+    name: Door
+    device_class: door          # ON = open; the component inverts it to Matter's "true = closed"
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 10min
+    lambda: return 90.0f;
+
+matter:
+  endpoints:
+    1:
+      contact_sensor: door
+      battery: batt

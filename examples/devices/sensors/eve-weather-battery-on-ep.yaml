@@ -1,0 +1,55 @@
+# mirrors: eve-weather-sensor
+# Mirrors: Eve Weather (Thread), HA fixture eve_weather_sensor.json
+# Variant (c): endpoint-level `battery:` on the temperature endpoint (the form docs/sensors.md recommends). This puts the
+# Power Source (BAT) cluster on EP1 next to TemperatureMeasurement, which is the Eve Door & Window layout (cluster on
+# the application endpoint), not the Eve Weather layout (cluster on EP0). Compare the three Eve/Aqara/IKEA placements
+# in research/devices/repro-sensors.md.
+# Note: Power Source on an application endpoint is a "Power Source cluster on an endpoint without the Power Source
+# device type": legal, but then PowerSourceConfiguration/EndpointList on the root are not set.
+esphome:
+  name: eve-weather-battery-on-ep
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: weather_t
+      name: Temperature
+    humidity:
+      id: weather_h
+      name: Humidity
+  - platform: template
+    id: weather_batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 10min
+    lambda: return 87.0f;
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor: weather_t
+      battery: weather_batt
+    2:
+      humidity_sensor:
+        relative_humidity: weather_h

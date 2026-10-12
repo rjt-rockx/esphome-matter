@@ -1,0 +1,53 @@
+# mirrors: heiman-smoke-detector
+# Mirrors: Heiman Smoke Detector (Thread, VID 4619 / PID 4099), HA fixture heiman_smoke_detector.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/heiman_smoke_detector.json
+# Real device: EP1 = Smoke CO Alarm (0x0076) with SmokeCOAlarm (SMOKE feature) AND a Power Source (BAT, REPLC)
+# cluster on the same endpoint (no Power Source device type), events SmokeAlarm/CoAlarm/LowBattery/AlarmMuted;
+# root: ICD Management (CIP).
+# Variant (b): explicit endpoint. `smoke_state` binds the alarm; endpoint-level `battery:` adds the Power Source
+# cluster. Differs: no self-test / mute handling (SelfTestRequest is a no-op), no LowBattery event or
+# BatteryAlert attribute logic, ExpressedState only Normal/SmokeAlarm, no ICD.
+esphome:
+  name: heiman-smoke-detector
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+binary_sensor:
+  - platform: gpio
+    id: smoke
+    name: Smoke
+    device_class: smoke
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 94.0f;
+
+matter:
+  endpoints:
+    1:
+      smoke_co_alarm:
+        smoke_state: smoke
+      battery: batt
