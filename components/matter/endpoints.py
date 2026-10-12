@@ -517,12 +517,6 @@ class Endpoint:
             ]
             # Features of a bound fan come from its traits instead.
             bound_fan = self._fan_variable if cluster.name == "FanControl" else None
-            if bound_fan is not None:
-                direct_features = [
-                    f
-                    for f in direct_features
-                    if f.name not in fan_binding.TRAIT_FEATURES
-                ]
             if not direct_features and bound_fan is None:
                 continue
             cluster_var = f"{cluster.espm_namespace}_cluster"

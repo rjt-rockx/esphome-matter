@@ -19,7 +19,7 @@ esp32:
     type: esp-idf
 
 external_components:
-  - source: github://DavidvtWout/esphome-matter@main
+  - source: github://rjt-rockx/esphome-matter@main
 
 api:
 

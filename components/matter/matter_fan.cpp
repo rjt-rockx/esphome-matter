@@ -138,10 +138,8 @@ void MatterFanMapping::initialize() {
 
   // Push the ESPHome state to Matter on changes. The state callback is called
   // synchronously from publish_state().
-  this->fan_->add_on_state_callback([this]() {
-    // TODO: Fix this race-condition
-    this->push_state_to_matter(!this->synchronizing_from_matter_);
-  });
+  this->fan_->add_on_state_callback(
+      [this]() { this->push_state_to_matter(!this->synchronizing_from_matter_); });
 
   // Restore the Matter state (Matter persists the FanMode).
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
