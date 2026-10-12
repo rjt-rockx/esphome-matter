@@ -117,7 +117,8 @@ def test_move_to_hue_and_saturation(color_light, api):
 def test_move_to_color_xy(color_light, api):
     m = color_light
     mark = m.mark()
-    x, y = int(0.64 * 65536), int(0.33 * 65536)  # about the sRGB red primary
+    # Matter xy is converted with the wide gamut matrix of Home Assistant / Hue: (0.70, 0.30) is pure red there.
+    x, y = int(0.70 * 65536), int(0.30 * 65536)
     m.invoke(COLOR, "ColorControl", "MoveToColor", move_to_xy(x, y))
     st = api.wait_state(LIGHT, lambda s: s.red > 0.8 and s.green < 0.25 and s.blue < 0.25, REPORT)
     assert st is not None, f"API light after MoveToColor(red): {api.state(LIGHT)}"
@@ -172,7 +173,8 @@ def test_esphome_color_change_is_reported_once(color_light, api, device):
     time.sleep(QUIET)
     reports = color_reports(m, mark)
     print(f"ColorControl reports after an ESPHome colour change: {reports}")
-    assert m.read(COLOR, "ColorControl", "ColorMode") == HS
+    # The mode stays what the controller used last (HS or XY) when the colour is representable in both.
+    assert m.read(COLOR, "ColorControl", "ColorMode") in (HS, XY)
     assert hue_close(m.read(COLOR, "ColorControl", "CurrentHue"), 85)
     assert m.read(COLOR, "ColorControl", "CurrentSaturation") >= 254 - SAT_TOL
     # No echo storm: every attribute reports a handful of times, never flip-flops.
@@ -290,10 +292,21 @@ def test_level_transition_is_not_fought_by_echoes(color_light, api):
     mark = m.mark()
     t0 = time.monotonic()
     m.invoke(COLOR, "LevelControl", "MoveToLevel", {"level": 200, "transitionTime": 30, "optionsMask": {}, "optionsOverride": {}})  # 3 s
-    # The transition is not instant: the API light is seen somewhere in between.
-    mid = api.wait_state(LIGHT, lambda s: 0.1 < s.brightness < 0.75, 6)
-    print(f"intermediate API state: {mid}")
-    assert m.wait_report(COLOR, "LevelControl", "CurrentLevel", 200, since=mark, timeout=REPORT + 6), (
+    # Sample the ESPHome side while the transition runs: brightness must only rise (an echo of a stale Matter level
+    # pulling the light back is the fight this test looks for).
+    samples: list[tuple[float, float]] = []
+    deadline = time.monotonic() + REPORT + 6
+    while time.monotonic() < deadline:
+        samples.append((round(time.monotonic() - t0, 2), round(api.state(LIGHT).brightness * 254)))
+        if m.reports(COLOR, "LevelControl", "CurrentLevel", since=mark)[-1:] == [200]:
+            break
+        time.sleep(0.25)
+    levels = [b for _, b in samples]
+    print(f"ESPHome brightness samples (s, level/254): {samples}")
+    print(f"CurrentLevel reports: {m.reports(COLOR, 'LevelControl', 'CurrentLevel', since=mark)}")
+    dips = [(a, b) for a, b in zip(levels, levels[1:]) if b < a - 3]
+    assert not dips, f"ESPHome brightness went backwards during the MoveToLevel transition: {dips}; samples {samples}"
+    assert m.wait_report(COLOR, "LevelControl", "CurrentLevel", 200, since=mark, timeout=1), (
         f"CurrentLevel reports: {m.reports(COLOR, 'LevelControl', 'CurrentLevel', since=mark)}"
     )
     elapsed = time.monotonic() - t0
