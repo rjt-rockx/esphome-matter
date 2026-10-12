@@ -13,7 +13,6 @@ from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_I
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
 from ..matter_climate import climate_schema, validate_climate_features
 from ..lock_valve import extend_device_type_schema
-from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..sensor_mapping import (
     CONF_CURRENT_TYPE,
     CONF_MEASUREMENT_UNITS,
