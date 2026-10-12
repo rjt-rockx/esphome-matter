@@ -74,6 +74,21 @@ public:
         sensor, endpoint_id, cluster_id, attribute_id, converter,
         update_code_driven_sensor_attribute<ClusterT, ValueT, Setter>));
   }
+
+  // Defined in matter_sensors.cpp
+  void register_concentration_sensor(sensor::Sensor *sensor,
+                                     uint16_t endpoint_id, uint32_t cluster_id,
+                                     uint32_t attribute_id,
+                                     SensorValueConverter converter,
+                                     uint8_t measurement_unit);
+  void register_electrical_power_sensor(sensor::Sensor *sensor,
+                                        uint16_t endpoint_id,
+                                        uint32_t attribute_id,
+                                        SensorValueConverter converter);
+  void register_electrical_energy_sensor(sensor::Sensor *sensor,
+                                         uint16_t endpoint_id,
+                                         uint32_t attribute_id,
+                                         SensorValueConverter converter);
 #endif // USE_SENSOR
 #ifdef USE_BINARY_SENSOR
   void
