@@ -491,6 +491,7 @@ matter:
           # - temperature_step # Use step control with temperature numbers
       clusters:
         # The following server clusters are optional to temperature_controlled_cabinet;
+        oven_mode: # Attributes and commands for selecting a mode from a list of supported options.
         refrigerator_and_temperature_controlled_cabinet_mode: # Attributes and commands for selecting a mode from a list of supported options.
         temperature_measurement: # Attributes and commands for configuring the measurement of temperature, and reporting temperature measurements.
 ```
@@ -602,6 +603,7 @@ matter:
         identify: # Attributes and commands for putting a device into Identification mode (e.g. flashing a light).
         on_off: # Attributes and commands for switching devices between 'On' and 'Off' states.
         temperature_control: # Attributes and commands for configuring the temperature control, and reporting temperature.
+        dishwasher_mode: # Attributes and commands for selecting a mode from a list of supported options.
 ```
 
 # smoke_co_alarm

@@ -17,6 +17,7 @@ from esphome.types import ConfigType
 from . import binary_sensors
 from . import conformance
 from . import sensor_extras
+from . import delegates
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
 from .covers import WINDOW_COVERING
@@ -156,7 +157,9 @@ ENDPOINT_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(MatterEndpointRef),
             cv.Optional(CONF_CLUSTERS, default=dict): {
-                cluster.schema_key: maybe_empty(cluster.schema())
+                cluster.schema_key: maybe_empty(
+                    cluster.schema(), *delegates.cluster_validators(cluster.name)
+                )
                 for cluster in CLUSTERS
             },
             # TODO: move on_attribute to clusters
@@ -207,6 +210,8 @@ class Endpoint:
         self._electrical_power_features: list[str] = []
         # Extra C++ for clusters configured by sensor_extras.py (evaluated lazily, see sensor_extras.Extra).
         self.extras: list[sensor_extras.Extra] = []
+        # Cluster ids whose delegate is installed at the end of the build callback (delegates.py).
+        self._delegate_cluster_ids: list[int] = []
 
     @property
     def endpoint_id(self) -> int:
@@ -288,8 +293,8 @@ class Endpoint:
             if usage.conformance is not None:
                 usages_by_cluster[cluster.id].append(usage)
 
-        for conf_key in self._config[CONF_CLUSTERS]:
-            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
+        for cluster_key in self._config[CONF_CLUSTERS]:
+            cluster = CLUSTERS_BY_CONF_KEY[cluster_key]
             clusters_by_id[cluster.id] = cluster
 
         for config_key, device_config in self._config.items():
@@ -400,13 +405,20 @@ class Endpoint:
             self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
             await self._register_sensor_attribute(var, sensor_id, battery)
 
-        for conf_key, config in self._config[CONF_CLUSTERS].items():
-            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
+        for cluster_key, config in self._config[CONF_CLUSTERS].items():
+            cluster = CLUSTERS_BY_CONF_KEY[cluster_key]
             self.enabled_sdkconfig_options.add(cluster.sdkconfig_option)
             cluster_config = self._cluster_configs[cluster.name]
             for configured_feature in config.get(CONF_WITH_FEATURES, ()):
                 if feature := cluster.get_feature(configured_feature):
                     cluster_config.enabled_features[feature.name] = True
+            if delegates.is_delegate_cluster(
+                cluster.name
+            ) and await delegates.register_cluster(
+                var, self._endpoint_id, cluster, config
+            ):
+                self._delegate_cluster_ids.append(cluster.id)
+                self.global_includes.add(delegates.DELEGATES_INCLUDE)
 
         if self.plan.label is not None:
             # The label is served by the FixedLabel cluster (see matter_conformance.cpp).
@@ -640,6 +652,14 @@ class Endpoint:
                 device_config,
             )
         )
+        if device_type.name == "mode_select":
+            lines.extend(
+                delegates.cluster_config_lines(
+                    "ModeSelect",
+                    f"{config_var}.mode_select",
+                    self._config[CONF_CLUSTERS].get("mode_select"),
+                )
+            )
 
         # Configure cluster features
         for cluster in device_type.server_clusters:
@@ -843,6 +863,13 @@ class Endpoint:
         if feature_flags:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
         lines.extend(
+            delegates.cluster_config_lines(
+                cluster.name,
+                config_var,
+                self._config[CONF_CLUSTERS].get(cluster.conf_key),
+            )
+        )
+        lines.extend(
             (
                 f"if ({cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
                 "  return false;",
@@ -909,6 +936,8 @@ class Endpoint:
         for extra in self.extras:
             if not extra.creates_cluster:
                 lines.extend(extra.lines())
+        # Delegates are installed once all clusters of the endpoint exist.
+        lines.extend(delegates.build_attach_lines(self._delegate_cluster_ids))
 
         lines.extend(("return true;", "}"))
         return "\n".join(lines)

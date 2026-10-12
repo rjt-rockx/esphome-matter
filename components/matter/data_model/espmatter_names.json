@@ -718,6 +718,14 @@
         "MaximumCheckInBackOff": "create_maximum_check_in_backoff"
       }
     },
+    "OvenMode": {
+      "namespace": null,
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
+      }
+    },
     "LaundryDryerControls": {
       "namespace": "laundry_dryer_controls",
       "features": {},
@@ -836,6 +844,14 @@
         "Mask": "create_mask",
         "State": "create_state",
         "Supported": "create_supported"
+      }
+    },
+    "DishwasherMode": {
+      "namespace": "dish_washer_mode",
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
       }
     },
     "AirQuality": {

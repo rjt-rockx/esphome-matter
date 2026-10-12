@@ -7568,6 +7568,40 @@
       }
     }
   },
+  "73": {
+    "name": "Oven Mode",
+    "revision": 2,
+    "attributes": {
+      "0": {
+        "define": "SUPPORTED_MODES",
+        "name": "SupportedModes",
+        "type": "array",
+        "server": true,
+        "writable": false,
+        "optional": false
+      },
+      "1": {
+        "define": "CURRENT_MODE",
+        "name": "CurrentMode",
+        "type": "int8u",
+        "server": true,
+        "writable": false,
+        "optional": false
+      }
+    },
+    "commands": {
+      "ChangeToMode": {
+        "id": 0,
+        "args": [
+          {
+            "id": 0,
+            "name": "NewMode",
+            "type": "int8u"
+          }
+        ]
+      }
+    }
+  },
   "74": {
     "name": "Laundry Dryer Controls",
     "revision": 1,
@@ -8117,6 +8151,40 @@
             "bitmap_masks": {
               "door_open": 1
             }
+          }
+        ]
+      }
+    }
+  },
+  "89": {
+    "name": "Dishwasher Mode",
+    "revision": 3,
+    "attributes": {
+      "0": {
+        "define": "SUPPORTED_MODES",
+        "name": "SupportedModes",
+        "type": "array",
+        "server": true,
+        "writable": false,
+        "optional": false
+      },
+      "1": {
+        "define": "CURRENT_MODE",
+        "name": "CurrentMode",
+        "type": "int8u",
+        "server": true,
+        "writable": false,
+        "optional": false
+      }
+    },
+    "commands": {
+      "ChangeToMode": {
+        "id": 0,
+        "args": [
+          {
+            "id": 0,
+            "name": "NewMode",
+            "type": "int8u"
           }
         ]
       }

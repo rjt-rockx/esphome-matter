@@ -86,8 +86,8 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 | `button`, `event` | Generic Switch | Supported (untested on hardware) | [generic-switch.md](docs/generic-switch.md) |
 | `climate` | Thermostat / Room Air Conditioner | Supported (untested on hardware) | [climate.md](docs/climate.md) |
 | Physical buttons controlling other Matter devices | On/Off Light Switch, Dimmer Switch, Color Dimmer Switch (bindings) | Supported (a command can take a few seconds) | [binding.md](docs/binding.md), [actions.md](docs/actions.md) |
-| `select` | Refrigerator / cabinet mode list | Partial (untested; other mode clusters planned) | [refrigerator.md](docs/refrigerator.md) |
-| `select` | Mode Select | Planned (weak mapping) | [ROADMAP.md](docs/ROADMAP.md) |
+| `select` | Mode Select, and the mode clusters of appliances (washer, dishwasher, RVC, fridge, water heater, ...) | Supported (untested on hardware) | [delegates.md](docs/delegates.md) |
+| `select`, `text_sensor`, actions | Operational State, RVC Operational State (washer, dishwasher, robot vacuum) | Supported (untested on hardware) | [delegates.md](docs/delegates.md) |
 | `number`, `text_sensor`, `alarm_control_panel` | none | Not planned (no good mapping) | [ROADMAP.md](docs/ROADMAP.md) |
 
 Other Matter device types can be created under an endpoint but have no entity binding. See [device-types.md](docs/device-types.md#untested--unsupported).
@@ -254,7 +254,8 @@ More information about endpoints and a full list of supported device types can b
 - [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
 - [docs/lights.md](docs/lights.md): lights
 - [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
-- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md), [refrigerator](docs/refrigerator.md)
+- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
+- [docs/delegates.md](docs/delegates.md): delegate-driven clusters: mode clusters, Mode Select, Operational State (appliances)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
 - [docs/faq.md](docs/faq.md): frequently asked questions

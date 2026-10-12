@@ -727,7 +727,15 @@ matter.send_command:
 
 # OvenMode
 
-> This cluster is not supported by esp-matter.
+Attributes and commands for selecting a mode from a list of supported options.
+
+```yaml
+# This command is used to change device modes.
+matter.send_command:
+  path: some_endpoint.oven_mode.change_to_mode
+  arguments:
+    new_mode:
+```
 
 # TemperatureControlledCabinetTopology
 
@@ -808,7 +816,15 @@ matter.send_command:
 
 # DishwasherMode
 
-> This cluster is not supported by esp-matter.
+Attributes and commands for selecting a mode from a list of supported options.
+
+```yaml
+# This command is used to change device modes.
+matter.send_command:
+  path: some_endpoint.dishwasher_mode.change_to_mode
+  arguments:
+    new_mode:
+```
 
 # SmokeCOAlarm
 
