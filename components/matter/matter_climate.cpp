@@ -3,7 +3,6 @@
 
 #include "esphome/core/log.h"
 #include "matter_climate.h"
-#include "matter_attributes.h"
 #include "matter_component.h"
 #include "matter_conversions.h"
 
@@ -126,13 +125,7 @@ uint16_t to_running_state(climate::ClimateAction action) {
 
 } // namespace
 
-int16_t MatterClimateSpec::clamp_heating(int16_t centi) const {
-  return std::clamp(centi, this->heat_min, this->heat_max);
-}
 
-int16_t MatterClimateSpec::clamp_cooling(int16_t centi) const {
-  return std::clamp(centi, this->cool_min, this->cool_max);
-}
 
 MatterClimateSpec derive_climate_spec(climate::Climate *climate,
                                       bool prefer_cooling,
@@ -262,14 +255,18 @@ void MatterComponent::register_climate(climate::Climate *climate,
       climate, endpoint_id, prefer_cooling, heating_only));
 }
 
+// ESPHome wins at boot: the climate platform owns state restore, so its state is
+// pushed rather than replaying Matter's persisted attributes.
 MatterClimateMapping::MatterClimateMapping(climate::Climate *climate,
                                            uint16_t endpoint_id,
                                            bool prefer_cooling,
                                            bool heating_only)
-    : MatterEndpointMappingBase(endpoint_id), climate_(climate),
-      prefer_cooling_(prefer_cooling), heating_only_(heating_only) {}
+    : MatterBinding<MatterClimateState, MatterClimateInbound>(
+          endpoint_id, BindingPolicy{BootSync::ESPHOME_WINS, SETTLE_MS, true}),
+      climate_(climate), prefer_cooling_(prefer_cooling),
+      heating_only_(heating_only) {}
 
-void MatterClimateMapping::initialize() {
+void MatterClimateMapping::setup_() {
   if (this->climate_ == nullptr)
     return;
 
@@ -282,68 +279,82 @@ void MatterClimateMapping::initialize() {
           this->endpoint_id(), Thermostat::Id,
           Thermostat::Attributes::ThermostatRunningState::Id) != nullptr;
 
-  global_matter_component->register_attribute_callback(
-      this->endpoint_id(), Thermostat::Id,
-      Thermostat::Attributes::SystemMode::Id,
-      [this](const esp_matter_attr_val_t &value) {
-        uint8_t mode = value.val.u8;
-        global_matter_component->defer_to_main_loop(
-            [this, mode]() { this->apply_system_mode_(mode); });
-      });
-  if (this->spec_.heating) {
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), Thermostat::Id,
-        Thermostat::Attributes::OccupiedHeatingSetpoint::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          int16_t centi = value.val.i16;
-          global_matter_component->defer_to_main_loop(
-              [this, centi]() { this->apply_setpoint_(true, centi); });
-        });
-  }
-  if (this->spec_.cooling) {
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), Thermostat::Id,
-        Thermostat::Attributes::OccupiedCoolingSetpoint::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          int16_t centi = value.val.i16;
-          global_matter_component->defer_to_main_loop(
-              [this, centi]() { this->apply_setpoint_(false, centi); });
-        });
-  }
-  if (this->has_on_off_) {
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), OnOff::Id, OnOff::Attributes::OnOff::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          bool on = value.val.b;
-          global_matter_component->defer_to_main_loop(
-              [this, on]() { this->apply_on_off_(on); });
-        });
-  }
+  this->watch_attribute(Thermostat::Id, Thermostat::Attributes::SystemMode::Id);
+  if (this->spec_.heating)
+    this->watch_attribute(Thermostat::Id,
+                          Thermostat::Attributes::OccupiedHeatingSetpoint::Id);
+  if (this->spec_.cooling)
+    this->watch_attribute(Thermostat::Id,
+                          Thermostat::Attributes::OccupiedCoolingSetpoint::Id);
+  if (this->has_on_off_)
+    this->watch_attribute(OnOff::Id, OnOff::Attributes::OnOff::Id);
 
   this->climate_->add_on_state_callback(
-      [this](climate::Climate &) { this->push_state_to_matter(); });
-
-  // The climate platform owns state restore, so push ESPHome state at boot
-  // rather than replaying Matter's persisted attributes.
-  global_matter_component->defer_to_main_loop(
-      [this]() { this->push_state_to_matter(); });
+      [this](climate::Climate &) { this->request_push(); });
 }
 
-void MatterClimateMapping::push_state_to_matter() {
-  uint16_t eid = this->endpoint_id();
+// Runs on the CHIP task, for every write that is not ESPHome's own.
+void MatterClimateMapping::on_attribute_(uint32_t cluster, uint32_t attribute,
+                                         const esp_matter_attr_val_t &v) {
+  MatterClimateInbound in;
+  if (cluster == Thermostat::Id &&
+      attribute == Thermostat::Attributes::SystemMode::Id) {
+    in.has_mode = true;
+    in.system_mode = v.val.u8;
+  } else if (cluster == Thermostat::Id &&
+             attribute == Thermostat::Attributes::OccupiedHeatingSetpoint::Id) {
+    in.has_heating = true;
+    in.heating_centi = v.val.i16;
+  } else if (cluster == Thermostat::Id &&
+             attribute == Thermostat::Attributes::OccupiedCoolingSetpoint::Id) {
+    in.has_cooling = true;
+    in.cooling_centi = v.val.i16;
+  } else if (cluster == OnOff::Id &&
+             attribute == OnOff::Attributes::OnOff::Id) {
+    in.has_on_off = true;
+    in.on = v.val.b;
+  } else {
+    return;
+  }
+  this->submit_inbound(in);
+}
+
+void MatterClimateMapping::merge_inbound_(MatterClimateInbound &acc,
+                                          const MatterClimateInbound &in) {
+  climate_merge_inbound(acc, in);
+}
+
+// Runs on the ESPHome main loop. The order is fixed: the mode first, so that a
+// setpoint of the same request is judged against the new mode.
+void MatterClimateMapping::apply_inbound_(const MatterClimateInbound &in) {
+  if (in.has_mode)
+    this->apply_system_mode_(in.system_mode);
+  if (in.has_on_off)
+    this->apply_on_off_(in.on);
+  if (in.has_heating)
+    this->apply_setpoint_(true, in.heating_centi);
+  if (in.has_cooling)
+    this->apply_setpoint_(false, in.cooling_centi);
+}
+
+// Runs on the ESPHome main loop.
+MatterClimateState MatterClimateMapping::capture_() {
   auto *climate = this->climate_;
+  if (climate == nullptr)
+    return {};
   auto traits = climate->get_traits();
+  MatterClimateState s;
 
   if (climate->mode != climate::CLIMATE_MODE_OFF)
     this->last_active_mode_ = climate->mode;
 
-  uint8_t system_mode = SYSTEM_MODE_OFF;
-  to_system_mode(climate->mode, system_mode);
+  s.system_mode = SYSTEM_MODE_OFF;
+  to_system_mode(climate->mode, s.system_mode);
   // A heating only device type has no Cool, Auto, ... SystemModes.
-  if (this->heating_only_ && system_mode != SYSTEM_MODE_HEAT)
-    system_mode = SYSTEM_MODE_OFF;
+  if (this->heating_only_ && s.system_mode != SYSTEM_MODE_HEAT)
+    s.system_mode = SYSTEM_MODE_OFF;
 
-  auto local_temperature =
+  s.local_temperature =
       traits.has_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE)
           ? conversion::temperature(climate->current_temperature)
           : conversion::temperature(NAN);
@@ -352,108 +363,95 @@ void MatterClimateMapping::push_state_to_matter() {
   // belonging to the active mode follows the target; the other is untouched.
   // Values are clamped to the absolute limits: the Thermostat cluster rejects
   // reports outside them (and, with AutoMode, inside the dead band margins).
-  bool write_heating = false;
-  bool write_cooling = false;
   int16_t heating = 0;
   int16_t cooling = 0;
   if (this->spec_.two_point) {
     if (std::isfinite(climate->target_temperature_low)) {
-      write_heating = this->spec_.heating;
+      s.write_heating = this->spec_.heating;
       heating = to_centi(climate->target_temperature_low);
     }
     if (std::isfinite(climate->target_temperature_high)) {
-      write_cooling = this->spec_.cooling;
+      s.write_cooling = this->spec_.cooling;
       cooling = to_centi(climate->target_temperature_high);
     }
   } else if (std::isfinite(climate->target_temperature)) {
     int16_t centi = to_centi(climate->target_temperature);
     switch (climate->mode) {
     case climate::CLIMATE_MODE_HEAT:
-      write_heating = this->spec_.heating;
+      s.write_heating = this->spec_.heating;
       heating = centi;
       break;
     case climate::CLIMATE_MODE_COOL:
-      write_cooling = this->spec_.cooling;
+      s.write_cooling = this->spec_.cooling;
       cooling = centi;
       break;
     case climate::CLIMATE_MODE_HEAT_COOL:
     case climate::CLIMATE_MODE_AUTO:
       break; // Target temperature is not adjustable in these modes.
     default:
-      write_heating = this->spec_.heating && !this->spec_.cooling;
-      write_cooling = this->spec_.cooling && !this->spec_.heating;
+      s.write_heating = this->spec_.heating && !this->spec_.cooling;
+      s.write_cooling = this->spec_.cooling && !this->spec_.heating;
       heating = cooling = centi;
       break;
     }
   }
+  s.heating = this->spec_.clamp_heating(heating);
+  s.cooling = this->spec_.clamp_cooling(cooling);
 
-  heating = this->spec_.clamp_heating(heating);
-  cooling = this->spec_.clamp_cooling(cooling);
-
-  bool has_running_state = this->has_running_state_;
-  uint16_t running_state = to_running_state(climate->action);
-  bool has_on_off = this->has_on_off_;
-  bool on = climate->mode != climate::CLIMATE_MODE_OFF;
-
-  // The captures (an esp_matter_attr_val_t alone is 16 bytes) exceed
-  // CHIP_CONFIG_LAMBDA_EVENT_SIZE, so ScheduleLambda would not compile.
-  run_on_matter_thread(
-      [this, eid, system_mode, local_temperature, write_heating, write_cooling,
-       heating, cooling, has_running_state, running_state, has_on_off, on]() {
-        using namespace chip::app::Clusters;
-        // The Thermostat setpoints and SystemMode are writable: esp-matter runs
-        // the attribute callbacks for these reports (and the cluster may shift the
-        // other setpoint to keep the dead band). None of that is a controller
-        // request.
-        MatterPushGuard push_guard;
-        auto mode_val = esp_matter_enum8(system_mode);
-        esp_matter::attribute::report(
-            eid, Thermostat::Id, Thermostat::Attributes::SystemMode::Id,
-            &mode_val);
-        auto temp_val = local_temperature;
-        esp_matter::attribute::report(
-            eid, Thermostat::Id, Thermostat::Attributes::LocalTemperature::Id,
-            &temp_val);
-        if (write_heating) {
-          auto val = esp_matter_int16(heating);
-          esp_matter::attribute::report(
-              eid, Thermostat::Id,
-              Thermostat::Attributes::OccupiedHeatingSetpoint::Id, &val);
-        }
-        if (write_cooling) {
-          auto val = esp_matter_int16(cooling);
-          esp_matter::attribute::report(
-              eid, Thermostat::Id,
-              Thermostat::Attributes::OccupiedCoolingSetpoint::Id, &val);
-        }
-        if (has_running_state) {
-          auto val = esp_matter_bitmap16(running_state);
-          esp_matter::attribute::report(
-              eid, Thermostat::Id,
-              Thermostat::Attributes::ThermostatRunningState::Id, &val);
-        }
-        if (has_on_off) {
-          auto val = esp_matter_bool(on);
-          esp_matter::attribute::report(eid, OnOff::Id,
-                                        OnOff::Attributes::OnOff::Id, &val);
-        }
-      });
+  s.has_running_state = this->has_running_state_;
+  s.running_state = to_running_state(climate->action);
+  s.has_on_off = this->has_on_off_;
+  s.on = climate->mode != climate::CLIMATE_MODE_OFF;
+  return s;
 }
+
+// Runs on the CHIP task, inside a PushScope: esp-matter runs the attribute
+// callbacks for these reports (the Thermostat setpoints and SystemMode are
+// writable) and the cluster may shift the other setpoint to keep the dead band.
+// None of that is a controller request.
+void MatterClimateMapping::write_matter_(const MatterClimateState &s) {
+  if (this->climate_ == nullptr)
+    return;
+  uint16_t eid = this->endpoint_id();
+  auto *platform = binding_platform();
+  auto report = [&](uint32_t cluster, uint32_t attribute,
+                    esp_matter_attr_val_t value) {
+    platform->write_attribute(eid, cluster, attribute, value, true);
+  };
+  report(Thermostat::Id, Thermostat::Attributes::SystemMode::Id,
+         esp_matter_enum8(s.system_mode));
+  report(Thermostat::Id, Thermostat::Attributes::LocalTemperature::Id,
+         s.local_temperature);
+  if (s.write_heating)
+    report(Thermostat::Id, Thermostat::Attributes::OccupiedHeatingSetpoint::Id,
+           esp_matter_int16(s.heating));
+  if (s.write_cooling)
+    report(Thermostat::Id, Thermostat::Attributes::OccupiedCoolingSetpoint::Id,
+           esp_matter_int16(s.cooling));
+  if (s.has_running_state)
+    report(Thermostat::Id, Thermostat::Attributes::ThermostatRunningState::Id,
+           esp_matter_bitmap16(s.running_state));
+  if (s.has_on_off)
+    report(OnOff::Id, OnOff::Attributes::OnOff::Id, esp_matter_bool(s.on));
+}
+
+// The requests below that the climate can't take are dropped: the reconcile
+// after the apply puts the Matter attribute back to the climate's state.
 
 void MatterClimateMapping::apply_system_mode_(uint8_t system_mode) {
   auto traits = this->climate_->get_traits();
   ClimateMode mode;
   // ClimateCall::validate_() silently drops unsupported modes, so check first
-  // and put the Matter attribute back when the request cannot be honoured.
+  // and log when the request cannot be honoured.
   if ((this->heating_only_ && system_mode != SYSTEM_MODE_OFF &&
        system_mode != SYSTEM_MODE_HEAT) ||
       !from_system_mode(system_mode, traits, mode)) {
     ESP_LOGW(TAG, "Endpoint %u: SystemMode %u is not supported by climate",
              this->endpoint_id(), system_mode);
-    this->push_state_to_matter();
     return;
   }
-  // Also stops the echo of our own report from turning AUTO into HEAT_COOL.
+  // No call needed when the climate is there already (HEAT_COOL / AUTO both
+  // report as Matter Auto).
   uint8_t current = 0;
   if (to_system_mode(this->climate_->mode, current) && current == system_mode)
     return;
@@ -476,28 +474,28 @@ void MatterClimateMapping::apply_setpoint_(bool heating, int16_t centi) {
     else
       call.set_target_temperature_high(target);
   } else {
-    bool accept;
+    SetpointTarget active;
     switch (climate->mode) {
     case climate::CLIMATE_MODE_HEAT:
-      accept = heating;
+      active = SetpointTarget::Heat;
       break;
     case climate::CLIMATE_MODE_COOL:
-      accept = !heating;
+      active = SetpointTarget::Cool;
       break;
     case climate::CLIMATE_MODE_HEAT_COOL:
     case climate::CLIMATE_MODE_AUTO:
-      accept = false;
+      active = SetpointTarget::None;
       break;
     default:
-      accept = heating ? !this->spec_.cooling : !this->spec_.heating;
+      active = SetpointTarget::Neutral;
       break;
     }
-    if (!accept) {
+    if (!climate_accepts_setpoint(heating, active, this->spec_.heating,
+                                  this->spec_.cooling)) {
       ESP_LOGD(TAG,
                "Endpoint %u: ignoring %s setpoint, the climate's single "
                "target temperature is not active in this mode",
                this->endpoint_id(), heating ? "heating" : "cooling");
-      this->push_state_to_matter();
       return;
     }
     if (same_centi(climate->target_temperature, centi))
@@ -527,10 +525,8 @@ void MatterClimateMapping::apply_on_off_(bool on) {
         }
       }
     }
-    if (mode == climate::CLIMATE_MODE_OFF) {
-      this->push_state_to_matter();
-      return;
-    }
+    if (mode == climate::CLIMATE_MODE_OFF)
+      return; // nothing to turn on; the reconcile reports OnOff off
   }
   auto call = climate->make_call();
   call.set_mode(mode);
