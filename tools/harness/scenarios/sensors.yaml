@@ -1,0 +1,44 @@
+# One document per sensor type; documents whose cluster is missing on the endpoint are skipped.
+# Sensor values come from ESPHome, so these only check that a plausible value is served.
+# Use --var ep=N to point at the endpoint of the sensor.
+name: temperature sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: TemperatureMeasurement }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: TemperatureMeasurement, attribute: MeasuredValue, exists: true, gte: -5000, lte: 15000 }
+---
+name: relative humidity sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: RelativeHumidityMeasurement }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: RelativeHumidityMeasurement, attribute: MeasuredValue, exists: true, gte: 0, lte: 10000 }
+---
+name: occupancy sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: OccupancySensing }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: OccupancySensing, attribute: Occupancy, exists: true }
+---
+name: contact sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: BooleanState }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: BooleanState, attribute: StateValue, exists: true }
+---
+name: illuminance sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: IlluminanceMeasurement }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: IlluminanceMeasurement, attribute: MeasuredValue, exists: true }
+---
+name: pressure sensor
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: PressureMeasurement }]
+subscribe: false
+steps:
+  - read: { ep: "${ep}", cluster: PressureMeasurement, attribute: MeasuredValue, exists: true }
