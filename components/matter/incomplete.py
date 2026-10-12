@@ -14,6 +14,7 @@ import esphome.config_validation as cv
 
 from .const import CONF_ENDPOINTS
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+from .ota import ota_config
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,6 +68,12 @@ def validate_incomplete_device_types(matter_config: dict) -> None:
     """Final validation: reject (unless allowed) or warn about device types without a working delegate."""
     allowed = set(matter_config.get(CONF_ALLOW_INCOMPLETE_DEVICE_TYPES, ()))
     for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
+        if "ota_requestor" in endpoint_config and ota_config(matter_config) is None:
+            # esp-matter's endpoint::ota_requestor::add() returns ESP_FAIL without CONFIG_ENABLE_OTA_REQUESTOR.
+            raise cv.Invalid(
+                f"Matter endpoint {endpoint_id}: the ota_requestor device type needs Matter OTA, otherwise the "
+                "endpoint fails to build at boot. Enable it with `matter: ota: true` (and `software_version`)"
+            )
         for key in endpoint_config:
             if (
                 key not in DEVICE_TYPES_BY_CONF_KEY

@@ -71,3 +71,16 @@ def test_guard_table_names_known_clusters():
 
 def test_evse_implies_charging_preferences():
     assert "charging_preferences" in Profile().implied_features("Energy EVSE", [])
+
+
+def test_ota_requestor_device_type_needs_matter_ota(run_config):
+    result = run_config("matter:\n  endpoints:\n    1:\n      ota_requestor: {}\n")
+    assert not result.ok
+    assert "matter: ota: true" in result.output
+
+
+def test_ota_requestor_device_type_with_matter_ota(run_config):
+    result = run_config(
+        "matter:\n  software_version: 2\n  ota: true\n  endpoints:\n    1:\n      ota_requestor: {}\n"
+    )
+    assert result.ok, result.output[-2000:]
