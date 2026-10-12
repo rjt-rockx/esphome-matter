@@ -33,15 +33,13 @@ def to_code() -> None:
 
     Called from matter.to_code only when the `ethernet` integration is loaded.
     """
-    # CONFIG_ENABLE_ETHERNET_TELEMETRY is the name connectedhomeip uses for the option that
-    # enables CHIP_DEVICE_CONFIG_ENABLE_ETHERNET (ConnectivityManager Ethernet + driver).
-    add_idf_sdkconfig_option("CONFIG_ENABLE_ETHERNET_TELEMETRY", True)
+    # CONFIG_ENABLE_ETHERNET_TELEMETRY (CHIP's Ethernet switch) is set in matter/__init__.py.
     add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_NUM_ADDRESSES", 6)
     # Adapt the SDK's Ethernet driver and DNS-SD backend in a separate IDF target. Its
     # CMakeLists.txt follows the CONFIG_ENABLE_WIFI_* selection set by matter/__init__.py.
     add_idf_component(
         name="esphome_matter_ethernet",
-        path=str(Path(__file__).parent / "esphome_matter_ethernet"),
+        path=str((Path(__file__).parent / "esphome_matter_ethernet").resolve()),
     )
     # The SDK copies IP_EVENT_STA_GOT_IP data but not IP_EVENT_ETH_GOT_IP data;
     # matter_ethernet.cpp preserves the payload so the Ethernet IPv4 address reaches
