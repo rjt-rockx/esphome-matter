@@ -30,7 +30,11 @@ for f in "$dir"/*.yaml; do
   case "$f" in */ci_tmp_*|*/secrets.yaml) continue ;; esac
   echo "::group::esphome config $f"
   prepared=$(python3 .github/scripts/ci_prepare.py "$f" --toolchain "$toolchain")
-  if out=$("$ESPHOME" config "$prepared" 2>&1); then
+  # VALIDATE_GENERATE=1 additionally runs `esphome compile --only-generate`, which
+  # executes the code generation (catches errors that only show up in to_code).
+  if out=$("$ESPHOME" config "$prepared" 2>&1) && {
+    [ "${VALIDATE_GENERATE:-0}" != 1 ] || out=$("$ESPHOME" compile --only-generate "$prepared" 2>&1)
+  }; then
     echo "OK   $f"
     passed=$((passed + 1))
   else

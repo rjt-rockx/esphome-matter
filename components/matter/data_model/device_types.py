@@ -194,6 +194,12 @@ class DeviceType:
         DEFAULT_CHOICE_FEATURES is applied when the user made no selection,
         and an error is raised when there is no sensible default.
         """
+        if (
+            self.name == "window_covering"
+            and "end_product_type" in config
+            and "cover_id" not in config
+        ):
+            raise cv.Invalid("end_product_type requires cover_id")
         if self.has_required_cluster("Switch"):
             config = apply_switch_defaults(config)
         enabled = list(config.get(CONF_FEATURES, ()))

@@ -16,8 +16,7 @@ CHIP_PROJECT_CONFIG_HEADER = Path(__file__).parent / "matter_chip_config.h"
 
 
 def configure_network(*, debug: bool) -> None:
-    from esphome.components.esp32.const import KEY_SDKCONFIG_OPTIONS
-    from esphome.const import KEY_ESP32
+    from esphome.components.esp32.const import KEY_ESP32, KEY_SDKCONFIG_OPTIONS
 
     sdkconfig = CORE.data[KEY_ESP32][KEY_SDKCONFIG_OPTIONS]
     # Do not clobber a project config header chosen by the user.

@@ -124,6 +124,14 @@ jobs:
           VALIDATE_DIRS: tests/configs
         run: tests/validate.sh .venv/bin/esphome
 
+      # Runs the code generation (`esphome compile --only-generate`) for every
+      # test config; `esphome config` alone does not execute to_code().
+      - name: Generate code for tests/configs/*.yaml
+        env:
+          VALIDATE_DIRS: tests/configs
+          VALIDATE_GENERATE: "1"
+        run: tests/validate.sh .venv/bin/esphome
+
       # The examples are user-facing templates; several need user-specific
       # values (SSID, variant, ...) and do not validate as-is. Report only.
       - name: Validate examples/*.yaml (non-blocking)
@@ -131,6 +139,43 @@ jobs:
         env:
           VALIDATE_DIRS: examples
         run: tests/validate.sh .venv/bin/esphome
+
+  # ---------------------------------------------------------------------------
+  # pytest suite in tests/unit (data model, config validation, codegen)
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests (ESPHome ${{ matrix.esphome-version }})
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.esphome-version == 'dev' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome-version:
+          - 2026.6.0
+          - 2026.7.4
+          - dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ESPHome and pytest
+        run: |
+          python -m venv .venv
+          if [ "${{ matrix.esphome-version }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          fi
+          .venv/bin/python -m pip install pytest
+          .venv/bin/esphome version
+      - name: pytest (fast)
+        run: .venv/bin/python -m pytest tests/unit -m "not slow"
+      - name: pytest (slow, code generation)
+        run: .venv/bin/python -m pytest tests/unit -m slow
 
   # ---------------------------------------------------------------------------
   # Compile matrix (native ESP-IDF toolchain)

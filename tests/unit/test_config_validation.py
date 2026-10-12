@@ -280,6 +280,9 @@ def test_climate_id_binding(run_config):
           - platform: thermostat
             id: c
             sensor: t
+            min_idle_time: 1s
+            min_heating_off_time: 1s
+            min_heating_run_time: 1s
             heat_action: []
             idle_action: []
         """
@@ -451,7 +454,8 @@ def test_unknown_device_type_rejected(run_config):
 
 
 @pytest.mark.skipif(not bound_code("generic_switch"), reason="generic switch not present")
-def test_generic_switch_requires_choice_feature(run_config):
+def test_generic_switch_bare_defaults_to_momentary(run_config):
+    # The mandatory Switch choice feature is resolved to MomentarySwitch.
     result = run_config(
         """
         matter:
@@ -460,5 +464,4 @@ def test_generic_switch_requires_choice_feature(run_config):
               generic_switch: {}
         """
     )
-    assert not result.ok
-    assert "feature" in result.output.lower()
+    assert result.ok, result.output
