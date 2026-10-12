@@ -37,11 +37,11 @@ from .device_info import (
 from .endpoints import (
     ENDPOINT_SCHEMA,
     build_endpoints,
-    light_restore_warning,
     register_endpoints,
     switch_restore_warning,
 )
 from .fan_binding import fan_restore_warning
+from .light_binding import light_restore_warning, validate_light_effects
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
     add_ble_sdkconfig,
@@ -203,6 +203,7 @@ def _final_validate(config: dict):
     validate_composition(config.get(CONF_ENDPOINTS, {}))
 
     light_restore_warning(config, full_config)
+    validate_light_effects(config, full_config)
     switch_restore_warning(config, full_config)
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)

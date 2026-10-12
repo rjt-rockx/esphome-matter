@@ -41,6 +41,7 @@ matter:
           - Hue And Saturation
           - EnhancedHue
           - ColorLoop
+        color_loop_effect: Color loop
     5:
       extended_color_light:
         light_id: rgb_light
@@ -116,6 +117,22 @@ light:
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 3000 K
     color_interlock: false
+    effects:
+      - lambda:
+          name: Color loop
+          update_interval: 200ms
+          lambda: |-
+            static float hue = 0;
+            hue = fmodf(hue + 10.0f, 360.0f);
+            float r, g, b;
+            hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
+            auto call = state->turn_on();
+            call.set_rgb(r, g, b);
+            call.set_white_if_supported(0);
+            call.set_cold_white_if_supported(0);
+            call.set_warm_white_if_supported(0);
+            call.set_transition_length(0);
+            call.perform();
   - platform: rgb
     id: rgb_light
     red: output_rgb_red

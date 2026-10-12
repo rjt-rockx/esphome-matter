@@ -10,6 +10,7 @@
 
 #include <esp_matter.h>
 
+#include <atomic>
 #include <cstdint>
 
 namespace chip::TLV {
@@ -70,6 +71,14 @@ struct MatterLightCommand {
   bool level_if_turning_on{false};
   optional<MatterLightColorUpdate> color;
   uint32_t transition_ms{0};
+  // How long CHIP itself takes to reach the target. That can be longer than
+  // transition_ms (On and Off use OnTransitionTime and OffTransitionTime for
+  // the light, CHIP only knows OnOffTransitionTime), and CHIP's steps are
+  // ignored until it is done.
+  uint32_t chip_transition_ms{0};
+  // ColorLoopSet starts or stops the color loop effect of the light.
+  enum class ColorLoop : uint8_t { NONE, START, STOP };
+  ColorLoop color_loop{ColorLoop::NONE};
   // Attribute groups whose CHIP-driven intermediate writes are ignored while
   // the transition runs.
   bool light_group{false}; // OnOff and CurrentLevel
@@ -79,10 +88,21 @@ struct MatterLightCommand {
   bool stop_color{false};
 };
 
+// Adds the Extended Color Light device type to an endpoint like
+// esp_matter::endpoint::extended_color_light::add(), but the ColorTemperature
+// feature only when the light can show a color temperature. A light that only
+// does RGB would otherwise advertise a color temperature range it can't
+// follow. The other ColorControl features are added by the caller.
+esp_err_t add_extended_color_light(
+    esp_matter::endpoint_t *endpoint,
+    esp_matter::endpoint::extended_color_light::config_t *config,
+    light::LightState *light);
+
 class MatterLightMapping : public MatterEndpointMappingBase,
                            public light::LightRemoteValuesListener {
 public:
-  MatterLightMapping(light::LightState *light, uint16_t endpoint_id);
+  MatterLightMapping(light::LightState *light, uint16_t endpoint_id,
+                     const char *color_loop_effect = nullptr);
 
   void on_light_remote_values_update() override;
   void initialize() override;
@@ -124,6 +144,12 @@ protected:
 
   light::LightState *light_;
   MatterLightCapabilities capabilities_;
+  // Name of the ESPHome effect that runs while a Matter color loop is active.
+  const char *color_loop_effect_;
+  // A color loop effect is running: CHIP walks the hue attributes in the
+  // background, those steps are not applied to the light and not reported
+  // from it. Written on the main loop, read on the CHIP task.
+  std::atomic<bool> color_loop_active_{false};
 
   // Main loop only.
   MatterLightPendingUpdate pending_;

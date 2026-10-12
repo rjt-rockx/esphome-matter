@@ -96,7 +96,9 @@ public:
 
   // Register ESPHome entities
 #ifdef USE_LIGHT
-  void register_light(light::LightState *light, uint16_t endpoint_id);
+  // color_loop_effect is the name of the ESPHome effect that ColorLoopSet runs.
+  void register_light(light::LightState *light, uint16_t endpoint_id,
+                      const char *color_loop_effect = nullptr);
 #endif // USE_LIGHT
 #ifdef USE_SWITCH
   void register_switch(switch_::Switch *sw, uint16_t endpoint_id);

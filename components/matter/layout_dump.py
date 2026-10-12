@@ -85,6 +85,13 @@ def _endpoint_layout(endpoint) -> dict:
         for cluster_name, key in _TRAIT_DRIVEN.items():
             if isinstance(device_config, dict) and device_config.get(key) is not None:
                 dynamic.append(cluster_name)
+        if (
+            device_type.name == "extended_color_light"
+            and isinstance(device_config, dict)
+            and device_config.get("light_id") is not None
+        ):
+            # ColorTemperature is only added when the light can show it.
+            dynamic.append("ColorControl")
     return {
         "device_types": [
             {"name": device_type.name, "id": device_type.id}

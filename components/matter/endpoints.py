@@ -59,6 +59,7 @@ from .sensor_mapping import (
     validate_battery_binding,
 )
 from .data_model.events import Event
+from . import light_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import iter_matter_actions, maybe_empty, snake_case
 
@@ -89,10 +90,6 @@ def _restore_mode_warning(
                     entity_id,
                     restore_mode,
                 )
-
-
-def light_restore_warning(matter_config: dict, full_config: Config):
-    _restore_mode_warning(matter_config, full_config, CONF_LIGHT_ID, "Light")
 
 
 def switch_restore_warning(matter_config: dict, full_config: Config):
@@ -197,6 +194,8 @@ class Endpoint:
         self._climate_variables = {}
         # (Cluster, Attribute) of sensor attributes that esp-matter does not create itself.
         self._optional_attributes: list[tuple[Cluster, Attribute]] = []
+        # Extra lines that set the initial value of a created optional attribute.
+        self._initial_values: dict[tuple[int, int], list[str]] = {}
         self._electrical_power_features: list[str] = []
 
     @property
@@ -512,7 +511,14 @@ class Endpoint:
         if CONF_LIGHT_ID in device_config:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
-            cg.add(var.register_light(light_, self._endpoint_id))
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_lights.h"'
+            )
+            register_light_args = [light_, self._endpoint_id]
+            if loop_effect := device_config.get(light_binding.CONF_COLOR_LOOP_EFFECT):
+                register_light_args.append(loop_effect)
+            cg.add(var.register_light(*register_light_args))
+            self._register_light_level_attributes(device_type, device_config)
         if CONF_SWITCH_ID in device_config:
             switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
             cg.add(var.register_switch(switch_, self._endpoint_id))
@@ -550,6 +556,40 @@ class Endpoint:
                 if feature := cluster.get_feature(enabled_feature):
                     cluster_config = self._cluster_configs[cluster.name]
                     cluster_config.enabled_features[feature.name] = True
+
+    def _register_light_level_attributes(
+        self, device_type: DeviceType, device_config: dict
+    ) -> None:
+        """Create the optional LevelControl attributes of a bound light.
+
+        The transition time attributes only exist with the OnOff feature
+        (OnOffTransitionTime, OnTransitionTime, OffTransitionTime); the light
+        mapping uses them for On, Off, Toggle and MoveToLevel commands.
+        """
+        level_cluster = CLUSTERS_BY_NAME["LevelControl"]
+        present, enabled_codes, _ = self._cluster_state(level_cluster)
+        has_on_off = "OO" in enabled_codes
+        if not present:
+            if light_binding.CONF_ON_OFF_TRANSITION_TIME in device_config:
+                raise cv.Invalid(
+                    f"Matter endpoint {self._endpoint_id}: "
+                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the "
+                    f"LevelControl cluster, which {device_type.name} doesn't have. "
+                    "Add it with `clusters: level_control:`"
+                )
+            return
+        if light_binding.CONF_ON_OFF_TRANSITION_TIME in device_config and not has_on_off:
+            raise cv.Invalid(
+                f"Matter endpoint {self._endpoint_id}: "
+                f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the OnOff feature "
+                "of the LevelControl cluster"
+            )
+        for name in light_binding.level_attribute_names(has_on_off):
+            attribute = next(a for a in level_cluster.attributes if a.name == name)
+            if (level_cluster, attribute) not in self._optional_attributes:
+                self._optional_attributes.append((level_cluster, attribute))
+            if extra := light_binding.initial_value_lines(name, device_config):
+                self._initial_values[(level_cluster.id, attribute.id)] = extra
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
         config_var = f"device_config_{index}"
@@ -652,12 +692,13 @@ class Endpoint:
                 )
             )
 
-        lines.extend(
-            (
-                f"if (esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var}) != ESP_OK)",
-                "  return false;",
-            )
-        )
+        bound_light = self._light_variables.get(device_type.name)
+        if device_type.name == "extended_color_light" and bound_light is not None:
+            # The ColorTemperature feature follows the traits of the light.
+            add_call = f"esphome::matter::add_extended_color_light(endpoint, &{config_var}, {bound_light})"
+        else:
+            add_call = f"esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var})"
+        lines.extend((f"if ({add_call} != ESP_OK)", "  return false;"))
         if device_type.name == "soil_sensor":
             # The code driven Soil Measurement cluster aborts at startup without limits.
             self.global_includes.add(
@@ -870,7 +911,9 @@ class Endpoint:
                 )
 
         # Optional attributes can only be created once their cluster exists.
-        lines.extend(optional_attribute_lines(self._optional_attributes))
+        lines.extend(
+            optional_attribute_lines(self._optional_attributes, self._initial_values)
+        )
 
         lines.extend(("return true;", "}"))
         return "\n".join(lines)
