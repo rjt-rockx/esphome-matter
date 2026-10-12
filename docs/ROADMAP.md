@@ -9,7 +9,7 @@ Design direction and principles: [design/DIRECTION.md](design/DIRECTION.md).
 - **Matter without Home Assistant.** The dominant theme in the long-running ESPHome feature requests ([#1430](https://github.com/esphome/feature-requests/issues/1430), about 124 thumbs-up; [#2722](https://github.com/esphome/feature-requests/issues/2722)) and the Home Assistant forum: cross-vendor interoperability, local control, no bridge, no single point of failure.
 - **Matter over Wi-Fi first** to avoid buying new hardware; Thread for low-power devices second.
 - **Entity coverage.** Switches/outlets, lights, fans, window coverings, thermostats, locks, valves and basic sensors; contact and presence sensors first for many.
-- **Power and energy measurement.** The top hobbyist need. Implemented as the `electrical_sensor` device type, see [sensors.md](sensors.md#electrical-measurements), but not yet verified on controllers.
+- **Power and energy measurement.** The top hobbyist need. Implemented as the `electrical_sensor` device type with a selectable Power Topology (node, tree, set), see [sensors.md](sensors.md#electrical-measurements) and [power.md](power.md), but not yet verified on controllers.
 - **Easy pairing in more ecosystems**, especially Google Home, and clear documentation.
 - **Reliability.** Reconnect after restart, binding stability, fewer surprises in the config schema.
 

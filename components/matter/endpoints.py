@@ -8,7 +8,6 @@ from esphome import automation
 from esphome.components import light
 from esphome.components.binary_sensor import BinarySensor
 from esphome.components.esp32 import add_idf_sdkconfig_option
-from esphome.components.sensor import Sensor
 from esphome.config import Config
 from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGER_ID
 from esphome.core import CORE, ID, HexInt
@@ -52,10 +51,9 @@ from .matter_climate import (
 from .lock_valve import device_config_lines, register_entity
 from .generic_switch import multi_press_max_line, register_switch_binding
 from .data_model.units import MEASUREMENT_UNITS
+from . import power_source, power_topology
 from .sensor_mapping import (
-    CONF_BATTERY,
     CONF_MEASUREMENT_UNITS,
-    battery_sensor_attribute,
     configure_electrical_sensor,
     converter_expression,
     electrical_config_lines,
@@ -161,9 +159,9 @@ ENDPOINT_SCHEMA = cv.All(
             },
             # TODO: move on_attribute to clusters
             cv.Optional(CONF_ON_ATTRIBUTE): _on_attribute_schema(),
-            # Battery level sensor (%) exposed through a Power Source cluster on this endpoint.
-            cv.Optional(CONF_BATTERY): cv.use_id(Sensor),
         }
+        # battery: / wired: expose a Power Source cluster on this endpoint (see power_source.py).
+        | power_source.SCHEMA_OPTIONS
         | conformance.SCHEMA_OPTIONS
         | {device_type.schema_key: device_type.schema() for device_type in DEVICE_TYPES}
     ),
@@ -186,9 +184,14 @@ class Endpoint:
         endpoint_id: int,
         config: dict,
         plan: conformance.EndpointPlan | None = None,
+        all_endpoint_ids: tuple[int, ...] = (),
     ):
         self._endpoint_id = endpoint_id
         self._config = config
+        # Every configured endpoint (for the EndpointList of a root node Power Source).
+        self.all_endpoint_ids = tuple(all_endpoint_ids)
+        # (endpoint, kind, order, present sensor) of every Power Source; set by build_endpoints.
+        self.all_power_sources: list[tuple] = []
         self.usages: list[tuple[Cluster, Attribute | Event]] = []
         self.plan = plan or conformance.EndpointPlan()
 
@@ -212,6 +215,19 @@ class Endpoint:
     @property
     def config(self) -> dict:
         return self._config
+
+    @property
+    def cluster_configs(self):
+        return self._cluster_configs
+
+    @property
+    def optional_attributes(self) -> list[tuple[Cluster, Attribute]]:
+        return self._optional_attributes
+
+    @property
+    def is_root(self) -> bool:
+        """Endpoint 0 is the root node, created by esp-matter itself."""
+        return self._endpoint_id == power_source.ROOT_ENDPOINT
 
     def register_usage(self, cluster: Cluster, usage: Attribute | Event) -> None:
         self.usages.append((cluster, usage))
@@ -410,10 +426,7 @@ class Endpoint:
             if device_type:
                 await self._configure_device_type(var, device_type, device_config)
 
-        if sensor_id := self._config.get(CONF_BATTERY):
-            battery = battery_sensor_attribute()
-            self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
-            await self._register_sensor_attribute(var, sensor_id, battery)
+        await power_source.register(self, var)
 
         for conf_key, config in self._config[CONF_CLUSTERS].items():
             cluster = CLUSTERS_BY_CONF_KEY[conf_key]
@@ -440,6 +453,8 @@ class Endpoint:
 
     def _register_conformance(self, var):
         """Parent, label and semantic tags are applied by matter_conformance.cpp."""
+        if self.is_root:
+            return  # the root node has no parent, label or tags
         plan = self.plan
         cg.add(var.register_endpoint_parent(self._endpoint_id, plan.parent))
         if plan.label is not None:
@@ -615,6 +630,14 @@ class Endpoint:
                     )
                 )
 
+        if device_type.name == "power_source":
+            lines.extend(
+                power_source.device_type_lines(
+                    f"{config_var}.{device_type.config_member(CLUSTERS_BY_NAME[power_source.POWER_SOURCE_CLUSTER])}",
+                    device_config,
+                )
+            )
+
         if device_type.name == "fan" and self._fan_variable is not None:
             lines.extend(
                 fan_binding.config_lines(
@@ -689,6 +712,15 @@ class Endpoint:
                     self._endpoint_id,
                     self._cluster_configs,
                     self._electrical_power_features,
+                )
+            )
+            if power_topology.needs_power_header(device_config):
+                self.global_includes.add(power_topology.POWER_HEADER_INCLUDE)
+            lines.extend(
+                power_topology.delegate_lines(
+                    config_var,
+                    power_topology.power_topology_member(device_type),
+                    device_config,
                 )
             )
 
@@ -848,6 +880,8 @@ class Endpoint:
             )
         if feature_flags:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
+        if cluster.name == power_source.POWER_SOURCE_CLUSTER:
+            lines.extend(power_source.config_lines(config_var, self._config))
         lines.extend(
             (
                 f"if ({cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
@@ -862,6 +896,10 @@ class Endpoint:
 
         for index, device_type in enumerate(self._device_types):
             lines.extend(self._make_device_type_lines(device_type, index))
+
+        if self.is_root and power_source.kind(self._config) is not None:
+            # The root node endpoint exists already; it gets the Power Source device type.
+            lines.extend(power_source.root_device_type_lines())
 
         for cluster_name, cluster_config in self._cluster_configs.items():
             if not cluster_config.created:
@@ -940,8 +978,11 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
     """During validation an endpoint registry is built and stored in CORE.data["matter"]["endpoints"]."""
     endpoints = EndpointRegistry()
     plans = conformance.plan_endpoints(matter_config[CONF_ENDPOINTS])
+    endpoint_ids = tuple(matter_config[CONF_ENDPOINTS])
     for endpoint_id, endpoint_config in matter_config[CONF_ENDPOINTS].items():
-        endpoints.register(Endpoint(endpoint_id, endpoint_config, plans[endpoint_id]))
+        endpoints.register(
+            Endpoint(endpoint_id, endpoint_config, plans[endpoint_id], endpoint_ids)
+        )
 
     # Register matter actions that might require specific features to the endpoints.
     for action_type, action in iter_matter_actions(full_config):
@@ -955,7 +996,9 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
             cluster, attribute = get_attribute_from_config(action)
             endpoint.register_usage(cluster, attribute)
 
+    power_sources = power_source.power_sources(matter_config[CONF_ENDPOINTS])
     for endpoint in endpoints:
+        endpoint.all_power_sources = power_sources
         endpoint.resolve()
 
     CORE.data.setdefault(CONF_MATTER, {})[CONF_ENDPOINTS] = endpoints
@@ -999,9 +1042,11 @@ async def register_endpoints(var, config: ConfigType):
         )
     )
     # Exact limits: esp-matter sizes per-endpoint and per-device-type tables from them.
-    # The root node endpoint counts as a dynamic endpoint.
+    # The root node endpoint counts as a dynamic endpoint (it is configured as endpoint 0
+    # when it gets a Power Source or Electrical Sensor).
     add_idf_sdkconfig_option(
-        "CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT", len(config[CONF_ENDPOINTS]) + 1
+        "CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT",
+        len(set(config[CONF_ENDPOINTS]) - {power_source.ROOT_ENDPOINT}) + 1,
     )
     add_idf_sdkconfig_option(
         "CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT",

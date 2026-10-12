@@ -108,8 +108,12 @@ void MatterSensorAttributeMapping::initialize() {
 }
 
 void MatterSensorAttributeMapping::publish_(float value) {
+  esp_matter_attr_val_t converted = this->converter_(value);
+  // A converter returns an invalid value when the reading cannot be reported.
+  if (converted.type == ESP_MATTER_VAL_TYPE_INVALID)
+    return;
   update_attribute(this->endpoint_id_, this->cluster_id_, this->attribute_id_,
-                   this->converter_(value), this->updater_);
+                   converted, this->updater_);
 }
 
 namespace {

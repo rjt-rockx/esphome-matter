@@ -72,8 +72,8 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 | `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (unit conversion implemented, untested on controllers) | [sensors.md](docs/sensors.md#units) |
 | `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |
 | `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: power, energy, voltage, current | Electrical Sensor | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements) |
-| `sensor`: battery | Power Source | Partial (battery level only, untested on controllers) | [sensors.md](docs/sensors.md#battery) |
+| `sensor`: power, energy, voltage, current | Electrical Sensor (node, tree or set topology) | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements), [power.md](docs/power.md) |
+| `battery:` / `wired:` | Power Source (root node or endpoint) | Partial (level, voltage, charge state, replacement; untested on controllers) | [power.md](docs/power.md) |
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |
@@ -253,7 +253,7 @@ More information about endpoints and a full list of supported device types can b
 - [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
 - [docs/lights.md](docs/lights.md): lights
 - [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
-- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
+- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md), [power sources and topology](docs/power.md)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
 - [docs/design/DIRECTION.md](docs/design/DIRECTION.md): design direction and principles

@@ -204,7 +204,7 @@ matter:
 
 ### electrical_sensor
 
-This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the configuration.
+This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the sensors and [power.md](power.md) for the `topology` (node, tree or set) and for placing it on the root node or next to another device type.
 
 # generic_switch
 
