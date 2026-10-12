@@ -84,7 +84,7 @@ public:
   void set_priority(uint8_t priority) { this->priority_ = priority; }
   void set_data(const char *data) { this->data_ = data; }
 
-  void play(Ts... x) override {
+  void play(const Ts &...x) override {
     send_event(this->endpoint_id_, this->cluster_id_, this->event_id_,
                this->priority_, this->data_.c_str());
   }
