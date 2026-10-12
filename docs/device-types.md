@@ -84,7 +84,7 @@ matter:
 
 # Binary sensors
 
-There are several binary state sensors. These are `contact_sensor`, `occupancy_sensor`, `rain_sensor`, `soil_sensor`. Unlike the simple sensors, these sensors all expose the same boolean_state cluster.
+There are several binary state sensors. These are `contact_sensor`, `occupancy_sensor`, `rain_sensor`. (The `soil_sensor` is not a binary sensor, it uses the Soil Measurement cluster.) Unlike the simple sensors, these sensors all expose the same boolean_state cluster.
 
 ```yaml
 matter:
@@ -93,12 +93,6 @@ matter:
       contact_sensor:
         boolean_state: binary_sensor_id
     2:
-      occupancy_sensor:
-        boolean_state: binary_sensor_id
-    3:
-      soil_sensor:
-        boolean_state: binary_sensor_id
-    4:
       occupancy_sensor:
         boolean_state: binary_sensor_id
 ```
@@ -128,7 +122,7 @@ matter:
 
 # electrical_sensor
 
-This device type exposes clusters and attributes for power and energy measurements. However, this device type currently can't successfully be created in esphome-matter yet.
+This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the configuration.
 
 # Untested / unsupported
 

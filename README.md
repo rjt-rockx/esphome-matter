@@ -214,7 +214,7 @@ Also check out [examples/extended-color-light.yaml](./examples/extended-color-li
 
 Matter can expose many ESPHome sensor values. To expose a sensor, first create a device type that supports it and then map sensor ids to it. The supported sensor device types include `temperature_sensor`, `humidity_sensor`, `light_sensor`, `pressure_sensor`, `flow_sensor`, `contact_sensor`, `occupancy_sensor`, and `air_quality_sensor`. See [docs/device-types.md](docs/device-types.md) for a more complete overview of how to configure these sensors.
 
-The [all-sensors example](examples/all-sensors.yaml) also shows how to expose all supported sensors.
+The [all-sensors example](examples/all-sensors.yaml) also shows how to expose all supported sensors. Units, air quality, battery and electrical sensors are described in [docs/sensors.md](docs/sensors.md).
 
 # Actions
 

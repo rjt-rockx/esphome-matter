@@ -2,10 +2,14 @@ esphome:
   name: all-sensor-devices
 
 external_components:
-  - source: github://DavidvtWout/esphome-matter@main
+  - source: github://rjt-rockx/esphome-matter@main
 
 # ESPHome sensors are "attached" to Matter device types that support them. Below is a collection of matter
 # device types that can expose a sensor value to one or more of their cluster attributes.
+#
+# Matter uses fixed units. esphome-matter converts the value of a sensor from its unit_of_measurement, so always
+# set the right unit_of_measurement (and device_class) on the sensors. A warning is logged when a sensor does not
+# fit the attribute it is mapped to. See docs/sensors.md for all supported units.
 matter:
   endpoints:
     1:
@@ -16,10 +20,14 @@ matter:
     2:
       # The following schema is also supported for simple sensors that only expose a single sensor value.
       temperature_sensor: temperature_id
+      # A battery level sensor (%) can be added to any endpoint. This creates a Power Source cluster with the
+      # Battery feature on this endpoint.
+      battery: battery_id
     3:
       humidity_sensor:
         relative_humidity: humidity_id
     4:
+      # Matter reports hPa. Sensors in Pa, kPa, bar, mmHg, inHg or psi are converted.
       pressure_sensor:
         pressure: pressure_id
     5:
@@ -49,11 +57,32 @@ matter:
         nitrogen_dioxide: no2_ppm
         ozone: o3_ppm
         formaldehyde: ch2o_ppm
-        radon: co2_ppm
+        radon: radon_bq
         pm_1: pm_1_0
         pm_2_5: pm_2_5
         pm_10: pm_10_0
-        total_voc: co2_ppm
+        total_voc: tvoc_ppb
+        # The Matter MeasurementUnit is derived from the unit_of_measurement of each sensor. It only has to be set
+        # to advertise a different unit than the sensor reports (the value is converted). Here the formaldehyde
+        # sensor reports ppm, but the controller will show ppb.
+        measurement_units:
+          formaldehyde: ppb
+    12:
+      # A dedicated Power Source endpoint with a battery level sensor.
+      power_source:
+        battery: battery_id
+    13:
+      # Electrical measurements. Voltage, current, power, frequency and power factor are exposed through the
+      # ElectricalPowerMeasurement cluster and the cumulative energy (kWh) through ElectricalEnergyMeasurement.
+      # These clusters are created automatically for the sensors that are mapped.
+      electrical_sensor:
+        voltage: voltage_id
+        active_current: current_id
+        active_power: power_id
+        frequency: frequency_id
+        power_factor: power_factor_id
+        energy_imported: energy_id
+        # current_type: ac  # Default. Use "dc" for DC measurements (only voltage, active_current and active_power).
 
 # Just an example of how to obtain sensor ids. Not all of the sensor IDs used above are defined below.
 sensor:
@@ -71,6 +100,30 @@ sensor:
       id: pm_2_5
     pm_10_0:
       id: pm_10_0
+  - platform: pzemac
+    voltage:
+      id: voltage_id
+    current:
+      id: current_id
+    power:
+      id: power_id
+    energy:
+      id: energy_id
+    frequency:
+      id: frequency_id
+    power_factor:
+      id: power_factor_id
+  - platform: adc
+    pin: GPIO1
+    id: battery_adc
+    attenuation: 12db
+  # A battery level in percent. Matter has no battery voltage so convert it with a template sensor.
+  - platform: template
+    id: battery_id
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: |-
+      return clamp((id(battery_adc).state - 3.3f) / (4.2f - 3.3f) * 100.0f, 0.0f, 100.0f);
 
 switch:
   - platform: template
