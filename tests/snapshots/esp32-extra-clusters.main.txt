@@ -23,7 +23,8 @@
     if (esp_matter::endpoint::air_purifier::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     esp_matter::cluster::hepa_filter_monitoring::config_t hepa_filter_monitoring_config{};
-    if (esp_matter::cluster::hepa_filter_monitoring::create(endpoint, &hepa_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+    auto *hepa_filter_monitoring_cluster = esp_matter::cluster::hepa_filter_monitoring::create(endpoint, &hepa_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (hepa_filter_monitoring_cluster == nullptr)
       return false;
     return true;
   });

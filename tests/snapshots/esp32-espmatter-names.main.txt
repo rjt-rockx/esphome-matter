@@ -14,13 +14,13 @@
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
       return false;
-    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::weekday_access_schedules::add) != ESP_OK)
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
       return false;
-    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::weekday_access_schedules::add) != ESP_OK)
       return false;
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
       return false;
-    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
       return false;
     return true;
   });

@@ -82,8 +82,15 @@ def test_identify_time_is_read_from_the_cluster():
     assert "GetIdentifyTime" in text
 
 
+# Code driven Fan Control setters (SetFanMode, ...) are not attribute store writes, so they use a
+# scope flag instead of MatterPushGuard.
+SCOPE_FLAG_ALLOWED = {"matter_fan.cpp", "matter_fan.h", "matter_climate_fan.cpp", "matter_climate_fan.h"}
+
+
 def test_no_per_mapping_echo_flags_left():
     for path in _sources():
+        if path.name in SCOPE_FLAG_ALLOWED:
+            continue
         assert "pushing_" not in path.read_text(), f"{path.name}: use MatterPushGuard"
 
 

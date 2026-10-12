@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import esphome.config_validation as cv
 from esphome.components import climate, fan
 from esphome.config import Config
+from esphome.const import CONF_RESTORE_MODE
 
 from .const import CONF_CLUSTERS, CONF_ENDPOINTS, CONF_WITH_FEATURES
 from .util import restore_warning
