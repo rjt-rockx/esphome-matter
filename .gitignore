@@ -75,6 +75,9 @@ tempCodeRunnerFile.py
 
 # Temporary copies written by .github/scripts/ci_prepare.py
 ci_tmp_*.yaml
+
+# Runtime test artifacts (UART log, harness log, junit)
+/test-artifacts/
 /tests/configs/ci_tmp_*.yaml
 tests/configs/secrets.yaml
 /examples/.gitignore

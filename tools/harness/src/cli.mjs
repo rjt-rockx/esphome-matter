@@ -16,6 +16,7 @@ Global: --state <dir>  controller state dir (default $HARNESS_STATE or ./.harnes
   invoke --node <id> --ep <n> --cluster <c> --command <name|id> [--args '<json>']
   subscribe --node <id> [--duration <sec>] [--out file.jsonl] [--min 0] [--max 60]
   remove --node <id>
+  serve [--node <id>]                      long-running: JSON requests on stdin (one per line), responses and subscription records on stdout (see README)
   selftest [--transport sim|real] [--restart]   (--restart also reboots the device and times subscription resumption, ~1 min)
 
 Add --verbose [debug|info|notice|warn] for matter.js logs on stderr (default: error).
@@ -133,6 +134,65 @@ async function main() {
                 await new Promise(r => setTimeout(r, duration * 1000));
                 await sub.stop();
                 if (args.out) writeFileSync(args.out, lines.join("\n") + "\n");
+                break;
+            }
+            case "serve": {
+                // One process, one warm CASE session: used by tests/runtime. Each stdin line is
+                //   {"id":1,"op":"read|write|invoke|subscribe|unsubscribe|ping", ...same fields as the CLI options...}
+                // and is answered by {"id":1,"result":...} or {"id":1,"error":"..."}. After "subscribe",
+                // every report is also written as {"record":{...}} (the same records as the subscribe command).
+                const { createInterface } = await import("node:readline");
+                const send = o => process.stdout.write(JSON.stringify(o) + "\n");
+                let sub;
+                const handle = async req => {
+                    const node = h.resolveNodeId(req.node ?? args.node);
+                    switch (req.op) {
+                        case "ping":
+                            return { pong: true, nodes: h.commissionedNodeIds() };
+                        case "read":
+                            return await h.read(node, req.ep, req.cluster, req.attribute);
+                        case "write":
+                            return await h.write(node, req.ep, req.cluster, req.attribute, req.value);
+                        case "invoke":
+                            return await h.invoke(node, req.ep, req.cluster, req.command, req.args ?? {});
+                        case "subscribe":
+                            if (sub) return { already: true };
+                            sub = await h.subscribe(node, {
+                                minInterval: Number(req.min ?? 0),
+                                maxInterval: Number(req.max ?? 60),
+                                onRecord: record => send({ record }),
+                            });
+                            return { subscribed: true };
+                        case "unsubscribe":
+                            await sub?.stop();
+                            sub = undefined;
+                            return { subscribed: false };
+                        default:
+                            throw new Error(`unknown op ${req.op}`);
+                    }
+                };
+                const rl = createInterface({ input: process.stdin });
+                const pending = new Set();
+                rl.on("line", line => {
+                    if (!line.trim()) return;
+                    let req;
+                    try {
+                        req = JSON.parse(line);
+                    } catch (e) {
+                        send({ error: `bad json: ${e.message}` });
+                        return;
+                    }
+                    const p = handle(req).then(
+                        result => send({ id: req.id, result }),
+                        err => send({ id: req.id, error: String(err?.message ?? err) }),
+                    );
+                    pending.add(p);
+                    p.finally(() => pending.delete(p));
+                });
+                send({ ready: true, nodes: h.commissionedNodeIds() });
+                await new Promise(r => rl.on("close", r));
+                await Promise.allSettled([...pending]);
+                await sub?.stop();
                 break;
             }
             case "scenario": {

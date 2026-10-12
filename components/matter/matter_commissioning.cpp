@@ -244,7 +244,11 @@ bool MatterCommissioning::init(int persist_passcode_mode) {
     if (!this->generate_passcode_(id))
       return false;
     changed = true;
+#ifdef MATTER_PASSCODE
+    ESP_LOGI(TAG, "Created the commissioning data from the passcode in the YAML");
+#else
     ESP_LOGI(TAG, "Generated a new commissioning passcode");
+#endif
   } else {
     id.discriminator = (uint16_t)disc;
 #ifdef MATTER_DISCRIMINATOR
@@ -385,7 +389,12 @@ void MatterCommissioning::on_server_ready_() {
     // factory reset or decommissioning that erased it, or an upgrade). Nothing
     // is paired yet, so simply issue a fresh one.
     if (this->regenerate_identity_()) {
+#ifdef MATTER_PASSCODE
+      ESP_LOGI(TAG, "Device is not commissioned: reset the commissioning data "
+                    "(fixed passcode from the YAML)");
+#else
       ESP_LOGI(TAG, "Device is not commissioned: generated a new passcode");
+#endif
       wm.CloseCommissioningWindow();
       if (wm.OpenBasicCommissioningWindow() != CHIP_NO_ERROR)
         ESP_LOGW(TAG, "Failed to re-open the commissioning window");

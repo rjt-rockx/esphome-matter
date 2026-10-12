@@ -5,6 +5,7 @@
 #   tools/qemu/run.sh build [yaml]      compile + merge a 4 MB flash image
 #   tools/qemu/run.sh run   [yaml]      boot the image (builds it first if missing)
 #   tools/qemu/run.sh test  [yaml]      boot, wait for "Server ready!", then exit 0/1
+#   tools/qemu/run.sh cmd   [yaml]      print the QEMU command line (used by tests/runtime/conftest.py)
 #
 # Environment:
 #   ESPHOME      esphome executable            (default: esphome from PATH)
@@ -15,13 +16,16 @@
 #   API_PORT     host TCP port -> guest 6053   (default: 6053)
 #   CMAKE_BUILD_PARALLEL_LEVEL compile jobs (default 3; cc1plus of CHIP needs ~1.5 GB each, OOM on small hosts)
 #   BOOT_TIMEOUT seconds to wait in `test`     (default: 240)
+#   WORK_NAME    build subdirectory name       (default: basename of the YAML; share one to rebuild incrementally)
+#   FLASH_IMAGE  image `cmd` boots             (default: $BUILD_DIR/<name>/flash.run.bin)
 #   FLASH_KEEP=1 keep the existing flash image (NVS/fabrics persist) on `run`
 set -euo pipefail
 
 MODE=${1:-run}
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 YAML=${2:-$REPO/tests/qemu/esp32-openeth.yaml}
-NAME=$(basename "$YAML" .yaml)
+NAME=${WORK_NAME:-$(basename "$YAML" .yaml)}
+STAGED=$(basename "$YAML" .yaml)
 ESPHOME=${ESPHOME:-esphome}
 BUILD_DIR=${BUILD_DIR:-$HOME/build-qemu}
 QEMU_TAG=${QEMU_TAG:-20260417}
@@ -52,10 +56,10 @@ fetch_qemu() {
 build() {
   mkdir -p "$WORK"
   # Stage a copy: absolute external_components path, native ESP-IDF toolchain.
-  sed -E "s#source: \.\./\.\./components#source: $REPO/components#" "$YAML" > "$WORK/$NAME.yaml"
-  grep -q '^  toolchain:' "$WORK/$NAME.yaml" || \
-    sed -i -E 's/^  framework:/  toolchain: esp-idf\n  framework:/' "$WORK/$NAME.yaml"
-  (cd "$WORK" && CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-3} "$ESPHOME" compile "$NAME.yaml")
+  sed -E "s#source: \.\./\.\./components#source: $REPO/components#" "$YAML" > "$WORK/$STAGED.yaml"
+  grep -q '^  toolchain:' "$WORK/$STAGED.yaml" || \
+    sed -i -E 's/^  framework:/  toolchain: esp-idf\n  framework:/' "$WORK/$STAGED.yaml"
+  (cd "$WORK" && CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-3} "$ESPHOME" compile "$STAGED.yaml")
   local b
   b=$(echo "$WORK"/.esphome/build/*/build)
   # Offsets come from the IDF-generated flasher_args.json, so partition layout changes are picked up.
@@ -104,5 +108,10 @@ case "$MODE" in
       sleep 1
     done
     echo "Timeout waiting for 'Server ready!'"; tail -40 "$LOG"; exit 1 ;;
-  *) echo "usage: $0 build|run|test [yaml]" >&2; exit 2 ;;
+  cmd)
+    fetch_qemu
+    IMAGE=${FLASH_IMAGE:-$WORK/flash.run.bin}
+    qemu_cmd
+    printf '%q ' "${QEMU_CMD[@]}"; echo ;;
+  *) echo "usage: $0 build|run|test|cmd [yaml]" >&2; exit 2 ;;
 esac
