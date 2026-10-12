@@ -12,6 +12,14 @@
 esphome:
   # Same name as esp32-openeth.yaml so that both can share one build directory (incremental rebuilds).
   name: matter-qemu
+  on_boot:
+    # A template binary sensor has no initial state, and ESPHome treats the first published state as the
+    # initial one without triggering state callbacks: publish OFF now so the first `press` is a real press.
+    priority: -100
+    then:
+      - binary_sensor.template.publish:
+          id: golden_button
+          state: false
 
 esp32:
   variant: ESP32

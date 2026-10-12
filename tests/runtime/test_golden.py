@@ -31,10 +31,21 @@ def move_to_level(level: int) -> dict:
 
 
 def event_number(data, key: str):
-    """Switch event payloads come as a dict (or a one-element list of dicts): fetch a field."""
-    if isinstance(data, list):
-        data = data[0]
-    return data.get(key) if isinstance(data, dict) else None
+    """Event records carry a list of events [{eventNumber, priority, epochTimestamp, data: {...}}]: fetch a payload field."""
+    for ev in data if isinstance(data, list) else [data]:
+        payload = ev.get("data", ev) if isinstance(ev, dict) else {}
+        if key in payload:
+            return payload[key]
+    return None
+
+
+def event_names(records: list[dict], ep: int) -> list[str]:
+    """Names of the events in the records, in order (one record may carry several events)."""
+    names: list[str] = []
+    for r in records:
+        if r["kind"] == "event" and r["endpoint"] == ep:
+            names += [r["event"]] * (len(r["data"]) if isinstance(r["data"], list) and r["data"] else 1)
+    return names
 
 
 # -- 1. light ------------------------------------------------------------------------------------------------------
@@ -124,7 +135,7 @@ def _press(m, api, kind: str, expect_complete: int) -> list[str]:
     assert done is not None, f"no final event for a {kind} press; events: {[(r['event']) for r in m.records(mark) if r['kind'] == 'event']}"
     if kind != "long":
         assert event_number(done, "totalNumberOfPressesCounted") == expect_complete, f"MultiPressComplete data: {done}"
-    return [r["event"] for r in m.records(mark) if r["kind"] == "event" and r["endpoint"] == BUTTON]
+    return event_names(m.records(mark), BUTTON)
 
 
 def test_generic_switch_events(node, api, device):
@@ -180,6 +191,12 @@ def test_fan_mode_both_directions(node, api, device):
 
 
 # -- 5. reconcile and consistency ----------------------------------------------------------------------------------
+@pytest.mark.xfail(
+    strict=True,
+    reason="component bug: MatterSwitchMapping::apply_on_off_ (matter_switch.cpp) calls switch_->control(true) and relies on "
+    "the switch's state callback to push the result back. A switch that refuses turn_on never publishes a state, so no "
+    "callback fires and the Matter OnOff attribute stays true while the ESPHome switch is off (no reconcile after apply)",
+)
 def test_reconcile_refused_turn_on(node, api, device):
     m = node
     api.switch("golden_switch", False)

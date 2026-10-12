@@ -119,3 +119,16 @@ subscription priming and the emulated crypto.
 
 Tests that currently fail because of a real component bug are marked `xfail(strict=True)` with the reason, so the suite
 stays green and the test turns into an error (XPASS) the moment the bug is fixed. Remove the marker then.
+
+Currently marked:
+
+| Test | Bug |
+|---|---|
+| `test_reconcile_refused_turn_on` | `MatterSwitchMapping::apply_on_off_` calls `switch_->control(true)` and relies on the switch's state callback to push the result to Matter. A switch that refuses `turn_on` never publishes a state, so the Matter `OnOff` stays true while the ESPHome switch is off. |
+
+## Gotchas found while building the loop
+
+* A template `binary_sensor` has no initial state, and ESPHome treats the first published state as the initial one (no
+  state callbacks). `golden.yaml` publishes OFF in `on_boot`, otherwise the first `press` would be swallowed.
+* The UART log shows `E data_model: Attribute cannot be NULL` once per run (esp-matter, not yet attributed to a component).
+* `matter.js` locks its state directory: never run a second harness process against the same `--state` while `serve` is up.

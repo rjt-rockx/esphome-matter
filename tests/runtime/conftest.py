@@ -54,6 +54,11 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "golden: golden behavioural tests (nightly / label `runtime`)")
 
 
+def pytest_collection_modifyitems(items):
+    """Run the smoke tests first: boot and commissioning are the first thing to look at when something breaks."""
+    items.sort(key=lambda i: 0 if i.get_closest_marker("smoke") else 1)
+
+
 def _env() -> dict[str, str]:
     env = dict(os.environ)
     # run.sh needs esphome and esptool.py: use the ones next to the interpreter running pytest.
@@ -305,7 +310,7 @@ class Matter:
         return self.request("invoke", ep=ep, cluster=cluster, command=command, args=args or {})
 
     def subscribe(self) -> None:
-        self.request("subscribe", min=0, max=60)
+        self.request("subscribe", timeout=300, min=0, max=60)
 
     # -- subscription records ----------------------------------------------------------------------------------
     def mark(self) -> int:
@@ -355,11 +360,16 @@ class Api:
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
         self._thread.start()
-        self._cli = aioesphomeapi.APIClient(host, port, None, client_info="matter-runtime-tests")
+        self._host, self._port = host, port
+        self._cli = self._run(self._make_client())
         self.entities: dict[str, Any] = {}  # object_id -> EntityInfo
         self.services: dict[str, Any] = {}
         self._states: dict[int, Any] = {}
         self._cond = threading.Condition()
+
+    async def _make_client(self):
+        # aioesphomeapi needs a running loop at construction time.
+        return self._lib.APIClient(self._host, self._port, None, client_info="matter-runtime-tests")
 
     def _run(self, coro, timeout: float = 60):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
