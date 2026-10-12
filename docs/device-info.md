@@ -6,7 +6,7 @@ This page covers the options that control how a controller (Home Assistant, Appl
 matter:
   node_label: Living room plug      # default: friendly_name, else the ESPHome name
   serial_number: "PLUG-0001"        # default: device MAC address as 12 hex digits
-  software_version_string: "1.4.2"  # default: esphome.project.version, else the ESPHome version
+  software_version_string: "1.4.2"  # default: esphome.project.version, else software_version, else the ESPHome version
   hardware_version_string: "rev-b"  # default: chip variant, e.g. ESP32C6
   unique_id: "living-room-plug"     # default: random, generated once and stored
   max_fabrics: 8                    # default: 5
@@ -21,7 +21,7 @@ matter:
 | --- | --- | --- | --- |
 | `node_label` | NodeLabel | `friendly_name`, else the ESPHome `name` | 32 characters |
 | `serial_number` | SerialNumber | ESPHome device MAC as uppercase hex (`AABBCCDDEEFF`), the same address the native API reports, also on chips without Wi-Fi such as the ESP32-H2 | 32 characters |
-| `software_version_string` | SoftwareVersionString | `esphome.project.version`, else the ESPHome version | 31 characters |
+| `software_version_string` | SoftwareVersionString | `esphome.project.version`, else the numeric `software_version` (when set), else the ESPHome version | 31 characters |
 | `hardware_version_string` | HardwareVersionString | the chip variant (`ESP32C6`) | 64 characters |
 | `unique_id` | UniqueID | random, persisted in flash | 32 characters |
 
@@ -57,7 +57,9 @@ Variables available in the automation:
 | `endpoint_id` | `uint16_t` | the endpoint that is identifying |
 | `active` | `bool` | `true` when identification starts (or an effect is requested), `false` when it stops |
 | `identify_time` | `uint16_t` | seconds the controller requested, 0 on stop and on effect requests |
-| `effect` | `uint8_t` | Identify effect (0 blink, 1 breathe, 2 okay, 3 channel change, 11 finish effect, 255 stop effect), or 255 when this is not an effect request |
+| `effect` | `uint8_t` | Identify effect (`EffectIdentifierEnum`: 0 blink, 1 breathe, 2 okay, 11 channel change, 254 finish effect, 255 stop effect), or 255 when this is not an effect request |
+
+The value 255 is used for both "stop effect" and "not an effect request". A stop effect request arrives with `active` true and `identify_time` 0, which is how to tell it apart from the start of an identification (`identify_time` greater than 0) and from the end (`active` false).
 
 `on_identify` is a list. Add `endpoint:` to a list entry to run it for one endpoint only; without it the entry runs for every endpoint.
 

@@ -6,7 +6,7 @@ checks for the expected Matter registration calls.
 
 from __future__ import annotations
 
-from conftest import CONFIGS, prepare_config, run_esphome
+from conftest import config_files, prepare_config, run_esphome
 import pytest
 
 pytestmark = pytest.mark.slow
@@ -20,10 +20,28 @@ EXPECTED = {
     "esp32-binary-sensors": ["register_binary_sensor_attribute"],
     "esp32-all-endpoints": ["register_endpoint"],
     "esp32-ble-commissioning": ["register_endpoint"],
+    "esp32-power-source": [
+        "MatterPowerSourceEndpointList(0, {1, 2, 3})",
+        "MatterFlagEnumMapping",
+        "create_bat_voltage",
+        "create_wired_present",
+        "esp_matter::endpoint::add_device_type(endpoint",
+        "wired_current_type",
+        "MatterFlagEnumMapping(1, 47, 0, 3, -1, {{mains_present, 1}})",
+        "MatterFlagEnumMapping(2, 47, 14, 0, -1,",
+        "MatterFlagEnumMapping(0, 47, 0, 1, -1, {{mains_present, 2}})",
+        "MatterFlagEnumMapping(0, 47, 26, 3, 0,",
+    ],
+    "esp32-power-topology": [
+        "tree_topology::get_id()",
+        "set_topology::get_id() | esp_matter::cluster::power_topology::feature::dynamic_power_flow",
+        "power_topology_delegate({11, 12}, {11})",
+        "register_endpoint(0,",
+    ],
 }
 
 
-@pytest.mark.parametrize("config", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("config", config_files(), ids=lambda p: p.stem)
 def test_generate(config, tmp_path):
     prepared = prepare_config(config, tmp_path)
     result = run_esphome("compile", "--only-generate", str(prepared), cwd=tmp_path)
@@ -37,5 +55,5 @@ def test_generate(config, tmp_path):
 
 
 def test_all_expected_configs_exist():
-    stems = {p.stem for p in CONFIGS.glob("*.yaml")}
+    stems = {p.stem for p in config_files()}
     assert set(EXPECTED) <= stems

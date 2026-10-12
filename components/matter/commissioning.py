@@ -17,6 +17,7 @@ from .types import MatterComponent, matter_ns
 _LOGGER = logging.getLogger(__name__)
 
 CONF_PERSIST_PASSCODE = "persist_passcode"
+PERSIST_UNTIL_COMMISSIONED = "until_commissioned"
 CONF_ON_COMMISSIONED = "on_commissioned"
 CONF_ON_DECOMMISSIONED = "on_decommissioned"
 
@@ -33,13 +34,28 @@ MatterResetIdentityAction = matter_ns.class_(
     "MatterResetIdentityAction", automation.Action
 )
 
+# Values of the MATTER_PERSIST_PASSCODE_MODE define (matter_commissioning.h).
+_PERSIST_MODE = {False: 0, True: 1, PERSIST_UNTIL_COMMISSIONED: 2}
+
+_validate_persist_passcode = cv.Any(
+    cv.one_of(PERSIST_UNTIL_COMMISSIONED, lower=True), cv.boolean
+)
+
 # Extends the top level `matter:` schema.
 COMMISSIONING_SCHEMA = cv.Schema(
     {
-        # Keep the plaintext passcode in flash (like earlier versions did). Only
-        # useful if the device must be able to show its original pairing code
-        # at any time. Default: only the SPAKE2+ verifier is stored.
-        cv.Optional(CONF_PERSIST_PASSCODE, default=False): cv.boolean,
+        # Where the plaintext passcode lives:
+        #   until_commissioned (default): in flash while the device has no
+        #     fabric, so the printed code survives power cycles. Erased on the
+        #     first commissioning; a new one is generated when the last fabric
+        #     is removed or on factory reset.
+        #   true: always in flash (a sticker that stays valid forever).
+        #   false: RAM only; every boot of an uncommissioned device shows a new
+        #     code.
+        # Only the SPAKE2+ verifier is stored once the passcode is erased.
+        cv.Optional(
+            CONF_PERSIST_PASSCODE, default=PERSIST_UNTIL_COMMISSIONED
+        ): _validate_persist_passcode,
         cv.Optional(CONF_ON_COMMISSIONED): automation.validate_automation(
             {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(MatterCommissionedTrigger)}
         ),
@@ -58,8 +74,9 @@ async def commissioning_to_code(config):
     # The passcode is served by a custom CommissionableDataProvider
     # (matter_commissioning.cpp) instead of CHIP's legacy NVS based provider.
     add_idf_sdkconfig_option("CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER", True)
-    if config[CONF_PERSIST_PASSCODE]:
-        cg.add_define("MATTER_PERSIST_PASSCODE")
+    cg.add_define(
+        "MATTER_PERSIST_PASSCODE_MODE", _PERSIST_MODE[config[CONF_PERSIST_PASSCODE]]
+    )
     if CONF_PASSCODE in config:
         _LOGGER.warning(
             "matter: `passcode` is set in the YAML. It is compiled into the firmware and "

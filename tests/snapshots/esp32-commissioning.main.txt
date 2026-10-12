@@ -7,35 +7,39 @@
   new(automation_id) Automation<>(matter_mattercommissionedtrigger_id);
   new(matter_matterdecommissionedtrigger_id) matter::MatterDecommissionedTrigger();
   new(automation_id_2) Automation<>(matter_matterdecommissionedtrigger_id);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_light::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     return true;
   });
-  new(matter_mattertextsensor_id) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id, "Matter state", 3615238436UL, 134217728);  // category:diagnostic
-  App.register_component_(matter_mattertextsensor_id, 8);
-  matter_mattertextsensor_id->set_type(matter::MatterTextSensorType::COMMISSIONING_STATE);
-  new(matter_mattertextsensor_id_2) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_2, "Matter fabrics", 2522131001UL, 134217728);  // category:diagnostic
-  App.register_component_(matter_mattertextsensor_id_2, 8);
-  matter_mattertextsensor_id_2->set_type(matter::MatterTextSensorType::FABRIC_COUNT);
+  matter_mattercomponent_id->set_structure_hash(0x3CFC84FE);
   new(matter_mattertextsensor_id_3) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_3, "Matter pairing code", 3176657465UL, 167772160);  // disabled_by_default, category:diagnostic
+  App.register_text_sensor(matter_mattertextsensor_id_3, "Matter pairing code", 3176657465UL, 167837696);  // disabled_by_default, category:diagnostic, icon:mdi:key
   App.register_component_(matter_mattertextsensor_id_3, 8);
   matter_mattertextsensor_id_3->set_type(matter::MatterTextSensorType::PAIRING_CODE);
   new(matter_mattertextsensor_id_4) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_4, "Matter QR code", 1535156712, 167772160);  // disabled_by_default, category:diagnostic
+  App.register_text_sensor(matter_mattertextsensor_id_4, "Matter QR code", 1535156712, 167903232);  // disabled_by_default, category:diagnostic, icon:mdi:qrcode
   App.register_component_(matter_mattertextsensor_id_4, 8);
   matter_mattertextsensor_id_4->set_type(matter::MatterTextSensorType::QR_CODE);
+  new(matter_mattertextsensor_id) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id, "Matter state", 3615238436UL, 134414336);  // category:diagnostic, icon:mdi:state-machine
+  App.register_component_(matter_mattertextsensor_id, 8);
+  matter_mattertextsensor_id->set_type(matter::MatterTextSensorType::COMMISSIONING_STATE);
+  new(matter_mattertextsensor_id_2) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_2, "Matter fabrics", 2522131001UL, 134479872);  // category:diagnostic, icon:mdi:counter
+  App.register_component_(matter_mattertextsensor_id_2, 8);
+  matter_mattertextsensor_id_2->set_type(matter::MatterTextSensorType::FABRIC_COUNT);
+  matter_mattercomponent_id->set_fabric_label_sensor(0, text_sensor_textsensor_id);
+  matter_mattercomponent_id->set_fabric_node_id_sensor(0, text_sensor_textsensor_id_2);
   new(matter_matteropencommissioningwindowaction_id) matter::MatterOpenCommissioningWindowAction<>();
   matter_matteropencommissioningwindowaction_id->set_timeout([]() -> uint32_t {
       return 300;
   });
-  automation_id_3->add_actions({matter_matteropencommissioningwindowaction_id});
+  automation_id_3->add_action(matter_matteropencommissioningwindowaction_id);
   new(matter_matterfactoryresetaction_id) matter::MatterFactoryResetAction<>();
   matter_matterfactoryresetaction_id->set_parent(matter_mattercomponent_id);
-  automation_id_4->add_actions({matter_matterfactoryresetaction_id});
+  automation_id_4->add_action(matter_matterfactoryresetaction_id);
   new(matter_matterresetidentityaction_id) matter::MatterResetIdentityAction<>();
-  automation_id_5->add_actions({matter_matterresetidentityaction_id});
+  automation_id_5->add_action(matter_matterresetidentityaction_id);

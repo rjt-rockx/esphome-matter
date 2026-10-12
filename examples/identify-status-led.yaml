@@ -27,6 +27,7 @@ wifi:
   password: !secret wifi_password
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   node_label: Identify Demo
   serial_number: "DEMO-0001"
   on_identify:

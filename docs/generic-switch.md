@@ -48,8 +48,8 @@ If `with_features` is not configured, `MomentarySwitchRelease` is enabled. When 
 | Option               | Default | Description |
 |----------------------|---------|-------------|
 | `binary_sensor_id`   |         | Binary sensor that is the button. Use `inverted`, `filters`, ... on the binary sensor for debouncing and polarity. |
-| `long_press_time`    | `500ms` | How long the button must be held for `long_press`. Requires `MomentarySwitchLongPress`. |
-| `multi_press_window` | `300ms` | Time after a release in which another press continues a multi-press sequence. Requires `MomentarySwitchMultiPress`. |
+| `long_press_time`    | `500ms` | How long the button must be held for `long_press` (at least 50ms). Requires `MomentarySwitchLongPress`. |
+| `multi_press_window` | `300ms` | Time after a release in which another press continues a multi-press sequence (at least 50ms). Requires `MomentarySwitchMultiPress`. |
 | `multi_press_max`    | `2`     | Maximum number of presses of a multi-press sequence (2-255), exposed as the `MultiPressMax` attribute. Requires `MomentarySwitchMultiPress`. |
 
 The event sequences that are emitted (for the enabled features) are:

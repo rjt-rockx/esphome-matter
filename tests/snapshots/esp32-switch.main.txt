@@ -4,6 +4,7 @@
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   matter_mattercomponent_id->register_switch(relay, 1);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
@@ -11,6 +12,7 @@
     return true;
   });
   matter_mattercomponent_id->register_switch(lamp_relay, 2);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
   matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_light::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
@@ -18,9 +20,11 @@
     return true;
   });
   matter_mattercomponent_id->register_switch(load_relay, 3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
   matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::mounted_on_off_control::config_t device_config_0{};
     if (esp_matter::endpoint::mounted_on_off_control::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     return true;
   });
+  matter_mattercomponent_id->set_structure_hash(0x44A8F34);

@@ -12,7 +12,7 @@ Yes, `api:` can stay in your YAML and the two use different ports. They are inde
 
 ### Which chips and transports are supported?
 
-ESP32 targets built with the ESP-IDF framework (Arduino is not supported). ESP32-C3, C5, C6, S3 and H2 have been reported to work. ESP32 classic is Wi-Fi only and is not validated in CI. Matter over Wi-Fi needs `wifi:`; Matter over Thread needs `openthread:` and a Thread-capable chip (C5, C6, H2) plus ESPHome 2026.6.0 or newer. Ethernet is not supported yet.
+ESP32 targets built with the ESP-IDF framework (Arduino is not supported). ESP32-C3, C5, C6, S3 and H2 have been reported to work. ESP32 classic is Wi-Fi only and is not validated in CI. Matter over Wi-Fi needs `wifi:`; Matter over Thread needs `openthread:` and a Thread-capable chip (C5, C6, H2) plus ESPHome 2026.6.0 or newer. Ethernet is experimental, see [ethernet.md](ethernet.md).
 
 ### Why does my app say "uncertified accessory"?
 
@@ -28,7 +28,7 @@ Enable test-net DCL in the Matter Server app (or start matterjs-server with `--e
 
 ### Why is BLE commissioning not used?
 
-ESPHome devices already know their Wi-Fi or Thread credentials from the YAML, so the device is commissioned over the network. BLE commissioning is currently broken and cannot be combined with `api`. Do not add `esp32_ble*` components to the same YAML.
+ESPHome devices already know their Wi-Fi or Thread credentials from the YAML, so the device is commissioned over the network. BLE commissioning exists as a separate build mode (no `wifi`/`openthread`/`ethernet`) but is not verified on hardware, and in that mode `api` and `ota` are unreachable. Do not add `esp32_ble*` components to the same YAML. See [ble-commissioning.md](ble-commissioning.md).
 
 ### How do I add the device to a second ecosystem?
 
@@ -36,11 +36,11 @@ Use "Share" / "Turn on pairing mode" in the first ecosystem to get a temporary c
 
 ### How do I factory reset the Matter part?
 
-Add a button with the `matter.factory_reset` action (see the README example config). It removes all fabrics and reopens the commissioning window after the reboot. The device shows a new setup code (see [commissioning](commissioning.md#passcode-storage)), unless `persist_passcode` or `passcode:` is set.
+Add a button with the `matter.factory_reset` action (see [commissioning.md](commissioning.md#actions)). It removes all fabrics and reopens the commissioning window after the reboot. The device shows a new setup code (see [commissioning](commissioning.md#passcode-storage)), unless `persist_passcode: true` or `passcode:` is set.
 
 ### How do I update the firmware?
 
-Use ESPHome's normal OTA (`ota:` platform `esphome`). Matter OTA is not implemented. Fabrics survive OTA updates.
+Use ESPHome's normal OTA (`ota:` platform `esphome`). Matter OTA (controller driven updates) is opt-in, see [matter-ota.md](matter-ota.md). Fabrics survive OTA updates.
 
 ### The device takes a long time to come back after a reboot.
 
@@ -52,7 +52,7 @@ See [flash size](troubleshooting.md#flash-size-especially-on-4-mb-boards) and [c
 
 ### Which ESPHome entities are supported?
 
-See the [feature matrix](../README.md#feature-matrix) and [device-types.md](device-types.md). Lights and sensors work; others are being added. Anything not listed there is untested.
+See the [feature matrix](../README.md#feature-matrix) and [device-types.md](device-types.md). Lights, switches, sensors, covers, fans, locks, valves, climate and generic switches have their own pages (see the list in [device-types.md](device-types.md)). Anything not listed there is untested.
 
 ### Do I need an `external_components` entry?
 

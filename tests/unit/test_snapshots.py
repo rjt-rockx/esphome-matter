@@ -48,7 +48,9 @@ def test_snapshot(config: Path, version: str):
         elif path.read_text() != new:
             failures.append(snap.unified(path, new))
     assert not failures, (
-        "generated code differs from the golden snapshot. If intended, regenerate with\n"
+        "generated code differs from the golden snapshot. Many failures at once usually mean\n"
+        "your ESPHome dev checkout is older/newer than CI's (update it, or skip with -m 'not slow').\n"
+        "If the change is intended, regenerate with\n"
         "  python tools/snapshot_codegen.py --update   (or UPDATE_SNAPSHOTS=1 pytest ...)\n\n"
         + "\n".join(failures)
     )

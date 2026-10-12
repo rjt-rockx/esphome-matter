@@ -95,7 +95,9 @@ matter:
 
 `battery` on the endpoint works for every device type and is the recommended way: the battery then belongs to the same endpoint as the sensor, which is where controllers are most likely to look for it (not verified for every controller). Do not use both on the same endpoint. The `power_source` device type requires a `battery` (or `with_features: [Wired]` for a mains powered source).
 
-The percentage is converted to the half percent resolution of Matter (0 to 200, 0.5 % steps). The cluster's `Status` attribute is set to `Active`. The `BatChargeLevel` attribute stays `OK`.
+The percentage is converted to the half percent resolution of Matter (0 to 200, 0.5 % steps). The cluster's `Status` attribute is set to `Active`. `BatChargeLevel` follows the percentage (`Warning` below 20 %, `Critical` below 10 %, configurable).
+
+`battery` also takes a map for the other battery attributes (voltage, charging state, replacement), can be placed on the root node with an `EndpointList`, and has a `wired` counterpart for mains supplies. See [power.md](power.md).
 
 ## Electrical measurements
 
@@ -115,8 +117,10 @@ matter:
 ```
 
 * `ElectricalPowerMeasurement` is created when any of `voltage`, `active_current`, `reactive_current`, `apparent_current`, `active_power`, `reactive_power`, `apparent_power`, `rms_voltage`, `rms_current`, `rms_power`, `frequency`, `power_factor` or `neutral_current` is mapped. Without any sensor the cluster is created anyway (the device type requires at least one measurement cluster).
-* `ElectricalEnergyMeasurement` is created when `energy_imported` (cumulative energy consumed) or `energy_exported` (cumulative energy produced) is mapped. kWh sensors are converted to the mWh of the `EnergyMeasurementStruct`. Use a sensor with `state_class: total_increasing`. Float sensors have about 7 significant digits, so a sensor with a large total (say 12345.678 kWh) can't report every Wh.
+* `ElectricalEnergyMeasurement` is created when `energy_imported` (cumulative energy consumed) or `energy_exported` (cumulative energy produced) is mapped, and only the attribute of the mapped direction exists (`CumulativeEnergyImported` or `CumulativeEnergyExported`). kWh sensors are converted to the mWh of the `EnergyMeasurementStruct`. Use a sensor with `state_class: total_increasing`. Float sensors have about 7 significant digits, so a sensor with a large total (say 12345.678 kWh) can't report every Wh.
 * `current_type` selects the electrical type: `ac` (default) or `dc`. DC only supports `voltage`, `active_current` and `active_power`. Mapping a sensor that requires AC (reactive/apparent/rms values, frequency, power factor) with `current_type: dc` is an error. `neutral_current` enables the PolyphasePower feature.
+
+`topology` selects which endpoints the sensor measures (`node`, the default, `tree` or `set`), and the sensor can sit next to an application device type on the same endpoint (not on the root node). See [power.md](power.md#power-topology).
 
 The accuracy that is reported for the measurements is a nominal one (10 % over the whole range) because esphome-matter doesn't know the accuracy of the measuring hardware.
 
@@ -126,4 +130,4 @@ Controller support for these clusters differs and has not been verified for ever
 
 * `soil_sensor` exposes the Soil Measurement cluster (`soil_moisture`, a sensor in `%`, reported in 1 % steps). The measurement limits are fixed to 0 to 100 %. This mapping is untested on real hardware.
 * Periodic energy, harmonics, power quality and the cumulative energy reset are not supported.
-* The `BatVoltage`, `BatTimeRemaining` and charging attributes of the Power Source cluster are not supported.
+* `BatTimeRemaining`, `BatPresent`, `BatCapacity` and `BatChargingCurrent` of the Power Source cluster are not supported. `BatVoltage`, the charging state and the replacement attributes are, see [power.md](power.md#battery-options).

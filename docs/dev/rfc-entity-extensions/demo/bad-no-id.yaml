@@ -1,0 +1,21 @@
+# Expected: the extension validate() hook rejects an entity without an explicit id.
+esphome:
+  name: entity-ext-demo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+matter_entity_demo:
+
+switch:
+  - platform: template
+    name: No id
+    optimistic: true
+    matter_entity_demo: true

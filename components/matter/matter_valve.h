@@ -4,7 +4,7 @@
 #if defined(USE_MATTER) && defined(USE_VALVE)
 
 #include "esphome/components/valve/valve.h"
-#include "matter_endpoints.h"
+#include "matter_binding.h"
 
 #include <app/clusters/valve-configuration-and-control-server/valve-configuration-and-control-delegate.h>
 #include <esp_matter.h>
@@ -34,20 +34,41 @@ protected:
   MatterValveMapping *mapping_;
 };
 
+// ESPHome valve state as mirrored into the cluster.
+struct MatterValveState {
+  bool valid{false};
+  uint8_t level{0};
+  chip::app::Clusters::ValveConfigurationAndControl::ValveStateEnum state{
+      chip::app::Clusters::ValveConfigurationAndControl::ValveStateEnum::
+          kTransitioning};
+};
+
+// A pending Open or Close command.
+struct MatterValveCommand {
+  bool open{false};
+  bool has_level{false};
+  uint8_t level{100};
+};
+
 // Binds an ESPHome valve to the Matter Valve Configuration and Control cluster
-// of an endpoint.
+// of an endpoint, through the binding framework.
 //
-// Matter -> ESPHome: Open and Close commands reach the delegate, which defers
-// to the main loop and performs a valve call.
+// Matter -> ESPHome: Open and Close commands reach the delegate (CHIP task),
+// which submits them; the main loop performs a valve call.
 // ESPHome -> Matter: the valve state is published to the cluster
 // (UpdateCurrentState / UpdateCurrentLevel) whenever the ESPHome valve
-// publishes. Without this, CurrentState would stay at Transitioning after a
-// command because the cluster never settles it by itself.
-class MatterValveMapping : public MatterEndpointMappingBase {
+// publishes, coalesced to the latest state. Without this, CurrentState would
+// stay at Transitioning after a command because the cluster never settles it
+// by itself. After a command the binding waits (settle) for the valve to
+// publish and otherwise pushes the unchanged state, so a valve that is already
+// at the target does not leave CurrentState at Transitioning.
+class MatterValveMapping
+    : public MatterBinding<MatterValveState, MatterValveCommand> {
 public:
-  MatterValveMapping(valve::Valve *valve, uint16_t endpoint_id);
+  // Wait this long for the valve to publish after a command before pushing.
+  static constexpr uint16_t SETTLE_MS = 200;
 
-  void initialize() override;
+  MatterValveMapping(valve::Valve *valve, uint16_t endpoint_id);
 
   MatterValveDelegate *delegate() { return &this->delegate_; }
 
@@ -57,9 +78,10 @@ public:
   void handle_close();
 
 protected:
-  void apply_open_(bool has_level, uint8_t level);
-  void apply_close_();
-  void push_state_to_matter_();
+  void setup_() override;
+  MatterValveState capture_() override;
+  void write_matter_(const MatterValveState &s) override;
+  void apply_inbound_(const MatterValveCommand &cmd) override;
 
   valve::Valve *valve_;
   MatterValveDelegate delegate_;

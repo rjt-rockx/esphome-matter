@@ -13,6 +13,9 @@ climate:
   - platform: thermostat
     id: room_heater
     sensor: room_temperature
+    min_idle_time: 30s
+    min_heating_off_time: 300s
+    min_heating_run_time: 300s
     heat_action:
       - switch.turn_on: heater_relay
     idle_action:
@@ -36,7 +39,7 @@ Do not configure `Heating`, `Cooling` or `AutoMode` in `with_features` when `cli
 
 If a climate supports neither heating nor cooling, a thermostat exposes Heating and a room air conditioner exposes Cooling (Matter requires at least one).
 
-Without `climate_id` you can still select features by hand, for example `with_with_features: [Heating, Cooling, AutoMode]`. Matter requires at least one of Heating and Cooling, and AutoMode needs both.
+Without `climate_id` you can still select features by hand, for example `with_features: [Heating, Cooling, AutoMode]`. Matter requires at least one of Heating and Cooling, and AutoMode needs both.
 
 ## Mapping
 

@@ -1,0 +1,7433 @@
+{
+ "clusters": {
+  "access_control": {
+   "base": {
+    "attrs": [
+     "acl",
+     "subjects_per_access_control_entry",
+     "access_control_entries_per_fabric",
+     "targets_per_access_control_entry"
+    ],
+    "cmds": [],
+    "events": [
+     "access_control_entry_changed"
+    ]
+   },
+   "cls": "AccessControl",
+   "features": {
+    "extension": {
+     "attrs": [
+      "extension"
+     ],
+     "cmds": [],
+     "events": [
+      "access_control_extension_changed"
+     ]
+    },
+    "managed_device": {
+     "attrs": [
+      "commissioning_arl",
+      "arl"
+     ],
+     "cmds": [
+      "review_fabric_restrictions",
+      "review_fabric_restrictions_response"
+     ],
+     "events": [
+      "fabric_restriction_review_update"
+     ]
+    }
+   },
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "actions": {
+   "base": {
+    "attrs": [
+     "action_list",
+     "endpoint_lists"
+    ],
+    "cmds": [],
+    "events": [
+     "action_failed",
+     "state_changed"
+    ]
+   },
+   "cls": "Actions",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "activated_carbon_filter_monitoring": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": null,
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "administrator_commissioning": {
+   "base": {
+    "attrs": [
+     "window_status",
+     "admin_fabric_index",
+     "admin_vendor_id"
+    ],
+    "cmds": [
+     "open_commissioning_window",
+     "revoke_commissioning"
+    ],
+    "events": []
+   },
+   "cls": "AdministratorCommissioning",
+   "features": {
+    "basic": {
+     "attrs": [],
+     "cmds": [
+      "open_basic_commissioning_window"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "air_quality": {
+   "base": {
+    "attrs": [
+     "air_quality"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "AirQuality",
+   "features": {
+    "extremely_poor": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "fair": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "moderate": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "very_poor": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "application_basic": {
+   "base": {
+    "attrs": [
+     "application_name",
+     "application",
+     "status",
+     "application_version",
+     "allowed_vendor_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ApplicationBasic",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "basic_information": {
+   "base": {
+    "attrs": [
+     "data_model_revision",
+     "location",
+     "vendor_name",
+     "vendor_id",
+     "product_name",
+     "product_id",
+     "hardware_version",
+     "hardware_version_string",
+     "software_version",
+     "software_version_string",
+     "capability_minima",
+     "specification_version",
+     "max_paths_per_invoke",
+     "configuration_version",
+     "node_label",
+     "unique_id"
+    ],
+    "cmds": [],
+    "events": [
+     "start_up"
+    ]
+   },
+   "cls": "BasicInformation",
+   "features": {},
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "binding": {
+   "base": {
+    "attrs": [
+     "binding"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Binding",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "boolean_state": {
+   "base": {
+    "attrs": [
+     "state_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "BooleanState",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "boolean_state_configuration": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "BooleanStateConfiguration",
+   "features": {
+    "alarm_suppress": {
+     "attrs": [
+      "alarms_suppressed"
+     ],
+     "cmds": [
+      "suppress_alarm"
+     ],
+     "events": []
+    },
+    "audible": {
+     "attrs": [
+      "alarms_active",
+      "alarms_supported"
+     ],
+     "cmds": [
+      "enable_disable_alarm"
+     ],
+     "events": [
+      "alarms_state_changed"
+     ]
+    },
+    "sensitivity_level": {
+     "attrs": [
+      "current_sensitivity_level",
+      "supported_sensitivity_levels"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "visual": {
+     "attrs": [
+      "alarms_active",
+      "alarms_supported"
+     ],
+     "cmds": [
+      "enable_disable_alarm"
+     ],
+     "events": [
+      "alarms_state_changed"
+     ]
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "bridged_device_basic_information": {
+   "base": {
+    "attrs": [
+     "reachable",
+     "unique_id"
+    ],
+    "cmds": [],
+    "events": [
+     "reachable_changed"
+    ]
+   },
+   "cls": "BridgedDeviceBasicInformation",
+   "features": {
+    "bridged_icd_support": {
+     "attrs": [],
+     "cmds": [
+      "keep_active"
+     ],
+     "events": [
+      "active_changed"
+     ]
+    }
+   },
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "camera_av_settings_user_level_management": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "CameraAvSettingsUserLevelManagement",
+   "features": {
+    "digital_ptz": {
+     "attrs": [
+      "dptz_streams"
+     ],
+     "cmds": [
+      "dptz_set_viewport"
+     ],
+     "events": []
+    },
+    "mechanical_pan": {
+     "attrs": [
+      "mptz_position",
+      "pan_min",
+      "pan_max",
+      "movement_state"
+     ],
+     "cmds": [
+      "mptz_set_position",
+      "mptz_relative_move"
+     ],
+     "events": []
+    },
+    "mechanical_presets": {
+     "attrs": [
+      "max_presets",
+      "mptz_presets"
+     ],
+     "cmds": [
+      "mptz_move_to_preset",
+      "mptz_save_preset",
+      "mptz_remove_preset"
+     ],
+     "events": []
+    },
+    "mechanical_tilt": {
+     "attrs": [
+      "mptz_position",
+      "tilt_min",
+      "tilt_max",
+      "movement_state"
+     ],
+     "cmds": [
+      "mptz_set_position",
+      "mptz_relative_move"
+     ],
+     "events": []
+    },
+    "mechanical_zoom": {
+     "attrs": [
+      "mptz_position",
+      "zoom_max",
+      "movement_state"
+     ],
+     "cmds": [
+      "mptz_set_position",
+      "mptz_relative_move"
+     ],
+     "events": []
+    }
+   },
+   "implies": {
+    "digital_ptz": [
+     "digital_ptz"
+    ],
+    "mechanical_pan": [
+     "mechanical_pan",
+     "mechanical_presets"
+    ],
+    "mechanical_tilt": [
+     "mechanical_tilt",
+     "mechanical_presets"
+    ],
+    "mechanical_zoom": [
+     "mechanical_zoom",
+     "mechanical_presets"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "camera_av_stream_management": {
+   "base": {
+    "attrs": [
+     "max_content_buffer_size",
+     "max_network_bandwidth",
+     "supported_stream_usages",
+     "stream_usage_priorities"
+    ],
+    "cmds": [
+     "set_stream_priorities"
+    ],
+    "events": []
+   },
+   "cls": "CameraAvStreamManagement",
+   "features": {
+    "audio": {
+     "attrs": [
+      "microphone_capabilities",
+      "allocated_audio_streams",
+      "microphone_muted",
+      "microphone_volume_level",
+      "microphone_max_level",
+      "microphone_min_level"
+     ],
+     "cmds": [
+      "audio_stream_allocate",
+      "audio_stream_allocate_response",
+      "audio_stream_deallocate"
+     ],
+     "events": []
+    },
+    "high_dynamic_range": {
+     "attrs": [
+      "hdr_mode_enabled"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "image_control": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "local_storage": {
+     "attrs": [
+      "local_video_recording_enabled",
+      "local_snapshot_recording_enabled"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "night_vision": {
+     "attrs": [
+      "night_vision_uses_infrared",
+      "night_vision"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "on_screen_display": {
+     "attrs": [],
+     "cmds": [
+      "video_stream_modify"
+     ],
+     "events": []
+    },
+    "privacy": {
+     "attrs": [
+      "soft_recording_privacy_mode_enabled",
+      "soft_livestream_privacy_mode_enabled"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "snapshot": {
+     "attrs": [
+      "snapshot_capabilities",
+      "allocated_snapshot_streams",
+      "local_snapshot_recording_enabled"
+     ],
+     "cmds": [
+      "snapshot_stream_allocate",
+      "snapshot_stream_allocate_response",
+      "snapshot_stream_deallocate",
+      "capture_snapshot",
+      "capture_snapshot_response"
+     ],
+     "events": []
+    },
+    "speaker": {
+     "attrs": [
+      "speaker_capabilities",
+      "two_way_talk_support",
+      "speaker_muted",
+      "speaker_volume_level",
+      "speaker_max_level",
+      "speaker_min_level"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "video": {
+     "attrs": [
+      "max_concurrent_encoders",
+      "max_encoded_pixel_rate",
+      "video_sensor_params",
+      "min_viewport_resolution",
+      "rate_distortion_trade_off_points",
+      "current_frame_rate",
+      "allocated_video_streams",
+      "viewport"
+     ],
+     "cmds": [
+      "video_stream_allocate",
+      "video_stream_allocate_response",
+      "video_stream_deallocate"
+     ],
+     "events": []
+    },
+    "watermark": {
+     "attrs": [],
+     "cmds": [
+      "video_stream_modify"
+     ],
+     "events": []
+    }
+   },
+   "implies": {
+    "audio": [
+     "audio"
+    ],
+    "high_dynamic_range": [
+     "high_dynamic_range"
+    ],
+    "image_control": [
+     "image_control"
+    ],
+    "local_storage": [
+     "local_storage"
+    ],
+    "night_vision": [
+     "night_vision"
+    ],
+    "on_screen_display": [
+     "on_screen_display"
+    ],
+    "privacy": [
+     "privacy"
+    ],
+    "snapshot": [
+     "snapshot"
+    ],
+    "speaker": [
+     "speaker"
+    ],
+    "video": [
+     "video"
+    ],
+    "watermark": [
+     "watermark"
+    ]
+   },
+   "revision": 2,
+   "unless": {}
+  },
+  "carbon_dioxide_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "CarbonDioxideConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "carbon_monoxide_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "CarbonMonoxideConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "chime": {
+   "base": {
+    "attrs": [
+     "installed_chime_sounds",
+     "selected_chime",
+     "enabled"
+    ],
+    "cmds": [
+     "play_chime_sound"
+    ],
+    "events": []
+   },
+   "cls": "Chime",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "closure_control": {
+   "base": {
+    "attrs": [
+     "main_state",
+     "current_error_list",
+     "overall_current_state",
+     "overall_target_state"
+    ],
+    "cmds": [
+     "move_to"
+    ],
+    "events": [
+     "operational_error",
+     "secure_state_changed"
+    ]
+   },
+   "cls": "ClosureControl",
+   "features": {
+    "calibration": {
+     "attrs": [],
+     "cmds": [
+      "calibrate"
+     ],
+     "events": []
+    },
+    "instantaneous": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "manually_operable": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "engage_state_changed"
+     ]
+    },
+    "motion_latching": {
+     "attrs": [
+      "latch_control_modes"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "pedestrian": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "positioning": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "protection": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "speed": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "ventilation": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "calibration": [
+     "calibration"
+    ],
+    "instantaneous": [
+     "instantaneous"
+    ],
+    "manually_operable": [
+     "manually_operable"
+    ],
+    "motion_latching": [
+     "motion_latching"
+    ],
+    "pedestrian": [
+     "pedestrian"
+    ],
+    "positioning": [
+     "positioning"
+    ],
+    "protection": [
+     "protection"
+    ],
+    "speed": [
+     "speed"
+    ],
+    "ventilation": [
+     "ventilation"
+    ]
+   },
+   "revision": 1,
+   "unless": {
+    "instantaneous": {
+     "attrs": [],
+     "cmds": [
+      "stop"
+     ],
+     "events": [
+      "movement_completed"
+     ]
+    }
+   }
+  },
+  "closure_dimension": {
+   "base": {
+    "attrs": [
+     "current_state",
+     "target_state"
+    ],
+    "cmds": [
+     "set_target"
+    ],
+    "events": []
+   },
+   "cls": "ClosureDimension",
+   "features": {
+    "limitation": {
+     "attrs": [
+      "limit_range"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "modulation": {
+     "attrs": [
+      "modulation_type"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "motion_latching": {
+     "attrs": [
+      "latch_control_modes"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "positioning": {
+     "attrs": [
+      "resolution",
+      "step_value"
+     ],
+     "cmds": [
+      "step"
+     ],
+     "events": []
+    },
+    "rotation": {
+     "attrs": [
+      "rotation_axis",
+      "overflow"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "speed": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "translation": {
+     "attrs": [
+      "translation_direction"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "unit": {
+     "attrs": [
+      "unit",
+      "unit_range"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "limitation": [
+     "limitation"
+    ],
+    "modulation": [
+     "modulation"
+    ],
+    "motion_latching": [
+     "motion_latching"
+    ],
+    "positioning": [
+     "positioning"
+    ],
+    "rotation": [
+     "rotation"
+    ],
+    "speed": [
+     "speed"
+    ],
+    "translation": [
+     "translation"
+    ],
+    "unit": [
+     "unit"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "color_control": {
+   "base": {
+    "attrs": [
+     "color_mode",
+     "color_control_options",
+     "enhanced_color_mode",
+     "color_capabilities",
+     "number_of_primaries",
+     "primary_n_x",
+     "primary_n_y",
+     "primary_n_intensity"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ColorControl",
+   "features": {
+    "color_loop": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "color_loop+enhanced_hue": {
+     "attrs": [
+      "color_loop_active",
+      "color_loop_direction",
+      "color_loop_time",
+      "color_loop_start_enhanced_hue",
+      "color_loop_stored_enhanced_hue"
+     ],
+     "cmds": [
+      "color_loop_set"
+     ],
+     "events": []
+    },
+    "color_temperature": {
+     "attrs": [
+      "color_temperature_mireds",
+      "color_temp_physical_min_mireds",
+      "color_temp_physical_max_mireds",
+      "couple_color_temp_to_level_min_mireds",
+      "start_up_color_temperature_mireds"
+     ],
+     "cmds": [
+      "move_to_color_temperature",
+      "move_color_temperature",
+      "step_color_temperature"
+     ],
+     "events": []
+    },
+    "enhanced_hue": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "enhanced_hue+hue_saturation": {
+     "attrs": [
+      "enhanced_current_hue"
+     ],
+     "cmds": [
+      "enhanced_move_to_hue",
+      "enhanced_move_hue",
+      "enhanced_step_hue",
+      "enhanced_move_to_hue_and_saturation"
+     ],
+     "events": []
+    },
+    "hue_saturation": {
+     "attrs": [
+      "current_hue",
+      "current_saturation"
+     ],
+     "cmds": [
+      "move_to_hue",
+      "move_hue",
+      "step_hue",
+      "move_to_saturation",
+      "move_saturation",
+      "step_saturation",
+      "move_to_hue_and_saturation"
+     ],
+     "events": []
+    },
+    "xy": {
+     "attrs": [
+      "current_x",
+      "current_y"
+     ],
+     "cmds": [
+      "move_to_color",
+      "move_color",
+      "step_color"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 9,
+   "unless": {}
+  },
+  "commissioner_control": {
+   "base": {
+    "attrs": [
+     "supported_device_categories"
+    ],
+    "cmds": [
+     "request_commissioning_approval",
+     "commission_node",
+     "reverse_open_commissioning_window"
+    ],
+    "events": [
+     "commissioning_request_result"
+    ]
+   },
+   "cls": "CommissionerControl",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "commodity_metering": {
+   "base": {
+    "attrs": [
+     "metered_quantity",
+     "metered_quantity_timestamp",
+     "tariff_unit",
+     "maximum_metered_quantities"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "CommodityMetering",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "commodity_price": {
+   "base": {
+    "attrs": [
+     "tariff_unit",
+     "currency",
+     "current_price"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "CommodityPrice",
+   "features": {
+    "forecasting": {
+     "attrs": [
+      "price_forecast"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 4,
+   "unless": {}
+  },
+  "commodity_tariff": {
+   "base": {
+    "attrs": [
+     "tariff_info",
+     "tariff_unit",
+     "start_date",
+     "day_entries",
+     "day_patterns",
+     "calendar_periods",
+     "individual_days",
+     "current_day",
+     "next_day",
+     "current_day_entry",
+     "current_day_entry_date",
+     "next_day_entry",
+     "next_day_entry_date",
+     "tariff_components",
+     "tariff_periods",
+     "current_tariff_components",
+     "next_tariff_components"
+    ],
+    "cmds": [
+     "get_tariff_component",
+     "get_tariff_component_response",
+     "get_day_entry",
+     "get_day_entry_response"
+    ],
+    "events": []
+   },
+   "cls": "CommodityTariff",
+   "features": {
+    "auxiliary_load": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "friendly_credit": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "peak_period": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "power_threshold": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "pricing": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "randomization": {
+     "attrs": [
+      "default_randomization_offset",
+      "default_randomization_type"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "auxiliary_load": [
+     "auxiliary_load"
+    ],
+    "friendly_credit": [
+     "friendly_credit"
+    ],
+    "peak_period": [
+     "peak_period"
+    ],
+    "power_threshold": [
+     "power_threshold"
+    ],
+    "pricing": [
+     "pricing"
+    ],
+    "randomization": [
+     "randomization"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": null,
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "revision": 5,
+   "unless": {}
+  },
+  "descriptor": {
+   "base": {
+    "attrs": [
+     "device_type_list",
+     "server_list",
+     "client_list",
+     "parts_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Descriptor",
+   "features": {
+    "tag_list": {
+     "attrs": [
+      "tag_list"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "device_energy_management": {
+   "base": {
+    "attrs": [
+     "esa_type",
+     "esa_can_generate",
+     "esa_state",
+     "abs_min_power",
+     "abs_max_power"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "DeviceEnergyManagement",
+   "features": {
+    "constraint_based_adjustment": {
+     "attrs": [
+      "opt_out_state"
+     ],
+     "cmds": [
+      "request_constraint_based_forecast",
+      "cancel_request"
+     ],
+     "events": []
+    },
+    "forecast_adjustment": {
+     "attrs": [
+      "opt_out_state"
+     ],
+     "cmds": [
+      "modify_forecast_request",
+      "cancel_request"
+     ],
+     "events": []
+    },
+    "pausable": {
+     "attrs": [
+      "opt_out_state"
+     ],
+     "cmds": [
+      "pause_request",
+      "resume_request"
+     ],
+     "events": [
+      "paused",
+      "resumed"
+     ]
+    },
+    "power_adjustment": {
+     "attrs": [
+      "power_adjustment_capability",
+      "opt_out_state"
+     ],
+     "cmds": [
+      "power_adjust_request",
+      "cancel_power_adjust_request"
+     ],
+     "events": [
+      "power_adjust_start",
+      "power_adjust_end"
+     ]
+    },
+    "power_forecast_reporting": {
+     "attrs": [
+      "forecast"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "start_time_adjustment": {
+     "attrs": [
+      "opt_out_state"
+     ],
+     "cmds": [
+      "start_time_adjust_request",
+      "cancel_request"
+     ],
+     "events": []
+    },
+    "state_forecast_reporting": {
+     "attrs": [
+      "forecast"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "constraint_based_adjustment": [
+     "power_forecast_reporting",
+     "constraint_based_adjustment"
+    ],
+    "forecast_adjustment": [
+     "power_forecast_reporting",
+     "forecast_adjustment"
+    ],
+    "pausable": [
+     "power_forecast_reporting",
+     "pausable"
+    ],
+    "power_adjustment": [
+     "power_adjustment"
+    ],
+    "power_forecast_reporting": [
+     "power_forecast_reporting"
+    ],
+    "start_time_adjustment": [
+     "power_forecast_reporting",
+     "start_time_adjustment"
+    ],
+    "state_forecast_reporting": [
+     "state_forecast_reporting"
+    ]
+   },
+   "revision": 4,
+   "unless": {}
+  },
+  "device_energy_management_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "DeviceEnergyManagementMode",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "diagnostic_logs": {
+   "base": {
+    "attrs": [],
+    "cmds": [
+     "retrieve_logs_request",
+     "retrieve_logs_response"
+    ],
+    "events": []
+   },
+   "cls": "DiagnosticLogs",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "dish_washer_alarm": {
+   "base": {
+    "attrs": [
+     "mask",
+     "state",
+     "supported"
+    ],
+    "cmds": [],
+    "events": [
+     "notify"
+    ]
+   },
+   "cls": "DishwasherAlarm",
+   "features": {
+    "reset": {
+     "attrs": [
+      "latch"
+     ],
+     "cmds": [
+      "reset"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "dish_washer_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "DishwasherMode",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "door_lock": {
+   "base": {
+    "attrs": [
+     "lock_state",
+     "lock_type",
+     "actuator_enabled",
+     "operating_mode",
+     "supported_operating_modes"
+    ],
+    "cmds": [
+     "lock_door",
+     "unlock_door"
+    ],
+    "events": [
+     "door_lock_alarm",
+     "lock_operation",
+     "lock_operation_error"
+    ]
+   },
+   "cls": "DoorLock",
+   "features": {
+    "aliro_bleuwb": {
+     "attrs": [
+      "aliro_group_resolving_key",
+      "aliro_supported_bleuwb_protocol_versions",
+      "aliro_ble_advertising_version"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "aliro_provisioning": {
+     "attrs": [
+      "aliro_reader_verification_key",
+      "aliro_reader_group_identifier",
+      "aliro_reader_group_sub_identifier",
+      "aliro_expedited_transaction_supported_protocol_versions",
+      "number_of_aliro_credential_issuer_keys_supported",
+      "number_of_aliro_endpoint_keys_supported"
+     ],
+     "cmds": [
+      "set_aliro_reader_config",
+      "clear_aliro_reader_config"
+     ],
+     "events": []
+    },
+    "credential_over_the_air_access": {
+     "attrs": [
+      "require_pin_for_remote_operation"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "door_position_sensor": {
+     "attrs": [
+      "door_state"
+     ],
+     "cmds": [],
+     "events": [
+      "door_state_change"
+     ]
+    },
+    "face_credentials": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "finger_credentials": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "holiday_schedules": {
+     "attrs": [
+      "number_of_holiday_schedules_supported"
+     ],
+     "cmds": [
+      "set_holiday_schedule",
+      "get_holiday_schedule",
+      "get_holiday_schedule_response",
+      "clear_holiday_schedule"
+     ],
+     "events": []
+    },
+    "logging": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "notification": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "pin_credential": {
+     "attrs": [
+      "number_of_pin_users_supported",
+      "max_pin_code_length",
+      "min_pin_code_length",
+      "wrong_code_entry_limit",
+      "user_code_temporary_disable_time",
+      "require_pin_for_remote_operation"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "rfid_credential": {
+     "attrs": [
+      "number_of_rfid_users_supported",
+      "max_rfid_code_length",
+      "min_rfid_code_length",
+      "wrong_code_entry_limit",
+      "user_code_temporary_disable_time"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "unbolting": {
+     "attrs": [],
+     "cmds": [
+      "unbolt_door"
+     ],
+     "events": []
+    },
+    "user": {
+     "attrs": [
+      "number_of_total_users_supported",
+      "credential_rules_support",
+      "number_of_credentials_supported_per_user"
+     ],
+     "cmds": [
+      "set_user",
+      "get_user",
+      "get_user_response",
+      "clear_user",
+      "set_credential",
+      "set_credential_response",
+      "get_credential_status",
+      "get_credential_status_response",
+      "clear_credential"
+     ],
+     "events": [
+      "lock_user_change"
+     ]
+    },
+    "weekday_access_schedules": {
+     "attrs": [
+      "number_of_weekday_schedules_supported_per_user"
+     ],
+     "cmds": [
+      "set_weekday_schedule",
+      "get_weekday_schedule",
+      "get_weekday_schedule_response",
+      "clear_weekday_schedule"
+     ],
+     "events": []
+    },
+    "year_day_access_schedules": {
+     "attrs": [
+      "number_of_year_day_schedules_supported_per_user"
+     ],
+     "cmds": [
+      "set_year_day_schedule",
+      "get_year_day_schedule",
+      "get_year_day_schedule_response",
+      "clear_year_day_schedule"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 10,
+   "unless": {}
+  },
+  "ecosystem_information": {
+   "base": {
+    "attrs": [
+     "device_directory",
+     "location_directory"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "EcosystemInformation",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "electrical_energy_measurement": {
+   "base": {
+    "attrs": [
+     "accuracy"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ElectricalEnergyMeasurement",
+   "features": {
+    "cumulative_energy": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "cumulative_energy_measured"
+     ]
+    },
+    "cumulative_energy+exported_energy": {
+     "attrs": [
+      "cumulative_energy_exported"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "cumulative_energy+imported_energy": {
+     "attrs": [
+      "cumulative_energy_imported"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "exported_energy": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "imported_energy": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "periodic_energy": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "periodic_energy_measured"
+     ]
+    },
+    "periodic_energy+exported_energy": {
+     "attrs": [
+      "periodic_energy_exported"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "periodic_energy+imported_energy": {
+     "attrs": [
+      "periodic_energy_imported"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "cumulative_energy": [
+     "cumulative_energy"
+    ],
+    "exported_energy": [
+     "exported_energy"
+    ],
+    "imported_energy": [
+     "imported_energy"
+    ],
+    "periodic_energy": [
+     "periodic_energy"
+    ]
+   },
+   "revision": 2,
+   "unless": {}
+  },
+  "electrical_grid_conditions": {
+   "base": {
+    "attrs": [
+     "local_generation_available",
+     "current_conditions"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ElectricalGridConditions",
+   "features": {
+    "forecasting": {
+     "attrs": [
+      "forecast_conditions"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "electrical_power_measurement": {
+   "base": {
+    "attrs": [
+     "power_mode",
+     "number_of_measurement_types",
+     "accuracy",
+     "active_power"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ElectricalPowerMeasurement",
+   "features": {
+    "alternating_current": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "direct_current": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "harmonics": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "harmonics+alternating_current": {
+     "attrs": [
+      "harmonic_currents"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "polyphase_power": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "power_quality": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "power_quality+alternating_current": {
+     "attrs": [
+      "harmonic_phases"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "alternating_current": [
+     "alternating_current"
+    ],
+    "direct_current": [
+     "direct_current"
+    ],
+    "harmonics": [
+     "harmonics"
+    ],
+    "polyphase_power": [
+     "polyphase_power"
+    ],
+    "power_quality": [
+     "power_quality"
+    ]
+   },
+   "revision": 3,
+   "unless": {}
+  },
+  "energy_evse": {
+   "base": {
+    "attrs": [
+     "state",
+     "supply_state",
+     "fault_state",
+     "charging_enabled_until",
+     "circuit_capacity",
+     "minimum_charge_current",
+     "maximum_charge_current",
+     "session_id",
+     "session_duration",
+     "session_energy_charged"
+    ],
+    "cmds": [
+     "disable",
+     "enable_charging"
+    ],
+    "events": []
+   },
+   "cls": "EnergyEvse",
+   "features": {
+    "charging_preferences": {
+     "attrs": [
+      "next_charge_start_time",
+      "next_charge_target_time",
+      "next_charge_required_energy",
+      "next_charge_target_soc"
+     ],
+     "cmds": [
+      "set_targets",
+      "get_targets",
+      "clear_targets",
+      "get_targets_response"
+     ],
+     "events": []
+    },
+    "plug_and_charge": {
+     "attrs": [
+      "vehicle_id"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "rfid": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "soc_reporting": {
+     "attrs": [
+      "state_of_charge",
+      "battery_capacity"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "v2x": {
+     "attrs": [
+      "discharging_enabled_until",
+      "maximum_discharge_current",
+      "session_energy_discharged"
+     ],
+     "cmds": [
+      "enable_discharging"
+     ],
+     "events": []
+    }
+   },
+   "implies": {
+    "*": [
+     "charging_preferences"
+    ]
+   },
+   "revision": 4,
+   "unless": {}
+  },
+  "energy_evse_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "EnergyEvseMode",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "energy_preference": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "EnergyPreference",
+   "features": {
+    "energy_balance": {
+     "attrs": [
+      "energy_balances",
+      "current_energy_balance",
+      "energy_priorities"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "low_power_mode_sensitivity": {
+     "attrs": [
+      "low_power_mode_sensitivities",
+      "current_low_power_mode_sensitivity"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "energy_balance": [
+     "energy_balance"
+    ],
+    "low_power_mode_sensitivity": [
+     "low_power_mode_sensitivity"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "ethernet_network_diagnostics": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "EthernetNetworkDiagnostics",
+   "features": {
+    "error_counts": {
+     "attrs": [
+      "tx_err_count",
+      "collision_count",
+      "overrun_count"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "packet_counts": {
+     "attrs": [
+      "packet_rx_count",
+      "packet_tx_count"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "fan_control": {
+   "base": {
+    "attrs": [
+     "fan_mode",
+     "fan_mode_sequence",
+     "percent_setting",
+     "percent_current"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "FanControl",
+   "features": {
+    "airflow_direction": {
+     "attrs": [
+      "airflow_direction"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "fan_auto": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "multi_speed": {
+     "attrs": [
+      "speed_max",
+      "speed_setting",
+      "speed_current"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "rocking": {
+     "attrs": [
+      "rock_support",
+      "rock_setting"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "step": {
+     "attrs": [],
+     "cmds": [
+      "step"
+     ],
+     "events": []
+    },
+    "wind": {
+     "attrs": [
+      "wind_support",
+      "wind_setting"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "fixed_label": {
+   "base": {
+    "attrs": [
+     "label_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "FixedLabel",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "flow_measurement": {
+   "base": {
+    "attrs": [
+     "measured_value",
+     "min_measured_value",
+     "max_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "FlowMeasurement",
+   "features": {},
+   "implies": {},
+   "revision": 5,
+   "unless": {}
+  },
+  "formaldehyde_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "FormaldehydeConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "general_commissioning": {
+   "base": {
+    "attrs": [
+     "regulatory_config",
+     "location_capability",
+     "basic_commissioning_info",
+     "supports_concurrent_connection",
+     "breadcrumb"
+    ],
+    "cmds": [
+     "arm_fail_safe",
+     "arm_fail_safe_response",
+     "set_regulatory_config",
+     "set_regulatory_config_response",
+     "commissioning_complete",
+     "commissioning_complete_response"
+    ],
+    "events": []
+   },
+   "cls": "GeneralCommissioning",
+   "features": {
+    "terms_and_conditions": {
+     "attrs": [
+      "tc_accepted_version",
+      "tc_min_required_version",
+      "tc_acknowledgements",
+      "tc_acknowledgements_required",
+      "tc_update_deadline"
+     ],
+     "cmds": [
+      "set_tc_acknowledgements",
+      "set_tc_acknowledgements_response"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "general_diagnostics": {
+   "base": {
+    "attrs": [
+     "network_interfaces",
+     "reboot_count",
+     "up_time",
+     "test_event_triggers_enabled",
+     "device_load_status"
+    ],
+    "cmds": [
+     "test_event_trigger",
+     "time_snap_shot",
+     "time_snap_shot_response"
+    ],
+    "events": [
+     "boot_reason"
+    ]
+   },
+   "cls": "GeneralDiagnostics",
+   "features": {
+    "data_model_test": {
+     "attrs": [],
+     "cmds": [
+      "payload_test_request",
+      "payload_test_response"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "group_key_management": {
+   "base": {
+    "attrs": [
+     "group_key_map",
+     "group_table",
+     "max_groups_per_fabric",
+     "max_group_keys_per_fabric"
+    ],
+    "cmds": [
+     "key_set_write",
+     "key_set_read",
+     "key_set_remove",
+     "key_set_read_all_indices",
+     "key_set_read_response",
+     "key_set_read_all_indices_response"
+    ],
+    "events": []
+   },
+   "cls": "GroupKeyManagement",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "groupcast": {
+   "base": {
+    "attrs": [
+     "membership",
+     "max_membership_count",
+     "max_mcast_address_count",
+     "used_mcast_address_count",
+     "fabric_under_test"
+    ],
+    "cmds": [
+     "join_group",
+     "leave_group",
+     "leave_group_response",
+     "update_group_key",
+     "groupcast_testing"
+    ],
+    "events": [
+     "groupcast_testing"
+    ]
+   },
+   "cls": "Groupcast",
+   "features": {
+    "listener": {
+     "attrs": [],
+     "cmds": [
+      "configure_auxiliary_acl"
+     ],
+     "events": []
+    },
+    "per_group": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "sender": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "listener": [
+     "listener"
+    ],
+    "per_group": [
+     "per_group"
+    ],
+    "sender": [
+     "sender"
+    ]
+   },
+   "unless": {}
+  },
+  "groups": {
+   "base": {
+    "attrs": [
+     "name_support"
+    ],
+    "cmds": [
+     "add_group",
+     "view_group",
+     "get_group_membership",
+     "remove_group",
+     "remove_all_groups",
+     "add_group_if_identifying",
+     "add_group_response",
+     "view_group_response",
+     "get_group_membership_response",
+     "remove_group_response"
+    ],
+    "events": []
+   },
+   "cls": "Groups",
+   "features": {},
+   "implies": {},
+   "revision": 4,
+   "unless": {}
+  },
+  "hepa_filter_monitoring": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": null,
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "icd_management": {
+   "base": {
+    "attrs": [
+     "idle_mode_duration",
+     "active_mode_duration",
+     "active_mode_threshold"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "IcdManagement",
+   "features": {
+    "check_in_protocol_support": {
+     "attrs": [
+      "registered_clients",
+      "icd_counter",
+      "clients_supported_per_fabric",
+      "maximum_check_in_backoff"
+     ],
+     "cmds": [
+      "register_client",
+      "register_client_response",
+      "unregister_client"
+     ],
+     "events": []
+    },
+    "dynamic_sit_lit_support": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "long_idle_time_support": {
+     "attrs": [
+      "operating_mode"
+     ],
+     "cmds": [
+      "stay_active_request",
+      "stay_active_response"
+     ],
+     "events": []
+    },
+    "user_active_mode_trigger": {
+     "attrs": [
+      "user_active_mode_trigger_hint",
+      "user_active_mode_trigger_instruction"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "identify": {
+   "base": {
+    "attrs": [
+     "identify_time",
+     "identify_type"
+    ],
+    "cmds": [
+     "identify"
+    ],
+    "events": []
+   },
+   "cls": "Identify",
+   "features": {},
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "illuminance_measurement": {
+   "base": {
+    "attrs": [
+     "measured_value",
+     "min_measured_value",
+     "max_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "IlluminanceMeasurement",
+   "features": {},
+   "implies": {},
+   "revision": 5,
+   "unless": {}
+  },
+  "keypad_input": {
+   "base": {
+    "attrs": [],
+    "cmds": [
+     "send_key",
+     "send_key_response"
+    ],
+    "events": []
+   },
+   "cls": "KeypadInput",
+   "features": {
+    "location_keys": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "navigation_key_codes": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "number_keys": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "laundry_dryer_controls": {
+   "base": {
+    "attrs": [
+     "supported_dryness_levels",
+     "selected_dryness_level"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "LaundryDryerControls",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "laundry_washer_controls": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "LaundryWasherControls",
+   "features": {
+    "rinse": {
+     "attrs": [
+      "number_of_rinses",
+      "supported_rinses"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "spin": {
+     "attrs": [
+      "spin_speeds",
+      "spin_speed_current"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "rinse": [
+     "rinse"
+    ],
+    "spin": [
+     "spin"
+    ]
+   },
+   "revision": 2,
+   "unless": {}
+  },
+  "laundry_washer_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "LaundryWasherMode",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "level_control": {
+   "base": {
+    "attrs": [
+     "current_level",
+     "min_level",
+     "max_level",
+     "on_level",
+     "options"
+    ],
+    "cmds": [
+     "move_to_level",
+     "move",
+     "step",
+     "stop",
+     "move_to_level_with_on_off",
+     "move_with_on_off",
+     "step_with_on_off",
+     "stop_with_on_off"
+    ],
+    "events": []
+   },
+   "cls": "LevelControl",
+   "features": {
+    "frequency": {
+     "attrs": [
+      "current_frequency",
+      "min_frequency",
+      "max_frequency"
+     ],
+     "cmds": [
+      "move_to_closest_frequency"
+     ],
+     "events": []
+    },
+    "lighting": {
+     "attrs": [
+      "remaining_time",
+      "start_up_current_level"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "on_off": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 7,
+   "unless": {}
+  },
+  "localization_configuration": {
+   "base": {
+    "attrs": [
+     "active_locale",
+     "supported_locales"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "LocalizationConfiguration",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "meter_identification": {
+   "base": {
+    "attrs": [
+     "meter_type",
+     "point_of_delivery",
+     "meter_serial_number"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "MeterIdentification",
+   "features": {
+    "power_threshold": {
+     "attrs": [
+      "power_threshold"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "microwave_oven_control": {
+   "base": {
+    "attrs": [],
+    "cmds": [
+     "set_cooking_parameters"
+    ],
+    "events": []
+   },
+   "cls": "MicrowaveOvenControl",
+   "features": {
+    "power_as_number": {
+     "attrs": [
+      "power_setting"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "power_in_watts": {
+     "attrs": [
+      "supported_watts",
+      "selected_watt_index"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "power_number_limits": {
+     "attrs": [
+      "min_power",
+      "max_power",
+      "power_step"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "power_as_number": [
+     "power_as_number"
+    ],
+    "power_in_watts": [
+     "power_in_watts"
+    ],
+    "power_number_limits": [
+     "power_number_limits"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "microwave_oven_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "MicrowaveOvenMode",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "mode_select": {
+   "base": {
+    "attrs": [
+     "supported_modes",
+     "description",
+     "standard_namespace",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode"
+    ],
+    "events": []
+   },
+   "cls": "ModeSelect",
+   "features": {
+    "on_off": {
+     "attrs": [
+      "on_mode"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "network_commissioning": {
+   "base": {
+    "attrs": [
+     "max_networks",
+     "networks",
+     "interface_enabled",
+     "last_networking_status",
+     "last_network_id",
+     "last_connect_error_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "NetworkCommissioning",
+   "features": {
+    "ThreadNetworkInterface": {
+     "attrs": [
+      "scan_max_time_seconds",
+      "connect_max_time_seconds",
+      "supported_thread_features",
+      "thread_version"
+     ],
+     "cmds": [
+      "add_or_update_thread_network",
+      "scan_networks",
+      "remove_network",
+      "connect_network",
+      "reorder_network",
+      "scan_networks_response",
+      "network_config_response",
+      "connect_network_response"
+     ],
+     "events": []
+    },
+    "WiFiNetworkInterface": {
+     "attrs": [
+      "scan_max_time_seconds",
+      "connect_max_time_seconds",
+      "supported_wifi_bands"
+     ],
+     "cmds": [
+      "add_or_update_wifi_network",
+      "scan_networks",
+      "remove_network",
+      "connect_network",
+      "reorder_network",
+      "scan_networks_response",
+      "network_config_response",
+      "connect_network_response"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "nitrogen_dioxide_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "NitrogenDioxideConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "occupancy_sensing": {
+   "base": {
+    "attrs": [
+     "occupancy",
+     "occupancy_sensor_type",
+     "occupancy_sensor_type_bitmap"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "OccupancySensing",
+   "features": {
+    "active_infrared": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "other": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "passive_infrared": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "physical_contact": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "radar": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "rf_sensing": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "ultrasonic": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "vision": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "active_infrared": [
+     "active_infrared"
+    ],
+    "other": [
+     "other"
+    ],
+    "passive_infrared": [
+     "passive_infrared"
+    ],
+    "physical_contact": [
+     "physical_contact"
+    ],
+    "radar": [
+     "radar"
+    ],
+    "rf_sensing": [
+     "rf_sensing"
+    ],
+    "ultrasonic": [
+     "ultrasonic"
+    ],
+    "vision": [
+     "vision"
+    ]
+   },
+   "revision": 7,
+   "unless": {}
+  },
+  "on_off": {
+   "base": {
+    "attrs": [
+     "on_off"
+    ],
+    "cmds": [
+     "off"
+    ],
+    "events": []
+   },
+   "cls": "OnOff",
+   "features": {
+    "dead_front_behavior": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "lighting": {
+     "attrs": [
+      "global_scene_control",
+      "on_time",
+      "off_wait_time",
+      "start_up_on_off"
+     ],
+     "cmds": [
+      "off_with_effect",
+      "on_with_recall_global_scene",
+      "on_with_timed_off"
+     ],
+     "events": []
+    },
+    "off_only": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "operational_credentials": {
+   "base": {
+    "attrs": [
+     "nocs",
+     "supported_fabrics",
+     "commissioned_fabrics",
+     "fabrics",
+     "trusted_root_certificates",
+     "current_fabric_index"
+    ],
+    "cmds": [
+     "attestation_request",
+     "attestation_response",
+     "certificate_chain_request",
+     "certificate_chain_response",
+     "csr_request",
+     "csr_response",
+     "add_noc",
+     "update_noc",
+     "noc_response",
+     "update_fabric_label",
+     "remove_fabric",
+     "add_trusted_root_certificate",
+     "set_vid_verification_statement",
+     "sign_vid_verification_request",
+     "sign_vid_verification_response"
+    ],
+    "events": []
+   },
+   "cls": "OperationalCredentials",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "operational_state": {
+   "base": {
+    "attrs": [
+     "phase_list",
+     "current_phase",
+     "operational_state_list",
+     "operational_state",
+     "operational_error"
+    ],
+    "cmds": [],
+    "events": [
+     "operational_error"
+    ]
+   },
+   "cls": "OperationalState",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "ota_software_update_provider": {
+   "base": {
+    "attrs": [],
+    "cmds": [
+     "query_image",
+     "query_image_response",
+     "apply_update_request",
+     "apply_update_response",
+     "notify_update_applied"
+    ],
+    "events": []
+   },
+   "cls": "OtaSoftwareUpdateProvider",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "ota_software_update_requestor": {
+   "base": {
+    "attrs": [
+     "default_ota_providers",
+     "update_possible",
+     "update_state",
+     "update_state_progress"
+    ],
+    "cmds": [
+     "announce_ota_provider"
+    ],
+    "events": [
+     "download_error",
+     "state_transition",
+     "version_applied"
+    ]
+   },
+   "cls": "OtaSoftwareUpdateRequestor",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "ozone_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "OzoneConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "pm10_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Pm10ConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "pm1_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Pm1ConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "pm25_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Pm25ConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "power_source": {
+   "base": {
+    "attrs": [
+     "status",
+     "order",
+     "description",
+     "endpoint_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "PowerSource",
+   "features": {
+    "battery": {
+     "attrs": [
+      "bat_charge_level",
+      "bat_replacement_needed",
+      "bat_replaceability"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "rechargeable": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "rechargeable+battery": {
+     "attrs": [
+      "bat_charge_state",
+      "bat_functional_while_charging"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "replaceable": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "replaceable+battery": {
+     "attrs": [
+      "bat_replacement_description",
+      "bat_quantity"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "wired": {
+     "attrs": [
+      "wired_current_type"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "battery": [
+     "battery"
+    ],
+    "rechargeable": [
+     "rechargeable"
+    ],
+    "replaceable": [
+     "replaceable"
+    ],
+    "wired": [
+     "wired"
+    ]
+   },
+   "revision": 3,
+   "unless": {}
+  },
+  "power_topology": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "PowerTopology",
+   "features": {
+    "dynamic_power_flow": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "dynamic_power_flow+set_topology": {
+     "attrs": [
+      "active_endpoints"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "node_topology": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "set_topology": {
+     "attrs": [
+      "available_endpoints"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "tree_topology": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "dynamic_power_flow": [
+     "dynamic_power_flow"
+    ],
+    "node_topology": [
+     "node_topology"
+    ],
+    "set_topology": [
+     "set_topology"
+    ],
+    "tree_topology": [
+     "tree_topology"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "pressure_measurement": {
+   "base": {
+    "attrs": [
+     "measured_value",
+     "min_measured_value",
+     "max_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "PressureMeasurement",
+   "features": {
+    "extended": {
+     "attrs": [
+      "scaled_value",
+      "min_scaled_value",
+      "max_scaled_value",
+      "scale"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 5,
+   "unless": {}
+  },
+  "pump_configuration_and_control": {
+   "base": {
+    "attrs": [
+     "max_pressure",
+     "max_speed",
+     "max_flow",
+     "effective_operation_mode",
+     "effective_control_mode",
+     "capacity",
+     "operation_mode"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "PumpConfigurationAndControl",
+   "features": {
+    "automatic": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "compensated_pressure": {
+     "attrs": [
+      "min_comp_pressure",
+      "max_comp_pressure"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "constant_flow": {
+     "attrs": [
+      "min_const_flow",
+      "max_const_flow"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "constant_pressure": {
+     "attrs": [
+      "min_const_pressure",
+      "max_const_pressure"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "constant_speed": {
+     "attrs": [
+      "min_const_speed",
+      "max_const_speed"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "constant_temperature": {
+     "attrs": [
+      "min_const_temp",
+      "max_const_temp"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "local_operation": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "automatic": [
+     "automatic"
+    ],
+    "compensated_pressure": [
+     "compensated_pressure"
+    ],
+    "constant_flow": [
+     "constant_flow"
+    ],
+    "constant_pressure": [
+     "constant_pressure"
+    ],
+    "constant_speed": [
+     "constant_speed"
+    ],
+    "constant_temperature": [
+     "constant_temperature"
+    ],
+    "local_operation": [
+     "local_operation"
+    ]
+   },
+   "revision": 5,
+   "unless": {}
+  },
+  "push_av_stream_transport": {
+   "base": {
+    "attrs": [
+     "supported_formats",
+     "current_connections"
+    ],
+    "cmds": [
+     "allocate_push_transport",
+     "allocate_push_transport_response",
+     "deallocate_push_transport",
+     "modify_push_transport",
+     "set_transport_status",
+     "manually_trigger_transport",
+     "find_transport",
+     "find_transport_response"
+    ],
+    "events": [
+     "push_transport_begin",
+     "push_transport_end"
+    ]
+   },
+   "cls": "PushAvStreamTransport",
+   "features": {
+    "metadata": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "per_zone_sensitivity": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "radon_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RadonConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "refrigerator_alarm": {
+   "base": {
+    "attrs": [
+     "mask",
+     "state",
+     "supported"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RefrigeratorAlarm",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "refrigerator_and_tcc_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RefrigeratorAndTemperatureControlledCabinetMode",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "relative_humidity_measurement": {
+   "base": {
+    "attrs": [
+     "measured_value",
+     "min_measured_value",
+     "max_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RelativeHumidityMeasurement",
+   "features": {},
+   "implies": {},
+   "revision": 5,
+   "unless": {}
+  },
+  "resource_monitoring": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": null,
+   "features": {
+    "condition": {
+     "attrs": [
+      "condition",
+      "degradation_direction"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "replacement_product_list": {
+     "attrs": [
+      "replacement_product_list"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "warning": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "unless": {}
+  },
+  "rvc_clean_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RvcCleanMode",
+   "features": {},
+   "implies": {},
+   "revision": 5,
+   "unless": {}
+  },
+  "rvc_operational_state": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RvcOperationalState",
+   "features": {},
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "rvc_run_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "RvcRunMode",
+   "features": {},
+   "implies": {},
+   "revision": 4,
+   "unless": {}
+  },
+  "scenes_management": {
+   "base": {
+    "attrs": [
+     "scene_table_size",
+     "fabric_scene_info"
+    ],
+    "cmds": [
+     "add_scene",
+     "view_scene",
+     "remove_scene",
+     "remove_all_scenes",
+     "store_scene",
+     "recall_scene",
+     "get_scene_membership",
+     "add_scene_response",
+     "view_scene_response",
+     "remove_scene_response",
+     "remove_all_scenes_response",
+     "store_scene_response",
+     "get_scene_membership_response"
+    ],
+    "events": []
+   },
+   "cls": "ScenesManagement",
+   "features": {
+    "scene_names": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "service_area": {
+   "base": {
+    "attrs": [
+     "supported_areas",
+     "selected_areas"
+    ],
+    "cmds": [
+     "select_areas",
+     "select_areas_response"
+    ],
+    "events": []
+   },
+   "cls": "ServiceArea",
+   "features": {
+    "maps": {
+     "attrs": [
+      "supported_maps"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "progress_reporting": {
+     "attrs": [
+      "progress"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "select_while_running": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "smoke_co_alarm": {
+   "base": {
+    "attrs": [
+     "expressed_state",
+     "battery_alert",
+     "test_in_progress",
+     "hardware_fault_alert",
+     "end_of_service_alert"
+    ],
+    "cmds": [],
+    "events": [
+     "low_battery",
+     "hardware_fault",
+     "end_of_service",
+     "self_test_complete",
+     "all_clear"
+    ]
+   },
+   "cls": "SmokeCoAlarm",
+   "features": {
+    "co_alarm": {
+     "attrs": [
+      "co_state"
+     ],
+     "cmds": [],
+     "events": [
+      "co_alarm"
+     ]
+    },
+    "smoke_alarm": {
+     "attrs": [
+      "smoke_state"
+     ],
+     "cmds": [],
+     "events": [
+      "smoke_alarm"
+     ]
+    }
+   },
+   "implies": {
+    "co_alarm": [
+     "co_alarm"
+    ],
+    "smoke_alarm": [
+     "smoke_alarm"
+    ]
+   },
+   "revision": 2,
+   "unless": {}
+  },
+  "software_diagnostics": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "SoftwareDiagnostics",
+   "features": {
+    "watermarks": {
+     "attrs": [
+      "current_heap_high_watermark"
+     ],
+     "cmds": [
+      "reset_watermarks"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "soil_measurement": {
+   "base": {
+    "attrs": [
+     "soil_moisture_measurement_limits",
+     "soil_moisture_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "SoilMeasurement",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "switch_cluster": {
+   "base": {
+    "attrs": [
+     "number_of_positions",
+     "current_position"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "Switch",
+   "features": {
+    "action_switch": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "latching_switch": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "switch_latched"
+     ]
+    },
+    "momentary_switch": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "initial_press"
+     ]
+    },
+    "momentary_switch_long_press": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "long_press",
+      "long_release"
+     ]
+    },
+    "momentary_switch_multi_press": {
+     "attrs": [
+      "multi_press_max"
+     ],
+     "cmds": [],
+     "events": [
+      "multi_press_ongoing",
+      "multi_press_complete"
+     ]
+    },
+    "momentary_switch_release": {
+     "attrs": [],
+     "cmds": [],
+     "events": [
+      "short_release"
+     ]
+    }
+   },
+   "implies": {
+    "action_switch": [
+     "action_switch",
+     "momentary_switch_multi_press"
+    ],
+    "latching_switch": [
+     "latching_switch"
+    ],
+    "momentary_switch": [
+     "momentary_switch"
+    ],
+    "momentary_switch_long_press": [
+     "momentary_switch_long_press"
+    ],
+    "momentary_switch_multi_press": [
+     "momentary_switch_multi_press"
+    ],
+    "momentary_switch_release": [
+     "momentary_switch_release"
+    ]
+   },
+   "revision": 2,
+   "unless": {}
+  },
+  "temperature_control": {
+   "base": {
+    "attrs": [],
+    "cmds": [
+     "set_temperature"
+    ],
+    "events": []
+   },
+   "cls": "TemperatureControl",
+   "features": {
+    "temperature_level": {
+     "attrs": [
+      "supported_temperature_levels",
+      "selected_temperature_level"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "temperature_number": {
+     "attrs": [
+      "temperature_setpoint",
+      "min_temperature",
+      "max_temperature"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "temperature_step": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "temperature_step+temperature_number": {
+     "attrs": [
+      "step"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "temperature_level": [
+     "temperature_level"
+    ],
+    "temperature_number": [
+     "temperature_number"
+    ],
+    "temperature_step": [
+     "temperature_step"
+    ]
+   },
+   "revision": 1,
+   "unless": {}
+  },
+  "temperature_measurement": {
+   "base": {
+    "attrs": [
+     "measured_value",
+     "min_measured_value",
+     "max_measured_value"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "TemperatureMeasurement",
+   "features": {},
+   "implies": {},
+   "revision": 6,
+   "unless": {}
+  },
+  "thermostat": {
+   "base": {
+    "attrs": [
+     "local_temperature",
+     "control_sequence_of_operation",
+     "system_mode"
+    ],
+    "cmds": [
+     "setpoint_raise_lower"
+    ],
+    "events": []
+   },
+   "cls": "Thermostat",
+   "features": {
+    "auto_mode": {
+     "attrs": [
+      "min_setpoint_dead_band"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "cooling": {
+     "attrs": [
+      "occupied_cooling_setpoint"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "heating": {
+     "attrs": [
+      "occupied_heating_setpoint"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "local_temperature_not_exposed": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "matter_schedule_configuration": {
+     "attrs": [
+      "schedule_types",
+      "number_of_schedules",
+      "number_of_schedule_transitions",
+      "number_of_schedule_transition_per_day",
+      "active_schedule_handle",
+      "schedules"
+     ],
+     "cmds": [
+      "atomic_request",
+      "atomic_response",
+      "set_active_schedule_request"
+     ],
+     "events": []
+    },
+    "occupancy": {
+     "attrs": [
+      "occupancy",
+      "unoccupied_cooling_setpoint",
+      "unoccupied_heating_setpoint",
+      "unoccupied_setback",
+      "unoccupied_setback_min",
+      "unoccupied_setback_max"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "presets": {
+     "attrs": [
+      "preset_types",
+      "number_of_presets",
+      "active_preset_handle",
+      "presets"
+     ],
+     "cmds": [
+      "atomic_request",
+      "atomic_response",
+      "set_active_preset_request"
+     ],
+     "events": []
+    },
+    "setback": {
+     "attrs": [
+      "occupied_setback",
+      "occupied_setback_min",
+      "occupied_setback_max"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "auto_mode": [
+     "auto_mode",
+     "heating",
+     "cooling"
+    ],
+    "cooling": [
+     "cooling"
+    ],
+    "heating": [
+     "heating"
+    ],
+    "local_temperature_not_exposed": [
+     "local_temperature_not_exposed"
+    ],
+    "matter_schedule_configuration": [
+     "matter_schedule_configuration"
+    ],
+    "occupancy": [
+     "occupancy"
+    ],
+    "presets": [
+     "presets"
+    ],
+    "setback": [
+     "setback"
+    ]
+   },
+   "revision": 11,
+   "unless": {}
+  },
+  "thermostat_user_interface_configuration": {
+   "base": {
+    "attrs": [
+     "temperature_display_mode",
+     "keypad_lockout"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ThermostatUserInterfaceConfiguration",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "thread_border_router_management": {
+   "base": {
+    "attrs": [
+     "border_router_name",
+     "border_agent_id",
+     "thread_version",
+     "interface_enabled",
+     "active_dataset_timestamp",
+     "pending_dataset_timestamp"
+    ],
+    "cmds": [
+     "get_active_dataset_request",
+     "get_pending_dataset_request",
+     "dataset_response",
+     "set_active_dataset_request"
+    ],
+    "events": []
+   },
+   "cls": "ThreadBorderRouterManagement",
+   "features": {
+    "pan_change": {
+     "attrs": [],
+     "cmds": [
+      "set_pending_dataset_request"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "thread_network_diagnostics": {
+   "base": {
+    "attrs": [
+     "channel",
+     "routing_role",
+     "network_name",
+     "pan_id",
+     "extended_pan_id",
+     "mesh_local_prefix",
+     "neighbor_table",
+     "route_table",
+     "partition_id",
+     "weighting",
+     "data_version",
+     "stable_data_version",
+     "leader_router_id",
+     "security_policy",
+     "channel_page0_mask",
+     "operational_dataset_components",
+     "active_network_faults_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "ThreadNetworkDiagnostics",
+   "features": {
+    "error_counts": {
+     "attrs": [
+      "overrun_count"
+     ],
+     "cmds": [
+      "reset_counts"
+     ],
+     "events": []
+    },
+    "mac_counts": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "mle_counts": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "packet_counts": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 3,
+   "unless": {}
+  },
+  "thread_network_directory": {
+   "base": {
+    "attrs": [
+     "preferred_extended_pan_id",
+     "thread_networks",
+     "thread_network_table_size"
+    ],
+    "cmds": [
+     "add_network",
+     "remove_network",
+     "get_operational_dataset",
+     "operational_dataset_response"
+    ],
+    "events": []
+   },
+   "cls": "ThreadNetworkDirectory",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "time_format_localization": {
+   "base": {
+    "attrs": [
+     "hour_format"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "TimeFormatLocalization",
+   "features": {
+    "calendar_format": {
+     "attrs": [
+      "active_calendar_type",
+      "supported_calendar_types"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "time_synchronization": {
+   "base": {
+    "attrs": [
+     "utc_time",
+     "granularity"
+    ],
+    "cmds": [
+     "set_utc_time"
+    ],
+    "events": [
+     "time_failure"
+    ]
+   },
+   "cls": "TimeSynchronization",
+   "features": {
+    "ntp_client": {
+     "attrs": [
+      "default_ntp",
+      "supports_dns_resolve"
+     ],
+     "cmds": [
+      "set_default_ntp"
+     ],
+     "events": []
+    },
+    "ntp_server": {
+     "attrs": [
+      "ntp_server_available"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "time_sync_client": {
+     "attrs": [
+      "trusted_time_source"
+     ],
+     "cmds": [
+      "set_trusted_time_source"
+     ],
+     "events": [
+      "missing_trusted_time_source"
+     ]
+    },
+    "time_zone": {
+     "attrs": [
+      "time_zone",
+      "dst_offset",
+      "local_time",
+      "time_zone_list_max_size",
+      "dst_offset_list_max_size",
+      "time_zone_database"
+     ],
+     "cmds": [
+      "set_time_zone",
+      "set_dst_offset",
+      "set_time_zone_response"
+     ],
+     "events": [
+      "dst_table_empty",
+      "dst_status",
+      "time_zone_status"
+     ]
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "tls_certificate_management": {
+   "base": {
+    "attrs": [
+     "max_root_certificates",
+     "provisioned_root_certificates",
+     "max_client_certificates",
+     "provisioned_client_certificates"
+    ],
+    "cmds": [
+     "provision_root_certificate",
+     "provision_root_certificate_response",
+     "find_root_certificate",
+     "find_root_certificate_response",
+     "lookup_root_certificate",
+     "lookup_root_certificate_response",
+     "remove_root_certificate",
+     "client_csr",
+     "client_csr_response",
+     "provision_client_certificate",
+     "find_client_certificate",
+     "find_client_certificate_response",
+     "lookup_client_certificate",
+     "lookup_client_certificate_response",
+     "remove_client_certificate"
+    ],
+    "events": []
+   },
+   "cls": "TlsCertificateManagement",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "tls_client_management": {
+   "base": {
+    "attrs": [
+     "max_provisioned",
+     "provisioned_endpoints"
+    ],
+    "cmds": [
+     "provision_endpoint",
+     "provision_endpoint_response",
+     "find_endpoint",
+     "find_endpoint_response",
+     "remove_endpoint"
+    ],
+    "events": []
+   },
+   "cls": "TlsClientManagement",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "total_volatile_organic_compounds_concentration_measurement": {
+   "base": {
+    "attrs": [
+     "measurement_medium"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "TotalVolatileOrganicCompoundsConcentrationMeasurement",
+   "features": {
+    "average_measurement": {
+     "attrs": [
+      "average_measured_value",
+      "average_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "critical_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "level_indication": {
+     "attrs": [
+      "level_value"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "medium_level": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "numeric_measurement": {
+     "attrs": [
+      "measured_value",
+      "min_measured_value",
+      "max_measured_value",
+      "measurement_unit"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "peak_measurement": {
+     "attrs": [
+      "peak_measured_value",
+      "peak_measured_value_window"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "average_measurement": [
+     "average_measurement"
+    ],
+    "critical_level": [
+     "critical_level"
+    ],
+    "level_indication": [
+     "level_indication"
+    ],
+    "medium_level": [
+     "medium_level"
+    ],
+    "numeric_measurement": [
+     "numeric_measurement"
+    ],
+    "peak_measurement": [
+     "peak_measurement"
+    ]
+   },
+   "unless": {}
+  },
+  "unit_localization": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "UnitLocalization",
+   "features": {
+    "temperature_unit": {
+     "attrs": [
+      "temperature_unit",
+      "supported_temperature_units"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "user_label": {
+   "base": {
+    "attrs": [
+     "label_list"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "UserLabel",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "valve_configuration_and_control": {
+   "base": {
+    "attrs": [
+     "remaining_duration",
+     "open_duration",
+     "default_open_duration",
+     "current_state",
+     "target_state"
+    ],
+    "cmds": [
+     "open",
+     "close"
+    ],
+    "events": []
+   },
+   "cls": "ValveConfigurationAndControl",
+   "features": {
+    "level": {
+     "attrs": [
+      "current_level",
+      "target_level"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "time_sync": {
+     "attrs": [
+      "auto_close_time"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "water_heater_management": {
+   "base": {
+    "attrs": [
+     "heater_types",
+     "heat_demand",
+     "boost_state"
+    ],
+    "cmds": [
+     "boost",
+     "cancel_boost"
+    ],
+    "events": [
+     "boost_started",
+     "boost_ended"
+    ]
+   },
+   "cls": "WaterHeaterManagement",
+   "features": {
+    "energy_management": {
+     "attrs": [
+      "tank_volume",
+      "estimated_heat_required"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "tank_percent": {
+     "attrs": [
+      "tank_percentage"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "water_heater_mode": {
+   "base": {
+    "attrs": [],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "WaterHeaterMode",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "webrtc_transport_provider": {
+   "base": {
+    "attrs": [
+     "current_sessions"
+    ],
+    "cmds": [
+     "solicit_offer",
+     "solicit_offer_response",
+     "provide_offer",
+     "provide_offer_response",
+     "provide_answer",
+     "provide_ice_candidates",
+     "end_session"
+    ],
+    "events": []
+   },
+   "cls": "WebRTCTransportProvider",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "webrtc_transport_requestor": {
+   "base": {
+    "attrs": [
+     "current_sessions"
+    ],
+    "cmds": [
+     "offer",
+     "answer",
+     "ice_candidates",
+     "end"
+    ],
+    "events": []
+   },
+   "cls": "WebRTCTransportRequestor",
+   "features": {},
+   "implies": {},
+   "revision": 2,
+   "unless": {}
+  },
+  "wifi_network_diagnostics": {
+   "base": {
+    "attrs": [
+     "bssid",
+     "security_type",
+     "wifi_version",
+     "channel_number",
+     "rssi"
+    ],
+    "cmds": [],
+    "events": []
+   },
+   "cls": "WiFiNetworkDiagnostics",
+   "features": {
+    "error_counts": {
+     "attrs": [
+      "beacon_lost_count",
+      "overrun_count"
+     ],
+     "cmds": [
+      "reset_counts"
+     ],
+     "events": []
+    },
+    "packet_counts": {
+     "attrs": [
+      "beacon_rx_count",
+      "packet_multicast_rx_count",
+      "packet_multicast_tx_count",
+      "packet_unicast_rx_count",
+      "packet_unicast_tx_count"
+     ],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "wifi_network_management": {
+   "base": {
+    "attrs": [
+     "ssid",
+     "passphrase_surrogate"
+    ],
+    "cmds": [
+     "network_passphrase_request",
+     "network_passphrase_response"
+    ],
+    "events": []
+   },
+   "cls": "WiFiNetworkManagement",
+   "features": {},
+   "implies": {},
+   "revision": 1,
+   "unless": {}
+  },
+  "window_covering": {
+   "base": {
+    "attrs": [
+     "type",
+     "config_status",
+     "operational_status",
+     "end_product_type",
+     "mode"
+    ],
+    "cmds": [
+     "up_or_open",
+     "down_or_close",
+     "stop_motion"
+    ],
+    "events": []
+   },
+   "cls": "WindowCovering",
+   "features": {
+    "lift": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "position_aware_lift": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "position_aware_lift+lift": {
+     "attrs": [
+      "target_position_lift_percent_100ths",
+      "current_position_lift_percent_100ths"
+     ],
+     "cmds": [
+      "go_to_lift_percentage"
+     ],
+     "events": []
+    },
+    "position_aware_tilt": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "position_aware_tilt+tilt": {
+     "attrs": [
+      "target_position_tilt_percent_100ths",
+      "current_position_tilt_percent_100ths"
+     ],
+     "cmds": [
+      "go_to_tilt_percentage"
+     ],
+     "events": []
+    },
+    "tilt": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    }
+   },
+   "implies": {
+    "lift": [
+     "lift"
+    ],
+    "position_aware_lift": [
+     "position_aware_lift"
+    ],
+    "position_aware_tilt": [
+     "position_aware_tilt"
+    ],
+    "tilt": [
+     "tilt"
+    ]
+   },
+   "revision": 8,
+   "unless": {}
+  },
+  "zone_management": {
+   "base": {
+    "attrs": [
+     "max_zones",
+     "zones",
+     "triggers",
+     "sensitivity_max",
+     "sensitivity"
+    ],
+    "cmds": [
+     "or_update_trigger",
+     "remove_trigger"
+    ],
+    "events": [
+     "zone_triggered",
+     "zone_stopped"
+    ]
+   },
+   "cls": "ZoneManagement",
+   "features": {
+    "focus_zones": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "per_zone_sensitivity": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "two_dimensional_cartesian_zone": {
+     "attrs": [
+      "two_d_cartesian_max"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "user_defined": {
+     "attrs": [
+      "max_user_defined_zones"
+     ],
+     "cmds": [
+      "remove_zone",
+      "two_d_cartesian_zone",
+      "two_d_cartesian_zone_response",
+      "update_two_d_cartesian_zone"
+     ],
+     "events": []
+    }
+   },
+   "implies": {},
+   "unless": {}
+  }
+ },
+ "device_types": {
+  "aggregator": {
+   "clusters": [],
+   "id": 14,
+   "version": 2
+  },
+  "air_purifier": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "fan_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 45,
+   "version": 2
+  },
+  "air_quality_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "air_quality",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 44,
+   "version": 1
+  },
+  "audio_doorbell": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "switch_cluster",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "audio"
+     ],
+     "ns": "camera_av_stream_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "webrtc_transport_provider",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "webrtc_transport_requestor",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "chime",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 321,
+   "version": 1
+  },
+  "battery_storage": {
+   "clusters": [],
+   "id": 24,
+   "version": 2
+  },
+  "bridged_node": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "bridged_device_basic_information",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 19,
+   "version": 3
+  },
+  "camera": {
+   "clusters": [],
+   "id": 322,
+   "version": 1
+  },
+  "chime": {
+   "clusters": [],
+   "id": 326,
+   "version": 1
+  },
+  "closure": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "closure_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 560,
+   "version": 1
+  },
+  "closure_controller": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "closure_control",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 574,
+   "version": 1
+  },
+  "closure_panel": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "closure_dimension",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 561,
+   "version": 1
+  },
+  "color_dimmer_switch": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server",
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "level_control",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "color_control",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 261,
+   "version": 3
+  },
+  "color_temperature_light": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "on_off",
+      "lighting"
+     ],
+     "ns": "level_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [
+      "remaining_time"
+     ],
+     "cmds": [
+      "stop_move_step"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "color_temperature"
+     ],
+     "ns": "color_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 268,
+   "version": 4
+  },
+  "contact_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "state_change"
+     ],
+     "features": [],
+     "ns": "boolean_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 21,
+   "version": 2
+  },
+  "control_bridge": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server",
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "level_control",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "color_control",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 2112,
+   "version": 3
+  },
+  "cook_surface": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & COOK_SURFACE_OPTIONAL_CLUSTER_TEMPERATURE_CONTROL",
+     "events": [],
+     "features": [],
+     "ns": "temperature_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & COOK_SURFACE_OPTIONAL_CLUSTER_TEMPERATURE_MEASUREMENT",
+     "events": [],
+     "features": [],
+     "ns": "temperature_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 119,
+   "version": 2
+  },
+  "cooktop": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "off_only"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 120,
+   "version": 1
+  },
+  "device_energy_management": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "device_energy_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "device_energy_management_mode",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1293,
+   "version": 3
+  },
+  "dimmable_light": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "on_off",
+      "lighting"
+     ],
+     "ns": "level_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 257,
+   "version": 3
+  },
+  "dimmable_plug_in_unit": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "on_off",
+      "lighting"
+     ],
+     "ns": "level_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 267,
+   "version": 5
+  },
+  "dimmer_switch": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server",
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "level_control",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 260,
+   "version": 3
+  },
+  "dish_washer": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "operation_completion"
+     ],
+     "features": [],
+     "ns": "operational_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 117,
+   "version": 2
+  },
+  "door_lock": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "door_lock",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 10,
+   "version": 3
+  },
+  "doorbell": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "momentary_switch"
+     ],
+     "ns": "switch_cluster",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "chime",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 328,
+   "version": 1
+  },
+  "electrical_energy_tariff": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & ELECTRICAL_ENERGY_TARIFF_OPTIONAL_CLUSTER_COMMODITY_PRICE",
+     "events": [],
+     "features": [],
+     "ns": "commodity_price",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & ELECTRICAL_ENERGY_TARIFF_OPTIONAL_CLUSTER_COMMODITY_TARIFF",
+     "events": [],
+     "features": [],
+     "ns": "commodity_tariff",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1299,
+   "version": 1
+  },
+  "electrical_meter": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "electrical_power_measurement",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "electrical_energy_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1300,
+   "version": 1
+  },
+  "electrical_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "power_topology",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & ELECTRICAL_SENSOR_OPTIONAL_CLUSTER_ELECTRICAL_POWER_MEASUREMENT",
+     "events": [],
+     "features": [],
+     "ns": "electrical_power_measurement",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "config->optional_clusters_mask & ELECTRICAL_SENSOR_OPTIONAL_CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT",
+     "events": [],
+     "features": [],
+     "ns": "electrical_energy_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1296,
+   "version": 1
+  },
+  "electrical_utility_meter": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "meter_identification",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1297,
+   "version": 1
+  },
+  "energy_evse": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "energy_evse",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "energy_evse_mode",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "device_energy_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1292,
+   "version": 2
+  },
+  "extended_color_light": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "on_off",
+      "lighting"
+     ],
+     "ns": "level_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [
+      "remaining_time"
+     ],
+     "cmds": [
+      "stop_move_step"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "color_temperature",
+      "xy"
+     ],
+     "ns": "color_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 269,
+   "version": 4
+  },
+  "extractor_hood": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "fan_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 122,
+   "version": 1
+  },
+  "fan": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "fan_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 43,
+   "version": 4
+  },
+  "flow_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "flow_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 774,
+   "version": 2
+  },
+  "generic_switch": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "switch_cluster",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 15,
+   "version": 3
+  },
+  "heat_pump": {
+   "clusters": [],
+   "id": 777,
+   "version": 1
+  },
+  "humidity_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "relative_humidity_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 775,
+   "version": 2
+  },
+  "irrigation_system": {
+   "clusters": [],
+   "id": 64,
+   "version": 1
+  },
+  "laundry_dryer": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "operation_completion"
+     ],
+     "features": [],
+     "ns": "operational_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 124,
+   "version": 2
+  },
+  "laundry_washer": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "operation_completion"
+     ],
+     "features": [],
+     "ns": "operational_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 115,
+   "version": 2
+  },
+  "light_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "illuminance_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 262,
+   "version": 3
+  },
+  "microwave_oven": {
+   "clusters": [
+    {
+     "attrs": [
+      "countdown_time"
+     ],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "operation_completion"
+     ],
+     "features": [],
+     "ns": "operational_state",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "microwave_oven_mode",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "microwave_oven_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 121,
+   "version": 2
+  },
+  "mode_select": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "mode_select",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 39,
+   "version": 1
+  },
+  "mounted_dimmable_load_control": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting",
+      "on_off"
+     ],
+     "ns": "level_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 272,
+   "version": 2
+  },
+  "mounted_on_off_control": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 271,
+   "version": 2
+  },
+  "occupancy_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "occupancy_sensing",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 263,
+   "version": 4
+  },
+  "on_off_light": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 256,
+   "version": 3
+  },
+  "on_off_light_switch": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server",
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 259,
+   "version": 3
+  },
+  "on_off_plug_in_unit": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [
+      "trigger_effect"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "lighting"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "copy_scene",
+      "copy_scene_response"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "scenes_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 266,
+   "version": 4
+  },
+  "ota_provider": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "ota_software_update_provider",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 20,
+   "version": 1
+  },
+  "ota_requestor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#ifdef CONFIG_ENABLE_OTA_REQUESTOR",
+     "events": [],
+     "features": [],
+     "ns": "ota_software_update_provider",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#ifdef CONFIG_ENABLE_OTA_REQUESTOR",
+     "events": [],
+     "features": [],
+     "ns": "ota_software_update_requestor",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 18,
+   "version": 1
+  },
+  "oven": {
+   "clusters": [],
+   "id": 123,
+   "version": 2
+  },
+  "power_source": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "power_source",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 17,
+   "version": 1
+  },
+  "pressure_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "pressure_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 773,
+   "version": 2
+  },
+  "pump": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "pump_configuration_and_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 771,
+   "version": 3
+  },
+  "pump_controller": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "on_off",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "pump_configuration_and_control",
+     "sides": [
+      "client"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "binding",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 772,
+   "version": 4
+  },
+  "rain_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "state_change"
+     ],
+     "features": [],
+     "ns": "boolean_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 68,
+   "version": 1
+  },
+  "refrigerator": {
+   "clusters": [],
+   "id": 112,
+   "version": 2
+  },
+  "robotic_vacuum_cleaner": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "rvc_run_mode",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "operation_completion"
+     ],
+     "features": [],
+     "ns": "rvc_operational_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 116,
+   "version": 4
+  },
+  "room_air_conditioner": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [
+      "on",
+      "toggle"
+     ],
+     "cond": null,
+     "events": [],
+     "features": [
+      "dead_front_behavior"
+     ],
+     "ns": "on_off",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thermostat",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 114,
+   "version": 3
+  },
+  "root_node": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "access_control",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "basic_information",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "general_commissioning",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#ifndef CONFIG_CUSTOM_NETWORK_CONFIG",
+     "events": [],
+     "features": [],
+     "ns": "network_commissioning",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "general_diagnostics",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "administrator_commissioning",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "operational_credentials",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "group_key_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#if CHIP_CONFIG_ENABLE_ICD_SERVER && icd::get_icd_server_enabled()",
+     "events": [],
+     "features": [
+      "long_idle_time_support",
+      "check_in_protocol_support",
+      "user_active_mode_trigger"
+     ],
+     "ns": "icd_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#if CHIP_DEVICE_CONFIG_ENABLE_WIFI && defined(CONFIG_SUPPORT_WIFI_NETWORK_DIAGNOSTICS_CLUSTER)",
+     "events": [],
+     "features": [],
+     "ns": "wifi_network_diagnostics",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#if CHIP_DEVICE_CONFIG_ENABLE_THREAD && defined(CONFIG_SUPPORT_THREAD_NETWORK_DIAGNOSTICS_CLUSTER)",
+     "events": [],
+     "features": [],
+     "ns": "thread_network_diagnostics",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": "#if defined(CONFIG_SUPPORT_GROUPCAST_CLUSTER)",
+     "events": [],
+     "features": [],
+     "ns": "groupcast",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 22,
+   "version": 4
+  },
+  "secondary_network_interface": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "network_commissioning",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 25,
+   "version": 1
+  },
+  "smoke_co_alarm": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "smoke_co_alarm",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 118,
+   "version": 1
+  },
+  "soil_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "soil_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 69,
+   "version": 1
+  },
+  "solar_power": {
+   "clusters": [],
+   "id": 23,
+   "version": 1
+  },
+  "temperature_controlled_cabinet": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "temperature_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 113,
+   "version": 5
+  },
+  "temperature_sensor": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "temperature_measurement",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 770,
+   "version": 3
+  },
+  "thermostat": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thermostat",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 769,
+   "version": 4
+  },
+  "thermostat_controller": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thermostat",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
+   "id": 778,
+   "version": 1
+  },
+  "thread_border_router": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thread_network_diagnostics",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thread_border_router_management",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 145,
+   "version": 2
+  },
+  "video_doorbell": {
+   "clusters": [],
+   "id": 323,
+   "version": 1
+  },
+  "water_freeze_detector": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "state_change"
+     ],
+     "features": [],
+     "ns": "boolean_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 65,
+   "version": 1
+  },
+  "water_heater": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "thermostat",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "water_heater_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "water_heater_mode",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 1295,
+   "version": 1
+  },
+  "water_leak_detector": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [
+      "state_change"
+     ],
+     "features": [],
+     "ns": "boolean_state",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 67,
+   "version": 1
+  },
+  "water_valve": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "valve_configuration_and_control",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 66,
+   "version": 1
+  },
+  "window_covering": {
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "identify",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "groups",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "window_covering",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
+   "id": 514,
+   "version": 5
+  }
+ },
+ "esp_matter": "esp-matter-1.6"
+}

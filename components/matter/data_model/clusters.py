@@ -65,6 +65,23 @@ class Feature:
     def conf_key(self):
         return snake_case(self.name)
 
+    def matches(self, value: str) -> bool:
+        """True if value is a spelling of this feature.
+
+        The snake_case key, the CamelCase name and the spec name ("Enhanced Hue")
+        all work, case and spaces are ignored.
+        """
+        wanted = normalize_feature_name(value)
+        return wanted in {
+            normalize_feature_name(self.name),
+            normalize_feature_name(self.spec_name),
+        }
+
+
+def normalize_feature_name(value) -> str:
+    """Feature spellings are compared without spaces, underscores, hyphens and case."""
+    return "".join(ch for ch in str(value).lower() if ch.isalnum())
+
 
 @dataclass(frozen=True, slots=True)
 class Cluster:
@@ -234,12 +251,18 @@ class Cluster:
     def schema_key(self):
         return cv.Optional(self.conf_key)
 
+    def _validate_feature_name(self, value):
+        """Accepts every spelling of a feature; returns its snake_case key."""
+        for feature in self.features:
+            if feature.matches(value):
+                return feature.conf_key
+        return cv.one_of(*(feature.conf_key for feature in self.features))(value)
+
     def schema(self):
         schema = {}
         if self.features:
-            # Features must be given in snake_case. e.g.: "average_measurement"
             schema[cv.Optional(CONF_WITH_FEATURES, default=list)] = cv.ensure_list(
-                cv.one_of(*(feature.conf_key for feature in self.features))
+                self._validate_feature_name
             )
         return schema
 

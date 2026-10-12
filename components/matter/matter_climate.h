@@ -70,11 +70,6 @@ protected:
   bool has_on_off_{false};
   bool has_running_state_{false};
   climate::ClimateMode last_active_mode_{climate::CLIMATE_MODE_OFF};
-  // True while push_state_to_matter() reports attributes (CHIP thread only).
-  // esp-matter runs the attribute callbacks for writable attributes on reports
-  // too, and the Thermostat cluster may shift the other setpoint to keep the
-  // dead band; neither is a request from a controller.
-  bool pushing_{false};
 };
 
 } // namespace esphome::matter

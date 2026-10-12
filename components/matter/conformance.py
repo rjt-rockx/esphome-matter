@@ -105,10 +105,35 @@ _HASH_VERSION = 1
 
 
 def _label(value):
+    """Explicit user-provided label: over-long values are errors, never truncated."""
     value = cv.string_strict(value)
-    if not value or len(value.encode()) > LABEL_MAX:
-        raise cv.Invalid(f"Labels must be 1 to {LABEL_MAX} bytes long, got '{value}'")
+    size = len(value.encode())
+    if not value:
+        raise cv.Invalid(f"Labels must be 1 to {LABEL_MAX} UTF-8 bytes long, got an empty string")
+    if size > LABEL_MAX:
+        raise cv.Invalid(
+            f"Label '{value}' is {size} UTF-8 bytes long, but Matter labels are limited to "
+            f"{LABEL_MAX} bytes; shorten it"
+        )
     return value
+
+
+def default_label(name: str, source: str = "entity name") -> str:
+    """Label derived by default from `name` (e.g. an entity name).
+
+    Unlike an explicit `label:`, a derived label that exceeds LABEL_MAX bytes is
+    truncated on a UTF-8 character boundary with a config-time warning.
+    """
+    encoded = name.encode()
+    if len(encoded) <= LABEL_MAX:
+        return name
+    truncated = encoded[:LABEL_MAX].decode("utf-8", errors="ignore").rstrip()
+    _LOGGER.warning(
+        "Matter endpoint label derived from %s '%s' is %d bytes; truncated to '%s' "
+        "(limit %d bytes). Set an explicit `label:` (max %d bytes) to choose it yourself",
+        source, name, len(encoded), truncated, LABEL_MAX, LABEL_MAX,
+    )
+    return truncated
 
 
 def _namespace(value):
@@ -186,6 +211,8 @@ def _duplicate_components(endpoints: dict[int, dict]) -> list[list[int]]:
     """Group sibling endpoints (same parent) connected by overlapping application device types."""
     by_parent: dict[int, list[int]] = {}
     for endpoint_id, config in endpoints.items():
+        if endpoint_id == 0:
+            continue  # the root node is nobody's sibling
         by_parent.setdefault(config.get(CONF_PARENT, 0), []).append(endpoint_id)
 
     components: list[list[int]] = []
@@ -302,8 +329,10 @@ def structure_hash(endpoints: dict[int, dict], plans: dict[int, EndpointPlan], s
 
 def max_device_types(endpoints: dict[int, dict]) -> int:
     count = 1
-    for config in endpoints.values():
-        count = max(
-            count, sum(1 for key in config if key in DEVICE_TYPES_BY_CONF_KEY)
-        )
+    for endpoint_id, config in endpoints.items():
+        types = sum(1 for key in config if key in DEVICE_TYPES_BY_CONF_KEY)
+        if endpoint_id == 0:
+            # The root node device type, plus the Power Source device type for battery / wired.
+            types += 1 + (1 if "battery" in config or "wired" in config else 0)
+        count = max(count, types)
     return count

@@ -1,5 +1,7 @@
 """ESPHome cover to Matter Window Covering binding (codegen helpers)."""
 
+import logging
+
 import esphome.config_validation as cv
 from esphome.components import cover
 from esphome.config import Config
@@ -38,8 +40,12 @@ END_PRODUCT_TYPES = {
     "sliding_shutter": 0x17,
 }
 
-# Garage doors, gates and doors need the Closure Control cluster (Matter 1.5+).
-UNSUPPORTED_DEVICE_CLASSES = ("garage", "gate", "door")
+# Garage doors, gates and doors are closures in Matter 1.5+ (Closure Control, see closure.py), but retail
+# openers (Konnected, Meross, ...) advertise Window Covering because most controllers cannot use Closure yet.
+# Exposing them as Window Covering is therefore allowed; `closure_compat: true` acknowledges the choice.
+CLOSURE_DEVICE_CLASSES = ("garage", "gate", "door")
+CONF_CLOSURE_COMPAT = "closure_compat"
+_LOGGER = logging.getLogger(__name__)
 
 
 def schema_options() -> dict:
@@ -47,6 +53,8 @@ def schema_options() -> dict:
     return {
         cv.Optional(CONF_COVER_ID): cv.use_id(cover.Cover),
         cv.Optional(CONF_END_PRODUCT_TYPE): cv.one_of(*END_PRODUCT_TYPES, lower=True),
+        # Compatibility mode: expose a garage/gate/door cover as Window Covering.
+        cv.Optional(CONF_CLOSURE_COMPAT, default=False): cv.boolean,
     }
 
 
@@ -67,6 +75,8 @@ def validate_cover_bindings(matter_config: dict, full_config: Config) -> None:
         if cover_id is None:
             if CONF_END_PRODUCT_TYPE in device_config:
                 raise cv.Invalid("end_product_type requires cover_id")
+            if device_config.get(CONF_CLOSURE_COMPAT):
+                raise cv.Invalid("closure_compat requires cover_id")
             continue
         if device_config.get(CONF_WITH_FEATURES):
             raise cv.Invalid(
@@ -75,12 +85,21 @@ def validate_cover_bindings(matter_config: dict, full_config: Config) -> None:
             )
         cover_config = _cover_config(full_config, cover_id)
         device_class = (cover_config or {}).get(CONF_DEVICE_CLASS)
-        if device_class in UNSUPPORTED_DEVICE_CLASSES:
+        is_closure = device_class in CLOSURE_DEVICE_CLASSES
+        if device_config.get(CONF_CLOSURE_COMPAT) and not is_closure:
             raise cv.Invalid(
-                f"Cover '{cover_id}' has device_class '{device_class}'. Garage "
-                "doors, gates and doors are not Window Coverings. They need the "
-                "Matter Closure Control cluster (Matter 1.5+), which is not "
-                "supported yet"
+                "closure_compat is for covers with device_class garage, gate or door; "
+                f"cover '{cover_id}' has device_class '{device_class}'"
+            )
+        if is_closure and not device_config.get(CONF_CLOSURE_COMPAT):
+            _LOGGER.info(
+                "Cover '%s' has device_class '%s' and is exposed as a Matter Window "
+                "Covering. This is deliberate: no controller supports the Matter 1.5 "
+                "Closure device types yet, while Window Covering works everywhere "
+                "(it is shown as a shutter or blind). Set `closure_compat: true` to "
+                "silence this note, or use the experimental `closure` device type",
+                cover_id,
+                device_class,
             )
 
 

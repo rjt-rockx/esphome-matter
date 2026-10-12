@@ -4,7 +4,7 @@
 #if defined(USE_MATTER) && defined(USE_SWITCH)
 
 #include "esphome/components/switch/switch.h"
-#include "matter_endpoints.h"
+#include "matter_push_bindings.h"
 
 #include <esp_matter.h>
 
@@ -12,18 +12,17 @@
 
 namespace esphome::matter {
 
-// Binds an ESPHome switch to the OnOff cluster of an endpoint.
-class MatterSwitchMapping : public MatterEndpointMappingBase {
+// Binds an ESPHome switch to the OnOff cluster of an endpoint, through the
+// binding framework (MatterOnOffBinding): coalesced pushes, PushScope echo
+// suppression, reconcile after refused commands, stored value replayed at boot.
+class MatterSwitchMapping : public MatterOnOffBinding {
 public:
   MatterSwitchMapping(switch_::Switch *sw, uint16_t endpoint_id);
 
-  void initialize() override;
-
-  void push_state_to_matter(bool on);
-
 protected:
-  // Called on the ESPHome main loop.
-  void apply_on_off_(bool on);
+  void setup_() override;
+  bool entity_on_() override;
+  void command_on_(bool on) override;
 
   switch_::Switch *switch_;
 };

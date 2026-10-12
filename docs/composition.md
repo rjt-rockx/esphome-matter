@@ -30,7 +30,7 @@ Namespaces by name: `common_number`, `common_position`, `switches`. Any other na
 
 ## Labels
 
-`label:` publishes a FixedLabel cluster with the single label `name: <label>` on the endpoint. Home Assistant uses it to name entities of multi-endpoint devices. The value is limited to 16 bytes by the Matter specification. If the endpoint also receives an automatic Number tag, the label is added to that tag as its `Label`.
+`label:` publishes a FixedLabel cluster with the single label `name: <label>` on the endpoint. Home Assistant uses it to name entities of multi-endpoint devices. The value is limited to 16 UTF-8 bytes by the Matter specification; an explicit `label:` that is longer is a configuration error. A label derived by default from an entity name (`conformance.default_label`) is instead truncated on a UTF-8 character boundary, with a warning at config time. If the endpoint also receives an automatic Number tag, the label is added to that tag as its `Label`.
 
 Using `label:` enables `CONFIG_CUSTOM_DEVICE_INFO_PROVIDER`: esphome-matter installs a small `DeviceInfoProvider` that serves the FixedLabel lists. User labels are not supported and read as empty.
 
@@ -61,6 +61,6 @@ The ESP32 platform serves a compile time constant and cannot store the version, 
 
 ## Limits
 
-The build sets `CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT` to the number of configured endpoints plus the root node and `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` to the largest number of device types on one endpoint. Both are exact; the esp-matter defaults are 16.
+Endpoint 0 is the root node, which exists already. Configure it only to add a node level `battery:` / `wired:` Power Source to it, see [power.md](power.md). The build sets `CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT` to the number of configured endpoints (without endpoint 0) plus the root node and `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` to the largest number of device types on one endpoint. Both are exact; the esp-matter defaults are 16.
 
 An [example](../examples/multi-relay.yaml) with four relays is available.

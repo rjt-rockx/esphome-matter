@@ -11,6 +11,7 @@
 #include "matter_component.h"
 #include "matter_identify.h"
 #include "matter_network.h"
+#include "matter_plan.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -212,12 +213,7 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
 
 void MatterComponent::setup() {
   global_matter_component = this;
-#ifdef MATTER_PERSIST_PASSCODE
-  constexpr bool persist_passcode = true;
-#else
-  constexpr bool persist_passcode = false;
-#endif
-  if (!MatterCommissioning::instance().init(persist_passcode)) {
+  if (!MatterCommissioning::instance().init(MATTER_PERSIST_PASSCODE_MODE)) {
     this->mark_failed();
     return;
   }
@@ -296,6 +292,9 @@ void MatterComponent::dump_config() {
     return;
   }
   device_info_dump_config(this->device_info_);
+#ifdef USE_MATTER_PLAN
+  dump_plan();
+#endif // USE_MATTER_PLAN
 
   MatterCommissioning::instance().dump_config();
 

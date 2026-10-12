@@ -56,7 +56,7 @@ Notes:
 - python-matter-server accepted the dev DAC without extra steps, but it is discontinued and archived. Migrate to matterjs-server.
 - Matter-over-Thread devices need a Thread border router that Home Assistant can reach (for example the OpenThread Border Router app). See [troubleshooting.md](troubleshooting.md#thread).
 - The same device can also be added through the ESPHome integration via the native API (if `api:` is configured). Home Assistant will then show it twice. Pick one path per entity to avoid duplicates, unless you intentionally want both. Running both at once is untested for duplicate entity behaviour.
-- Home Assistant shows update entities only for devices that support Matter OTA, which esphome-matter does not. Update the firmware over ESPHome's own OTA.
+- Home Assistant shows update entities only for devices that support Matter OTA. esphome-matter has an opt-in OTA requestor, see [matter-ota.md](matter-ota.md); without it, update the firmware over ESPHome's own OTA.
 
 ## Apple Home
 
@@ -117,14 +117,11 @@ The IKEA Home smart app (DIRIGERA hub) accepts esphome-matter devices: open the 
 
 ## Multi-admin: sharing a device with more than one ecosystem
 
-A Matter device can belong to several ecosystems (fabrics) at once. The device supports up to **5 fabrics** by default. You can raise this with the `CONFIG_MAX_FABRICS` sdkconfig option (5 to 255):
+A Matter device can belong to several ecosystems (fabrics) at once. The device supports up to **5 fabrics** by default. You can raise this with the `max_fabrics` option (5 to 254, see [device-info.md](device-info.md#fabric-limit)):
 
 ```yaml
-esp32:
-  framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_MAX_FABRICS: "8"
+matter:
+  max_fabrics: 8
 ```
 
 Once a device has joined its first fabric, its commissioning window is **closed** on restarts. To add another ecosystem:
@@ -134,7 +131,7 @@ Once a device has joined its first fabric, its commissioning window is **closed*
 
 Fabric data is stored in the dedicated NVS partition and survives OTA updates. It is independent of the transport, so you can commission over Wi-Fi and later swap in `openthread` without re-commissioning (if the hardware supports both).
 
-If you lose access to every controller, use the `matter.factory_reset` action (see the README's example config) to wipe all fabrics and re-open the commissioning window.
+If you lose access to every controller, use the `matter.factory_reset` action (see [commissioning.md](commissioning.md#actions)) to wipe all fabrics and re-open the commissioning window.
 
 Each ecosystem can have its own friendly name for the device (Matter NodeLabel is per fabric).
 

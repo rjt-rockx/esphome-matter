@@ -1,0 +1,50 @@
+# esphome config ok.yaml  (with the RFC patch applied to ESPHome)
+esphome:
+  name: entity-ext-demo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+logger:
+
+i2c:
+  id: i2c_bus
+  sda: GPIO6
+  scl: GPIO7
+
+matter_entity_demo:
+
+switch:
+  - platform: template
+    id: relay
+    name: Relay
+    optimistic: true
+    matter_entity_demo: true                  # inferred device type, hashed endpoint
+  - platform: template
+    id: fan_relay
+    name: Fan relay
+    optimistic: true
+    matter_entity_demo: {as: on_off_light, endpoint: 7, label: Fan}
+
+sensor:
+  - platform: scd4x                           # sub-entities carry the key too
+    i2c_id: i2c_bus
+    co2:
+      id: co2
+      name: CO2
+      matter_entity_demo: {endpoint: 20}
+    temperature:
+      id: room_t
+      name: Temperature
+      matter_entity_demo: true
+  - platform: template
+    id: not_exposed
+    name: Not exposed
+    lambda: return 1.0;

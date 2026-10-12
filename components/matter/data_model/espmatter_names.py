@@ -68,6 +68,17 @@ def feature_namespace(cluster_name: str, feature_name: str) -> str | None:
     return feature["namespace"]
 
 
+def cluster_has_feature_flags(cluster_name: str) -> bool:
+    """True if esp-matter's config_t of the cluster has ``feature_flags``.
+
+    Only for those create() evaluates the features that are set there. The
+    features of other clusters are added with feature::<name>::add() after the
+    cluster was created.
+    """
+    entry = cluster_entry(cluster_name)
+    return bool(entry and entry.get("feature_flags"))
+
+
 def attribute_create_function(cluster_name: str, attribute_name: str) -> str | None:
     """Name of the esp_matter::cluster::<cluster>::attribute::create_* function."""
     entry = cluster_entry(cluster_name)
