@@ -44,12 +44,6 @@ matter:
         switch_id: relay
 ```
 
-# Switches
-
-> **Placeholder.** Binding ESPHome `switch:` entities to a Matter on/off plug-in unit is documented in [switch.md](switch.md). Until that page lands, `switch:` entities are not mapped to a Matter device type.
-
-See [switch.md](switch.md).
-
 # Controller switches (bindings)
 
 The Matter *client* switch device types are `on_off_light_switch`, `dimmer_switch` and `color_dimmer_switch`. They do not expose an ESPHome entity. Instead, ESPHome actions are mapped to the endpoint, and the device sends commands to whatever it is bound to.

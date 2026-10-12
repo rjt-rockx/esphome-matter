@@ -40,7 +40,7 @@ Loops are prevented: a Matter change that matches the current switch state is ig
 
 ### Power-on behaviour
 
-Matter manages the power-on state of the endpoint. After boot, the stored value of the OnOff attribute is applied to the switch, which overrides the ESPHome restore logic. Use `restore_mode: ALWAYS_OFF` on the switch (the ESPHome default for most switch platforms). A warning is logged during config validation for any other restore mode.
+Matter manages the power-on state of the endpoint. After boot, the stored value of the OnOff attribute is applied to the switch, which overrides the ESPHome restore logic. Use `restore_mode: ALWAYS_OFF` on the switch (the ESPHome default). A warning is logged during config validation for any other restore mode.
 
 The `StartUpOnOff` attribute of the OnOff cluster determines the power-on behaviour on Matter's side. If it is not set the previous state is restored.
 
