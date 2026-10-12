@@ -130,13 +130,18 @@ def check_bridge(rep, model: NodeModel, spec: Spec) -> None:
             )
         info = node.bridge or {}
         unique_id = info.get("unique_id")
+        bdbi = node.servers.get(BDBI)
+        revision = bdbi.revision if bdbi is not None else None
         if not unique_id or not isinstance(unique_id, str):
+            # UniqueID became mandatory in cluster revision 4; an older device may leave it out.
+            old_cluster = model.mode == "dump" and revision is not None and revision < 4
             rep.add(
-                ERROR,
+                INFO if old_cluster else ERROR,
                 "BR-UNIQUEID",
                 where,
                 "UniqueID is missing or empty; it is mandatory for Bridged Device Basic Information "
-                "revision 4 and later and must never change",
+                "revision 4 and later and must never change"
+                + (f" (this cluster is revision {revision})" if old_cluster else ""),
             )
         else:
             if len(unique_id.encode()) > MAX_LENGTH:

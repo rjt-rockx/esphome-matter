@@ -96,7 +96,7 @@ against matter.js or chip-tool output easy if wanted.
 | `CL-REVISION`, `CL-GLOBAL-MISSING`, `CL-ATTRLIST-*` | (dump) ClusterRevision, global attributes, AttributeList consistency |
 | `EP-SINGLETON`, `EP-ELECTRICAL` | Root-only (singleton) clusters on other endpoints; Electrical Sensor needs a measurement cluster |
 | `EP-PARTS`, `EP-SERVERLIST` | (dump) PartsList reachability/cycles, Descriptor ServerList matches the clusters read |
-| `BR-AGG-*`, `BR-NODE-*`, `BR-UNIQUEID`, `BR-NODELABEL`, `BR-PARTS` | Bridges ([bridge.md](bridge.md)): Aggregator is a direct child of the root and has no application device type, Bridged Nodes are direct children of an Aggregator and have a UniqueID/NodeLabel that is unique and fits 32 bytes, an Aggregator PartsList lists all descendants (dump) |
+| `BR-AGG-*`, `BR-NODE-*`, `BR-UNIQUEID`, `BR-NODELABEL`, `BR-PARTS` | Bridges ([bridge.md](bridge.md)): Aggregator is a direct child of the root and has no application device type, Bridged Nodes are direct children of an Aggregator and have a UniqueID/NodeLabel that is unique and fits 32 bytes, an Aggregator PartsList lists all descendants (dump); UniqueID is only required from BDBI cluster revision 4 (dump) |
 
 Severity: `error` = non-conformant; `warning` = likely problem (not-applicable
 element present, provisional feature, controller hint); `info` = tool limits and

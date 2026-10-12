@@ -11,7 +11,7 @@ import re
 from dataclasses import replace
 
 import esphome.config_validation as cv
-from esphome.core import CORE
+from esphome.core import CORE, ID
 
 from ..conformance import application_device_type_ids
 from ..const import CONF_ENDPOINTS, CONF_MATTER, CONF_VENDOR_ID
@@ -51,6 +51,24 @@ def bare_matter_hint(inventory: list[Entity]) -> str:
         "  expose: all\n"
         "  expose: []                       # root node only"
     )
+
+
+def bound_entity_ids(endpoints: dict) -> frozenset[str]:
+    """Ids of the entities that hand-written or `bridge:` endpoints already bind."""
+    found: set[str] = set()
+
+    def walk(value):
+        if isinstance(value, ID):
+            found.add(value.id)
+        elif isinstance(value, dict):
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                walk(item)
+
+    walk(endpoints)
+    return frozenset(found)
 
 
 def _has_endpoints(config: dict) -> bool:
@@ -366,7 +384,12 @@ def lower_expose(config: dict) -> dict:
         return config
 
     items = parse_items(config[CONF_EXPOSE])
-    selection = select(inventory, items, config.get(CONF_EXCLUDE, []))
+    selection = select(
+        inventory,
+        items,
+        config.get(CONF_EXCLUDE, []),
+        bound_entity_ids(config.get(CONF_ENDPOINTS) or {}),
+    )
     if warning := unnamed_warning(selection):
         _LOGGER.warning(warning)
     planned, _ = _plan(selection)

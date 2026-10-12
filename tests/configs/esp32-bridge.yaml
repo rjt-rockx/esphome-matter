@@ -26,6 +26,12 @@ wifi:
 
 matter:
   endpoints:
+    # The node's own Power Source lists only its own endpoints (10), not the bridge below the Aggregator.
+    0:
+      wired: {}
+    10:
+      on_off_plug_in_unit:
+        switch_id: relay3
     1:
       aggregator: {}
     2:
@@ -72,6 +78,11 @@ switch:
   - platform: template
     id: relay2
     name: Relay 2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay3
+    name: Relay 3
     optimistic: true
     restore_mode: ALWAYS_OFF
 

@@ -59,7 +59,7 @@ INFO matter.bridge: 2 device(s)
   endpoint 30736: Bridged Node 'Bedroom Thermometer' (bedroom_thermometer); temperature_sensor on endpoint 50033; humidity_sensor on endpoint 61119
 ```
 
-`bridge:` can be combined with hand-written `endpoints:` and with `expose:`. The numbers of the other endpoints are reserved; entities that `expose:` publishes stay on the root node (outside the bridge).
+`bridge:` can be combined with hand-written `endpoints:` and with `expose:`. The numbers of the other endpoints are reserved; entities that `expose:` publishes stay on the root node (outside the bridge). Globs and `expose: all` skip every entity that `bridge:` or `endpoints:` already binds (they would show up twice otherwise); listing such an entity explicitly in `expose:` publishes it again and logs a warning. The root node Power Source (`wired:` / `battery:` on endpoint 0) lists only the node's own endpoints, not the Aggregator or anything below it.
 
 ### Device options
 
@@ -71,7 +71,7 @@ INFO matter.bridge: 2 device(s)
 | `primary` | The device type that shares the Bridged Node endpoint; the other device types get child endpoints. |
 | `nested` | `true`: every device type gets a child endpoint, even a single one. `false`: one endpoint (only valid for one device type). |
 | `reachable` | A `binary_sensor` id driving BDBI Reachable (see below). |
-| `unique_id` | BDBI UniqueID (up to 32 bytes). Default: `<esphome name>-<key>`, hashed to 32 characters when longer. |
+| `unique_id` | BDBI UniqueID (up to 32 bytes). Default: `<node id>-<hash of the key>`, see below. |
 | `vendor_name`, `vendor_id`, `product_name`, `product_id`, `hardware_version`, `hardware_version_string`, `software_version`, `software_version_string`, `manufacturing_date`, `part_number`, `product_url`, `product_label`, `serial_number` | Static BDBI identity attributes. Only the ones you set are created. |
 | `battery`, `wired` | A Power Source on the Bridged Node endpoint, as described in [power.md](power.md). `powers:` defaults to the Bridged Node endpoint and its child endpoints. |
 | `label`, `tags`, `clusters`, `on_attribute` | As on any endpoint. `clusters` and `on_attribute` go on the Bridged Node endpoint and need a `primary` (or a single device type on it). |
@@ -90,18 +90,18 @@ INFO matter.bridge: 2 device(s)
 
 This follows the Matter device library: the Bridged Node is a utility device type on the endpoint, application device types sit on the same endpoint (one) or on parts of a composed device (several). The Descriptor `PartsList` is computed by connectedhomeip from the parent links: the Aggregator lists all of its descendants (full family), a Bridged Node lists its children. The Bridged Node device type is first in the endpoint's DeviceTypeList.
 
-**Identical bridged devices and tags.** Sibling endpoints with an overlapping application device type need a Descriptor `TagList` (the Duplicate condition, see [composition.md](composition.md)); one is added automatically as a Common Number tag, and there are only 31 of them. Twenty identical one-endpoint thermometers share the Aggregator as parent, so they get tags One..Twenty. More than 31 identical devices fail with an error that asks for explicit `tags:`. With `nested: true` the Bridged Node endpoints have only the utility device type, so they are never duplicates and need no tags, at the price of one extra endpoint per device.
+**Identical bridged devices and tags.** Sibling endpoints with an overlapping application device type need a Descriptor `TagList` (the Duplicate condition, see [composition.md](composition.md)); one is added automatically as a Common Number tag, and there are only 31 of them. Twenty identical one-endpoint thermometers share the Aggregator as parent, so they get tags One..Twenty. The numbers follow the device keys, never the hashed endpoint numbers: a key that ends in a number keeps it (`relay_2` is Two), the others take the lowest free numbers in YAML order, and numbers used by explicit `tags:` are skipped. Add new devices at the end of the list (or end their key with a number) and the tags of the existing devices do not change. More than 31 identical devices fail with an error that asks for `nested: true` or explicit `tags:`. With `nested: true` the Bridged Node endpoints have only the utility device type, so they are never duplicates and need no tags, at the price of one extra endpoint per device.
 
 ### Endpoint numbers
 
-Endpoint numbers are a pure function of the key, with the same FNV-1a hashing as `expose:` ([expose.md](expose.md#endpoint-numbers)): `bridge` for the Aggregator, `bridge:<key>` for a Bridged Node and `bridge:<key>/<device type>` for a child. Adding, removing or reordering devices never moves the others, and renaming `name:` does not either. Do not rename a key once the node is commissioned. A hash collision is a build error that names both and suggests a pin; with 150 endpoints the chance of one is around 15%, so large bridges should expect to pin a few.
+Endpoint numbers are a pure function of the key, with the same FNV-1a hashing as `expose:` ([expose.md](expose.md#endpoint-numbers)): `bridge` for the Aggregator, `bridge:<key>` for a Bridged Node and `bridge:<key>/<device type>` for a child. Adding, removing or reordering devices never moves the others, and renaming `name:` does not either. Do not rename a key once the node is commissioned. A hash collision is a build error that names both devices and the pin to add, for example `bridge: {devices: {new_device: {endpoint: 1234}}}`. Pin the device you added last: the other keeps its hashed number, so nothing that is already commissioned moves. With 150 endpoints the chance of a collision is around 15%, so large bridges should expect to pin a few.
 
 ## Bridged Device Basic Information
 
 | Attribute | Source |
 |---|---|
-| NodeLabel | `name`. Writable by controllers and stored in flash when a controller writes it: a later `name:` change in YAML then does not take effect (unverified). |
-| UniqueID | `unique_id`, or `<esphome name>-<key>`. Mandatory in BDBI revision 4 and never allowed to change: set it explicitly if you may rename the ESPHome node. Duplicates are a build error. |
+| NodeLabel | `name`. The attribute is writable and persistent: once a controller writes a new label it is stored in flash, and esp-matter prefers the stored value over the YAML at boot (`esp_matter_data_model.cpp`, attribute creation). To keep `name:` authoritative, the firmware remembers a hash of the configured name per endpoint and erases the stored label when the YAML name changes. A label a controller wrote stays until you change `name:` in YAML. Not verified on hardware. |
+| UniqueID | `unique_id:`, or by default `<node id>-<hash of the device key>`. The node id is a random number created on first boot and kept in flash, the key hash comes from the `bridge:` device key. Renaming the ESPHome node or renumbering endpoints therefore never changes it, but erasing flash does (controllers then see new devices). Always set `unique_id:` for devices that must survive a re-flash with erased flash. UniqueID is mandatory in BDBI revision 4 and must never change. Duplicates are a build error, and the build warns about every device that uses the default. For hand-written `bridged_node` endpoints the key is the endpoint number, so renumbering changes it: set `unique_id:` explicitly there. |
 | VendorName, VendorID, ProductName, ProductID, HardwareVersion(String), SoftwareVersion(String), ManufacturingDate, PartNumber, ProductURL, ProductLabel, SerialNumber | Static values from the options above. Unset ones are not created; controllers fall back to the NodeLabel or the device type. Lengths are checked in bytes. |
 | Reachable | `reachable`, a binary sensor (ON = reachable). Without it the attribute is always true. |
 
@@ -142,7 +142,7 @@ matter:
       temperature_sensor: garage_temperature
 ```
 
-With exactly one aggregator a Bridged Node needs no `parent:`; with several, `parent:` names the Aggregator. The default UniqueID is `<esphome name>-<endpoint>`.
+With exactly one aggregator a Bridged Node needs no `parent:`; with several, `parent:` names the Aggregator. Set `unique_id:` on every hand-written Bridged Node: the default is derived from the endpoint number (plus the per-node id kept in flash), so renumbering the endpoint would change it.
 
 ## Rules that are checked at build time
 

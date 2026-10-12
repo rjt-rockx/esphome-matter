@@ -510,6 +510,9 @@ class Endpoint:
         device_types = ",".join(
             str(i) for i in sorted(t.id for t in self._device_types)
         )
+        if bridged_node := self._config.get(bridge.DEVICE_TYPE_BRIDGED_NODE):
+            # The BDBI attributes a controller reads (NodeLabel, VendorName, ...) are part of the structure.
+            device_types += "|b" + ",".join(sorted(bridge.attribute_names(bridged_node)))
         cluster_text = ",".join(
             f"{cid}[{'+'.join(sorted(features))}]"
             for cid, features in sorted(clusters.items())
@@ -663,6 +666,10 @@ class Endpoint:
             lines.extend(
                 bridge.config_lines(config_var, self._endpoint_id, device_config)
             )
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_conformance.h"'
+            )
+            self.global_includes.add(bridge.DATA_MODEL_GUARD)
 
         if min_level := device_config.get(CONF_MIN_LEVEL):
             lines.append(f"{config_var}.level_control.min_level = {min_level};")
@@ -1120,7 +1127,10 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
     """During validation an endpoint registry is built and stored in CORE.data["matter"]["endpoints"]."""
     endpoints = EndpointRegistry()
     plans = conformance.plan_endpoints(matter_config[CONF_ENDPOINTS])
-    endpoint_ids = tuple(matter_config[CONF_ENDPOINTS])
+    # The default EndpointList of the root node Power Source: the node's own endpoints. The Aggregator and
+    # the bridged devices below it have power sources of their own.
+    bridged = bridge.bridge_subtree(matter_config[CONF_ENDPOINTS])
+    endpoint_ids = tuple(e for e in matter_config[CONF_ENDPOINTS] if e not in bridged)
     for endpoint_id, endpoint_config in matter_config[CONF_ENDPOINTS].items():
         endpoints.register(
             Endpoint(endpoint_id, endpoint_config, plans[endpoint_id], endpoint_ids)

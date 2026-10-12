@@ -89,7 +89,7 @@ STRING_ATTRIBUTES = (
     (CONF_SOFTWARE_VERSION_STRING, "SoftwareVersionString", "create_software_version_string", 64),
     (CONF_MANUFACTURING_DATE, "ManufacturingDate", "create_manufacturing_date", 16),
     (CONF_PART_NUMBER, "PartNumber", "create_part_number", 32),
-    (CONF_PRODUCT_URL, "ProductURL", "create_product_url", 256),
+    (CONF_PRODUCT_URL, "ProductURL", "create_product_url", 254),
     (CONF_PRODUCT_LABEL, "ProductLabel", "create_product_label", 64),
     (CONF_SERIAL_NUMBER, "SerialNumber", "create_serial_number", 32),
 )
@@ -114,6 +114,15 @@ _MANUFACTURING_DATE_RE = re.compile(r"^\d{8}")
 
 # Keys of an endpoint that a `bridge: devices:` entry passes through to its endpoint(s).
 _PASSTHROUGH_KEYS = ("battery", "wired", CONF_LABEL, "tags", "clusters", "on_attribute")
+
+
+# esp-matter's generated data model (experimental) has no cluster::...::attribute::create_*() API.
+DATA_MODEL_GUARD = (
+    '#include "sdkconfig.h"\n'
+    "#ifdef CONFIG_ESP_MATTER_ENABLE_GENERATED_DATA_MODEL\n"
+    '#error "bridge: needs the legacy esp-matter data model; disable CONFIG_ESP_MATTER_ENABLE_GENERATED_DATA_MODEL"\n'
+    "#endif"
+)
 
 
 def _utf8_string(max_bytes: int, min_bytes: int = 1):
@@ -317,12 +326,15 @@ def split_device_types(device: dict, application: list[str]) -> tuple[list[str],
     return list(application), []
 
 
-def default_unique_id(seed: str) -> str:
-    """Stable UniqueID derived from the node name and a seed; hashed when it does not fit in 32 bytes."""
-    unique_id = f"{CORE.name}-{seed}"
-    if len(unique_id.encode()) <= MAX_LABEL_LENGTH:
-        return unique_id
-    return hashlib.sha1(unique_id.encode()).hexdigest()[:MAX_LABEL_LENGTH]
+def key_token(seed: str) -> str:
+    """8 hex digits that identify a bridged device in its default UniqueID (a hash of the device key)."""
+    return hashlib.sha1(seed.encode()).hexdigest()[:8]
+
+
+def node_seed(endpoint_id: int) -> str:
+    """Identity of a Bridged Node for the default UniqueID: the `bridge:` device key, else its endpoint number."""
+    keys = CORE.data.get(CONF_MATTER, {}).get("bridge_keys", {})
+    return keys.get(endpoint_id) or f"endpoint-{endpoint_id}"
 
 
 def _humanize(key: str) -> str:
@@ -340,12 +352,70 @@ def _power_with_endpoints(kind: str, value, endpoints: list[int]):
     return value
 
 
+def _describe(key: str, number: int | str = "N") -> tuple[str, str]:
+    """(what a numbering key is, the `bridge:` YAML that pins it) for error messages."""
+    if key == "bridge":
+        return "the Aggregator", f"bridge: {{endpoint: {number}}}"
+    rest = key[len("bridge:") :]
+    if "/" in rest:
+        device, app = rest.split("/", 1)
+        return (
+            f"the {app} endpoint of device '{device}'",
+            f"bridge: {{devices: {{{device}: {{parts: {{{app}: {number}}}}}}}}}",
+        )
+    return f"device '{rest}'", f"bridge: {{devices: {{{rest}: {{endpoint: {number}}}}}}}"
+
+
+def _resolve_numbers(keys: list[str], pins: dict[str, int], reserved: set[int]) -> dict[str, int]:
+    """Endpoint number per key: pinned, else hashed. Collisions are errors that say what to pin."""
+    from .expose.numbering import _free_suggestion, endpoint_for_key
+
+    def invalid(message):
+        return cv.Invalid(f"matter.bridge: {message}", path=[CONF_BRIDGE])
+
+    pinned: dict[int, str] = {}
+    for key, number in pins.items():
+        what, _ = _describe(key)
+        if number in reserved:
+            raise invalid(f"endpoint {number} is pinned for {what}, but `endpoints:` already uses it")
+        if number in pinned:
+            raise invalid(f"endpoint {number} is pinned for both {_describe(pinned[number])[0]} and {what}")
+        pinned[number] = key
+    hashed: dict[int, list[str]] = {}
+    for key in keys:  # YAML order: the last key of a collision is the one added last
+        if key not in pins:
+            hashed.setdefault(endpoint_for_key(key), []).append(key)
+    taken = set(pinned) | reserved | set(hashed)
+    for number, who in sorted(hashed.items()):
+        if len(who) == 1 and number not in pinned and number not in reserved:
+            continue
+        newest = who[-1]
+        free = _free_suggestion(newest, taken)
+        what, pin = _describe(newest, free)
+        if number in pinned or number in reserved:
+            holder = (
+                _describe(pinned[number])[0] if number in pinned else "an endpoint under `endpoints:`"
+            )
+            raise invalid(
+                f"{what} hashes to endpoint {number}, which {holder} already uses. Pin {what} to a free "
+                f"number, for example {free}: `{pin}`"
+            )
+        first = _describe(who[0])[0]
+        raise invalid(
+            f"{first} and {what} hash to the same endpoint {number}. Pin {what}, the one added last, to a free "
+            f"number, for example {free}: `{pin}`. {first[0].upper() + first[1:]} keeps {number}, so nothing "
+            "that is already commissioned moves"
+        )
+    result = dict(pins)
+    result.update({who[0]: number for number, who in hashed.items()})
+    return result
+
+
 def lower_bridge(config: dict) -> dict:
     """Lower the `bridge:` block into `endpoints:`. Runs at the tail of CONFIG_SCHEMA, before `expose`."""
     if CONF_BRIDGE not in config:
         return config
     from .endpoints import ENDPOINT_SCHEMA  # avoid an import cycle at module import
-    from .expose.numbering import resolve_numbers
 
     config = dict(config)
     block = config.pop(CONF_BRIDGE)
@@ -381,27 +451,23 @@ def lower_bridge(config: dict) -> dict:
             if app_key in device.get(CONF_PARTS, {}):
                 pins[part_key] = device[CONF_PARTS][app_key]
         layout[key] = {"node": node_key, "parts": part_keys, "node_types": node_types}
-    try:
-        numbers = resolve_numbers(keys, pins, set(explicit) | {0})
-    except cv.Invalid as exc:
-        raise cv.Invalid(
-            f"{exc.msg}. In `bridge:` pin the aggregator with `bridge: {{endpoint: N}}`, a device with "
-            "`endpoint: N` and a child endpoint with `parts: {<device type>: N}`",
-            path=[CONF_BRIDGE],
-        ) from None
+    numbers = _resolve_numbers(keys, pins, set(explicit) | {0})
 
     aggregator = numbers[aggregator_key]
     endpoints = dict(explicit)
+    bridge_keys: dict[int, str] = {}
+    owners: dict[int, tuple[int, str]] = {}  # endpoint -> (device index, tag key)
     endpoints[aggregator] = ENDPOINT_SCHEMA({DEVICE_TYPE_AGGREGATOR: {}})
     plan_lines = [f"endpoint {aggregator}: Aggregator"]
-    for key, device in devices.items():
+    for index, (key, device) in enumerate(devices.items()):
         info = layout[key]
         node_number = numbers[info["node"]]
         part_numbers = {k: numbers[v] for k, v in info["parts"].items()}
         node = {
             CONF_NAME: device.get(CONF_NAME) or _humanize(key),
-            CONF_UNIQUE_ID: device.get(CONF_UNIQUE_ID) or default_unique_id(key),
         }
+        # Without `unique_id:` the UniqueID is "<node id>-<hash of key>" (matter_conformance.cpp).
+        bridge_keys[node_number] = key
         for option in IDENTITY_KEYS + (CONF_REACHABLE,):
             if option in device:
                 node[option] = device[option]
@@ -424,6 +490,9 @@ def lower_bridge(config: dict) -> dict:
         }
         for app_key in info["node_types"]:
             node_config[app_key] = device[app_key]
+        owners[node_number] = (index, key)
+        for app_key, number in part_numbers.items():
+            owners[number] = (index, f"{key}/{app_key}")
         try:
             endpoints[node_number] = ENDPOINT_SCHEMA(node_config)
             for number, child in children.items():
@@ -439,10 +508,74 @@ def lower_bridge(config: dict) -> dict:
             + "".join(f" + {k}" for k in info["node_types"])
             + "".join(f"; {k} on endpoint {n}" for k, n in part_numbers.items())
         )
+    _assign_tags(endpoints, owners)
     config[CONF_ENDPOINTS] = dict(sorted(endpoints.items()))
     CORE.data.setdefault(CONF_MATTER, {})["bridge_plan"] = plan_lines
+    CORE.data[CONF_MATTER]["bridge_keys"] = bridge_keys
     _LOGGER.info("matter.bridge: %d device(s)\n  %s", len(devices), "\n  ".join(plan_lines))
     return config
+
+
+def _assign_tags(endpoints: dict[int, dict], owners: dict[int, tuple[int, str]]) -> None:
+    """Common Number tags for bridged devices that share an application device type (Duplicate condition).
+
+    The base engine numbers siblings in endpoint-number order, which is a hash here: adding a device would
+    renumber the others. The tags are numbered from the device keys instead: a key ending in a number keeps
+    that number (relay_2 -> Two), the others take the lowest free numbers in YAML order, and numbers that
+    explicit `tags:` use are skipped. Endpoints that have `tags:` are not touched.
+    """
+    from .conformance import (
+        CONF_TAGS,
+        NAMESPACE_COMMON_NUMBER,
+        NUMBER_TAG_MAX,
+        _duplicate_components,
+    )
+    from .expose.tags import _assign_numbers, _number_tags
+
+    for component in _duplicate_components(endpoints):
+        used: set[int] = set()
+        for number in component:
+            used |= _number_tags(endpoints[number].get(CONF_TAGS))
+        mine = sorted(
+            (n for n in component if n in owners and CONF_TAGS not in endpoints[n]),
+            key=lambda n: owners[n],
+        )
+        if not mine:
+            continue
+        names = [owners[n][1] for n in mine]
+        assigned, _by_position = _assign_numbers(names, used)
+        if max(assigned.values()) > NUMBER_TAG_MAX:
+            raise cv.Invalid(
+                f"matter.bridge: {len(component)} endpoints ({', '.join(names)}) share a device type and need "
+                f"more Common Number tags than the {NUMBER_TAG_MAX} that exist. Give some of the devices "
+                "`nested: true` (their Bridged Node endpoints then have no application device type) or `tags:`",
+                path=[CONF_BRIDGE],
+            )
+        for number, name in zip(mine, names):
+            endpoints[number][CONF_TAGS] = [
+                {"namespace": NAMESPACE_COMMON_NUMBER, "tag": assigned[name]}
+            ]
+        _LOGGER.info(
+            "matter.bridge: %s share a device type: tagged Common Number %s. A key that ends in a number keeps "
+            "it; add devices at the end (or end the key with a number) to keep the other tags",
+            ", ".join(names),
+            ", ".join(str(assigned[n]) for n in names),
+        )
+
+
+def bridge_subtree(endpoints: dict) -> set[int]:
+    """The Aggregator endpoints and every endpoint below them."""
+    parents = {e: c.get(CONF_PARENT, 0) for e, c in endpoints.items()}
+    roots = {e for e, c in endpoints.items() if DEVICE_TYPE_AGGREGATOR in c}
+    found = set(roots)
+    changed = True
+    while changed:
+        changed = False
+        for endpoint_id, parent in parents.items():
+            if parent in found and endpoint_id not in found:
+                found.add(endpoint_id)
+                changed = True
+    return found
 
 
 # --------------------------------------------------------------------------- #
@@ -487,6 +620,7 @@ def validate_topology(matter_config: dict) -> dict:
 
     labels: dict[tuple[int, str], int] = {}
     unique_ids: dict[str, int] = {}
+    defaulted: list[int] = []
     for endpoint_id in nodes:
         config = endpoints[endpoint_id]
         node = config[DEVICE_TYPE_BRIDGED_NODE]
@@ -507,7 +641,9 @@ def validate_topology(matter_config: dict) -> dict:
                 "A Bridged Node must be a direct child of the Aggregator",
                 path=[*path, endpoint_id, CONF_PARENT],
             )
-        unique_id = resolved_unique_id(endpoint_id, node)
+        unique_id = unique_id_identity(endpoint_id, node)
+        if CONF_UNIQUE_ID not in node:
+            defaulted.append(endpoint_id)
         if unique_id in unique_ids:
             raise cv.Invalid(
                 f"Bridged nodes on endpoints {unique_ids[unique_id]} and {endpoint_id} have the same "
@@ -549,6 +685,17 @@ def validate_topology(matter_config: dict) -> dict:
                     child,
                     endpoint_id,
                 )
+    if defaulted:
+        _LOGGER.warning(
+            "Bridged nodes on endpoints %s have no `unique_id:`. Their UniqueID is '<node id>-<hash of %s>': the "
+            "node id is created on first boot and kept in flash (erasing flash gives new ids, which controllers "
+            "see as new devices). Set `unique_id:` where the devices must survive that%s",
+            ", ".join(map(str, defaulted)),
+            "the bridge: device key",
+            "; hand-written endpoints also change their id when renumbered"
+            if any(node_seed(e).startswith("endpoint-") for e in defaulted)
+            else "",
+        )
     if len(nodes) > ALEXA_NODE_WARNING:
         _LOGGER.warning(
             "%d bridged nodes: Alexa reportedly lists only about %d devices per bridge and Apple Home allows %d "
@@ -565,9 +712,9 @@ def validate_topology(matter_config: dict) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def resolved_unique_id(endpoint_id: int, node: dict) -> str:
-    """UniqueID of a Bridged Node: explicit, or <esphome name>-<endpoint> (hand-written endpoints)."""
-    return node.get(CONF_UNIQUE_ID) or default_unique_id(str(endpoint_id))
+def unique_id_identity(endpoint_id: int, node: dict) -> str:
+    """What identifies the UniqueID at build time: the explicit value, or a placeholder node id plus key hash."""
+    return node.get(CONF_UNIQUE_ID) or f"########-{key_token(node_seed(endpoint_id))}"
 
 
 def _c_string(value: str) -> str:
@@ -597,11 +744,19 @@ def attribute_names(node: dict) -> list[str]:
 def config_lines(config_var: str, endpoint_id: int, node: dict) -> list[str]:
     """Fill the BDBI part of the esp-matter bridged_node config (UniqueID and the initial Reachable)."""
     bdbi = f"{config_var}.bridged_device_basic_information"
+    if CONF_UNIQUE_ID in node:
+        unique_id = (
+            f"strncpy({bdbi}.unique_id, {_c_string(node[CONF_UNIQUE_ID])}, sizeof({bdbi}.unique_id) - 1);"
+        )
+    else:
+        unique_id = (
+            f"esphome::matter::format_bridge_unique_id({bdbi}.unique_id, sizeof({bdbi}.unique_id), "
+            f'"{key_token(node_seed(endpoint_id))}");'
+        )
     return [
         # Reachable is driven by a binary sensor once it has a state; until then the node is not reachable.
         f"{bdbi}.reachable = {'false' if CONF_REACHABLE in node else 'true'};",
-        f"strncpy({bdbi}.unique_id, {_c_string(resolved_unique_id(endpoint_id, node))}, "
-        f"sizeof({bdbi}.unique_id) - 1);",
+        unique_id,
     ]
 
 
@@ -624,6 +779,11 @@ def post_create_lines(node: dict) -> list[str]:
         )
         lines.append("    return false;")
 
+    # A NodeLabel that a controller wrote stays in flash and wins over the YAML; a changed `name:` resets it.
+    lines.append(
+        "  esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "
+        f"{_c_string(node[CONF_NAME])});"
+    )
     add_string("create_node_label", node[CONF_NAME])
     for conf_key, _name, function, _max in STRING_ATTRIBUTES:
         if conf_key in node:
@@ -645,7 +805,7 @@ def layout_info(endpoint_id: int, config: dict) -> dict | None:
         return None
     return {
         "node_label": node[CONF_NAME],
-        "unique_id": resolved_unique_id(endpoint_id, node),
+        "unique_id": unique_id_identity(endpoint_id, node),
         "attributes": attribute_names(node),
         "reachable_bound": CONF_REACHABLE in node,
     }
