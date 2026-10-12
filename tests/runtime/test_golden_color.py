@@ -7,11 +7,11 @@ state through reads and subscription reports. Same fixtures and conventions as t
 
 from __future__ import annotations
 
+import itertools
 import time
 
 import pytest
 from test_golden import QUIET, REPORT, move_to_level, oscillates
-import itertools
 
 pytestmark = pytest.mark.golden
 
