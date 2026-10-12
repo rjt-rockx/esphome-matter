@@ -169,11 +169,11 @@
     auto *color_control_cluster = esp_matter::cluster::get(endpoint, 768);
     if (color_control_cluster == nullptr)
       return false;
-    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::color_loop::add) != ESP_OK)
+    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::hue_saturation::add) != ESP_OK)
       return false;
     if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::enhanced_hue::add) != ESP_OK)
       return false;
-    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::hue_saturation::add) != ESP_OK)
+    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::color_loop::add) != ESP_OK)
       return false;
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);

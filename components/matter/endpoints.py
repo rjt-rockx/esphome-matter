@@ -1176,18 +1176,6 @@ class Endpoint:
                 ),
                 key=lambda feature: feature.bit,
             )
-            # Features of a bound fan come from its traits instead.
-            bound_fan = self._fan_variable if cluster.name == "FanControl" else None
-            direct_features = [
-                features_by_name[feature_name]
-                for feature_name, enabled in cluster_config.enabled_features.items()
-                if enabled
-                and feature_name in features_by_name
-                and (
-                    features_by_name[feature_name].conformance is None
-                    or features_by_name[feature_name].conformance.choice is None
-                )
-            ]
             # Features of a bound fan or climate come from its traits instead.
             bound_fan = (
                 self._fan_binding if cluster.name == "FanControl" else None
