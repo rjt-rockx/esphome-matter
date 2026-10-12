@@ -125,9 +125,6 @@ private:
   void initialize_endpoint_mappings_();
 
   DeviceInfoConfig device_info_;
-  uint16_t discriminator_{0};
-  uint32_t passcode_{0};
-
   std::vector<MatterEndpointRegistration> endpoint_registrations_;
   std::vector<MatterEndpointMappingBase *> mappings_;
   std::vector<MatterAttributeCallbackRegistration> attribute_callbacks_;

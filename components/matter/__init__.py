@@ -23,6 +23,7 @@ from esphome.types import ConfigType
 from . import ethernet
 from .actions import register_bound_command_actions
 from .binary_sensors import check_binary_sensors
+from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
 from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .covers import validate_cover_bindings
@@ -163,6 +164,7 @@ CONFIG_SCHEMA = cv.All(
         }
     )
     .extend(DEVICE_INFO_SCHEMA)  # node_label, serial_number, on_identify, ...
+    .extend(COMMISSIONING_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
@@ -261,6 +263,7 @@ async def to_code(config: ConfigType):
     _configure_basic_information(config)
     await setup_device_info(var, config)
     await setup_identify_triggers(var, config)
+    await commissioning_to_code(config)
 
     use_openthread = "openthread" in CORE.loaded_integrations
     use_wifi = "wifi" in CORE.loaded_integrations
