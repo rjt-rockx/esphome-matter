@@ -17,6 +17,7 @@ from esphome.types import ConfigType
 from . import binary_sensors
 from .const import *
 from .covers import WINDOW_COVERING
+from .covers import config_init as cover_config_init
 from .covers import config_lines as cover_config_lines
 from .data_model.attributes import SensorAttribute, attribute_value_type
 from .data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME, Cluster
@@ -298,11 +299,14 @@ class Endpoint:
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
         config_var = f"device_config_{index}"
+        device_config = self._config[device_type.conf_key]
+        config_init = ""
+        if device_type.name == WINDOW_COVERING and CONF_COVER_ID in device_config:
+            config_init = cover_config_init(self._endpoint_id, device_config)
         lines = [
-            f"esp_matter::endpoint::{device_type.namespace}::config_t {config_var}{{}};"
+            f"esp_matter::endpoint::{device_type.namespace}::config_t {config_var}{{{config_init}}};"
         ]
 
-        device_config = self._config[device_type.conf_key]
         if min_level := device_config.get(CONF_MIN_LEVEL):
             lines.append(f"{config_var}.level_control.min_level = {min_level};")
         if max_level := device_config.get(CONF_MAX_LEVEL):

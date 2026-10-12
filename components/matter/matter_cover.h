@@ -33,7 +33,8 @@ float cover_from_matter(uint16_t matter_value);
 // The mapping is also the cluster's Delegate: connectedhomeip invokes
 // HandleMovement/HandleStopMotion on the CHIP task after it has set the
 // TargetPosition attributes, and the mapping defers the work to the ESPHome
-// main loop. Cover state is pushed back with attribute::report.
+// main loop. Cover state is pushed back with attribute::report, which does not
+// run the attribute callbacks.
 //
 // Using the Window Covering delegate and batching lift and tilt into a single
 // cover call is aligned with the approach of mrflo97/esphome-matter.
@@ -42,12 +43,15 @@ class MatterCoverMapping : public MatterEndpointMappingBase,
 public:
   MatterCoverMapping(cover::Cover *cover, uint16_t endpoint_id);
 
+  // EndProductType for the endpoint config constructor (the attribute is const
+  // in esp-matter). `end_product_type` < 0 selects it from the device class.
+  uint8_t end_product_type(const char *device_class, int end_product_type) const;
+
   // Fills the esp-matter cluster config used to create the endpoint: feature
-  // flags, Type, EndProductType, ConfigStatus, delegate and initial positions.
-  // Called from the generated endpoint build callback.
-  // `end_product_type` < 0 selects it from the device class.
+  // flags, Type, ConfigStatus, delegate and initial positions. Called from the
+  // generated endpoint build callback.
   void configure(esp_matter::cluster::window_covering::config_t &config,
-                 const char *device_class, int end_product_type);
+                 const char *device_class);
 
   void initialize() override;
 
@@ -57,8 +61,7 @@ public:
   CHIP_ERROR HandleStopMotion() override;
 
 protected:
-  void request_lift_(uint16_t target, bool from_delegate);
-  void request_tilt_(uint16_t target, bool from_delegate);
+  void request_(bool lift, uint16_t target);
   void schedule_drain_();
   void drain_();
   void stop_();
@@ -76,21 +79,14 @@ protected:
   bool drain_scheduled_{false};
   optional<uint16_t> target_lift_;
   optional<uint16_t> target_tilt_;
-  uint16_t last_lift_request_{0};
-  uint32_t last_lift_request_ms_{0};
-  bool have_lift_request_{false};
-  uint16_t last_tilt_request_{0};
-  uint32_t last_tilt_request_ms_{0};
-  bool have_tilt_request_{false};
-  uint32_t last_stop_ms_{0};
-  bool stop_seen_{false};
 };
 
-// Used by the generated endpoint code. Looks up the mapping registered for the
-// endpoint by MatterComponent::register_cover.
-void configure_window_covering(
-    esp_matter::cluster::window_covering::config_t &config,
-    uint16_t endpoint_id, const char *device_class, int end_product_type);
+// Used by the generated endpoint code. Both look up the mapping registered for
+// the endpoint by MatterComponent::register_cover.
+uint8_t window_covering_end_product_type(uint16_t endpoint_id, const char *device_class,
+                                         int end_product_type);
+void configure_window_covering(esp_matter::cluster::window_covering::config_t &config,
+                               uint16_t endpoint_id, const char *device_class);
 
 } // namespace esphome::matter
 

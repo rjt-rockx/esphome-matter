@@ -84,14 +84,31 @@ def validate_cover_bindings(matter_config: dict, full_config: Config) -> None:
             )
 
 
-def config_lines(config_var: str, endpoint_id: int, device_config: dict) -> list[str]:
-    """C++ lines that attach the cover binding to a window_covering config."""
+def _binding(device_config: dict) -> tuple[str, int]:
     device_class = ""
     cover_config = _cover_config(CORE.config, device_config[CONF_COVER_ID])
     if cover_config:
         device_class = cover_config.get(CONF_DEVICE_CLASS) or ""
     end_product = END_PRODUCT_TYPES.get(device_config.get(CONF_END_PRODUCT_TYPE), -1)
+    return device_class, end_product
+
+
+def config_init(endpoint_id: int, device_config: dict) -> str:
+    """Constructor argument of the window_covering endpoint config.
+
+    esp-matter only accepts EndProductType through the constructor.
+    """
+    device_class, end_product = _binding(device_config)
+    return (
+        "esphome::matter::window_covering_end_product_type("
+        f'{endpoint_id}, "{device_class}", {end_product})'
+    )
+
+
+def config_lines(config_var: str, endpoint_id: int, device_config: dict) -> list[str]:
+    """C++ lines that attach the cover binding to a window_covering config."""
+    device_class, _ = _binding(device_config)
     return [
         "esphome::matter::configure_window_covering("
-        f'{config_var}.window_covering, {endpoint_id}, "{device_class}", {end_product});'
+        f'{config_var}.window_covering, {endpoint_id}, "{device_class}");'
     ]

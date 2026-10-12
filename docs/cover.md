@@ -52,7 +52,7 @@ Device classes map as follows:
 | `curtain` | Drapery | CentralCurtain |
 | `awning` | Awning | AwningTerracePatio |
 | `shutter` | Shutter | RollerShutter |
-| any, with tilt | TiltBlindLiftAndTilt | InteriorVenetianBlind |
+| none, `shade`, `window`, `damper`, `blind`, with tilt | TiltBlindLiftAndTilt | InteriorVenetianBlind |
 
 ### Positions are inverted
 
@@ -84,11 +84,11 @@ are not supported by this component yet.
 ## Implementation notes
 
 Inbound commands reach the cover through the `chip::app::Clusters::WindowCovering::Delegate`, which the
-component attaches to the cluster when the endpoint is created. `HandleMovement` reads the target the cluster has just
-set and `HandleStopMotion` stops the cover; both defer to the ESPHome main loop. Changes to the
-`TargetPositionLiftPercent100ths`/`TargetPositionTiltPercent100ths` attributes are handled as a fallback;
-duplicates of the same command are filtered. Outbound state uses `esp_matter::attribute::report`, so reporting does not
-trigger the callbacks again.
+component attaches to the cluster when the endpoint is created. connectedhomeip sets the
+`TargetPositionLiftPercent100ths`/`TargetPositionTiltPercent100ths` attributes and then calls `HandleMovement`, which
+reads the target and defers to the ESPHome main loop. `HandleStopMotion` stops the cover the same way. Clients cannot
+write the target attributes, so the delegate is the only inbound path. Outbound state uses
+`esp_matter::attribute::report`, so reporting does not trigger attribute callbacks.
 
 The window covering delegate approach and the idea of combining lift and tilt into one call were inspired by
 [mrflo97/esphome-matter](https://github.com/mrflo97/esphome-matter).
