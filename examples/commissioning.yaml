@@ -18,6 +18,7 @@ wifi:
 
 # See docs/commissioning.md
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   # persist_passcode: true   # keep the plaintext passcode in flash (not recommended)
   on_commissioned:
     - logger.log: "Commissioned"

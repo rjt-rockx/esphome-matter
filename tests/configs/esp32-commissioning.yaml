@@ -24,6 +24,7 @@ wifi:
   password: ci-test-password
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   on_commissioned:
     - logger.log: "Commissioned"
   on_decommissioned:

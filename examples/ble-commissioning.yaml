@@ -18,6 +18,7 @@ network:
 # commissioner (phone / Home Assistant) provisions Wi-Fi or Thread credentials
 # through Matter. See docs/ble-commissioning.md for the limitations.
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   ble_commissioning: true # optional; asserts the automatic choice
   endpoints:
     1:

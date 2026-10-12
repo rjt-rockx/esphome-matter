@@ -57,6 +57,7 @@ If you want the old behaviour (a sticker on the device that stays valid forever)
 
 ```yaml
 matter:
+  expose: []
   persist_passcode: true
 ```
 

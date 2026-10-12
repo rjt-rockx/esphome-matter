@@ -26,6 +26,7 @@ openthread:
   channel: 15
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   debug: true
   endpoints:
     1:
