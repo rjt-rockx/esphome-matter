@@ -1,0 +1,8 @@
+esphome-matter
+
+The matter component in this repository is derived from
+DavidvtWout/esphome-matter (https://github.com/DavidvtWout/esphome-matter),
+licensed under the Apache License 2.0 (see LICENSE-APACHE), and has been
+modified.
+
+Other contents are licensed under the MIT License (see LICENSE).
