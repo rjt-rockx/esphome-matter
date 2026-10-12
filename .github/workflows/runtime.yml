@@ -102,7 +102,7 @@ jobs:
 
       - name: Install system packages
         if: steps.gate.outputs.run == 'true'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache libslirp0 libglib2.0-0
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache libslirp0 libglib2.0-0 libsdl2-2.0-0 libpixman-1-0
 
       - name: Install ESPHome, aioesphomeapi and pytest
         if: steps.gate.outputs.run == 'true'
