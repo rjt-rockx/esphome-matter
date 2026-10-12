@@ -10,6 +10,7 @@
 #include "esphome/core/log.h"
 #include "matter_attributes.h"
 #include "matter_endpoints.h"
+#include "matter_push_bindings.h"
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
 #endif
@@ -85,18 +86,22 @@ inline uint8_t air_quality_level(float value,
 }
 
 #ifdef USE_SENSOR
-// Air Quality level derived from a measurement with thresholds.
-class MatterAirQualityMapping : public MatterEndpointMappingBase {
+// Air Quality level derived from a measurement with thresholds. An ESPHome ->
+// Matter attribute push of the binding framework (MatterAttributePushBinding):
+// the newest level wins, the cluster is written on the CHIP task inside a
+// PushScope.
+class MatterAirQualityMapping : public MatterAttributePushBinding {
 public:
   MatterAirQualityMapping(sensor::Sensor *sensor, uint16_t endpoint_id,
                           uint32_t cluster_id, uint32_t attribute_id,
                           std::vector<MatterAirQualityThreshold> thresholds,
                           float hysteresis)
-      : MatterEndpointMappingBase(endpoint_id), sensor_(sensor),
-        cluster_id_(cluster_id), thresholds_(std::move(thresholds)),
+      : MatterAttributePushBinding(endpoint_id, cluster_id, attribute_id),
+        sensor_(sensor), thresholds_(std::move(thresholds)),
         hysteresis_(hysteresis) {}
 
-  void initialize() override {
+protected:
+  void setup_() override {
     if (this->sensor_ == nullptr)
       return;
     this->sensor_->add_on_state_callback(
@@ -105,7 +110,26 @@ public:
       this->publish_(this->sensor_->state);
   }
 
-protected:
+  // Main loop.
+  ValueState capture_() override {
+    ValueState s;
+    if (this->published_ >= 0) {
+      s.valid = true;
+      s.value = esp_matter_enum8(static_cast<uint8_t>(this->published_));
+    }
+    return s;
+  }
+
+  // CHIP task, inside the PushScope.
+  void write_attribute_(const ValueState &s) override {
+    CHIP_ERROR err = update_air_quality_attribute(this->endpoint_id_,
+                                                  this->cluster_id_, s.value);
+    if (err != CHIP_NO_ERROR)
+      ESP_LOGW("matter.air_quality",
+               "Cannot set the air quality level %u on endpoint %u: %s",
+               s.value.val.u8, this->endpoint_id_, err.AsString());
+  }
+
   // Main loop.
   void publish_(float value) {
     uint8_t level =
@@ -113,20 +137,10 @@ protected:
     if (level == this->published_)
       return;
     this->published_ = level;
-    uint16_t endpoint_id = this->endpoint_id_;
-    uint32_t cluster_id = this->cluster_id_;
-    run_on_matter_thread([endpoint_id, cluster_id, level]() {
-      CHIP_ERROR err = update_air_quality_attribute(endpoint_id, cluster_id,
-                                                    esp_matter_enum8(level));
-      if (err != CHIP_NO_ERROR)
-        ESP_LOGW("matter.air_quality",
-                 "Cannot set the air quality level %u on endpoint %u: %s",
-                 level, endpoint_id, err.AsString());
-    });
+    this->request_push();
   }
 
   sensor::Sensor *sensor_;
-  uint32_t cluster_id_;
   std::vector<MatterAirQualityThreshold> thresholds_;
   float hysteresis_;
   size_t index_{0};

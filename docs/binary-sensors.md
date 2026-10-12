@@ -144,7 +144,7 @@ add your own `delayed_off` to the same sensor unless you want both delays to add
   The value is clamped into the limits. Changing `min`, `max` or `default` therefore applies the new setup once.
 * `number`: an ESPHome `number` that mirrors HoldTime in both directions. A write from Matter (HoldTime or a legacy
   alias) sets the number; a change of the number sets HoldTime, clamped into the limits, and the clamped value is shown
-  in the number again. A stale value from Matter never overwrites a newer number change. The Matter value wins at boot as
+  in the number again. A stale value never wins: a number change that was captured before a controller write is dropped, and a controller write that arrives before a number push ran is applied to the number first. The Matter value wins at boot as
   above, so a restored number only matters when Matter has no value; use `restore_value: true` on it anyway so that it
   shows something at boot. The number's `min_value`/`max_value` should equal the limits: a narrower range is a warning
   (some values cannot be set from ESPHome) and a wider one too (values outside are clamped).
@@ -220,6 +220,8 @@ matter:
   suppressions were cleared). Use it to silence a siren that `on_active` started.
 * `on_active` runs on the ESPHome main loop whenever AlarmsActive changes, including changes caused by controllers
   (they can disable an active alarm). Use it to drive the buzzer or LED of the device.
+  `on_attribute` triggers on AlarmsActive treat the changes made by the alarm source itself as ESPHome's own writes and
+  do not fire for them; `on_active` does.
 * `sensitivity` creates CurrentSensitivityLevel (writable by controllers, persisted), SupportedSensitivityLevels and,
   with `default`, DefaultSensitivityLevel. With `number` the ESPHome number mirrors CurrentSensitivityLevel in both
   directions (the number wins at boot when it has a state; use `restore_value: true`). How a level changes the detection

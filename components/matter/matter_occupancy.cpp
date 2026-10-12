@@ -56,15 +56,12 @@ bool is_hold_time_attribute(uint32_t attribute_id) {
 
 } // namespace
 
-void MatterOccupancyHoldTimeMapping::initialize() {
-  bool number_has_state = false;
-  uint16_t number_value = 0;
-
+void MatterOccupancyHoldTimeMapping::setup_() {
 #ifdef USE_NUMBER
   if (this->number_ != nullptr) {
     if (this->number_->has_state() && !std::isnan(this->number_->state)) {
-      number_has_state = true;
-      number_value = static_cast<uint16_t>(std::clamp<long>(
+      this->boot_number_has_state_ = true;
+      this->boot_number_value_ = static_cast<uint16_t>(std::clamp<long>(
           std::lround(this->number_->state), this->min_, this->max_));
     }
     this->number_->add_on_state_callback(
@@ -73,29 +70,30 @@ void MatterOccupancyHoldTimeMapping::initialize() {
 #endif
 
   // Writes of HoldTime by a controller (and of the deprecated aliases): the
-  // callbacks run on the Matter thread.
+  // callbacks run on the Matter thread. Our own writes never reach them.
   for (uint32_t attribute_id :
        {OS::Attributes::HoldTime::Id,
         OS::Attributes::PIROccupiedToUnoccupiedDelay::Id,
         OS::Attributes::UltrasonicOccupiedToUnoccupiedDelay::Id,
-        OS::Attributes::PhysicalContactOccupiedToUnoccupiedDelay::Id}) {
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id_, OS::Id, attribute_id,
-        [this](const esp_matter_attr_val_t &value) {
-          this->on_controller_write_(value.val.u16);
-        });
-  }
+        OS::Attributes::PhysicalContactOccupiedToUnoccupiedDelay::Id})
+    this->watch_attribute(OS::Id, attribute_id);
 
-  run_on_matter_thread([this, number_has_state, number_value]() {
-    this->apply_(number_has_state, number_value);
-  });
+  // Queued before any push of the number, so it runs first on the CHIP task.
+  this->boot_slot_.request();
+}
+
+void MatterOccupancyHoldTimeMapping::boot_trampoline_(intptr_t ctx) {
+  auto *self = reinterpret_cast<MatterOccupancyHoldTimeMapping *>(ctx);
+  self->boot_slot_.begin_run();
+  self->apply_();
 }
 
 // Matter thread. Applies HoldTime after the cluster started: the Matter
 // persisted value wins (when it was stored for this configuration), then the
 // number, then the default.
-void MatterOccupancyHoldTimeMapping::apply_(bool number_has_state,
-                                            uint16_t number_value) {
+void MatterOccupancyHoldTimeMapping::apply_() {
+  const bool number_has_state = this->boot_number_has_state_;
+  const uint16_t number_value = this->boot_number_value_;
   auto *cluster = find_cluster(this->endpoint_id_);
   if (cluster == nullptr) {
     ESP_LOGW(TAG, "Occupancy Sensing cluster of endpoint %u not found",
@@ -134,27 +132,27 @@ void MatterOccupancyHoldTimeMapping::apply_(bool number_has_state,
     origin = "number";
   }
   value = std::clamp(value, this->min_, this->max_);
-  this->set_hold_time_(value);
+  {
+    PushScope scope(this->endpoint_id_);
+    this->set_hold_time_(value);
+  }
   ESP_LOGD(TAG, "Endpoint %u: HoldTime %u s from %s (limits %u-%u s)",
            this->endpoint_id_, static_cast<unsigned>(value), origin,
            this->min_, this->max_);
 
+  // Show the chosen value in the number (a no-op when it is already there).
 #ifdef USE_NUMBER
-  if (this->number_ != nullptr) {
-    uint32_t seq = this->number_seq_.load();
-    global_matter_component->defer_to_main_loop(
-        [this, value, seq]() { this->publish_to_number_(value, seq); });
-  }
+  if (this->number_ != nullptr)
+    this->matter_changed_(value);
 #endif
 }
 
-// Matter thread. Returns false when the cluster refused the value.
+// Matter thread, inside a PushScope. Returns false when the cluster refused
+// the value.
 bool MatterOccupancyHoldTimeMapping::set_hold_time_(uint16_t seconds) {
   auto *cluster = find_cluster(this->endpoint_id_);
   if (cluster == nullptr || !cluster->IsHoldTimeEnabled())
     return false;
-  // ESPHome -> Matter push, not a controller write.
-  MatterPushGuard push_guard;
   auto status = cluster->SetHoldTime(seconds);
   if (!status.IsSuccess()) {
     ESP_LOGW(TAG, "Cannot set HoldTime %u on endpoint %u",
@@ -178,49 +176,64 @@ void MatterOccupancyHoldTimeMapping::save_(uint16_t seconds) const {
 }
 
 // Matter thread, after the cluster accepted the write of a controller.
-void MatterOccupancyHoldTimeMapping::on_controller_write_(uint16_t seconds) {
-  this->save_(seconds);
+void MatterOccupancyHoldTimeMapping::on_attribute_(
+    uint32_t, uint32_t attribute_id, const esp_matter_attr_val_t &value) {
+  if (!is_hold_time_attribute(attribute_id))
+    return;
+  this->save_(value.val.u16);
 #ifdef USE_NUMBER
-  if (this->number_ != nullptr) {
-    uint32_t seq = this->number_seq_.load();
-    global_matter_component->defer_to_main_loop(
-        [this, seconds, seq]() { this->publish_to_number_(seconds, seq); });
+  if (this->number_ != nullptr)
+    this->matter_changed_(value.val.u16);
+#endif
+}
+
+// Main loop.
+bool MatterOccupancyHoldTimeMapping::entity_value_(int32_t &out) {
+#ifdef USE_NUMBER
+  if (this->number_ != nullptr && this->number_->has_state() &&
+      !std::isnan(this->number_->state)) {
+    out = std::clamp<long>(std::lround(this->number_->state), this->min_,
+                           this->max_);
+    return true;
   }
 #endif
+  return false;
+}
+
+// Main loop. Shows the value that Matter holds (without sending it back: the
+// push that follows carries the same value).
+void MatterOccupancyHoldTimeMapping::command_value_(int32_t value) {
+#ifdef USE_NUMBER
+  if (this->number_ == nullptr)
+    return;
+  if (this->number_->has_state() &&
+      std::lround(this->number_->state) == static_cast<long>(value))
+    return;
+  auto call = this->number_->make_call();
+  call.set_value(static_cast<float>(value));
+  call.perform();
+#endif
+}
+
+// CHIP task, inside the PushScope.
+void MatterOccupancyHoldTimeMapping::write_value_(int32_t value) {
+  this->set_hold_time_(static_cast<uint16_t>(value));
 }
 
 #ifdef USE_NUMBER
 // Main loop.
 void MatterOccupancyHoldTimeMapping::on_number_(float value) {
-  if (this->publishing_ || std::isnan(value))
+  if (std::isnan(value))
     return;
-  this->number_seq_.fetch_add(1);
-  uint16_t seconds = static_cast<uint16_t>(
-      std::clamp<long>(std::lround(value), this->min_, this->max_));
-  if (std::lround(value) != static_cast<long>(seconds)) {
+  long raw = std::lround(value);
+  long seconds = std::clamp<long>(raw, this->min_, this->max_);
+  if (raw != seconds) {
     // Outside the limits: Matter keeps the clamped value, show it.
     ESP_LOGW(TAG, "Number value %.0f is outside the HoldTime limits %u-%u s",
              value, this->min_, this->max_);
-    uint32_t seq = this->number_seq_.load();
-    global_matter_component->defer_to_main_loop(
-        [this, seconds, seq]() { this->publish_to_number_(seconds, seq); });
+    this->command_value_(static_cast<int32_t>(seconds));
   }
-  run_on_matter_thread([this, seconds]() { this->set_hold_time_(seconds); });
-}
-
-// Main loop. Shows the value that Matter holds without sending it back.
-void MatterOccupancyHoldTimeMapping::publish_to_number_(uint16_t seconds,
-                                                        uint32_t seq) {
-  if (seq != this->number_seq_.load())
-    return;
-  if (this->number_->has_state() &&
-      std::lround(this->number_->state) == static_cast<long>(seconds))
-    return;
-  this->publishing_ = true;
-  auto call = this->number_->make_call();
-  call.set_value(static_cast<float>(seconds));
-  call.perform();
-  this->publishing_ = false;
+  this->request_push();
 }
 #endif // USE_NUMBER
 

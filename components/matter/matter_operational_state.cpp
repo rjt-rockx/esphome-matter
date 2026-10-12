@@ -43,7 +43,12 @@ chip::CharSpan span_of(const std::string &text) {
 
 MatterOperationalStateMapping::MatterOperationalStateMapping(
     uint16_t endpoint_id, uint32_t cluster_id)
-    : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id) {
+    : MatterBinding<MatterOpStateSnapshot, NoInbound>(
+          endpoint_id, BindingPolicy{BootSync::ESPHOME_WINS, 0, false}),
+      cluster_id_(cluster_id),
+      events_([this](uint16_t, const MatterOpEvent &event) {
+        this->emit_event_(event);
+      }) {
   opstate_mappings().push_back(this);
 }
 
@@ -254,7 +259,7 @@ opstate_ns::Instance *MatterOperationalStateMapping::instance_() {
   return static_cast<opstate_ns::Instance *>(managed);
 }
 
-void MatterOperationalStateMapping::initialize() {
+void MatterOperationalStateMapping::setup_() {
 #ifdef USE_SENSOR
   if (this->countdown_sensor_ != nullptr) {
     auto update = [this](float value) {
@@ -264,10 +269,7 @@ void MatterOperationalStateMapping::initialize() {
                             : -1;
       if (seconds == this->countdown_.exchange(seconds))
         return;
-      run_on_matter_thread([this]() {
-        if (auto *instance = this->instance_())
-          instance->UpdateCountdownTimeFromDelegate();
-      });
+      this->request_push();
     };
     this->countdown_sensor_->add_on_state_callback(update);
     if (this->countdown_sensor_->has_state())
@@ -305,34 +307,36 @@ void MatterOperationalStateMapping::initialize() {
         [this](const std::string &value) { this->on_phase_source_(value); });
 #endif
   // Push the restored state of the sources (read on the main loop).
-  global_matter_component->defer_to_main_loop([this]() {
+  binding_platform()->defer_main([this]() { this->push_source_states_(); });
+}
+
+void MatterOperationalStateMapping::push_source_states_() {
 #ifdef USE_SELECT
-    if (this->state_select_ != nullptr && this->state_select_->has_state()) {
-      auto index = this->state_select_->active_index();
-      if (index.has_value()) {
-        auto option = this->state_select_->at(index.value());
-        if (option.has_value())
-          this->on_state_source_(option.value());
-      }
+  if (this->state_select_ != nullptr && this->state_select_->has_state()) {
+    auto index = this->state_select_->active_index();
+    if (index.has_value()) {
+      auto option = this->state_select_->at(index.value());
+      if (option.has_value())
+        this->on_state_source_(option.value());
     }
-    if (this->phase_select_ != nullptr && this->phase_select_->has_state()) {
-      auto index = this->phase_select_->active_index();
-      if (index.has_value()) {
-        auto option = this->phase_select_->at(index.value());
-        if (option.has_value())
-          this->on_phase_source_(option.value());
-      }
+  }
+  if (this->phase_select_ != nullptr && this->phase_select_->has_state()) {
+    auto index = this->phase_select_->active_index();
+    if (index.has_value()) {
+      auto option = this->phase_select_->at(index.value());
+      if (option.has_value())
+        this->on_phase_source_(option.value());
     }
+  }
 #endif
 #ifdef USE_TEXT_SENSOR
-    if (this->state_text_sensor_ != nullptr &&
-        this->state_text_sensor_->has_state())
-      this->on_state_source_(this->state_text_sensor_->state);
-    if (this->phase_text_sensor_ != nullptr &&
-        this->phase_text_sensor_->has_state())
-      this->on_phase_source_(this->phase_text_sensor_->state);
+  if (this->state_text_sensor_ != nullptr &&
+      this->state_text_sensor_->has_state())
+    this->on_state_source_(this->state_text_sensor_->state);
+  if (this->phase_text_sensor_ != nullptr &&
+      this->phase_text_sensor_->has_state())
+    this->on_phase_source_(this->phase_text_sensor_->state);
 #endif
-  });
 }
 
 void MatterOperationalStateMapping::on_state_source_(const std::string &value) {
@@ -343,6 +347,7 @@ void MatterOperationalStateMapping::on_phase_source_(const std::string &value) {
   this->set_phase(value);
 }
 
+// Main loop.
 void MatterOperationalStateMapping::set_state(const std::string &state_name) {
   uint8_t id = 0;
   if (!this->lookup_(this->state_names_, state_name, id)) {
@@ -352,13 +357,56 @@ void MatterOperationalStateMapping::set_state(const std::string &state_name) {
     return;
   }
   this->current_state_.store(id);
-  run_on_matter_thread([this, id]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr) {
-      ESP_LOGW(TAG, "Operational state cluster 0x%04x on endpoint %u is not running",
-               static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
+  this->desired_state_ = id;
+  this->state_from_event_ = false;
+  this->request_push();
+}
+
+// Main loop.
+void MatterOperationalStateMapping::set_phase(const std::string &phase_name) {
+  int16_t phase = -1;
+  if (!phase_name.empty()) {
+    std::string wanted = normalize_(phase_name);
+    bool found = false;
+    for (size_t i = 0; i < this->phases_.size(); i++) {
+      if (normalize_(this->phases_[i]) == wanted) {
+        phase = static_cast<int16_t>(i);
+        found = true;
+        break;
+      }
+    }
+    if (!found && wanted != "none" && wanted != "null") {
+      ESP_LOGW(TAG, "Unknown phase '%s' on endpoint %u cluster 0x%04x",
+               phase_name.c_str(), this->endpoint_id(),
+               static_cast<unsigned>(this->cluster_id_));
       return;
     }
+  }
+  this->desired_phase_ = phase;
+  this->request_push();
+}
+
+// Main loop.
+MatterOpStateSnapshot MatterOperationalStateMapping::capture_() {
+  MatterOpStateSnapshot snapshot;
+  // The Error state entered by raise_error() is written by its OperationalError event (which carries the error).
+  snapshot.state = this->state_from_event_ ? -1 : this->desired_state_;
+  snapshot.phase = this->desired_phase_;
+  snapshot.countdown = this->countdown_.load();
+  return snapshot;
+}
+
+// CHIP task, inside the PushScope.
+void MatterOperationalStateMapping::write_matter_(
+    const MatterOpStateSnapshot &s) {
+  auto *instance = this->instance_();
+  if (instance == nullptr) {
+    ESP_LOGW(TAG, "Operational state cluster 0x%04x on endpoint %u is not running",
+             static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
+    return;
+  }
+  if (s.state >= 0) {
+    const uint8_t id = static_cast<uint8_t>(s.state);
     if (id == chip::to_underlying(opstate_ns::OperationalStateEnum::kError)) {
       // The Error state can only be entered by reporting an OperationalError (matter.operational_state.error does that
       // with a specific error). A bare "error" state without one reports a generic error.
@@ -372,80 +420,83 @@ void MatterOperationalStateMapping::set_state(const std::string &state_name) {
       ESP_LOGW(TAG, "Operational state %u rejected by endpoint %u cluster 0x%04x",
                id, this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
     }
-  });
-}
-
-void MatterOperationalStateMapping::set_phase(const std::string &phase_name) {
-  chip::app::DataModel::Nullable<uint8_t> phase = chip::app::DataModel::NullNullable;
-  if (!phase_name.empty()) {
-    std::string wanted = normalize_(phase_name);
-    bool found = false;
-    for (size_t i = 0; i < this->phases_.size(); i++) {
-      if (normalize_(this->phases_[i]) == wanted) {
-        phase = chip::app::DataModel::MakeNullable(static_cast<uint8_t>(i));
-        found = true;
-        break;
-      }
-    }
-    if (!found && wanted != "none" && wanted != "null") {
-      ESP_LOGW(TAG, "Unknown phase '%s' on endpoint %u cluster 0x%04x",
-               phase_name.c_str(), this->endpoint_id(),
-               static_cast<unsigned>(this->cluster_id_));
-      return;
-    }
   }
-  run_on_matter_thread([this, phase]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr)
-      return;
+  if (s.phase != -2) {
+    chip::app::DataModel::Nullable<uint8_t> phase = chip::app::DataModel::NullNullable;
+    if (s.phase >= 0)
+      phase = chip::app::DataModel::MakeNullable(static_cast<uint8_t>(s.phase));
     if (instance->SetCurrentPhase(phase) != CHIP_NO_ERROR)
       ESP_LOGW(TAG, "Current phase rejected by endpoint %u cluster 0x%04x",
                this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
-  });
+  }
+  if (s.countdown != this->written_countdown_) {
+    this->written_countdown_ = s.countdown;
+    // The Instance reads the value from GetCountdownTime() and reports a change.
+    instance->UpdateCountdownTimeFromDelegate();
+  }
 }
 
+// Main loop.
 void MatterOperationalStateMapping::raise_error(uint8_t error_id,
                                                 const std::string &label,
                                                 const std::string &details) {
   this->current_state_.store(
       chip::to_underlying(opstate_ns::OperationalStateEnum::kError));
-  run_on_matter_thread([this, error_id, label, details]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr)
-      return;
-    // Already in this error (a state source reported "error" first, or this action ran twice): the
-    // OperationalError event was sent for it, do not send a duplicate.
-    opstate_ns::GenericOperationalError current(0);
-    instance->GetCurrentOperationalError(current);
-    if (instance->GetCurrentOperationalState() ==
-            chip::to_underlying(opstate_ns::OperationalStateEnum::kError) &&
-        current.errorStateID == error_id)
-      return;
-    opstate_ns::Structs::ErrorStateStruct::Type error;
-    error.errorStateID = error_id;
-    if (!label.empty())
-      error.errorStateLabel.SetValue(span_of(label));
-    if (!details.empty())
-      error.errorStateDetails.SetValue(span_of(details));
-    instance->OnOperationalErrorDetected(error);
-  });
+  this->desired_state_ =
+      chip::to_underlying(opstate_ns::OperationalStateEnum::kError);
+  this->state_from_event_ = true;
+  MatterOpEvent event;
+  event.error_id = error_id;
+  event.label = label;
+  event.details = details;
+  this->events_.post(this->endpoint_id(), event);
+  // Refresh the outbound slot: a state captured before the error must not run after the event and undo it.
+  this->request_push();
 }
 
+// Main loop.
 void MatterOperationalStateMapping::signal_completion(uint8_t error_id,
                                                       int64_t total_time,
                                                       int64_t paused_time) {
-  run_on_matter_thread([this, error_id, total_time, paused_time]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr)
-      return;
+  MatterOpEvent event;
+  event.completion = true;
+  event.error_id = error_id;
+  event.total_time = total_time;
+  event.paused_time = paused_time;
+  this->events_.post(this->endpoint_id(), event);
+}
+
+// CHIP task, in order with the events posted before it.
+void MatterOperationalStateMapping::emit_event_(const MatterOpEvent &event) {
+  auto *instance = this->instance_();
+  if (instance == nullptr)
+    return;
+  PushScope scope(this->endpoint_id());
+  if (event.completion) {
     chip::Optional<chip::app::DataModel::Nullable<uint32_t>> total;
     chip::Optional<chip::app::DataModel::Nullable<uint32_t>> paused;
-    if (total_time >= 0)
-      total.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(total_time)));
-    if (paused_time >= 0)
-      paused.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(paused_time)));
-    instance->OnOperationCompletionDetected(error_id, total, paused);
-  });
+    if (event.total_time >= 0)
+      total.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(event.total_time)));
+    if (event.paused_time >= 0)
+      paused.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(event.paused_time)));
+    instance->OnOperationCompletionDetected(event.error_id, total, paused);
+    return;
+  }
+  // Already in this error (a state source reported "error" first, or this action ran twice): the
+  // OperationalError event was sent for it, do not send a duplicate.
+  opstate_ns::GenericOperationalError current(0);
+  instance->GetCurrentOperationalError(current);
+  if (instance->GetCurrentOperationalState() ==
+          chip::to_underlying(opstate_ns::OperationalStateEnum::kError) &&
+      current.errorStateID == event.error_id)
+    return;
+  opstate_ns::Structs::ErrorStateStruct::Type error;
+  error.errorStateID = event.error_id;
+  if (!event.label.empty())
+    error.errorStateLabel.SetValue(span_of(event.label));
+  if (!event.details.empty())
+    error.errorStateDetails.SetValue(span_of(event.details));
+  instance->OnOperationalErrorDetected(error);
 }
 
 // --------------------------------------------------------------------- actions
