@@ -102,6 +102,10 @@ protected:
   SensorValueConverter converter_;
 };
 
+// The Soil Measurement cluster needs its limits before the Matter server starts
+// (it aborts otherwise). Called while building a soil_sensor endpoint.
+void set_soil_moisture_limits(uint16_t endpoint_id);
+
 // Delegate of the ElectricalPowerMeasurement cluster of an endpoint, used in the
 // esp-matter cluster config. Called while building an endpoint.
 void *electrical_power_delegate(uint16_t endpoint_id, bool alternating_current);

@@ -10,6 +10,7 @@
 #include <app/clusters/concentration-measurement-server/ConcentrationMeasurementCluster.h>
 #include <app/clusters/electrical-power-measurement-server/ElectricalPowerMeasurementDelegate.h>
 #include <data_model_provider/clusters/electrical_energy_measurement/integration.h>
+#include <data_model_provider/clusters/soil_measurement/integration.h>
 #include <platform/CHIPDeviceLayer.h>
 #include <system/SystemClock.h>
 
@@ -173,6 +174,17 @@ CHIP_ERROR update_concentration_attribute(uint16_t endpoint_id,
     converted.SetNonNull(value.val.f);
   return static_cast<Concentration::ConcentrationMeasurementCluster *>(server)
       ->SetMeasuredValue(converted);
+}
+
+// The Soil Measurement cluster is served by a code driven cluster of
+// esp-matter, which does not read the esp-matter attribute store.
+CHIP_ERROR update_soil_moisture_attribute(uint16_t endpoint_id, uint32_t,
+                                          esp_matter_attr_val_t value) {
+  chip::app::DataModel::Nullable<chip::Percent> converted;
+  if (!value.is_null())
+    converted.SetNonNull(value.val.u8);
+  return chip::app::Clusters::SoilMeasurement::SetSoilMoistureMeasuredValue(
+      endpoint_id, converted);
 }
 
 // Provides the values of the ElectricalPowerMeasurement cluster. The values
@@ -440,6 +452,14 @@ void MatterComponent::register_concentration_sensor(
       measurement_unit));
 }
 
+void MatterComponent::register_soil_moisture_sensor(
+    sensor::Sensor *sensor, uint16_t endpoint_id, uint32_t cluster_id,
+    uint32_t attribute_id, SensorValueConverter converter) {
+  this->mappings_.push_back(new MatterSensorAttributeMapping(
+      sensor, endpoint_id, cluster_id, attribute_id, converter,
+      update_soil_moisture_attribute));
+}
+
 void MatterComponent::register_electrical_power_sensor(
     sensor::Sensor *sensor, uint16_t endpoint_id, uint32_t attribute_id,
     SensorValueConverter converter) {
@@ -504,6 +524,28 @@ void MatterElectricalSensorMapping::publish_(float value) {
              err.AsString());
     delete update;
   }
+}
+
+void set_soil_moisture_limits(uint16_t endpoint_id) {
+  namespace Globals = chip::app::Clusters::Globals;
+  // Nominal accuracy. The real accuracy depends on the probe.
+  static const Globals::Structs::MeasurementAccuracyRangeStruct::Type range{
+      .rangeMin = 0,
+      .rangeMax = 100,
+      .percentMax = chip::MakeOptional<chip::Percent100ths>(1000),
+  };
+  chip::app::Clusters::SoilMeasurement::Attributes::
+      SoilMoistureMeasurementLimits::TypeInfo::Type limits;
+  limits.measurementType = Globals::MeasurementTypeEnum::kSoilMoisture;
+  limits.measured = true;
+  limits.minMeasuredValue = 0;
+  limits.maxMeasuredValue = 100;
+  limits.accuracyRanges =
+      chip::app::DataModel::List<const Globals::Structs::
+                                     MeasurementAccuracyRangeStruct::Type>(
+          &range, 1);
+  chip::app::Clusters::SoilMeasurement::SetSoilMoistureLimits(endpoint_id,
+                                                              limits);
 }
 
 void *electrical_power_delegate(uint16_t endpoint_id,

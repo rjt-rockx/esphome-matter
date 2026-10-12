@@ -213,7 +213,7 @@ class Endpoint:
         if sensor_id := self._config.get(CONF_BATTERY):
             battery = battery_sensor_attribute()
             self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
-            await self._register_sensor_attribute(var, sensor_id, battery)
+            await self._register_sensor_attribute(var, sensor_id, battery, None, None)
 
         for cluster_name in self._config[CONF_EXTRA_CLUSTERS]:
             cluster = CLUSTERS_BY_NAME[cluster_name]
@@ -438,6 +438,14 @@ class Endpoint:
                 "  return false;",
             )
         )
+        if device_type.name == "soil_sensor":
+            # The code driven Soil Measurement cluster aborts at startup without limits.
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_sensors.h"'
+            )
+            lines.append(
+                "esphome::matter::set_soil_moisture_limits(esp_matter::endpoint::get_id(endpoint));"
+            )
         if climate_ is not None:
             lines.extend(climate_post_create_lines(climate_, device_type.name))
         return lines
@@ -510,6 +518,12 @@ class Endpoint:
                     attribute.id,
                     converter,
                     MEASUREMENT_UNITS[plan.measurement_unit],
+                )
+            )
+        elif sensor_attribute.kind == "soil_moisture":
+            cg.add(
+                var.register_soil_moisture_sensor(
+                    sensor, self._endpoint_id, cluster.id, attribute.id, converter
                 )
             )
         elif sensor_attribute.kind == "electrical_power":

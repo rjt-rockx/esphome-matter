@@ -28,6 +28,8 @@ esp_matter_attr_val_t illuminance(float value);
 // Energy in kWh to EnergyMeasurementStruct::energy (mWh, nullable int64).
 esp_matter_attr_val_t kilowatt_hours(float value);
 esp_matter_attr_val_t occupancy(bool value);
+// Percent (1 %, uint8) as used by the Soil Measurement cluster.
+esp_matter_attr_val_t percent(float value);
 esp_matter_attr_val_t percentage(float value);
 // ElectricalPowerMeasurement::PowerFactor. Input is the ratio (-1.0 to 1.0),
 // output is in 1/100 % as a nullable int64.

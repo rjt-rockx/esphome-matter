@@ -136,11 +136,11 @@ matter:
         flow: sensor_id
 ```
 
-The pressure value is passed to Matter without scaling, so it is only correct if the ESPHome sensor reports the unit Matter expects. Check [sensors.md](sensors.md) before relying on it.
+Sensor values are converted from the `unit_of_measurement` of the ESPHome sensor to the unit Matter uses (for example Pa or kPa to Matter's 0.1 kPa). See [sensors.md](sensors.md#units).
 
 ### soil_sensor
 
-The `soil_sensor` exposes a Temperature Measurement and a Soil Measurement cluster (not Boolean State). The keys are `temperature` and `soil_moisture`. Untested.
+The `soil_sensor` exposes a Temperature Measurement and a Soil Measurement cluster (not Boolean State). The keys are `temperature` and `soil_moisture` (a sensor in `%`). The limits that the Soil Measurement cluster needs (0 to 100 %) are set automatically. Untested on real hardware.
 
 ```yaml
 matter:

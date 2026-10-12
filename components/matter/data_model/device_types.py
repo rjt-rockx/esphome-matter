@@ -12,6 +12,7 @@ from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_ID
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
 from ..matter_climate import climate_schema, validate_climate_features
+from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
 from ..sensor_mapping import (
     CONF_CURRENT_TYPE,

@@ -97,6 +97,7 @@ class SensorAttribute:
     # How the sensor is wired up at runtime:
     #   attribute         - esp_matter attribute store (or code driven cluster)
     #   concentration     - ConcentrationMeasurementCluster owned by this component
+    #   soil_moisture     - code driven SoilMeasurement cluster
     #   electrical_power  - ElectricalPowerMeasurement delegate
     #   electrical_energy - ElectricalEnergyMeasurement snapshots
     kind: str = "attribute"
@@ -263,7 +264,10 @@ SENSOR_ATTRIBUTES = {
         "MeasuredValue": _concentration("radon")
     },
     "SoilMeasurement": {  # 0x0430
-        "SoilMoistureMeasuredValue": SensorAttribute("soil_moisture", "percentage")
+        # Served by a code driven cluster (kind="soil_moisture"), uint8 in 1 %.
+        "SoilMoistureMeasuredValue": SensorAttribute(
+            "soil_moisture", "percent", family="humidity", kind="soil_moisture"
+        )
     },
     # Not used by any device type?
     "SmokeConcentrationMeasurement": {  # 0x0434

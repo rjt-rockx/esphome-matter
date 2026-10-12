@@ -74,6 +74,11 @@ matter:
         voltage: dc_voltage
         active_current: dc_current
         active_power: dc_power
+    # Soil moisture (Soil Measurement cluster, 1 % resolution).
+    9:
+      soil_sensor:
+        temperature: temperature
+        soil_moisture: soil_moisture
 
 sensor:
   - platform: template
@@ -196,3 +201,8 @@ sensor:
     unit_of_measurement: "W"
     device_class: power
     lambda: return 3.0;
+  - platform: template
+    id: soil_moisture
+    unit_of_measurement: "%"
+    device_class: moisture
+    lambda: return 33.4;

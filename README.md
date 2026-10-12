@@ -69,11 +69,11 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 |---|---|---|---|
 | `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (untested on hardware) | [lights.md](docs/lights.md) |
 | `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: pressure, flow | Pressure, Flow Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
-| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
+| `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (unit conversion implemented, untested on controllers) | [sensors.md](docs/sensors.md#units) |
+| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |
 | `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: power, energy, voltage, current | Electrical Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md#electrical-measurements) |
-| `sensor`: battery | Power Source | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
+| `sensor`: power, energy, voltage, current | Electrical Sensor | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements) |
+| `sensor`: battery | Power Source | Partial (battery level only, untested on controllers) | [sensors.md](docs/sensors.md#battery) |
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |

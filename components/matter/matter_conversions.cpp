@@ -158,6 +158,13 @@ esp_matter_attr_val_t power_factor(float value) {
   return nullable_int64_scaled(value, 10000.0f);
 }
 
+esp_matter_attr_val_t percent(float value) {
+  nullable<uint8_t> converted;
+  if (std::isfinite(value) && value >= 0.0f && value <= 100.0f)
+    converted = static_cast<uint8_t>(std::lround(value));
+  return esp_matter_nullable_uint8(converted);
+}
+
 esp_matter_attr_val_t percentage(float value) {
   nullable<uint16_t> converted;
   if (std::isfinite(value) && value >= 0.0f && value <= 100.0f) {
@@ -168,7 +175,7 @@ esp_matter_attr_val_t percentage(float value) {
 
 esp_matter_attr_val_t pressure(float value) {
   nullable<int16_t> converted;
-  if (std::isfinite(value) && value >= -32768.0f && value <= 32767.0f)
+  if (std::isfinite(value) && value >= -32767.0f && value <= 32767.0f)
     converted = static_cast<int16_t>(std::lround(value));
   return esp_matter_nullable_int16(converted);
 }

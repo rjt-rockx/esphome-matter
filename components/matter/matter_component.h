@@ -112,6 +112,10 @@ public:
                                      uint32_t attribute_id,
                                      SensorValueConverter converter,
                                      uint8_t measurement_unit);
+  void register_soil_moisture_sensor(sensor::Sensor *sensor,
+                                     uint16_t endpoint_id, uint32_t cluster_id,
+                                     uint32_t attribute_id,
+                                     SensorValueConverter converter);
   void register_electrical_power_sensor(sensor::Sensor *sensor,
                                         uint16_t endpoint_id,
                                         uint32_t attribute_id,

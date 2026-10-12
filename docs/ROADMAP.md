@@ -7,7 +7,7 @@ This is a synthesis of what the community asks for, the direction of the upstrea
 - **Matter without Home Assistant.** The dominant theme in the long-running ESPHome feature requests ([#1430](https://github.com/esphome/feature-requests/issues/1430), about 124 thumbs-up; [#2722](https://github.com/esphome/feature-requests/issues/2722)) and the Home Assistant forum: cross-vendor interoperability, local control, no bridge, no single point of failure.
 - **Matter over Wi-Fi first** to avoid buying new hardware; Thread for low-power devices second.
 - **Entity coverage.** Switches/outlets, lights, fans, window coverings, thermostats, locks, valves and basic sensors; contact and presence sensors first for many.
-- **Power and energy measurement.** The top hobbyist need not yet covered (the `electrical_sensor` device type cannot be created today).
+- **Power and energy measurement.** The top hobbyist need. Implemented as the `electrical_sensor` device type, see [sensors.md](sensors.md#electrical-measurements), but not yet verified on controllers.
 - **Easy pairing in more ecosystems**, especially Google Home, and clear documentation.
 - **Reliability.** Reconnect after restart, binding stability, fewer surprises in the config schema.
 
@@ -59,14 +59,14 @@ Priorities weigh community demand, maintainer direction, effort, and risk. P0 it
 
 - **Switch** to On/Off Plug-in Unit ([switch.md](switch.md)).
 - **Binary sensors** driven by `device_class` ([binary-sensors.md](binary-sensors.md)): contact, occupancy, water leak, rain, smoke/CO.
-- **Sensors** correctness and completeness ([sensors.md](sensors.md)): concentration units, pressure/flow scaling, battery (Power Source), `device_class` validation.
+- **Sensors** correctness and completeness ([sensors.md](sensors.md)): unit conversion, concentration units, battery (Power Source) and `device_class` validation are implemented but unverified on controllers.
 - **Buttons / events as Generic Switch** (press, double press, long press).
 - **Cover** ([cover.md](cover.md)), **fan** ([fan.md](fan.md)), **lock and valve** ([lock-valve.md](lock-valve.md)), **climate** to Thermostat.
 - **Identify** (`on_identify` trigger) so ecosystems can make a device blink during pairing.
 
 ### P2: power, identity and operations
 
-- **Electrical sensor**: power, voltage, current, energy (top hobbyist need, blocked on creating the device type and a struct write path for energy).
+- **Electrical sensor**: power, voltage, current, energy (top hobbyist need). Implemented, see [sensors.md](sensors.md#electrical-measurements); controller support still to be verified. Periodic energy and energy reset are not implemented.
 - **Basic Information options** (node label, serial number), configurable reporting intervals, Power Source for batteries.
 - **Light polish**: hue/saturation commands, honoring transition times.
 - **Footprint options**: expose the CHIP shell, endpoint count and optional LTO as release settings; offer a custom partition table for 4 MB boards.
