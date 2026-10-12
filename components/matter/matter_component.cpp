@@ -11,6 +11,7 @@
 #include "matter_component.h"
 #include "matter_identify.h"
 #include "matter_network.h"
+#include "matter_plan.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -291,6 +292,9 @@ void MatterComponent::dump_config() {
     return;
   }
   device_info_dump_config(this->device_info_);
+#ifdef USE_MATTER_PLAN
+  dump_plan();
+#endif // USE_MATTER_PLAN
 
   MatterCommissioning::instance().dump_config();
 

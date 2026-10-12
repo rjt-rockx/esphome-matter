@@ -23,6 +23,7 @@ network:
   enable_ipv6: true
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   ble_commissioning: true
   endpoints:
     1:

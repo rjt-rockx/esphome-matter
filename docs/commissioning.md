@@ -96,6 +96,7 @@ The fabric data is stored on flash (nvs partition) and survives OTA updates. The
 
 ```yaml
 matter:
+  expose: []
   persist_passcode: until_commissioned   # default; or true / false
 ```
 
