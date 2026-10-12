@@ -71,3 +71,4 @@ dmypy.json
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 .claude/worktrees/
+.esphome/
