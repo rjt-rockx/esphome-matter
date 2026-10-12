@@ -27,15 +27,19 @@ enum class NetworkMark : uint8_t {
 void network_on_device_event(const chip::DeviceLayer::ChipDeviceEvent *event);
 
 // Records a milestone (first occurrence only counts towards the summary).
-// Safe to call from any task.
+// Must be called from the CHIP task; the bookkeeping is not synchronized.
 void network_mark(NetworkMark mark, const char *detail = nullptr);
 
 // Schedules a retry of the operational/commissionable DNS-SD publication with
 // exponential backoff. Must be called from the CHIP task.
 void network_schedule_dnssd_retry(const char *reason);
 
-// Resets the retry backoff after a successful publication.
-void network_dnssd_publish_succeeded();
+// Bracket one DNS-SD update (CHIP's RemoveServices ... FinalizeServiceUpdate).
+// The retry backoff is only reset when an update finished without any failed
+// publish; resetting after each single successful publish would retry at the
+// minimum delay forever when one of several services keeps failing.
+void network_dnssd_update_started();
+void network_dnssd_update_finished();
 
 } // namespace esphome::matter
 
