@@ -83,13 +83,19 @@ void register_client_request_callbacks() {
 namespace {
 
 // Request handed from the ESPHome main loop to the CHIP task. Heap allocated
-// because the work item is a single intptr_t; ScheduleLambda would be limited
-// to CHIP_CONFIG_LAMBDA_EVENT_SIZE bytes of capture, too small for a string.
+// because the work item is a single intptr_t.
+//
+// `data` is deliberately NOT copied: esp_matter::client::cluster_update() makes
+// a shallow copy of the request handle, and the copy (including request_data)
+// lives until the binding manager has an operational session to the bound node
+// and has called client_invoke_cb(), which may be seconds later (CASE
+// establishment). The pointer must therefore stay valid for the lifetime of the
+// firmware; see send_client_command() in matter_actions.h.
 struct ClientCommandRequest {
   uint16_t endpoint_id;
   chip::ClusterId cluster;
   chip::CommandId command;
-  std::string data;
+  const char *data;
 };
 
 // Upper bound on requests queued towards the CHIP task. If the CHIP task is
@@ -130,13 +136,13 @@ void send_client_command_on_matter_thread(intptr_t context) {
            "data=%s",
            node_ids.c_str(), request->endpoint_id,
            static_cast<unsigned long>(request->cluster),
-           static_cast<unsigned long>(request->command), request->data.c_str());
+           static_cast<unsigned long>(request->command), request->data);
 
   esp_matter::client::request_handle_t req;
   req.type = esp_matter::client::INVOKE_CMD;
   req.command_path.mClusterId = request->cluster;
   req.command_path.mCommandId = request->command;
-  req.request_data = const_cast<char *>(request->data.c_str());
+  req.request_data = const_cast<char *>(request->data);
   esp_err_t err = esp_matter::client::cluster_update(request->endpoint_id, &req);
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "cluster_update failed: %s", esp_err_to_name(err));
@@ -147,8 +153,8 @@ void send_client_command_on_matter_thread(intptr_t context) {
 
 // Called from the ESPHome main loop. Never blocks and never touches CHIP state:
 // the whole send path (binding table walk and cluster_update) runs on the CHIP
-// task. The command data is copied, so the caller's pointer need not outlive
-// this call.
+// task. `command_data` is not copied and must outlive the call (see
+// ClientCommandRequest).
 void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
                          chip::CommandId command, const char *command_data) {
   if (pending_client_commands.load() >= MAX_PENDING_CLIENT_COMMANDS) {
@@ -157,8 +163,7 @@ void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
     return;
   }
   auto *request = new ClientCommandRequest{
-      endpoint_id, cluster, command,
-      command_data != nullptr ? command_data : "{}"};
+      endpoint_id, cluster, command, command_data != nullptr ? command_data : "{}"};
   pending_client_commands.fetch_add(1);
   CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
       send_client_command_on_matter_thread, reinterpret_cast<intptr_t>(request));

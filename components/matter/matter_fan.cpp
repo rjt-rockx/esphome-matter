@@ -139,7 +139,9 @@ void MatterFanMapping::initialize() {
   // Push the ESPHome state to Matter on changes. The state callback is called
   // synchronously from publish_state().
   this->fan_->add_on_state_callback([this]() {
-    // TODO: Fix this race-condition
+    // synchronizing_from_matter_ is only true while apply_() runs
+    // call.perform(). A fan that publishes its state later is treated as an
+    // ESPHome-side change and pushed back, settings included.
     this->push_state_to_matter(!this->synchronizing_from_matter_);
   });
 

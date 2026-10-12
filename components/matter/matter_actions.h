@@ -17,6 +17,10 @@ void register_client_request_callbacks();
 
 // Sends a client command through the Binding cluster of the given local
 // endpoint. command_data must use esp-matter's JSON command-data format.
+// Main loop only: the request is queued to the CHIP task and never blocks.
+// command_data is NOT copied; it must stay valid for the lifetime of the
+// firmware (a string literal or a member of a never-destroyed action), because
+// esp-matter keeps the pointer until the bound node's session is established.
 void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
                          chip::CommandId command,
                          const char *command_data = "{}");

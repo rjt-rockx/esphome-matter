@@ -8,6 +8,7 @@
 #include <platform/CHIPDeviceLayer.h>
 
 #include <cinttypes>
+#include <memory>
 #include <vector>
 
 static const char *const TAG = "matter";
@@ -16,6 +17,21 @@ namespace esphome::matter {
 
 void defer_to_main_loop(MatterComponent *component, std::function<void()> &&f) {
   component->defer_to_main_loop(std::move(f));
+}
+
+void run_on_matter_thread(std::function<void()> &&f) {
+  auto *task = new std::function<void()>(std::move(f));
+  CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
+      [](intptr_t context) {
+        std::unique_ptr<std::function<void()>> owned(
+            reinterpret_cast<std::function<void()> *>(context));
+        (*owned)();
+      },
+      reinterpret_cast<intptr_t>(task));
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGE(TAG, "Failed to schedule Matter work: %s", err.AsString());
+    delete task;
+  }
 }
 
 namespace {
