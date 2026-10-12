@@ -30,7 +30,7 @@ matter:
 ```
 
 * `software_version` is the Matter `SoftwareVersion` (uint32, 1..4294967295). It is reported in Basic Information and in the OTA Requestor, and controllers only offer images with a **higher** number than the running one. It is required when OTA is enabled and can also be set on its own.
-* The Basic Information `SoftwareVersionString` is the firmware's app-descriptor version: `esphome: project: version:` when set, otherwise the decimal `software_version`. Pass the same string to `--version-string` when building the `.ota` file.
+* The Basic Information `SoftwareVersionString` is set separately with `software_version_string` (default: `esphome: project: version:`, else the ESPHome version, see [device-info.md](device-info.md)). Pass the same string to `--version-string` when building the `.ota` file; it is informational, only the number is compared.
 * Matter OTA needs an IP network (`wifi`, `ethernet` or `openthread`). BLE-only commissioning builds are rejected.
 * `matter: ota:` (inside the `matter:` block) is unrelated to the top-level ESPHome `ota:` component.
 
@@ -40,16 +40,15 @@ What the component sets up (ESP-IDF sdkconfig, verified against esp-matter 1.6 /
 |---|---|
 | `CONFIG_ENABLE_OTA_REQUESTOR=y` | compiles the OTA Requestor; `esp_matter::start()` then calls `esp_matter_ota_requestor_init()` (adds the OTA Requestor cluster to endpoint 0 and the OTA Provider client cluster) and `esp_matter_ota_requestor_start()` |
 | `CONFIG_DEVICE_SOFTWARE_VERSION_NUMBER=<software_version>` + `CONFIG_APP_PROJECT_VER_FROM_CONFIG=y` | connectedhomeip reads the numeric version only from this Kconfig (otherwise it is 0) |
-| `CONFIG_APP_PROJECT_VER` | the `SoftwareVersionString` |
 | `CONFIG_OTA_AUTO_REBOOT_ON_APPLY=y` | reboot into the new image after Matter applied it |
 
 ## Coexistence with ESPHome OTA
 
 Both mechanisms write the other `ota_0` / `ota_1` app slot and switch it with `otadata`, so they never conflict at the flash level. Notes:
 
-* The default ESPHome partition table has two ~1.75 MB (0x1C0000) app slots. A Matter firmware is large; check that `firmware.ota.bin` fits (build log shows the size). If it does not, use a custom partition table (`esp32: partitions:`).
+* ESPHome splits the flash into two equal app slots (about 1.75 MB each on a 4 MB chip). A Matter firmware is large; check that `firmware.ota.bin` fits (build log shows the size). If it does not, use a custom partition table (`esp32: partitions:`).
 * An ESPHome OTA can install a build with a lower `software_version`; the device then reports the lower number and controllers may offer the newer published image again. Keep both paths in sync.
-* Rollback: ESPHome enables app rollback with safe mode. If the new image does not boot or ESPHome safe mode triggers, the bootloader returns to the previous slot.
+* Rollback: when ESPHome `ota:` and `safe_mode` are both enabled (the default), ESPHome turns on bootloader app rollback and `safe_mode` confirms the new image once it has booted successfully; a Matter-updated image that keeps crashing is rolled back to the previous slot. Without ESPHome `ota:`, rollback is off and the image is confirmed at boot, so a bad Matter update is not rolled back.
 * Both updating at once is not coordinated; avoid triggering an ESPHome OTA while a Matter update is downloading.
 
 ## Building the `.ota` image
@@ -60,7 +59,7 @@ Matter wraps the firmware in an OTA header (vendor id, product id, version, dige
 esphome compile device.yaml
 tools/make_ota_image.sh \
   --firmware .esphome/build/<name>/.pioenvs/<name>/firmware.ota.bin \
-  --version 2 --version-string 2 \
+  --version 2 --version-string 1.0.1 \
   --vendor-id 0xFFF1 --product-id 0x8000 \
   --output device-v2.ota
 ```

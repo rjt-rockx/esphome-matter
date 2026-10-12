@@ -14,14 +14,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components.esp32 import add_idf_sdkconfig_option
-from esphome.const import (
-    CONF_ESPHOME,
-    CONF_ID,
-    CONF_PROJECT,
-    CONF_TRIGGER_ID,
-    CONF_VERSION,
-)
-from esphome.core import CORE
+from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.types import ConfigType
 
 from .types import matter_ns
@@ -140,24 +133,16 @@ def final_validate_ota(config: ConfigType, full_config: ConfigType) -> None:
         )
 
 
-def _project_version() -> str | None:
-    return CORE.config.get(CONF_ESPHOME, {}).get(CONF_PROJECT, {}).get(CONF_VERSION)
-
-
 def add_software_version_sdkconfig(config: ConfigType) -> None:
-    """Numeric Matter SoftwareVersion (+ the app descriptor version string)."""
+    """Numeric Matter SoftwareVersion."""
     version = config.get(CONF_SOFTWARE_VERSION)
     if version is None:
         return
     # connectedhomeip reads the number from CONFIG_DEVICE_SOFTWARE_VERSION_NUMBER only
-    # when CONFIG_APP_PROJECT_VER_FROM_CONFIG is set (it is 0 otherwise). The
-    # SoftwareVersionString is esp_app_desc_t.version, i.e. CONFIG_APP_PROJECT_VER;
-    # ESPHome's `esphome: project: version` wins so both stay consistent.
+    # when CONFIG_APP_PROJECT_VER_FROM_CONFIG is set (it is 0 otherwise). The string
+    # (CONFIG_APP_PROJECT_VER) is set from `software_version_string` in device_info.py.
     add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER_FROM_CONFIG", True)
     add_idf_sdkconfig_option("CONFIG_DEVICE_SOFTWARE_VERSION_NUMBER", version)
-    add_idf_sdkconfig_option(
-        "CONFIG_APP_PROJECT_VER", _project_version() or str(version)
-    )
 
 
 async def to_code_ota(config: ConfigType) -> None:

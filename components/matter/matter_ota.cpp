@@ -96,16 +96,18 @@ void MatterOta::setup() {
   esp_matter_ota_config_t ota_config{};
   ota_config.periodic_query_timeout = this->query_interval_;
   ota_config.watchdog_timeout = this->watchdog_timeout_;
+
+  // The driver's timers live on the CHIP task, so hold the stack lock while
+  // changing them and registering the handler (one-off at boot, like dump_config).
+  chip::DeviceLayer::PlatformMgr().LockChipStack();
   esp_err_t err = esp_matter_ota_requestor_set_config(ota_config);
+  CHIP_ERROR cerr = chip::DeviceLayer::PlatformMgr().AddEventHandler(
+      handle_event_, reinterpret_cast<intptr_t>(this));
+  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "Failed to configure OTA requestor: %s",
              esp_err_to_name(err));
   }
-
-  chip::DeviceLayer::PlatformMgr().LockChipStack();
-  CHIP_ERROR cerr = chip::DeviceLayer::PlatformMgr().AddEventHandler(
-      handle_event_, reinterpret_cast<intptr_t>(this));
-  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
   if (cerr != CHIP_NO_ERROR) {
     ESP_LOGW(TAG, "Failed to register OTA event handler: %" CHIP_ERROR_FORMAT,
              cerr.Format());
