@@ -32,7 +32,7 @@ Connectivity depends on which ESPHome networking components are configured:
   on the network.
 - **Matter-over-Thread**: Requires the `openthread` component and ESPHome **2026.6.0** or newer.
 - **Matter-over-Ethernet**: Isn't supported yet and isn't actively being worked on. Feel free to implement it ;)
-- **BLE commissioning**: Currently broken, but this is something that I want to work on. The idea is that esphome-matter falls back to BLE commissioning (the default for most matter devices) when no `wifi`, `openthread`, or `ethernet` component is configured.
+- **BLE commissioning**: Automatic when no `wifi` or `openthread` component is configured (Matter then owns the radio; ESPHome `api`/`ota` are unavailable). Untested on hardware. See [docs/ble-commissioning.md](docs/ble-commissioning.md).
 
 Binding (for example, a button to a light) is working but still has some stability issues. Sometimes it takes a few
 seconds before a command is successfully sent.

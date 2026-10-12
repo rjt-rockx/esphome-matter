@@ -1,0 +1,28 @@
+esphome:
+  name: matter-ble-temperature
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+# No `wifi:` / `openthread:` block: the device advertises over BLE and the
+# commissioner (phone / Home Assistant) provisions Wi-Fi or Thread credentials
+# through Matter. See docs/ble-commissioning.md for the limitations.
+matter:
+  ble_commissioning: true # optional; asserts the automatic choice
+  endpoints:
+    1:
+      temperature_sensor: temperature_id
+
+sensor:
+  - platform: internal_temperature
+    id: temperature_id
