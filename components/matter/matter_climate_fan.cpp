@@ -12,6 +12,9 @@
 #include <data_model_provider/esp_matter_data_model_provider.h>
 #include <esp_matter_cluster.h>
 
+#include <cstdlib>
+#include <vector>
+
 static const char *const TAG = "matter";
 
 namespace esphome::matter {
@@ -32,67 +35,118 @@ FanControlCluster *find_cluster(uint16_t endpoint_id) {
   return static_cast<FanControlCluster *>(server);
 }
 
-// The climate fan mode that stands for a Matter fan mode, if any.
-struct FanModeMap {
-  optional<ClimateFanMode> off, low, medium, high, auto_;
+// Rank of a climate fan mode: 0 low, 1 medium, 2 high, -1 no Matter equivalent
+// (Off and Auto are handled separately).
+int rank_of(ClimateFanMode mode) {
+  switch (mode) {
+  case climate::CLIMATE_FAN_LOW:
+  case climate::CLIMATE_FAN_QUIET:
+    return 0;
+  case climate::CLIMATE_FAN_MEDIUM:
+  case climate::CLIMATE_FAN_MIDDLE:
+    return 1;
+  case climate::CLIMATE_FAN_HIGH:
+  case climate::CLIMATE_FAN_ON:
+    return 2;
+  default:
+    return -1;
+  }
+}
 
-  explicit FanModeMap(const climate::ClimateTraits &traits) {
-    auto pick = [&](std::initializer_list<ClimateFanMode> candidates) {
-      for (auto mode : candidates) {
-        if (traits.supports_fan_mode(mode))
-          return optional<ClimateFanMode>(mode);
+// The fan modes a climate supports, as the Matter modes of its FanModeSequence.
+struct FanLevels {
+  struct Level {
+    int rank;
+    ClimateFanMode mode;
+    FanModeEnum matter;
+  };
+  std::vector<Level> levels; // ascending rank
+  optional<ClimateFanMode> off;
+  optional<ClimateFanMode> auto_;
+
+  explicit FanLevels(const climate::ClimateTraits &traits) {
+    if (traits.supports_fan_mode(climate::CLIMATE_FAN_OFF))
+      this->off = climate::CLIMATE_FAN_OFF;
+    if (traits.supports_fan_mode(climate::CLIMATE_FAN_AUTO))
+      this->auto_ = climate::CLIMATE_FAN_AUTO;
+    const ClimateFanMode candidates[3][2] = {
+        {climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_QUIET},
+        {climate::CLIMATE_FAN_MEDIUM, climate::CLIMATE_FAN_MIDDLE},
+        {climate::CLIMATE_FAN_HIGH, climate::CLIMATE_FAN_ON}};
+    for (int rank = 0; rank < 3; rank++) {
+      for (auto mode : candidates[rank]) {
+        if (traits.supports_fan_mode(mode)) {
+          this->levels.push_back({rank, mode, FanModeEnum::kHigh});
+          break;
+        }
       }
-      return optional<ClimateFanMode>();
-    };
-    this->off = pick({climate::CLIMATE_FAN_OFF});
-    this->low = pick({climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_QUIET});
-    this->medium =
-        pick({climate::CLIMATE_FAN_MEDIUM, climate::CLIMATE_FAN_MIDDLE});
-    this->high = pick({climate::CLIMATE_FAN_HIGH, climate::CLIMATE_FAN_ON});
-    this->auto_ = pick({climate::CLIMATE_FAN_AUTO});
+    }
+    // 3 levels: Low, Medium, High. 2 levels: Low, High. 1 level: High.
+    size_t n = this->levels.size();
+    for (size_t i = 0; i < n; i++) {
+      this->levels[i].matter = i == n - 1  ? FanModeEnum::kHigh
+                               : i == 0    ? FanModeEnum::kLow
+                                           : FanModeEnum::kMedium;
+    }
   }
 
+  Sequence sequence() const {
+    bool with_auto = this->auto_.has_value();
+    if (this->levels.size() >= 3)
+      return with_auto ? Sequence::kOffLowMedHighAuto : Sequence::kOffLowMedHigh;
+    if (this->levels.size() == 2)
+      return with_auto ? Sequence::kOffLowHighAuto : Sequence::kOffLowHigh;
+    return with_auto ? Sequence::kOffHighAuto : Sequence::kOffHigh;
+  }
+
+  // The climate fan mode for a Matter fan mode. Off is empty when the climate
+  // has no OFF fan mode (see the file header).
   optional<ClimateFanMode> climate_mode(FanModeEnum mode) const {
     switch (mode) {
     case FanModeEnum::kOff:
       return this->off;
-    case FanModeEnum::kLow:
-      return this->low;
-    case FanModeEnum::kMedium:
-      return this->medium;
-    case FanModeEnum::kHigh:
-      return this->high;
     case FanModeEnum::kAuto:
       return this->auto_;
+    case FanModeEnum::kLow:
+    case FanModeEnum::kMedium:
+    case FanModeEnum::kHigh: {
+      if (this->levels.empty())
+        return {};
+      // The sequence only offers modes that exist; snap anyway for a cluster
+      // value that is outside of it.
+      int want = mode == FanModeEnum::kLow ? 0 : (mode == FanModeEnum::kMedium ? 1 : 2);
+      return this->nearest_(want).mode;
+    }
     default:
       return {};
     }
   }
 
-  // Not available for ESPHome fan modes without a Matter equivalent.
-  static bool matter_mode(ClimateFanMode mode, FanModeEnum &out) {
-    switch (mode) {
-    case climate::CLIMATE_FAN_OFF:
+  // The Matter fan mode that reports a climate fan mode; false if it has none.
+  bool matter_mode(ClimateFanMode mode, FanModeEnum &out) const {
+    if (mode == climate::CLIMATE_FAN_OFF) {
       out = FanModeEnum::kOff;
       return true;
-    case climate::CLIMATE_FAN_LOW:
-    case climate::CLIMATE_FAN_QUIET:
-      out = FanModeEnum::kLow;
-      return true;
-    case climate::CLIMATE_FAN_MEDIUM:
-    case climate::CLIMATE_FAN_MIDDLE:
-      out = FanModeEnum::kMedium;
-      return true;
-    case climate::CLIMATE_FAN_HIGH:
-    case climate::CLIMATE_FAN_ON:
-      out = FanModeEnum::kHigh;
-      return true;
-    case climate::CLIMATE_FAN_AUTO:
-      out = FanModeEnum::kAuto;
-      return true;
-    default:
-      return false;
     }
+    if (mode == climate::CLIMATE_FAN_AUTO) {
+      out = FanModeEnum::kAuto;
+      return this->auto_.has_value();
+    }
+    int rank = rank_of(mode);
+    if (rank < 0 || this->levels.empty())
+      return false;
+    out = this->nearest_(rank).matter;
+    return true;
+  }
+
+private:
+  const Level &nearest_(int rank) const {
+    const Level *best = &this->levels[0];
+    for (const auto &level : this->levels) {
+      if (std::abs(level.rank - rank) < std::abs(best->rank - rank))
+        best = &level;
+    }
+    return *best;
   }
 };
 
@@ -162,61 +216,28 @@ uint8_t percent_of(FanModeEnum mode) {
   }
 }
 
-bool sequence_has(Sequence sequence, FanModeEnum mode) {
-  bool three = sequence == Sequence::kOffLowMedHigh ||
-               sequence == Sequence::kOffLowMedHighAuto;
-  bool low_high = sequence == Sequence::kOffLowHigh ||
-                  sequence == Sequence::kOffLowHighAuto;
-  bool with_auto = sequence == Sequence::kOffLowMedHighAuto ||
-                   sequence == Sequence::kOffLowHighAuto ||
-                   sequence == Sequence::kOffHighAuto;
-  switch (mode) {
-  case FanModeEnum::kOff:
-  case FanModeEnum::kHigh:
-    return true;
-  case FanModeEnum::kLow:
-    return three || low_high;
-  case FanModeEnum::kMedium:
-    return three;
-  case FanModeEnum::kAuto:
-    return with_auto;
-  default:
-    return false;
-  }
-}
-
 } // namespace
 
 uint8_t climate_fan_mode_sequence(climate::Climate *climate) {
-  FanModeMap modes(climate->get_traits());
-  bool with_auto = modes.auto_.has_value();
-  Sequence sequence;
-  if (modes.medium.has_value())
-    sequence = with_auto ? Sequence::kOffLowMedHighAuto : Sequence::kOffLowMedHigh;
-  else if (modes.low.has_value())
-    sequence = with_auto ? Sequence::kOffLowHighAuto : Sequence::kOffLowHigh;
-  else
-    sequence = with_auto ? Sequence::kOffHighAuto : Sequence::kOffHigh;
-  return static_cast<uint8_t>(sequence);
+  return static_cast<uint8_t>(FanLevels(climate->get_traits()).sequence());
 }
 
+// A mismatch between the configuration and the climate must not fail the
+// endpoint build (Matter would not start): the feature is skipped with an error.
 esp_err_t add_climate_fan_features(esp_matter::cluster_t *cluster,
                                    climate::Climate *climate, bool step) {
   if (climate == nullptr)
     return ESP_ERR_INVALID_ARG;
   auto traits = climate->get_traits();
-  FanModeMap modes(traits);
+  FanLevels levels(traits);
   namespace feature = esp_matter::cluster::fan_control::feature;
 
-  if (!modes.low.has_value() && !modes.medium.has_value() &&
-      !modes.high.has_value()) {
+  if (levels.levels.empty())
     ESP_LOGE(TAG,
-             "Fan Control: climate '%s' supports none of the fan modes "
-             "low, medium or high",
-             climate->get_name().c_str());
-    return ESP_ERR_NOT_SUPPORTED;
-  }
-  if (modes.auto_.has_value() && feature::fan_auto::add(cluster) != ESP_OK)
+             "Fan Control: climate '%s' supports none of the fan modes low, "
+             "medium or high; only Off%s is exposed",
+             climate->get_name().c_str(), levels.auto_ ? " and Auto" : "");
+  if (levels.auto_.has_value() && feature::fan_auto::add(cluster) != ESP_OK)
     return ESP_FAIL;
   if (uint8_t support = rock_support(traits)) {
     feature::rocking::config_t config;
@@ -224,8 +245,12 @@ esp_err_t add_climate_fan_features(esp_matter::cluster_t *cluster,
     if (feature::rocking::add(cluster, &config) != ESP_OK)
       return ESP_FAIL;
   }
-  if (step && feature::step::add(cluster) != ESP_OK)
-    return ESP_FAIL;
+  if (step) {
+    if (levels.levels.empty())
+      ESP_LOGE(TAG, "Fan Control: the Step feature needs fan modes, skipped");
+    else if (feature::step::add(cluster) != ESP_OK)
+      return ESP_FAIL;
+  }
   return ESP_OK;
 }
 
@@ -255,30 +280,50 @@ void MatterClimateFanMapping::initialize() {
   FanControl::SetDefaultDelegate(this->endpoint_id(), this);
 
   this->climate_->add_on_state_callback(
-      [this](climate::Climate &) { this->push_state_to_matter(); });
+      [this](climate::Climate &) { this->push_state_(false); });
   // The climate platform owns the state, so push it at boot rather than
   // replaying the FanMode Matter persisted.
   global_matter_component->defer_to_main_loop(
-      [this]() { this->push_state_to_matter(); });
+      [this]() { this->push_state_(true); });
 }
 
-void MatterClimateFanMapping::push_state_to_matter() {
+void MatterClimateFanMapping::push_state_to_matter() { this->push_state_(false); }
+
+void MatterClimateFanMapping::push_state_(bool force) {
   uint16_t eid = this->endpoint_id();
   auto *climate = this->climate_;
+  FanLevels levels(climate->get_traits());
   bool has_mode = false;
   FanModeEnum mode = FanModeEnum::kOff;
-  // A custom fan mode has no Matter equivalent, nothing to report then.
-  if (climate->fan_mode.has_value() && !climate->has_custom_fan_mode())
-    has_mode = FanModeMap::matter_mode(*climate->fan_mode, mode);
+  if (!levels.off.has_value() && climate->mode == climate::CLIMATE_MODE_OFF) {
+    // No fan mode for Off: the climate being off is the fan being off.
+    has_mode = true;
+  } else if (climate->fan_mode.has_value() && !climate->has_custom_fan_mode()) {
+    // A custom fan mode has no Matter equivalent, nothing to report then.
+    has_mode = levels.matter_mode(*climate->fan_mode, mode);
+  }
   bool has_rock = this->has_rocking_;
   uint8_t rock = swing_to_rock(climate->swing_mode);
 
-  run_on_matter_thread([eid, has_mode, mode, has_rock, rock]() {
+  // Climate state callbacks come for every temperature update: report only
+  // what changed.
+  uint8_t mode_value = static_cast<uint8_t>(mode);
+  if (!force && this->pushed_ && has_mode == this->last_has_mode_ &&
+      (!has_mode || mode_value == this->last_mode_) &&
+      (!has_rock || rock == this->last_rock_))
+    return;
+  this->pushed_ = true;
+  this->last_has_mode_ = has_mode;
+  this->last_mode_ = mode_value;
+  this->last_rock_ = rock;
+
+  run_on_matter_thread([this, eid, has_mode, mode, has_rock, rock]() {
     auto *cluster = find_cluster(eid);
     if (cluster == nullptr)
       return;
-    if (has_mode && sequence_has(cluster->GetFanModeSequence(), mode)) {
-      // Calls OnFanDriveStateChanged(), which finds the climate in this mode.
+    // The delegate callbacks run synchronously inside the setters.
+    this->pushing_ = true;
+    if (has_mode) {
       cluster->SetFanMode(mode);
       if (mode != FanModeEnum::kAuto)
         cluster->SetPercentCurrent(percent_of(mode));
@@ -286,12 +331,15 @@ void MatterClimateFanMapping::push_state_to_matter() {
     if (has_rock)
       cluster->SetRockSetting(chip::BitMask<FanControl::RockBitmap>(
           rock & cluster->GetRockSupport().Raw()));
+    this->pushing_ = false;
   });
 }
 
 // Runs on the CHIP task.
 void MatterClimateFanMapping::OnFanDriveStateChanged(
     const FanControl::FanDriveState &state) {
+  if (this->pushing_)
+    return;
   uint8_t mode = static_cast<uint8_t>(state.mode);
   global_matter_component->defer_to_main_loop(
       [this, mode]() { this->apply_fan_mode_(mode); });
@@ -300,6 +348,8 @@ void MatterClimateFanMapping::OnFanDriveStateChanged(
 // Runs on the CHIP task.
 void MatterClimateFanMapping::OnRockSettingChanged(
     chip::BitMask<FanControl::RockBitmap> value) {
+  if (this->pushing_)
+    return;
   uint8_t rock = value.Raw();
   global_matter_component->defer_to_main_loop(
       [this, rock]() { this->apply_rock_(rock); });
@@ -315,23 +365,18 @@ chip::Protocols::InteractionModel::Status MatterClimateFanMapping::HandleStep(
 
   // The levels are Off followed by the modes of the sequence, lowest first.
   // Auto is not a level: stepping from Auto starts at Off.
-  FanModeEnum levels[4];
-  int count = 0;
-  levels[count++] = FanModeEnum::kOff;
-  auto sequence = cluster->GetFanModeSequence();
-  for (auto mode :
-       {FanModeEnum::kLow, FanModeEnum::kMedium, FanModeEnum::kHigh}) {
-    if (sequence_has(sequence, mode))
-      levels[count++] = mode;
-  }
+  FanLevels fan_levels(this->climate_->get_traits());
+  std::vector<FanModeEnum> levels{FanModeEnum::kOff};
+  for (const auto &level : fan_levels.levels)
+    levels.push_back(level.matter);
   int current = 0;
-  for (int i = 0; i < count; i++) {
+  for (size_t i = 0; i < levels.size(); i++) {
     if (levels[i] == cluster->GetFanMode())
-      current = i;
+      current = static_cast<int>(i);
   }
   int target = fan_step_target(
-      current, count - 1, direction == FanControl::StepDirectionEnum::kIncrease,
-      wrap, lowest_off);
+      current, static_cast<int>(levels.size()) - 1,
+      direction == FanControl::StepDirectionEnum::kIncrease, wrap, lowest_off);
   if (target == current)
     return Status::Success;
   // Calls OnFanDriveStateChanged(), which applies the mode to the climate.
@@ -341,19 +386,24 @@ chip::Protocols::InteractionModel::Status MatterClimateFanMapping::HandleStep(
 // Runs on the ESPHome main loop.
 void MatterClimateFanMapping::apply_fan_mode_(uint8_t fan_mode) {
   auto *climate = this->climate_;
-  auto traits = climate->get_traits();
-  auto target = FanModeMap(traits).climate_mode(static_cast<FanModeEnum>(fan_mode));
+  FanLevels levels(climate->get_traits());
+  auto matter_mode = static_cast<FanModeEnum>(fan_mode);
+  auto target = levels.climate_mode(matter_mode);
   if (!target.has_value()) {
-    ESP_LOGW(TAG, "Endpoint %u: the climate does not support fan mode %u",
+    if (matter_mode == FanModeEnum::kOff) {
+      // No OFF fan mode: Off turns the climate off.
+      if (climate->mode != climate::CLIMATE_MODE_OFF) {
+        auto call = climate->make_call();
+        call.set_mode(climate::CLIMATE_MODE_OFF);
+        call.perform();
+      }
+      return;
+    }
+    ESP_LOGW(TAG, "Endpoint %u: the climate has no fan mode for Matter mode %u",
              this->endpoint_id(), fan_mode);
-    this->push_state_to_matter();
+    this->push_state_(true);
     return;
   }
-  FanModeEnum current_matter;
-  if (climate->fan_mode.has_value() && !climate->has_custom_fan_mode() &&
-      FanModeMap::matter_mode(*climate->fan_mode, current_matter) &&
-      current_matter == static_cast<FanModeEnum>(fan_mode))
-    return; // Already in this mode, also stops the echo of our own report.
   auto call = climate->make_call();
   call.set_fan_mode(*target);
   call.perform();
@@ -366,11 +416,10 @@ void MatterClimateFanMapping::apply_rock_(uint8_t rock) {
   if (!rock_to_swing(rock, climate->get_traits(), mode)) {
     ESP_LOGW(TAG, "Endpoint %u: the climate does not support RockSetting %u",
              this->endpoint_id(), rock);
-    this->push_state_to_matter();
+    // Report the settled RockSetting back.
+    this->push_state_(true);
     return;
   }
-  if (climate->swing_mode == mode)
-    return;
   auto call = climate->make_call();
   call.set_swing_mode(mode);
   call.perform();

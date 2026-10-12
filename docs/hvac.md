@@ -65,13 +65,14 @@ climate:
 | `AUTO` | Auto |
 | `FOCUS`, `DIFFUSE`, custom fan modes | not exposed |
 
-* `FanModeSequence` follows the supported modes: Off/Low/Medium/High when a medium mode exists, Off/Low/High with only a low one, otherwise Off/High, each with Auto when the climate supports `AUTO`. The Auto feature is added for `AUTO`.
+* `FanModeSequence` is built from the fan modes the climate supports and only offers modes it can do. The supported modes are ranked low (`LOW`, `QUIET`), medium (`MEDIUM`, `MIDDLE`), high (`HIGH`, `ON`): three ranks give Off/Low/Medium/High, two ranks Off/Low/High (the Matter High is then the higher of the two), one rank Off/High. Each gets Auto when the climate supports `AUTO` (the Auto feature is added). A climate fan mode that is not one of those (`QUIET` next to `LOW`) is reported as the nearest supported one.
+* **Off.** The Matter sequences always contain Off, so Off must do something. With a `FAN_OFF` fan mode that is used. Without one, FanMode Off (or PercentSetting 0, or stepping down to Off) turns the **climate off** (`mode: OFF`), and a climate in mode `OFF` reports FanMode Off. Writing a fan mode while the climate is off therefore reports Off again. Give the climate a `fan_mode_off_action` if you want the fan alone to be switchable.
 * `PercentSetting` / `PercentCurrent` use the cluster's own mapping (Low 33, Medium 66, High 100). There is no MultiSpeed feature: climate fan modes have no step count.
 * Swing modes map to Rocking: `VERTICAL` = RockUpDown, `HORIZONTAL` = RockLeftRight, `BOTH` = both bits. `RockSupport` has the bits the climate can do. A climate that only supports `BOTH` takes any rock request as `BOTH`.
-* A request the climate can't do (a FanMode that is not in its supported modes, a swing it lacks) is logged and the Matter attribute is set back, like unsupported SystemModes.
+* A swing the climate can't do is logged and the settled RockSetting is reported back, like unsupported SystemModes. Climate state updates that change neither fan mode nor swing (temperature, ...) are not reported.
 * `step` moves through Off, Low, Medium, High (Auto is not a level). Wrap / LowestOff work as for fans.
 * The features `auto`, `multi_speed`, `rocking`, `airflow_direction` and `wind` are derived or unavailable and are rejected in `with_features` together with `climate_id`. `wind_presets` is rejected too.
-* A climate with none of low, medium or high fan modes fails the endpoint build with a log message.
+* A climate with none of low, medium or high fan modes keeps only Off (and Auto): an error is logged at boot, Step is skipped, Matter keeps running.
 * The ESPHome climate owns the state: it is pushed to Matter at boot instead of replaying the persisted FanMode.
 
 The climate swing / fan mapping is verified by compiling, not on hardware.
@@ -131,8 +132,21 @@ matter:
         climate_id: heat_pump_thermostat
 ```
 
-* **`water_heater`**: Thermostat is a mandatory server cluster of the device type, so this is the same binding as for the `thermostat` device type (`prefer_cooling` off: a climate without heating or cooling is exposed as heating). The Water Heater Mode and Water Heater Management clusters of the device type still have no delegate in this component, so the endpoint stays non-conformant (missing ChangeToMode) and the boost commands do nothing; the conformance checker reports this for a `water_heater` endpoint.
-* **`heat_pump`**: the Matter device type only lists Thermostat as a **client** cluster. `climate_id` creates the Thermostat **server** next to the device type so controllers such as Home Assistant show a climate entity. A warning is logged at config time because this is not what the device type's element list describes. For a strictly conforming device put a `thermostat` endpoint with `climate_id` below the heat pump with `parent:` (see [composition.md](composition.md)). `climate_id` together with `clusters: thermostat:` on a heat pump is rejected.
+* **`water_heater`**: Thermostat is a mandatory server cluster of the device type, so this is the same binding as for the `thermostat` device type, but **heating only**: the Heating feature, `HeatingOnly` ControlSequence and Off/Heat SystemModes. Cooling, auto and other modes of the climate are not exposed (a warning is logged at boot if the climate can cool), and a climate in such a mode reports SystemMode Off. The Water Heater Mode and Water Heater Management clusters of the device type still have no delegate in this component, so the endpoint stays non-conformant (missing ChangeToMode) and the boost commands do nothing; the conformance checker reports this for a `water_heater` endpoint.
+* **`heat_pump`**: the Matter device type only lists Thermostat as a **client** cluster, so a conforming heat pump keeps its thermostat on a child endpoint. This is the required layout, `climate_id` directly on `heat_pump` is a config error that shows it:
+
+  ```yaml
+  matter:
+    endpoints:
+      1:
+        heat_pump: {}
+      2:
+        parent: 1
+        thermostat:
+          climate_id: heat_pump_thermostat
+  ```
+
+  If you need the climate entity on the heat pump endpoint itself (Home Assistant shows a Thermostat server wherever it is), opt in with `thermostat_on_endpoint: true` next to `climate_id`. That creates the Thermostat **server** next to the device type, which is not what the device type describes, and logs a warning. `thermostat_on_endpoint` together with `clusters: thermostat:` is rejected.
 
 ## Gaps
 

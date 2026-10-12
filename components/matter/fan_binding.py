@@ -190,6 +190,12 @@ def normalize_endpoint(config: dict, device_types_by_key: dict) -> dict:
         return config
 
     _, key, _, holder = bindings[0]
+    if key == CONF_FAN_ID and "Auto" in features:
+        raise cv.Invalid(
+            "The Auto fan feature can't be used with fan_id: an ESPHome fan has no "
+            "automatic mode to map it to. Remove it, or drop fan_id and handle "
+            "FanMode with on_attribute"
+        )
     if key == CONF_CLIMATE_ID and "Wind" in features:
         raise cv.Invalid(
             "The Wind feature needs a fan with preset modes (fan_id); a climate "
@@ -309,29 +315,48 @@ def _holders(endpoint_config: dict):
             yield key, value
 
 
-def final_validate(matter_config: dict, full_config: Config):
-    """Checks that need the configuration of the bound fan."""
+def _fan_has_speed(fan_config: dict):
+    """True / False when the fan config says so, None when it can't be told."""
+    platform = fan_config.get("platform")
+    if platform == "binary":
+        return False
+    if platform == "template":
+        return "speed_count" in fan_config
+    if platform in ("speed", "hbridge"):
+        return True
+    return None
+
+
+def final_validate(matter_config: dict, full_config: Config, device_types_by_key: dict):
+    """Checks that need the configuration of the bound fan.
+
+    Features are the union over all configs of the endpoint (device type configs and
+    `clusters: fan_control:`), like find_binding() sees them.
+    """
     for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
-        for where, holder in _holders(endpoint_config):
-            fan_id = holder.get(CONF_FAN_ID)
-            if fan_id is None:
-                continue
-            features = _normalized(holder.get(CONF_WITH_FEATURES, ()))
-            fan_config = _entity_config(full_config, fan_id)
-            if fan_config is None:
-                continue
-            prefix = f"Matter endpoint {endpoint_id} ({where})"
-            if "Step" in features and fan_config.get("platform") == "binary":
-                raise cv.Invalid(
-                    f"{prefix}: the Step feature needs a fan with speed control, fan "
-                    f"'{fan_id}' is a binary fan"
-                )
-            if "Wind" in features:
-                _check_wind_presets(prefix, fan_id, fan_config, holder)
+        binding = find_binding(endpoint_config, device_types_by_key)
+        if binding is None or binding.kind != "fan":
+            continue
+        fan_id = binding.entity_id
+        fan_config = _entity_config(full_config, fan_id)
+        if fan_config is None:
+            continue
+        prefix = f"Matter endpoint {endpoint_id}"
+        if binding.step and _fan_has_speed(fan_config) is False:
+            raise cv.Invalid(
+                f"{prefix}: the Step feature needs a fan with speed control, fan "
+                f"'{fan_id}' ({fan_config.get('platform')}) has none"
+                + (" (set speed_count)" if fan_config.get("platform") == "template" else "")
+            )
+        if binding.wind:
+            presets = {}
+            for _, holder in _holders(endpoint_config):
+                if holder.get(CONF_FAN_ID) is not None:
+                    presets = holder.get(CONF_WIND_PRESETS) or {}
+            _check_wind_presets(prefix, fan_id, fan_config, presets)
 
 
-def _check_wind_presets(prefix: str, fan_id, fan_config: dict, holder: dict):
-    presets = holder.get(CONF_WIND_PRESETS) or {}
+def _check_wind_presets(prefix: str, fan_id, fan_config: dict, presets: dict):
     configured = fan_config.get("preset_modes")
     if configured is None:
         raise cv.Invalid(

@@ -145,12 +145,27 @@ def is_bound(config: dict) -> bool:
     return any(key in config for key in _BINDING_KEYS)
 
 
-def create_lines(cluster, config: dict) -> list[str]:
+def mapping_name(endpoint_id: int, cluster_id: int) -> str:
+    return f"matter_filter_{endpoint_id}_{cluster_id}"
+
+
+def create_lines(cluster, config: dict, endpoint_id: int) -> list[str]:
     """Build callback lines that create the cluster and its features."""
     ns = f"esp_matter::cluster::{cluster.espm_namespace}"
     var = f"{cluster.espm_namespace}_cluster"
     lines = [
         f"{ns}::config_t {cluster.espm_namespace}_config{{}};",
+    ]
+    if is_bound(config):
+        # esp-matter installs the delegate when the cluster is initialized, before
+        # Matter serves any request. ResourceMonitoringCluster dereferences it
+        # unchecked for ResetCondition, so it must never be missing.
+        lines.append(
+            f"{cluster.espm_namespace}_config.delegate = "
+            "static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>("
+            f"{mapping_name(endpoint_id, cluster.id)});"
+        )
+    lines += [
         f"auto *{var} = {ns}::create(endpoint, &{cluster.espm_namespace}_config, "
         "esp_matter::CLUSTER_FLAG_SERVER);",
         f"if ({var} == nullptr)",
@@ -180,6 +195,8 @@ def create_lines(cluster, config: dict) -> list[str]:
             "  return false;",
         ]
     if has_reset(config):
+        # Without the delegate above the command would reach an unset pointer.
+        assert is_bound(config)
         lines += [
             f"if ({ns}::command::create_reset_condition({var}) == nullptr)",
             "  return false;",
@@ -200,7 +217,7 @@ async def register_filter(var, endpoint_id: int, cluster, config: dict):
     cg.add_define("USE_MATTER_FILTER_MONITORING")
     mapping = cg.new_Pvariable(
         ID(
-            f"matter_filter_{endpoint_id}_{cluster.id}",
+            mapping_name(endpoint_id, cluster.id),
             is_declaration=True,
             type=MatterFilterMapping,
         ),

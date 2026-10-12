@@ -115,7 +115,7 @@ public:
 #endif // USE_COVER
 #ifdef USE_CLIMATE
   void register_climate(climate::Climate *climate, uint16_t endpoint_id,
-                        bool prefer_cooling);
+                        bool prefer_cooling, bool heating_only = false);
   // Fan Control cluster bound to the fan and swing modes of a climate.
 #ifdef USE_MATTER_CLIMATE_FAN
   void register_climate_fan(climate::Climate *climate, uint16_t endpoint_id);

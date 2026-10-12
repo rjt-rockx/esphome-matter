@@ -107,14 +107,14 @@ esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan,
   if (options.step) {
     // Step moves the fan speed one step up or down.
     if (!traits.supports_speed()) {
+      // Not fatal: failing the endpoint build would stop Matter altogether.
       ESP_LOGE(TAG,
                "Fan Control: the Step feature needs a fan with speed control, "
-               "'%s' has none",
+               "'%s' has none; Step is not available",
                fan->get_name().c_str());
-      return ESP_ERR_NOT_SUPPORTED;
-    }
-    if (feature::step::add(cluster) != ESP_OK)
+    } else if (feature::step::add(cluster) != ESP_OK) {
       return ESP_FAIL;
+    }
   }
   if (options.wind_natural != nullptr || options.wind_sleep != nullptr) {
     uint8_t support = 0;
@@ -125,16 +125,16 @@ esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan,
     if (support == 0) {
       ESP_LOGE(TAG,
                "Fan Control: the Wind feature maps to the preset modes '%s' / "
-               "'%s' but fan '%s' has neither",
+               "'%s' but fan '%s' has neither; Wind is not available",
                options.wind_natural == nullptr ? "" : options.wind_natural,
                options.wind_sleep == nullptr ? "" : options.wind_sleep,
                fan->get_name().c_str());
-      return ESP_ERR_NOT_FOUND;
+    } else {
+      feature::wind::config_t config;
+      config.wind_support = support;
+      if (feature::wind::add(cluster, &config) != ESP_OK)
+        return ESP_FAIL;
     }
-    feature::wind::config_t config;
-    config.wind_support = support;
-    if (feature::wind::add(cluster, &config) != ESP_OK)
-      return ESP_FAIL;
   }
   return ESP_OK;
 }
@@ -224,7 +224,14 @@ void MatterFanMapping::initialize() {
 
   // Push the ESPHome state to Matter on changes. The state callback is called
   // synchronously from publish_state().
+  this->last_ = this->snapshot_();
   this->fan_->add_on_state_callback([this]() {
+    // Only real ESPHome-side changes are pushed. A repeated state would
+    // overwrite a controller write that apply_() has not handled yet.
+    auto now = this->snapshot_();
+    if (now == this->last_)
+      return;
+    this->last_ = now;
     // synchronizing_from_matter_ is only true while apply_() runs
     // call.perform(). A fan that publishes its state later is treated as an
     // ESPHome-side change and pushed back, settings included.
@@ -316,6 +323,17 @@ void MatterFanMapping::apply_(const MatterFanState &state) {
   this->synchronizing_from_matter_ = true;
   call.perform();
   this->synchronizing_from_matter_ = false;
+  this->last_ = this->snapshot_();
+}
+
+MatterFanMapping::FanSnapshot MatterFanMapping::snapshot_() const {
+  FanSnapshot snapshot;
+  snapshot.on = this->fan_->state;
+  snapshot.speed = this->fan_->speed;
+  snapshot.oscillating = this->fan_->oscillating;
+  snapshot.reverse = this->fan_->direction == fan::FanDirection::REVERSE;
+  snapshot.preset = this->active_preset_();
+  return snapshot;
 }
 
 void MatterFanMapping::push_state_to_matter(bool update_settings) {
@@ -338,10 +356,12 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
       wind |= static_cast<uint8_t>(FanControl::WindBitmap::kSleepWind);
   }
 
-  chip::DeviceLayer::SystemLayer().ScheduleLambda([=]() {
+  // The capture exceeds CHIP_CONFIG_LAMBDA_EVENT_SIZE, so not ScheduleLambda.
+  run_on_matter_thread([=, this]() {
     auto *cluster = find_fan_control_cluster(eid);
     if (cluster == nullptr)
       return;
+    this->pushing_ = true;
 
     uint8_t current_speed = 0;
     uint8_t current_percent = 0;
@@ -371,8 +391,10 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
     if (has_wind)
       cluster->SetWindSetting(chip::BitMask<FanControl::WindBitmap>(wind));
 
-    if (!update_settings)
+    if (!update_settings) {
+      this->pushing_ = false;
       return;
+    }
     if (has_rocking) {
       chip::BitMask<FanControl::RockBitmap> rock;
       rock.Set(FanControl::RockBitmap::kRockLeftRight, oscillating);
@@ -382,6 +404,7 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
       cluster->SetAirflowDirection(
           reverse ? FanControl::AirflowDirectionEnum::kReverse
                   : FanControl::AirflowDirectionEnum::kForward);
+    this->pushing_ = false;
   });
 }
 
@@ -424,7 +447,8 @@ MatterFanMapping::HandleStep(FanControl::StepDirectionEnum direction, bool wrap,
 // Runs on the CHIP task.
 void MatterFanMapping::OnWindSettingChanged(
     chip::BitMask<FanControl::WindBitmap> value) {
-  if (!this->has_wind_)
+  // Echo of push_state_to_matter(), not a controller request.
+  if (!this->has_wind_ || this->pushing_)
     return;
   bool natural = value.Has(FanControl::WindBitmap::kNaturalWind);
   bool sleep = value.Has(FanControl::WindBitmap::kSleepWind);
@@ -452,8 +476,15 @@ void MatterFanMapping::apply_wind_(bool natural, bool sleep) {
     this->push_state_to_matter();
     return;
   }
-  if (wanted == current)
+  if (wanted.empty() && current.empty())
     return;
+  // A preset is set on a running fan: the fan is not turned on by WindSetting.
+  if (!wanted.empty() && !this->fan_->state) {
+    ESP_LOGW(TAG, "Endpoint %u: WindSetting ignored, the fan is off",
+             this->endpoint_id());
+    this->push_state_to_matter(false); // reports WindSetting back
+    return;
+  }
 
   auto call = this->fan_->make_call();
   if (!wanted.empty()) {
@@ -473,6 +504,7 @@ void MatterFanMapping::apply_wind_(bool natural, bool sleep) {
   this->synchronizing_from_matter_ = true;
   call.perform();
   this->synchronizing_from_matter_ = false;
+  this->last_ = this->snapshot_();
   // The Wind setting is correct now; the Current attributes follow the fan.
   this->push_state_to_matter(false);
 }

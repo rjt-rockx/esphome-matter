@@ -42,6 +42,14 @@ ENTITIES = textwrap.dedent(
             id: relay_fan
             output: out
             restore_mode: ALWAYS_OFF
+          - platform: template
+            id: speedless_fan
+            restore_mode: ALWAYS_OFF
+            preset_modes: [natural]
+          - platform: template
+            id: stepped_fan
+            speed_count: 3
+            restore_mode: ALWAYS_OFF
         sensor:
           - platform: template
             id: temp
@@ -316,7 +324,7 @@ def test_step_needs_a_fan_with_speed(check):
         """
     )
     assert not result.ok
-    assert "binary fan" in result.output
+    assert "speed control" in result.output
 
 
 def test_step_without_binding_rejected_at_config_time(check):
@@ -411,7 +419,7 @@ def test_thermostat_presets_and_setback_rejected_with_climate_id(check, feature)
     assert "G7" in result.output
 
 
-def test_heat_pump_climate_id(check):
+def test_heat_pump_climate_id_needs_opt_in(check):
     result = check(
         """
         1:
@@ -419,16 +427,57 @@ def test_heat_pump_climate_id(check):
             climate_id: heater
         """
     )
+    assert not result.ok
+    assert "thermostat_on_endpoint" in result.output
+    assert "parent" in result.output
+
+
+def test_heat_pump_with_child_thermostat_endpoint(check):
+    result = check(
+        """
+        1:
+          heat_pump: {}
+        2:
+          parent: 1
+          thermostat:
+            climate_id: heater
+        """
+    )
     assert result.ok, result.output
-    assert "Thermostat server on the Heat Pump" in result.output
 
 
-def test_heat_pump_climate_id_conflicts_with_explicit_thermostat(check):
+def test_heat_pump_thermostat_on_endpoint_opt_in(check):
     result = check(
         """
         1:
           heat_pump:
             climate_id: heater
+            thermostat_on_endpoint: true
+        """
+    )
+    assert result.ok, result.output
+    assert "Thermostat server on the Heat" in result.output
+
+
+def test_heat_pump_opt_in_needs_climate_id(check):
+    result = check(
+        """
+        1:
+          heat_pump:
+            thermostat_on_endpoint: true
+        """
+    )
+    assert not result.ok
+    assert "needs climate_id" in result.output
+
+
+def test_heat_pump_opt_in_conflicts_with_explicit_thermostat(check):
+    result = check(
+        """
+        1:
+          heat_pump:
+            climate_id: heater
+            thermostat_on_endpoint: true
           clusters:
             thermostat:
               with_features: [heating]
@@ -436,6 +485,100 @@ def test_heat_pump_climate_id_conflicts_with_explicit_thermostat(check):
     )
     assert not result.ok
     assert "remove" in result.output
+
+
+def test_fan_auto_feature_rejected_with_fan_id(check):
+    for body in (
+        """
+        1:
+          fan:
+            fan_id: plain_fan
+            with_features: [auto]
+        """,
+        """
+        1:
+          air_purifier: {}
+          clusters:
+            fan_control:
+              fan_id: plain_fan
+              with_features: [auto]
+        """,
+    ):
+        result = check(body)
+        assert not result.ok
+        assert "Auto" in result.output
+
+
+def test_wind_checked_across_holders_device_fan_cluster_feature(check):
+    # fan_id at device level, the feature in clusters: fan_control:
+    result = check(
+        """
+        1:
+          air_purifier:
+            fan_id: plain_fan
+          clusters:
+            fan_control:
+              with_features: [wind]
+        """
+    )
+    assert not result.ok
+    assert "preset_modes" in result.output
+
+
+def test_wind_checked_across_holders_cluster_fan_device_feature(check):
+    # fan_id in clusters: fan_control:, the feature at device level
+    result = check(
+        """
+        1:
+          air_purifier:
+            with_features: [wind]
+          clusters:
+            fan_control:
+              fan_id: plain_fan
+        """
+    )
+    assert not result.ok
+    assert "preset_modes" in result.output
+
+
+def test_step_checked_across_holders(check):
+    result = check(
+        """
+        1:
+          air_purifier:
+            fan_id: relay_fan
+          clusters:
+            fan_control:
+              with_features: [step]
+        """
+    )
+    assert not result.ok
+    assert "speed control" in result.output
+
+
+def test_step_rejected_for_template_fan_without_speed_count(check):
+    result = check(
+        """
+        1:
+          extractor_hood:
+            fan_id: speedless_fan
+            with_features: [step]
+        """
+    )
+    assert not result.ok
+    assert "speed_count" in result.output
+
+
+def test_step_accepted_for_template_fan_with_speed_count(check):
+    result = check(
+        """
+        1:
+          extractor_hood:
+            fan_id: stepped_fan
+            with_features: [step]
+        """
+    )
+    assert result.ok, result.output
 
 
 # --------------------------------------------------------------------------
@@ -477,6 +620,9 @@ def test_generated_fan_wind_step(generate):
     )
     assert 'register_fan(f, 1, "natural", "sleep")' in code
     assert 'FanFeatureOptions{true, "natural", "sleep"}' in code
+    assert "matter_filter_1_113->set_condition_sensor(life)" in code
+    # the delegate is installed through the cluster config, before Matter starts
+    assert "hepa_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_1_113)" in code
     assert "fan_control.fan_mode_sequence" in code
     assert "hepa_filter_monitoring::feature::condition::add" in code
     assert "hepa_filter_monitoring::feature::warning::add" in code
@@ -525,12 +671,14 @@ def test_generated_heat_pump_and_water_heater(generate):
         1:
           heat_pump:
             climate_id: heater
+            thermostat_on_endpoint: true
         """
     )
     assert "esp_matter::cluster::thermostat::create(endpoint, &thermostat_config" in code
     assert "configure_climate_thermostat(thermostat_config, heater, false)" in code
     assert "register_climate(heater, 1, false)" in code
     assert "extend_climate_thermostat(endpoint, heater, false)" in code
+    # conformant default: no Thermostat server on the heat pump itself
 
 
 @pytest.mark.slow
@@ -539,8 +687,10 @@ def test_generated_water_heater(generate):
         """
         1:
           water_heater:
-            climate_id: heater
+            climate_id: ac
         """
     )
-    assert "configure_climate_thermostat(device_config_0.thermostat, heater, false)" in code
-    assert "extend_climate_thermostat(endpoint, heater, false)" in code
+    # heating only: the flag tells the climate binding to leave cooling out
+    assert "configure_climate_thermostat(device_config_0.thermostat, ac, false, true)" in code
+    assert "extend_climate_thermostat(endpoint, ac, false, true)" in code
+    assert "register_climate(ac, 1, false, true)" in code

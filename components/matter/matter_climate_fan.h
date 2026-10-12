@@ -18,15 +18,21 @@ namespace esphome::matter {
 // Fan Control cluster of a room air conditioner bound to the fan and swing
 // modes of an ESPHome climate (`clusters: fan_control: {climate_id: ...}`).
 //
-//   climate fan mode   Matter FanMode
-//   OFF                Off
-//   LOW, QUIET         Low
-//   MEDIUM, MIDDLE     Medium
-//   HIGH, ON           High
-//   AUTO               Auto (Auto feature)
+// The climate fan modes are ranked low (LOW, QUIET), medium (MEDIUM, MIDDLE)
+// and high (HIGH, ON); the ones the climate supports become the Matter Low /
+// Medium / High modes of the FanModeSequence, so the sequence only contains
+// modes the climate can do:
+//   3 or more ranks: Off, Low, Medium, High   2 ranks: Off, Low, High
+//   1 rank:          Off, High                (+ Auto when the climate has AUTO)
+// A climate fan mode that is not one of those (QUIET next to LOW, ...) is
+// reported as the nearest supported one. FOCUS, DIFFUSE and custom fan modes
+// are not exposed.
 //
-// FOCUS, DIFFUSE and custom fan modes have no Matter equivalent and are not
-// exposed. The climate swing modes drive RockSetting (VERTICAL = UpDown,
+// Off needs a real action: with a FAN_OFF fan mode that is used, otherwise
+// Off turns the climate itself off (mode OFF), and a climate in mode OFF with
+// no FAN_OFF fan mode reports FanMode Off.
+//
+// The climate swing modes drive RockSetting (VERTICAL = UpDown,
 // HORIZONTAL = LeftRight, BOTH = both bits).
 
 // FanModeSequence (Matter enum value) for the fan modes the climate supports.
@@ -62,10 +68,21 @@ public:
 protected:
   void apply_fan_mode_(uint8_t fan_mode);
   void apply_rock_(uint8_t rock);
+  // force: also report an unchanged state (to revert a rejected request).
+  void push_state_(bool force);
 
   climate::Climate *climate_;
   bool has_rocking_{false};
   bool has_step_{false};
+  // True while push_state_ writes the cluster (CHIP task only). The delegate
+  // callbacks run synchronously inside those writes, so callbacks seen while
+  // it is set are echoes of our own report, not controller requests.
+  bool pushing_{false};
+  // Last state reported (main loop), to skip pushes when nothing changed.
+  bool pushed_{false};
+  bool last_has_mode_{false};
+  uint8_t last_mode_{0};
+  uint8_t last_rock_{0};
 };
 
 } // namespace esphome::matter

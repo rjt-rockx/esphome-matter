@@ -25,6 +25,7 @@
     if (esp_matter::endpoint::air_purifier::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     esp_matter::cluster::hepa_filter_monitoring::config_t hepa_filter_monitoring_config{};
+    hepa_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_1_113);
     auto *hepa_filter_monitoring_cluster = esp_matter::cluster::hepa_filter_monitoring::create(endpoint, &hepa_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (hepa_filter_monitoring_cluster == nullptr)
       return false;
@@ -40,6 +41,7 @@
     if (esp_matter::cluster::hepa_filter_monitoring::command::create_reset_condition(hepa_filter_monitoring_cluster) == nullptr)
       return false;
     esp_matter::cluster::activated_carbon_filter_monitoring::config_t activated_carbon_filter_monitoring_config{};
+    activated_carbon_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_1_114);
     auto *activated_carbon_filter_monitoring_cluster = esp_matter::cluster::activated_carbon_filter_monitoring::create(endpoint, &activated_carbon_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (activated_carbon_filter_monitoring_cluster == nullptr)
       return false;
@@ -110,18 +112,21 @@
       return false;
     return true;
   });
-  matter_mattercomponent_id->register_climate(boiler, 5, false);
   matter_mattercomponent_id->register_endpoint_parent(5, 0);
   matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::heat_pump::config_t device_config_0{};
     if (esp_matter::endpoint::heat_pump::add(endpoint, &device_config_0) != ESP_OK)
       return false;
-    {
-      esp_matter::cluster::thermostat::config_t thermostat_config{};
-      esphome::matter::configure_climate_thermostat(thermostat_config, boiler, false);
-      if (esp_matter::cluster::thermostat::create(endpoint, &thermostat_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-        return false;
-    }
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(boiler, 7, false);
+  matter_mattercomponent_id->register_endpoint_parent(7, 5);
+  matter_mattercomponent_id->register_endpoint_tag(7, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(7, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, boiler, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
     if (!esphome::matter::extend_climate_thermostat(endpoint, boiler, false))
       return false;
     return true;
@@ -129,6 +134,7 @@
   matter_mattercomponent_id->register_climate(hall_thermostat, 6, false);
   matter_mattercomponent_id->register_fan(stat_fan, 6);
   matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint_tag(6, 7, 2, "");
   matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::thermostat::config_t device_config_0{};
     esphome::matter::configure_climate_thermostat(device_config_0.thermostat, hall_thermostat, false);
@@ -147,4 +153,4 @@
       return false;
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xD8E0A5FC);
+  matter_mattercomponent_id->set_structure_hash(0xA3585C7F);

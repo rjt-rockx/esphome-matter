@@ -135,7 +135,8 @@ int16_t MatterClimateSpec::clamp_cooling(int16_t centi) const {
 }
 
 MatterClimateSpec derive_climate_spec(climate::Climate *climate,
-                                      bool prefer_cooling) {
+                                      bool prefer_cooling,
+                                      bool heating_only) {
   auto traits = climate->get_traits();
   MatterClimateSpec spec;
   bool heat_cool = traits.supports_mode(climate::CLIMATE_MODE_HEAT_COOL);
@@ -148,6 +149,14 @@ MatterClimateSpec derive_climate_spec(climate::Climate *climate,
                  heat_cool || auto_ || spec.two_point;
   spec.cooling = traits.supports_mode(climate::CLIMATE_MODE_COOL) ||
                  heat_cool || auto_ || spec.two_point;
+  if (heating_only) {
+    if (spec.cooling)
+      ESP_LOGW(TAG,
+               "Climate can cool, but this device type can only heat: cooling "
+               "modes are not exposed to Matter");
+    spec.heating = true;
+    spec.cooling = false;
+  }
   if (!spec.heating && !spec.cooling) {
     // Matter requires at least one of Heating / Cooling.
     ESP_LOGW(TAG,
@@ -176,9 +185,9 @@ MatterClimateSpec derive_climate_spec(climate::Climate *climate,
 
 void configure_climate_thermostat(
     esp_matter::cluster::thermostat::config_t &config,
-    climate::Climate *climate, bool prefer_cooling) {
+    climate::Climate *climate, bool prefer_cooling, bool heating_only) {
   namespace thermostat = esp_matter::cluster::thermostat;
-  auto spec = derive_climate_spec(climate, prefer_cooling);
+  auto spec = derive_climate_spec(climate, prefer_cooling, heating_only);
 
   uint32_t flags = 0;
   if (spec.heating)
@@ -222,12 +231,12 @@ void configure_climate_thermostat(
 // visual range.
 bool extend_climate_thermostat(esp_matter::endpoint_t *endpoint,
                                climate::Climate *climate,
-                               bool prefer_cooling) {
+                               bool prefer_cooling, bool heating_only) {
   namespace thermostat = esp_matter::cluster::thermostat;
   auto *cluster = esp_matter::cluster::get(endpoint, Thermostat::Id);
   if (cluster == nullptr)
     return false;
-  auto spec = derive_climate_spec(climate, prefer_cooling);
+  auto spec = derive_climate_spec(climate, prefer_cooling, heating_only);
   if (spec.heating) {
     thermostat::attribute::create_abs_min_heat_setpoint_limit(cluster,
                                                               spec.heat_min);
@@ -247,22 +256,25 @@ bool extend_climate_thermostat(esp_matter::endpoint_t *endpoint,
 
 void MatterComponent::register_climate(climate::Climate *climate,
                                        uint16_t endpoint_id,
-                                       bool prefer_cooling) {
-  this->mappings_.push_back(
-      new MatterClimateMapping(climate, endpoint_id, prefer_cooling));
+                                       bool prefer_cooling,
+                                       bool heating_only) {
+  this->mappings_.push_back(new MatterClimateMapping(
+      climate, endpoint_id, prefer_cooling, heating_only));
 }
 
 MatterClimateMapping::MatterClimateMapping(climate::Climate *climate,
                                            uint16_t endpoint_id,
-                                           bool prefer_cooling)
+                                           bool prefer_cooling,
+                                           bool heating_only)
     : MatterEndpointMappingBase(endpoint_id), climate_(climate),
-      prefer_cooling_(prefer_cooling) {}
+      prefer_cooling_(prefer_cooling), heating_only_(heating_only) {}
 
 void MatterClimateMapping::initialize() {
   if (this->climate_ == nullptr)
     return;
 
-  this->spec_ = derive_climate_spec(this->climate_, this->prefer_cooling_);
+  this->spec_ = derive_climate_spec(this->climate_, this->prefer_cooling_,
+                                    this->heating_only_);
   this->has_on_off_ = this->has_server_cluster(OnOff::Id);
   this->has_running_state_ =
       this->spec_.has_action &&
@@ -333,6 +345,9 @@ void MatterClimateMapping::push_state_to_matter() {
 
   uint8_t system_mode = SYSTEM_MODE_OFF;
   to_system_mode(climate->mode, system_mode);
+  // A heating only device type has no Cool, Auto, ... SystemModes.
+  if (this->heating_only_ && system_mode != SYSTEM_MODE_HEAT)
+    system_mode = SYSTEM_MODE_OFF;
 
   auto local_temperature =
       traits.has_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE)
@@ -433,7 +448,9 @@ void MatterClimateMapping::apply_system_mode_(uint8_t system_mode) {
   ClimateMode mode;
   // ClimateCall::validate_() silently drops unsupported modes, so check first
   // and put the Matter attribute back when the request cannot be honoured.
-  if (!from_system_mode(system_mode, traits, mode)) {
+  if ((this->heating_only_ && system_mode != SYSTEM_MODE_OFF &&
+       system_mode != SYSTEM_MODE_HEAT) ||
+      !from_system_mode(system_mode, traits, mode)) {
     ESP_LOGW(TAG, "Endpoint %u: SystemMode %u is not supported by climate",
              this->endpoint_id(), system_mode);
     this->push_state_to_matter();

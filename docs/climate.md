@@ -21,7 +21,7 @@ climate:
 
 See `examples/thermostat.yaml` for a complete heat-only example.
 
-The fan modes and swing modes of a climate are exposed through the Fan Control cluster of a room air conditioner, see [hvac.md](hvac.md). `water_heater` and `heat_pump` take `climate_id` too, see [hvac.md](hvac.md#water-heater-and-heat-pump).
+The fan modes and swing modes of a climate are exposed through the Fan Control cluster of a room air conditioner, see [hvac.md](hvac.md). `water_heater` takes `climate_id` too (heating only), and a heat pump keeps its thermostat on a child `thermostat` endpoint, see [hvac.md](hvac.md#water-heater-and-heat-pump).
 
 ## Features are derived from the climate
 

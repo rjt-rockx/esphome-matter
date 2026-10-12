@@ -65,13 +65,21 @@ matter:
       room_air_conditioner:
         climate_id: ac2
         fan_id: indoor_fan
-    # Heat pump with its Thermostat server bound to a climate.
+    # Heat pump with its thermostat on a child endpoint (the conforming layout).
     5:
-      heat_pump:
+      heat_pump: {}
+    # (both thermostat endpoints need distinguishing tags: the device type appears twice)
+    7:
+      parent: 5
+      tags:
+        - {namespace: common_number, tag: one}
+      thermostat:
         climate_id: boiler
     # Thermostat endpoint with a Fan Control server cluster (not part of the
     # Thermostat device type, see docs/hvac.md).
     6:
+      tags:
+        - {namespace: common_number, tag: two}
       thermostat:
         climate_id: hall_thermostat
       clusters:

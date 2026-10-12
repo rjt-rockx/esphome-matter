@@ -81,6 +81,23 @@ protected:
   // Name of the active preset mode ("" = none).
   std::string active_preset_() const;
 
+  // The ESPHome side state last seen or applied (main loop), to push only real
+  // ESPHome-side changes: a state callback that repeats the old state would
+  // otherwise overwrite a controller write that is still on its way to apply_().
+  struct FanSnapshot {
+    bool on{false};
+    int speed{0};
+    bool oscillating{false};
+    bool reverse{false};
+    std::string preset;
+    bool operator==(const FanSnapshot &o) const {
+      return on == o.on && speed == o.speed && oscillating == o.oscillating &&
+             reverse == o.reverse && preset == o.preset;
+    }
+  };
+  FanSnapshot snapshot_() const;
+  FanSnapshot last_;
+
   fan::Fan *fan_;
   bool has_speed_{false};
   bool has_rocking_{false};
@@ -94,6 +111,9 @@ protected:
   std::string wind_natural_;
   std::string wind_sleep_;
   bool has_wind_{false};
+  // True while push_state_to_matter() writes the cluster (CHIP task only): the
+  // delegate callbacks run synchronously inside those writes and are echoes.
+  bool pushing_{false};
   bool has_step_{false};
 };
 

@@ -51,10 +51,15 @@ void MatterFilterMapping::initialize() {
              static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
     return;
   }
-  // Without a delegate the ResetCondition command would dereference nothing.
-  if (cluster->SetDelegate(this) != CHIP_NO_ERROR) {
-    ESP_LOGW(TAG, "Failed to set the delegate of filter cluster 0x%04X",
-             static_cast<unsigned>(this->cluster_id_));
+  // The delegate is installed by esp-matter when the cluster is initialized (the
+  // generated endpoint build callback passes this object in the cluster config),
+  // before Matter serves requests. ResourceMonitoringCluster dereferences it
+  // unchecked for ResetCondition, so make the problem visible if it is missing.
+  if (this->GetInstance() == nullptr) {
+    ESP_LOGE(TAG,
+             "Filter cluster 0x%04X on endpoint %u has no delegate installed; "
+             "ResetCondition would not work",
+             static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
     return;
   }
 

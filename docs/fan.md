@@ -57,7 +57,7 @@ matter:
         with_features: [step]
 ```
 
-`Direction` increase/decrease changes the speed by one step. `Wrap` continues from the highest speed to the lowest and the other way around; `LowestOff` (default on) makes Off the lowest step, otherwise the lowest step is speed 1 and a step down on a running fan stops there. A fan that is off is not turned on by a step down. `step` without `fan_id` is a config error (nothing would handle the command), and so is `step` on a `platform: binary` fan; any other fan without speed control fails the endpoint build with a log message.
+`Direction` increase/decrease changes the speed by one step. `Wrap` continues from the highest speed to the lowest and the other way around; `LowestOff` (default on) makes Off the lowest step, otherwise the lowest step is speed 1 and a step down on a running fan stops there. A fan that is off is not turned on by a step down. `step` without `fan_id` is a config error (nothing would handle the command), and so is `step` on a fan known to have no speed control: `platform: binary`, or a `template` fan without `speed_count`. The check looks at the union of the device type config and `clusters: fan_control:`. For any other fan without speed control (custom platforms) the Step feature is skipped with an error log at boot; Matter keeps running.
 
 **Wind** maps the Matter `WindSetting` (natural wind, sleep wind) to ESPHome fan **preset modes**. Add `wind` to `with_features`, or `wind_presets`, which implies it:
 
@@ -83,12 +83,12 @@ fan:
 * At least one of the two presets must exist in the fan's static `preset_modes` list, otherwise the config is rejected with a message naming the fan and the presets. A name given in `wind_presets` that the fan doesn't have is also an error. `WindSupport` has the bits of the presets that exist.
 * Selecting a preset (from ESPHome or a controller) sets the matching `WindSetting` bit; activating anything else clears it. ESPHome presets are exclusive, so when a controller sets both bits the one that is not active yet wins and `WindSetting` is corrected.
 * Clearing `WindSetting` clears the preset the way ESPHome does for a manual speed change: by setting the current speed (at least 1). A fan without speed control can't clear its preset, the request is logged and `WindSetting` is set back.
-* A fan that is off keeps `WindSetting` as ESPHome reports it. Setting a preset does not turn the fan on.
-* `wind` and `wind_presets` need `fan_id`. Without a bound fan the config is rejected.
+* A `WindSetting` written while the fan is off is ignored (logged) and `WindSetting` is set back to 0: Wind does not turn the fan on. Clearing it while off does nothing.
+* `wind` and `wind_presets` need `fan_id`. Without a bound fan the config is rejected. If the config check could not see the presets (set from code) and none exists at boot, Wind is skipped with an error log and Matter keeps running.
 
 ### Limitations
 
-* The `Auto` fan mode has no ESPHome equivalent and is ignored. Do not enable the `Auto` feature unless you handle it yourself.
+* The `Auto` fan mode has no ESPHome equivalent: the `auto` feature is rejected together with `fan_id`. Without `fan_id` it can be enabled and handled with `on_attribute`.
 * Matter persists the fan mode (and so the speed). Use `restore_mode: ALWAYS_OFF` on the ESPHome fan so Matter restores the power-on state. A warning is logged when another restore mode is used.
 * The Fan device type has no OnOff cluster, so the on/off state is only available through the Fan Control cluster.
 * Preset modes other than the Wind ones are not exposed.

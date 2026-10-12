@@ -153,18 +153,35 @@ def _validate_on_attribute_forms(config):
 
 def _check_heat_pump_climate(config):
     heat_pump = config.get("heat_pump")
-    if isinstance(heat_pump, dict) and CONF_CLIMATE_ID in heat_pump:
+    if not isinstance(heat_pump, dict):
+        return config
+    on_endpoint = heat_pump.get(climate_binding.CONF_THERMOSTAT_ON_ENDPOINT, False)
+    if CONF_CLIMATE_ID in heat_pump and not on_endpoint:
+        raise cv.Invalid(
+            "heat_pump: the Heat Pump device type has Thermostat only as a client "
+            "cluster, so a conforming device puts the climate on a separate "
+            "`thermostat` endpoint below the heat pump:\n"
+            "  1: {heat_pump: {}}\n"
+            "  2: {parent: 1, thermostat: {climate_id: ...}}\n"
+            f"To put the Thermostat server on the heat pump endpoint anyway (what "
+            f"Home Assistant needs on a single endpoint, but not what the device "
+            f"type describes), set `{climate_binding.CONF_THERMOSTAT_ON_ENDPOINT}: true`"
+        )
+    if on_endpoint:
+        if CONF_CLIMATE_ID not in heat_pump:
+            raise cv.Invalid(
+                f"heat_pump: {climate_binding.CONF_THERMOSTAT_ON_ENDPOINT} needs climate_id"
+            )
         if "thermostat" in config[CONF_CLUSTERS]:
             raise cv.Invalid(
                 "heat_pump: climate_id creates the Thermostat server cluster, remove "
                 "`clusters: thermostat`"
             )
         _LOGGER.warning(
-            "heat_pump with climate_id puts a Thermostat server on the Heat Pump "
-            "endpoint; the Matter device type only lists Thermostat as a client "
-            "cluster there. Controllers such as Home Assistant show it as a "
-            "climate entity, but for a strictly conforming device put a `thermostat` "
-            "endpoint with climate_id below the heat pump (`parent:`), see docs/hvac.md"
+            "heat_pump with thermostat_on_endpoint puts a Thermostat server on the Heat "
+            "Pump endpoint; the Matter device type only lists Thermostat as a client "
+            "cluster there. Prefer a `thermostat` endpoint below the heat pump "
+            "(`parent:`), see docs/hvac.md"
         )
     return config
 
@@ -609,6 +626,7 @@ class Endpoint:
             climate_ = await cg.get_variable(device_config[CONF_CLIMATE_ID])
             self._climate_variables[device_type.name] = climate_
             if not climate_binding.has_thermostat_member(device_type.name):
+                # (only reachable for heat_pump with thermostat_on_endpoint)
                 # The device type has no Thermostat server of its own (Heat
                 # Pump): the cluster is created next to it, like an explicit one.
                 self._thermostat_outside.add(device_type.name)
@@ -617,13 +635,14 @@ class Endpoint:
                 self._cluster_configs.setdefault(thermostat.name, _ClusterConfig())
                 self._custom_created.add(thermostat.name)
             self.global_includes.add(CLIMATE_INCLUDE)
-            cg.add(
-                var.register_climate(
-                    climate_,
-                    self._endpoint_id,
-                    climate_prefer_cooling(device_type.name),
-                )
-            )
+            climate_args = [
+                climate_,
+                self._endpoint_id,
+                climate_prefer_cooling(device_type.name),
+            ]
+            if climate_binding.heating_only(device_type.name):
+                climate_args.append(True)
+            cg.add(var.register_climate(*climate_args))
 
         # Register Switch cluster event bindings
         await register_switch_binding(var, self._endpoint_id, device_config)
@@ -885,7 +904,9 @@ class Endpoint:
             return self._make_fan_control_lines(cluster)
         if filter_monitoring.is_filter_cluster(cluster.conf_key):
             return filter_monitoring.create_lines(
-                cluster, self._config[CONF_CLUSTERS][cluster.conf_key]
+                cluster,
+                self._config[CONF_CLUSTERS][cluster.conf_key],
+                self._endpoint_id,
             )
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
