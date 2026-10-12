@@ -5,7 +5,7 @@
 
 #include "esphome/components/cover/cover.h"
 #include "esphome/core/optional.h"
-#include "matter_endpoints.h"
+#include "matter_cover_binding.h"
 
 #include <app/clusters/window-covering-server/WindowCoveringDelegate.h>
 #include <esp_matter.h>
@@ -15,30 +15,18 @@
 
 namespace esphome::matter {
 
-namespace conversion {
-
-// Matter Percent100ths: 0 = fully open, 10000 = fully closed.
-// ESPHome cover position/tilt: 1.0 = fully open, 0.0 = fully closed.
-constexpr uint16_t kCoverMatterOpen = 0;
-constexpr uint16_t kCoverMatterClosed = 10000;
-
-// Returns false when the ESPHome value is not a finite number (unknown).
-bool cover_to_matter(float esphome_value, uint16_t &matter_value);
-float cover_from_matter(uint16_t matter_value);
-
-} // namespace conversion
-
-// Binds an ESPHome cover to a Matter Window Covering endpoint.
+// Binds an ESPHome cover to a Matter Window Covering endpoint, through the
+// binding framework (see matter_cover_binding.h for the state machine).
 //
 // The mapping is also the cluster's Delegate: connectedhomeip invokes
 // HandleMovement/HandleStopMotion on the CHIP task after it has set the
-// TargetPosition attributes, and the mapping defers the work to the ESPHome
+// TargetPosition attributes, and the mapping submits the request to the ESPHome
 // main loop. Cover state is pushed back with attribute::report, which does not
 // run the attribute callbacks.
 //
 // Using the Window Covering delegate and batching lift and tilt into a single
 // cover call is aligned with the approach of mrflo97/esphome-matter.
-class MatterCoverMapping : public MatterEndpointMappingBase,
+class MatterCoverMapping : public MatterCoverBinding,
                            public chip::app::Clusters::WindowCovering::Delegate {
 public:
   MatterCoverMapping(cover::Cover *cover, uint16_t endpoint_id);
@@ -53,32 +41,18 @@ public:
   void configure(esp_matter::cluster::window_covering::config_t &config,
                  const char *device_class);
 
-  void initialize() override;
-
   // chip::app::Clusters::WindowCovering::Delegate (CHIP task)
   CHIP_ERROR HandleMovement(
       chip::app::Clusters::WindowCovering::WindowCoveringType type) override;
   CHIP_ERROR HandleStopMotion() override;
 
 protected:
-  void request_(bool lift, uint16_t target);
-  void schedule_drain_();
-  void drain_();
-  void stop_();
-  void on_cover_state_();
-  void push_state_to_matter_();
+  void setup_() override;
+  CoverEntityView entity_() override;
+  void command_stop_() override;
+  void command_move_(bool has_lift, uint16_t lift, bool has_tilt, uint16_t tilt) override;
 
   cover::Cover *cover_;
-  bool has_tilt_{false};
-  bool has_position_{false};
-  bool has_stop_{false};
-
-  // Main-loop state
-  optional<uint16_t> pending_lift_;
-  optional<uint16_t> pending_tilt_;
-  bool drain_scheduled_{false};
-  optional<uint16_t> target_lift_;
-  optional<uint16_t> target_tilt_;
 };
 
 // Used by the generated endpoint code. Both look up the mapping registered for
