@@ -142,3 +142,24 @@ def test_satisfied_alternatives_do_not_need_a_choice() -> None:
     conf = {f.code: f.conformance for f in c.features}
     assert resolve_feature_requirements([], conf, {"PIN", "RID", "USR"}) == set()
     assert resolve_feature_requirements([], conf, {"PIN", "USR", "COTA"}) == set()
+
+
+def test_negated_or_conformance_resolves() -> None:
+    """On/Off's OFFONLY is `O, not (LT | DF)`; Cooktop enables it on its own."""
+    cluster = CLUSTERS_BY_ID[0x0006]
+    conf = {f.code: f.conformance for f in cluster.features}
+    assert resolve_feature_requirements([], conf, {"OFFONLY"}) == set()
+    with pytest.raises(Exception, match="No conformance alternative"):
+        resolve_feature_requirements([], conf, {"OFFONLY", "LT"})
+
+
+def test_bare_cooktop_endpoint_validates(run_config) -> None:
+    result = run_config(
+        """
+matter:
+  endpoints:
+    1:
+      cooktop: {}
+"""
+    )
+    assert result.ok, result.output

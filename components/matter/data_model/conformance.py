@@ -208,6 +208,32 @@ def _combine(left: list[Requirement], right: list[Requirement]) -> list[Requirem
     return combined
 
 
+def _negated_alternatives(term: Any) -> list[Requirement]:
+    """Alternatives for `not <term>`, pushing the negation down (De Morgan)."""
+    if isinstance(term, dict) and len(term) == 1:
+        operator, value = next(iter(term.items()))
+        if operator == "feature":
+            return [Requirement(prohibited_features=frozenset((value,)))]
+        if operator == "condition":
+            return [] if condition_value(value) else [Requirement()]
+        if operator == "not":
+            return _term_alternatives(value)
+        if operator == "or":
+            alternatives = [Requirement()]
+            for child in value:
+                alternatives = _combine(alternatives, _negated_alternatives(child))
+            return alternatives
+        if operator == "and":
+            return [
+                alternative
+                for child in value
+                for alternative in _negated_alternatives(child)
+            ]
+    raise ConformanceError(
+        f"Only negated feature references can currently be resolved: {term!r}"
+    )
+
+
 def _term_alternatives(term: Any) -> list[Requirement]:
     if term is True:
         return [Requirement()]
@@ -232,13 +258,7 @@ def _term_alternatives(term: Any) -> list[Requirement]:
             alternative for child in value for alternative in _term_alternatives(child)
         ]
     if operator == "not":
-        if isinstance(value, dict) and set(value) == {"condition"}:
-            return [] if condition_value(value["condition"]) else [Requirement()]
-        if not isinstance(value, dict) or set(value) != {"feature"}:
-            raise ConformanceError(
-                f"Only negated feature references can currently be resolved: {value!r}"
-            )
-        return [Requirement(prohibited_features=frozenset((value["feature"],)))]
+        return _negated_alternatives(value)
     raise ConformanceError(f"Unsupported conformance term operator: {operator}")
 
 
