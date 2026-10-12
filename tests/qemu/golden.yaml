@@ -14,6 +14,7 @@
 #  10  mode_select          3 modes bound to a select
 #  11  window_covering      template cover that moves 5 % per 500 ms; set_refuse_cover makes it ignore commands
 #  12  door_lock            template lock; set_refuse_lock makes it ignore commands
+#  13  extended_color_light RGBWW light (153..370 mireds), template outputs
 # Passcode 20202021 / discriminator 3840 give the manual code 34970112332.
 esphome:
   # Same name as esp32-openeth.yaml so that both can share one build directory (incremental rebuilds).
@@ -203,6 +204,11 @@ matter:
     12:
       door_lock:
         lock_id: golden_lock
+    13:
+      extended_color_light:
+        light_id: golden_color_light
+        with_features:
+          - hue_and_saturation
     7:
       thermostat:
         climate_id: golden_heater
@@ -261,6 +267,31 @@ output:
     write_action:
       - lambda: ""
   - platform: template
+    id: golden_color_r
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_g
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_b
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_cw
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_ww
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
     id: golden_fan_out
     type: float
     write_action:
@@ -278,6 +309,21 @@ light:
     output: golden_mono_out
     default_transition_length: 0s
     gamma_correct: 1.0 # brightness == level, so the Matter and API values are directly comparable
+    restore_mode: ALWAYS_OFF
+
+  - platform: rgbww
+    id: golden_color_light
+    name: Golden Color Light
+    red: golden_color_r
+    green: golden_color_g
+    blue: golden_color_b
+    cold_white: golden_color_cw
+    warm_white: golden_color_ww
+    cold_white_color_temperature: 153 mireds
+    warm_white_color_temperature: 370 mireds
+    color_interlock: true
+    default_transition_length: 0s
+    gamma_correct: 1.0
     restore_mode: ALWAYS_OFF
 
 # Not optimistic: the state only changes through publish_state, so turn_on can be refused.
