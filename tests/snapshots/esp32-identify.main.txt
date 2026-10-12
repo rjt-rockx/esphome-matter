@@ -13,9 +13,11 @@
   matter::register_identify_trigger(matter_identifytrigger_id_2);
   new(automation_id_2) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id_2);
   matter_mattercomponent_id->register_switch(relay, 1);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     return true;
   });
+  matter_mattercomponent_id->set_structure_hash(0x91132AD);

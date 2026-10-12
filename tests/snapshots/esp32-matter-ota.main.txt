@@ -18,9 +18,11 @@
   new(matter_matterotaeventtrigger_id_2) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::APPLY_FAILED);
   new(automation_id_3) Automation<>(matter_matterotaeventtrigger_id_2);
   matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 1, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     return true;
   });
+  matter_mattercomponent_id->set_structure_hash(0x7D9AABAA);

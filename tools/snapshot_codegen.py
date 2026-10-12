@@ -14,7 +14,8 @@ files are written to ``tests/snapshots/``:
     stripped; absolute paths become ``<REPO>`` and the ESPHome version
     ``<ESPHOME_VERSION>``.
 ``<config>.sdkconfig.txt``
-    The sorted ``CONFIG_*`` lines of the generated sdkconfig matching
+    The sorted ``CONFIG_*`` lines (minus ``CONFIG_SUPPORT_*_CLUSTER=n``, whose set depends
+    on the installed esp_matter version) of the generated sdkconfig matching
     ``ESP_MATTER_ SUPPORT_ CHIP_ ENABLE_ USE_ *MATTER*``, path-normalised.
 
 Regenerate everything with one command (the snapshots are ESPHome *dev* output;
@@ -139,8 +140,18 @@ def find_sdkconfig(build_dir: Path, name: str) -> Path:
     raise SystemExit(f"no sdkconfig found in {build_dir}")
 
 
+# CONFIG_SUPPORT_<cluster>_CLUSTER=n is emitted for every cluster the installed esp_matter
+# knows, so the set of "=n" lines depends on the environment (CI vs local). Only the
+# enabled clusters are meaningful for the snapshot.
+SDK_DISABLED_CLUSTER = re.compile(r"^CONFIG_SUPPORT_\w+_CLUSTER=n$")
+
+
 def extract_sdkconfig(text: str, version: str) -> str:
-    lines = {ln.strip() for ln in text.splitlines() if SDK_KEEP.match(ln.strip())}
+    lines = {
+        ln.strip()
+        for ln in text.splitlines()
+        if SDK_KEEP.match(ln.strip()) and not SDK_DISABLED_CLUSTER.match(ln.strip())
+    }
     return normalise("\n".join(sorted(lines)) + "\n", version)
 
 
