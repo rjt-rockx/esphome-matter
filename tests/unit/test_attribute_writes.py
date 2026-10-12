@@ -94,3 +94,25 @@ def test_identify_effect_values_in_docs():
     assert "11 channel change" in doc
     assert "254 finish effect" in doc
     assert "255 stop effect" in doc
+
+
+def test_every_mirrored_write_site_is_preceded_by_a_push_guard():
+    """Per call site, not per file: a MatterPushGuard must appear between the start of the
+    enclosing top-level function (a column-0 line ending in `{`, or an indented member
+    function of a header class) and each attribute::report/update call."""
+    offenders = []
+    for path in _sources():
+        if path.name in UNGUARDED_ALLOWED:
+            continue
+        lines = path.read_text().splitlines()
+        start = 0
+        for number, line in enumerate(lines):
+            if line and not line[0].isspace() and line.rstrip().endswith("{"):
+                start = number
+            if ANY_WRITE_RE.search(line) and not line.lstrip().startswith("//"):
+                lo = max(start, 0)
+                if path.suffix == ".h":
+                    lo = max(0, number - 80)
+                if not any("MatterPushGuard" in prev for prev in lines[lo:number]):
+                    offenders.append(f"{path.name}:{number + 1}")
+    assert not offenders, f"attribute::report/update without a MatterPushGuard in scope: {offenders}"
