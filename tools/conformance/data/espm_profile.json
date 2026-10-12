@@ -2155,7 +2155,8 @@
      "network_interfaces",
      "reboot_count",
      "up_time",
-     "test_event_triggers_enabled"
+     "test_event_triggers_enabled",
+     "device_load_status"
     ],
     "cmds": [
      "test_event_trigger",
@@ -2665,15 +2666,7 @@
      "last_network_id",
      "last_connect_error_value"
     ],
-    "cmds": [
-     "scan_networks",
-     "remove_network",
-     "connect_network",
-     "reorder_network",
-     "scan_networks_response",
-     "network_config_response",
-     "connect_network_response"
-    ],
+    "cmds": [],
     "events": []
    },
    "cls": "NetworkCommissioning",
@@ -2686,7 +2679,14 @@
       "thread_version"
      ],
      "cmds": [
-      "add_or_update_thread_network"
+      "add_or_update_thread_network",
+      "scan_networks",
+      "remove_network",
+      "connect_network",
+      "reorder_network",
+      "scan_networks_response",
+      "network_config_response",
+      "connect_network_response"
      ],
      "events": []
     },
@@ -2697,7 +2697,14 @@
       "supported_wifi_bands"
      ],
      "cmds": [
-      "add_or_update_wifi_network"
+      "add_or_update_wifi_network",
+      "scan_networks",
+      "remove_network",
+      "connect_network",
+      "reorder_network",
+      "scan_networks_response",
+      "network_config_response",
+      "connect_network_response"
      ],
      "events": []
     }

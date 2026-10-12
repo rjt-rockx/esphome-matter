@@ -195,12 +195,18 @@ class TestSpecLoader:
 
 
 class TestLayoutMode:
-    def test_dimmable_light_is_clean_apart_from_known_sdk_gaps(self, spec, profile):
+    def test_dimmable_light_is_clean(self, spec, profile):
         rep = check_node(from_layout(LIGHT_LAYOUT, spec, profile), spec)
-        errs = _codes(rep)
-        # DeviceLoadStatus is an esp-matter 1.6 gap (see data/known_gaps.json); nothing else.
-        assert {c for c, _ in errs} <= {"CL-ATTR-MISSING"}, errs
-        assert all("General Diagnostics" in w for _, w in errs)
+        # General Diagnostics DeviceLoadStatus is served by the code-driven cluster
+        # (espm._apply_code_driven_overlay), so nothing is left to baseline.
+        assert not _codes(rep), _codes(rep)
+
+    def test_ethernet_only_network_commissioning_has_no_wifi_thread_commands(self, profile):
+        nc = profile.data["clusters"]["network_commissioning"]
+        assert nc["base"]["cmds"] == []
+        for feat in ("WiFiNetworkInterface", "ThreadNetworkInterface"):
+            assert "scan_networks" in nc["features"][feat]["cmds"]
+        assert "device_load_status" in profile.data["clusters"]["general_diagnostics"]["base"]["attrs"]
 
     def test_duplicate_device_types_require_tag_list(self, spec, profile):
         layout = copy.deepcopy(LIGHT_LAYOUT)

@@ -1,25 +1,12 @@
 {
  "gaps": [
   {
-   "code": "CL-ATTR-MISSING",
-   "where": "General Diagnostics",
-   "message": "DeviceLoadStatus",
-   "reason": "esp-matter 1.6 advertises General Diagnostics revision 3 but its legacy cluster create() never creates DeviceLoadStatus (mandatory since revision 3)",
-   "ref": "esp-matter components/esp_matter/data_model/legacy/esp_matter_cluster.cpp:498-535, private/esp_matter_cluster_revisions.h (general_diagnostics = 3)"
-  },
-  {
    "code": "DT-FEATURE-MISSING",
    "where": "Base Device Type",
    "message": "TagList",
    "scope": "component",
    "reason": "component gap: endpoints sharing an application device type with a sibling need Descriptor.TagList (Base Device Type 'Duplicate' condition) but esphome-matter never enables the Descriptor tag_list feature or sets tags. Remove this entry once fixed to arm the check",
    "ref": "components/matter/endpoints.py Endpoint._make_build_callback (no Descriptor feature/tag handling); esp-matter descriptor::feature::tag_list"
-  },
-  {
-   "code": "CL-CMD-NA",
-   "where": "Network Commissioning",
-   "reason": "esp-matter's network_commissioning::create() creates ScanNetworks/RemoveNetwork/ConnectNetwork/ReorderNetwork and their responses unconditionally, also for Ethernet-only builds where the spec makes them Wi-Fi/Thread only",
-   "ref": "esp-matter components/esp_matter/data_model/legacy/esp_matter_cluster.cpp:472-483"
   }
  ]
 }

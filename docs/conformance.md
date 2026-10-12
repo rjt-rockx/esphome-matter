@@ -49,6 +49,10 @@ node model + Matter data model XML --> rules --> report (text / JSON / exit code
    cluster/feature/element creation sequence of its `add()`). Regenerate with
    `python -m tools.conformance.espm --esp-matter <checkout>` when bumping esp-matter.
    This is what makes the static mode meaningful at attribute level.
+   Clusters that esp-matter registers as *code-driven* connectedhomeip ServerClusters are
+   corrected by `_apply_code_driven_overlay` in `espm.py`, because for them the wire
+   AttributeList / AcceptedCommandList come from the cluster class (the provider asks
+   `mRegistry.Get(path)` first), not from what `esp_matter_cluster.cpp` puts in the store.
 3. **Evaluator** (`conformance.py`): own implementation over the conformance
    elements of the XML (`mandatory/optional/provisional/deprecate/disallow/described/
    otherwise`, feature/attribute/command/event/condition terms, and/or/xor/not,
@@ -94,6 +98,38 @@ Severity: `error` = non-conformant; `warning` = likely problem (not-applicable
 element present, provisional feature, controller hint); `info` = tool limits and
 informational notes (e.g. an older advertised device type revision); `known` =
 baselined.
+
+## SDK gaps that turned out not to be gaps
+
+Both were baselined at first and are now modelled instead (no workaround code is needed
+in the component, nothing to fork):
+
+* **General Diagnostics `DeviceLoadStatus`** (mandatory since revision 3). The legacy
+  `general_diagnostics::create()` does not create it, but the cluster is code-driven
+  (`GeneralDiagnosticsCluster`, registered by `ESPMatterGeneralDiagnosticsClusterServerInitCallback`),
+  and its constructor `ForceSet`s `UpTime` and `DeviceLoadStatus`; `Attributes()` lists them and
+  `ReadAttribute` encodes a `DeviceLoadStruct` from the InteractionModelEngine. So a read returns a
+  valid value and the attribute is in the AttributeList.
+* **Network Commissioning Wi-Fi/Thread-only commands on Ethernet.** The store holds
+  ScanNetworks/RemoveNetwork/ConnectNetwork/ReorderNetwork (+ responses) unconditionally, but the
+  code-driven `NetworkCommissioningCluster::AcceptedCommands/GeneratedCommands` only advertise them
+  with the Wi-Fi or Thread feature, so Ethernet-only builds expose none on the wire. (For reference,
+  esp-matter does have `esp_matter::command::destroy(cluster, command)` should a store-level removal
+  ever be wanted, but it is not needed.) Both are verified by reading the SDK sources, not on
+  hardware: confirm with a runtime dump from an Ethernet build (`python -m tools.conformance dump.json`).
+
+## Advertised device type revisions (INFO findings)
+
+`EP-DEVTYPE-REVISION` INFO entries come from esp-matter's *legacy* constants in
+`esp_matter_endpoint_impl.h` (Water Leak 1, Water Freeze 1, Rain 1, Pressure 2, Humidity 2, Light
+Sensor 3, Door Lock 3, Window Covering 5, Thermostat 4). They are stale hard-coded values from an
+older spec, not tied to the cluster contents `add()` creates. The generated data model shipped in the
+same package (`data_model/generated/device_types/*`) carries the current values (Water Leak 2, Freeze 2,
+Rain 2, Pressure 3, Humidity 3, Light Sensor 4, Door Lock 4, Window Covering 6, Thermostat 6). The legacy
+numbers are what the node really implements (the legacy `add()` creates the clusters of that older
+revision), so advertising them is honest; bumping them without adding the newer mandatory elements
+would claim conformance the node does not have. Recommendation: leave as is (INFO), and revisit
+when moving to the generated data model.
 
 ## Limits
 

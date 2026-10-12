@@ -318,6 +318,50 @@ def _functions_any(body: str):
     return out
 
 
+def _apply_code_driven_overlay(clusters: dict) -> None:
+    """Model clusters whose served model is decided by connectedhomeip C++, not the attribute store.
+
+    esp-matter registers some root-node clusters as code-driven ServerClusters. For those,
+    the attribute list and the accepted/generated command lists on the wire come from the
+    cluster class, not from what esp_matter_cluster.cpp creates in the store, so the
+    store-based extraction under- or over-reports.
+
+    * General Diagnostics (GeneralDiagnosticsCluster.h): the constructor force-sets UpTime and
+      DeviceLoadStatus, so DeviceLoadStatus is listed and readable although the legacy
+      create() never makes it.
+    * Network Commissioning (NetworkCommissioningCluster::AcceptedCommands/GeneratedCommands):
+      ScanNetworks/RemoveNetwork/ConnectNetwork/ReorderNetwork and the three responses are
+      only advertised with the Wi-Fi or Thread feature; Ethernet-only exposes none, although
+      the legacy create() makes them in the store.
+
+    Provider dispatch: esp_matter_data_model_provider.cpp (mRegistry.Get(path) first).
+    """
+    gd = clusters.get("general_diagnostics")
+    if gd and "device_load_status" not in gd["base"]["attrs"]:
+        gd["base"]["attrs"].append("device_load_status")
+    nc = clusters.get("network_commissioning")
+    if nc:
+        moved = []
+        for key in ("cmds",):
+            for name in (
+                "scan_networks",
+                "remove_network",
+                "connect_network",
+                "reorder_network",
+                "scan_networks_response",
+                "network_config_response",
+                "connect_network_response",
+            ):
+                if name in nc["base"][key]:
+                    nc["base"][key].remove(name)
+                    moved.append(name)
+        for f in ("WiFiNetworkInterface", "ThreadNetworkInterface"):
+            lst = nc["features"].setdefault(f, dict(attrs=[], cmds=[], events=[]))["cmds"]
+            for name in moved:
+                if name not in lst:
+                    lst.append(name)
+
+
 def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
     cluster_src = _strip_comments(
         (esp_matter / LEGACY / "esp_matter_cluster.cpp").read_text()
@@ -436,6 +480,7 @@ def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
     for ns, rev in revisions.items():
         if ns in clusters:
             clusters[ns]["revision"] = rev
+    _apply_code_driven_overlay(clusters)
     return dict(
         esp_matter=str(esp_matter),
         clusters=clusters,
