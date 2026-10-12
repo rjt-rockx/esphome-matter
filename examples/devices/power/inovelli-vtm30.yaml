@@ -1,0 +1,90 @@
+# mirrors: inovelli-vtm30
+# Real device: Inovelli VTM30 on/off switch (Thread), HA fixture inovelli_vtm30.json, evidence=dump: load (plug+LevelControl),
+# dimmer_switch client, 3 button generic switches with tags, RGB LED light, energy, humidity, temperature.
+# This reproduces the load, three buttons and the energy meter only (explicit endpoints, load as dimmable_light).
+# Differs: see repro-power.md (plug-in unit with Level Control, dimmer_switch client, RGB bar, ModeSelect omitted).
+
+esphome:
+  name: inovelli-vtm30
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+output:
+  - platform: ledc
+    id: dimmer_out
+    pin: GPIO4
+
+light:
+  - platform: monochromatic
+    id: load
+    name: Load
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    pin: {number: GPIO15, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_down
+    pin: {number: GPIO16, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_config
+    pin: {number: GPIO17, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: paddle
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - light.toggle: load
+
+sensor:
+  # BL0937 metering chip (same driver as HLW8012).
+  - platform: hlw8012
+    model: BL0937
+    sel_pin: {number: GPIO5, inverted: true}
+    cf_pin: GPIO6
+    cf1_pin: GPIO7
+    current_resistor: 0.001 ohm
+    voltage_divider: 2351
+    voltage: {id: mains_voltage, name: Voltage}
+    current: {id: mains_current, name: Current}
+    power: {id: mains_power, name: Power}
+    energy: {id: mains_energy, name: Energy}
+
+matter:
+  endpoints:
+    1:
+      label: Load Control
+      dimmable_light:
+        light_id: load
+    3:
+      label: Up
+      generic_switch: {binary_sensor_id: btn_up, multi_press_max: 5}
+    4:
+      label: Down
+      generic_switch: {binary_sensor_id: btn_down, multi_press_max: 5}
+    5:
+      label: Config
+      generic_switch: {binary_sensor_id: btn_config, multi_press_max: 5}
+    7:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: mains_current
+        active_power: mains_power
+        energy_imported: mains_energy

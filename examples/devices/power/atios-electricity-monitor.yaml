@@ -1,0 +1,58 @@
+# mirrors: atios-knx-bridge
+# Real device: Atios ADE-KD energy monitor behind a KNX bridge, HA fixture atios_knx_bridge.json, evidence=dump.
+# Here the monitor is a standalone node (electrical_sensor on ep1) instead of a bridged leaf; the bridged form is
+# gaps/atios-electricity-monitor-bridged.yaml.
+
+esphome:
+  name: atios-electricity-monitor
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: ade7953_i2c
+    irq_pin: GPIO8
+    voltage: {id: mains_voltage, name: Voltage}
+    frequency: {id: mains_frequency, name: Frequency}
+    current_a: {id: mains_current, name: Current}
+    active_power_a: {id: mains_power, name: Power}
+    apparent_power_a: {id: mains_apparent, name: Apparent power}
+    power_factor_a: {id: mains_pf, name: Power factor}
+  - platform: integration
+    id: mains_energy
+    name: Energy
+    sensor: mains_power
+    time_unit: h
+    restore: true
+    device_class: energy
+    state_class: total_increasing
+
+matter:
+  endpoints:
+    1:
+      electrical_sensor:
+        voltage: mains_voltage
+        frequency: mains_frequency
+        active_current: mains_current
+        active_power: mains_power
+        apparent_power: mains_apparent
+        power_factor: mains_pf
+        energy_imported: mains_energy

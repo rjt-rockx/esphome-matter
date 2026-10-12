@@ -1,0 +1,48 @@
+# mirrors: wago-home-relay-16a
+# Real device: WAGO Home Relay 16A (Thread), HA fixture wago_home_relay_16a.json, evidence=dump: plug + generic_switch (MSM max 2).
+# Variant (b): explicit endpoints. Differs: real OnOff has no LT feature and no Scenes; ours has LT.
+
+esphome:
+  name: wago-home-relay-16a
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: relay
+    name: Plug
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: Button
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - switch.toggle: relay
+
+matter:
+  endpoints:
+    1:
+      on_off_plug_in_unit:
+        switch_id: relay
+    2:
+      generic_switch:
+        binary_sensor_id: button
+        multi_press_max: 2

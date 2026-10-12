@@ -1,0 +1,154 @@
+# mirrors: tp-link-tapo-p316m
+# Real device: Tapo P316M 6-outlet strip: ep1-6 plugs, ep7-12 electrical sensors (SmartThings thread; parents unverified).
+# Variant (b): same shape as the real node, BL0906 six-channel meter. Sensors are siblings of the plugs.
+
+esphome:
+  name: tapo-p316m-siblings
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+switch:
+  - platform: gpio
+    id: outlet_1
+    name: Outlet 1
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_2
+    name: Outlet 2
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_3
+    name: Outlet 3
+    pin: GPIO6
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_4
+    name: Outlet 4
+    pin: GPIO7
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_5
+    name: Outlet 5
+    pin: GPIO8
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_6
+    name: Outlet 6
+    pin: GPIO9
+    restore_mode: ALWAYS_OFF
+
+uart:
+  rx_pin: GPIO20
+  tx_pin: GPIO21
+  baud_rate: 19200
+
+sensor:
+  - platform: bl0906
+    update_interval: 10s
+    voltage: {id: mains_voltage, name: Voltage}
+    total_power: {id: total_power, name: Total power}
+    total_energy: {id: total_energy, name: Total energy}
+    channel_1:
+      current: {id: ch1_current, name: "Outlet 1 current"}
+      power: {id: ch1_power, name: "Outlet 1 power"}
+      energy: {id: ch1_energy, name: "Outlet 1 energy"}
+    channel_2:
+      current: {id: ch2_current, name: "Outlet 2 current"}
+      power: {id: ch2_power, name: "Outlet 2 power"}
+      energy: {id: ch2_energy, name: "Outlet 2 energy"}
+    channel_3:
+      current: {id: ch3_current, name: "Outlet 3 current"}
+      power: {id: ch3_power, name: "Outlet 3 power"}
+      energy: {id: ch3_energy, name: "Outlet 3 energy"}
+    channel_4:
+      current: {id: ch4_current, name: "Outlet 4 current"}
+      power: {id: ch4_power, name: "Outlet 4 power"}
+      energy: {id: ch4_energy, name: "Outlet 4 energy"}
+    channel_5:
+      current: {id: ch5_current, name: "Outlet 5 current"}
+      power: {id: ch5_power, name: "Outlet 5 power"}
+      energy: {id: ch5_energy, name: "Outlet 5 energy"}
+    channel_6:
+      current: {id: ch6_current, name: "Outlet 6 current"}
+      power: {id: ch6_power, name: "Outlet 6 power"}
+      energy: {id: ch6_energy, name: "Outlet 6 energy"}
+
+matter:
+  endpoints:
+    1:
+      label: Outlet 1
+      on_off_plug_in_unit:
+        switch_id: outlet_1
+    2:
+      label: Outlet 2
+      on_off_plug_in_unit:
+        switch_id: outlet_2
+    3:
+      label: Outlet 3
+      on_off_plug_in_unit:
+        switch_id: outlet_3
+    4:
+      label: Outlet 4
+      on_off_plug_in_unit:
+        switch_id: outlet_4
+    5:
+      label: Outlet 5
+      on_off_plug_in_unit:
+        switch_id: outlet_5
+    6:
+      label: Outlet 6
+      on_off_plug_in_unit:
+        switch_id: outlet_6
+    7:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch1_current
+        active_power: ch1_power
+        energy_imported: ch1_energy
+    8:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch2_current
+        active_power: ch2_power
+        energy_imported: ch2_energy
+    9:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch3_current
+        active_power: ch3_power
+        energy_imported: ch3_energy
+    10:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch4_current
+        active_power: ch4_power
+        energy_imported: ch4_energy
+    11:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch5_current
+        active_power: ch5_power
+        energy_imported: ch5_energy
+    12:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch6_current
+        active_power: ch6_power
+        energy_imported: ch6_energy

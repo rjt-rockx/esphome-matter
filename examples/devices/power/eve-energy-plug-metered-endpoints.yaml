@@ -1,0 +1,64 @@
+# mirrors: eve-energy-plug-metered-patched
+# Real device: Eve Energy plug with a meter endpoint, HA fixture eve_energy_plug_patched.json (HA-edited dump).
+# Variant (b): explicit endpoints, plug on ep1 and a SEPARATE electrical_sensor on ep2 (sibling, as in the dump).
+# Differs: Power Topology NODE (real fixture has no feature bits); no Identify on the sensor endpoint (not required).
+
+esphome:
+  name: eve-energy-plug-metered-endpoin
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: relay
+    name: Plug
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - switch.toggle: relay
+
+sensor:
+  # BL0937 metering chip (same driver as HLW8012).
+  - platform: hlw8012
+    model: BL0937
+    sel_pin: {number: GPIO5, inverted: true}
+    cf_pin: GPIO6
+    cf1_pin: GPIO7
+    current_resistor: 0.001 ohm
+    voltage_divider: 2351
+    voltage: {id: mains_voltage, name: Voltage}
+    current: {id: mains_current, name: Current}
+    power: {id: mains_power, name: Power}
+    energy: {id: mains_energy, name: Energy}
+
+matter:
+  endpoints:
+    1:
+      on_off_plug_in_unit:
+        switch_id: relay
+    2:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: mains_current
+        active_power: mains_power
+        energy_imported: mains_energy

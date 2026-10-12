@@ -1,0 +1,57 @@
+# mirrors: tuya-wp35-matter-strip-usb
+# Variant (b): explicit endpoints 1-5 with labels (pins the numbers to the real 1-5).
+
+esphome:
+  name: tuya-wp35-power-strip-endpoints
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+switch:
+  - platform: gpio
+    id: outlet_1
+    name: Outlet 1
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_2
+    name: Outlet 2
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_3
+    name: Outlet 3
+    pin: GPIO6
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_4
+    name: Outlet 4
+    pin: GPIO7
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: usb
+    name: USB
+    pin: GPIO8
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1: {label: Outlet 1, on_off_plug_in_unit: {switch_id: outlet_1}}
+    2: {label: Outlet 2, on_off_plug_in_unit: {switch_id: outlet_2}}
+    3: {label: Outlet 3, on_off_plug_in_unit: {switch_id: outlet_3}}
+    4: {label: Outlet 4, on_off_plug_in_unit: {switch_id: outlet_4}}
+    5: {label: USB, on_off_plug_in_unit: {switch_id: usb}}

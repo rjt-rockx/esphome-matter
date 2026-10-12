@@ -1,0 +1,41 @@
+# mirrors: eve-energy-20ecn4101
+# Real device: Eve Energy 2-outlet (Thread), HA fixture eve_energy_20ecn4101.json, evidence=dump.
+# Variant (a): `expose:` with pinned endpoints 1 and 2 and labels. Two sibling plugs: the component adds
+# Common Number tags (real device has none: REAL-DEVICE-NONCONFORMANT, Duplicate rule).
+# Differs: FixedLabel `name` only (real: `id` and `orientation` labels).
+
+esphome:
+  name: eve-energy-20ecn4101
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: outlet_top
+    name: Outlet top
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_bottom
+    name: Outlet bottom
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose:
+    - {id: outlet_top, endpoint: 1, label: Top}
+    - {id: outlet_bottom, endpoint: 2, label: Bottom}

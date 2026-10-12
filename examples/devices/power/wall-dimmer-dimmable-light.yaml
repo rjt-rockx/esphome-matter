@@ -1,0 +1,47 @@
+# mirrors: mock-dimmable-light
+# A wall dimmer (monochromatic light) exposed by inference as dimmable_light. The spec-closer device types for a wall
+# dimmer (mounted_dimmable_load_control / dimmable_plug_in_unit) cannot bind a light: see gaps/.
+
+esphome:
+  name: wall-dimmer-dimmable-light
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: dimmer_out
+    pin: GPIO4
+
+light:
+  - platform: monochromatic
+    id: load
+    name: Load
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+binary_sensor:
+  - platform: gpio
+    id: paddle
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - light.toggle: load
+
+matter:
+  expose: [load]   # monochromatic light -> dimmable_light

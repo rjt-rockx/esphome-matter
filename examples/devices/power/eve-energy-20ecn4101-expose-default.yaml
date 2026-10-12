@@ -1,0 +1,36 @@
+# mirrors: eve-energy-20ecn4101
+# Variant (a'): bare `expose: [outlet_top, outlet_bottom]`: shows the hashed endpoint numbers and the entity-name labels.
+
+esphome:
+  name: eve-energy-20ecn4101-expose-def
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: outlet_top
+    name: Outlet top
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_bottom
+    name: Outlet bottom
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose: [outlet_top, outlet_bottom]

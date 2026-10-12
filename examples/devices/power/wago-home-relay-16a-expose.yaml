@@ -1,0 +1,42 @@
+# mirrors: wago-home-relay-16a
+# Variant (a): `expose` with `as: generic_switch` and `options: {multi_press_max: 2}` on the button.
+
+esphome:
+  name: wago-home-relay-16a-expose
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: relay
+    name: Plug
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: Button
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - switch.toggle: relay
+
+matter:
+  expose:
+    - relay
+    - {id: button, as: generic_switch, options: {multi_press_max: 2}}

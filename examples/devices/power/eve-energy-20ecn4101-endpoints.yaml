@@ -1,0 +1,47 @@
+# mirrors: eve-energy-20ecn4101
+# Variant (b): explicit endpoints with Common Position tags (top/bottom) instead of Eve's FixedLabel orientation.
+
+esphome:
+  name: eve-energy-20ecn4101-endpoints
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+switch:
+  - platform: gpio
+    id: outlet_top
+    name: Outlet top
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_bottom
+    name: Outlet bottom
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      label: Top
+      # Common Position tags say which outlet is which, instead of Eve's FixedLabel "orientation".
+      tags: [{namespace: common_position, tag: top}]
+      on_off_plug_in_unit:
+        switch_id: outlet_top
+    2:
+      label: Bottom
+      tags: [{namespace: common_position, tag: bottom}]
+      on_off_plug_in_unit:
+        switch_id: outlet_bottom
