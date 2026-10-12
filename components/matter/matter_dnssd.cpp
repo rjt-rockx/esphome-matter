@@ -1,23 +1,27 @@
 #include "esphome/core/defines.h"
-#if defined(USE_MATTER) && (defined(USE_OPENTHREAD) || defined(USE_WIFI))
+#if defined(USE_MATTER) && (defined(USE_OPENTHREAD) || defined(USE_WIFI) || defined(USE_ETHERNET))
 
 #ifdef USE_OPENTHREAD
 #include "esphome/components/openthread/openthread.h"
 #endif // USE_OPENTHREAD
+#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
+#include "matter_network.h"
 
 #include <inet/IPAddress.h>
 #include <lib/dnssd/platform/Dnssd.h>
 #include <lib/support/CHIPMem.h>
 #include <lib/support/CodeUtils.h>
+#include <platform/CHIPDeviceLayer.h>
+#include <system/SystemClock.h>
 #ifdef USE_OPENTHREAD
 #include <openthread/error.h>
 #include <openthread/srp_client.h>
 #include <platform/OpenThread/OpenThreadDnssdImpl.h>
 #endif // USE_OPENTHREAD
-#ifdef USE_WIFI
+#if defined(USE_WIFI) || defined(USE_ETHERNET)
 #include <platform/ESP32/ESP32DnssdImpl.h>
-#endif // USE_WIFI
+#endif // USE_WIFI || USE_ETHERNET
 
 #include <cstring>
 #include <memory>
@@ -79,6 +83,9 @@ void resolve_callback(void *context, chip::Dnssd::DnssdService *service,
   } else if (service == nullptr) {
     ESP_LOGW(TAG, "Can't resolve because DnssdService isn't initialized");
   } else {
+    esphome::matter::network_mark(
+        esphome::matter::NetworkMark::CONTROLLER_RESOLVED,
+        safe_string(service->mName));
     ESP_LOGD(TAG, "Resolved %s.%s.%s as %s:%u", safe_string(service->mName),
              safe_string(service->mType),
              protocol_to_string(service->mProtocol),
@@ -129,6 +136,16 @@ struct MatterSrpService {
   std::vector<otDnsTxtEntry> txt_entries;
   otSrpClientService service{};
   bool invalid{false};
+
+  // True if registering `other` would produce the same SRP service record, in
+  // which case the existing registration can be kept untouched.
+  bool same_content(const MatterSrpService &other) const {
+    return this->instance == other.instance && this->type == other.type &&
+           this->service.mPort == other.service.mPort &&
+           this->subtype_storage == other.subtype_storage &&
+           this->txt_key_storage == other.txt_key_storage &&
+           this->txt_value_storage == other.txt_value_storage;
+  }
 
   bool matches(const chip::Dnssd::DnssdService *dnssd_service) const {
     const char *protocol = protocol_to_srp_suffix(dnssd_service->mProtocol);
@@ -196,6 +213,53 @@ CHIP_ERROR build_srp_service(const chip::Dnssd::DnssdService *service,
   entry->service.mPort = service->mPort;
   return CHIP_NO_ERROR;
 }
+
+#ifdef MATTER_DEBUG_NETWORK
+// ESPHome owns the (single) SRP client callback, so registration is detected
+// by polling the state OpenThread keeps in our otSrpClientService structs.
+constexpr uint32_t SRP_POLL_MS = 500;
+constexpr uint32_t SRP_POLL_MAX = 240; // 2 minutes
+uint32_t srp_polls = 0;
+bool srp_poll_active = false;
+
+void srp_poll_cb(chip::System::Layer *, void *) {
+  srp_poll_active = false;
+  bool all_registered = !matter_services.empty();
+  {
+    auto lock = esphome::openthread::InstanceLock::try_acquire(50);
+    if (lock) {
+      for (const auto &entry : matter_services) {
+        if (entry->service.mState != OT_SRP_CLIENT_ITEM_STATE_REGISTERED)
+          all_registered = false;
+      }
+    } else {
+      all_registered = false;
+    }
+  }
+  if (all_registered) {
+    esphome::matter::network_mark(esphome::matter::NetworkMark::SRP_REGISTERED,
+                                  "all Matter services registered with the "
+                                  "SRP server");
+    return;
+  }
+  if (++srp_polls < SRP_POLL_MAX) {
+    srp_poll_active = true;
+    chip::DeviceLayer::SystemLayer().StartTimer(
+        chip::System::Clock::Milliseconds32(SRP_POLL_MS), srp_poll_cb, nullptr);
+  } else {
+    ESP_LOGW(TAG, "SRP registration not confirmed after 2 minutes");
+  }
+}
+
+void start_srp_poll() {
+  srp_polls = 0;
+  if (srp_poll_active)
+    return;
+  srp_poll_active = true;
+  chip::DeviceLayer::SystemLayer().StartTimer(
+      chip::System::Clock::Milliseconds32(SRP_POLL_MS), srp_poll_cb, nullptr);
+}
+#endif // MATTER_DEBUG_NETWORK
 #endif // USE_OPENTHREAD
 } // namespace
 
@@ -215,9 +279,9 @@ CHIP_ERROR ChipDnssdInit(DnssdAsyncReturnCallback init_callback,
   }
   return CHIP_NO_ERROR;
 #endif // USE_OPENTHREAD
-#ifdef USE_WIFI
+#if defined(USE_WIFI) || defined(USE_ETHERNET)
   return EspDnssdInit(init_callback, error_callback, context);
-#endif // USE_WIFI
+#endif // USE_WIFI || USE_ETHERNET
 }
 
 void ChipDnssdShutdown() { ESP_LOGV(TAG, "ChipDnssdShutdown"); }
@@ -240,24 +304,64 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
   ReturnErrorOnFailure(build_srp_service(service, entry));
 
   auto lock = esphome::openthread::InstanceLock::try_acquire(2000);
-  VerifyOrReturnError(static_cast<bool>(lock), CHIP_ERROR_INCORRECT_STATE);
+  if (!lock) {
+    ESP_LOGW(TAG, "Publish %s.%s: OpenThread busy, will retry", service->mName,
+             service->mType);
+    esphome::matter::network_schedule_dnssd_retry("OpenThread lock busy");
+    if (callback != nullptr)
+      callback(context, nullptr, nullptr, CHIP_ERROR_INCORRECT_STATE);
+    return CHIP_ERROR_INCORRECT_STATE;
+  }
 
   otInstance *instance = lock.get_instance();
-  for (auto it = matter_services.begin(); it != matter_services.end();) {
-    if ((*it)->matches(service)) {
-      otSrpClientClearService(instance, &(*it)->service);
-      it = matter_services.erase(it);
+  CHIP_ERROR chip_error = CHIP_NO_ERROR;
+  bool unchanged = false;
+  std::unique_ptr<MatterSrpService> replaced;
+  for (auto it = matter_services.begin(); it != matter_services.end(); ++it) {
+    if (!(*it)->matches(service))
+      continue;
+    if ((*it)->same_content(*entry)) {
+      // Identical record already handed to the SRP client: keep it. Clearing
+      // and re-adding would trigger a second SRP update for nothing and, if
+      // the re-add failed, would silently drop a working registration.
+      (*it)->invalid = false;
+      unchanged = true;
     } else {
-      ++it;
+      otSrpClientClearService(instance, &(*it)->service);
+      replaced = std::move(*it);
+      matter_services.erase(it);
+    }
+    break;
+  }
+
+  if (unchanged) {
+    ESP_LOGD(TAG, "SRP service %s unchanged, keeping registration",
+             service->mName);
+  } else {
+    otError error = otSrpClientAddService(instance, &entry->service);
+    chip_error = map_ot_error(error);
+    if (chip_error == CHIP_NO_ERROR) {
+      matter_services.push_back(std::move(entry));
+    } else {
+      ESP_LOGW(TAG, "Publish failed: %d (%s)", error,
+               otThreadErrorToString(error));
+      if (replaced != nullptr &&
+          otSrpClientAddService(instance, &replaced->service) == OT_ERROR_NONE) {
+        // Keep the previous (stale but working) registration.
+        replaced->invalid = false;
+        matter_services.push_back(std::move(replaced));
+      }
+      esphome::matter::network_schedule_dnssd_retry("SRP add failed");
     }
   }
 
-  otError error = otSrpClientAddService(instance, &entry->service);
-  CHIP_ERROR chip_error = map_ot_error(error);
   if (chip_error == CHIP_NO_ERROR) {
-    matter_services.push_back(std::move(entry));
-  } else {
-    ESP_LOGW(TAG, "Publish failed: %d", error);
+    esphome::matter::network_dnssd_publish_succeeded();
+    esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
+                                  service->mName);
+#ifdef MATTER_DEBUG_NETWORK
+    start_srp_poll();
+#endif // MATTER_DEBUG_NETWORK
   }
 
   if (callback != nullptr) {
@@ -267,9 +371,41 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
   }
   return chip_error;
 #endif // USE_OPENTHREAD
-#ifdef USE_WIFI
-  return EspDnssdPublishService(service, callback, context);
-#endif // USE_WIFI
+#if defined(USE_WIFI) || defined(USE_ETHERNET)
+  // ESPHome's mdns component owns the mDNS hostname (<name>.local). CHIP's
+  // EspDnssdPublishService would replace it with Matter's own hostname through
+  // mdns_hostname_set(), which breaks <name>.local for API clients. If a
+  // hostname is already configured, publish with an empty host name: CHIP then
+  // skips mdns_hostname_set() and the services' SRV target is the existing
+  // ESPHome hostname, which already resolves to this device.
+  char existing_hostname[MDNS_NAME_BUF_LEN] = "";
+  if (service != nullptr && mdns_hostname_get(existing_hostname) == ESP_OK &&
+      existing_hostname[0] != '\0') {
+    chip::Dnssd::DnssdService adjusted = *service;
+    adjusted.mHostName[0] = '\0';
+    ESP_LOGD(TAG, "Keeping mDNS hostname %s.local (Matter host name %s)",
+             existing_hostname, service->mHostName);
+    CHIP_ERROR err = EspDnssdPublishService(&adjusted, callback, context);
+    if (err == CHIP_NO_ERROR) {
+      esphome::matter::network_dnssd_publish_succeeded();
+      esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
+                                    service->mName);
+    } else {
+      esphome::matter::network_schedule_dnssd_retry("mDNS publish failed");
+    }
+    return err;
+  }
+  CHIP_ERROR err = EspDnssdPublishService(service, callback, context);
+  if (err == CHIP_NO_ERROR) {
+    esphome::matter::network_dnssd_publish_succeeded();
+    if (service != nullptr)
+      esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
+                                    service->mName);
+  } else {
+    esphome::matter::network_schedule_dnssd_retry("mDNS publish failed");
+  }
+  return err;
+#endif // USE_WIFI || USE_ETHERNET
 }
 
 CHIP_ERROR ChipDnssdRemoveServices() {
@@ -285,9 +421,9 @@ CHIP_ERROR ChipDnssdRemoveServices() {
   }
   return CHIP_NO_ERROR;
 #endif // USE_OPENTHREAD
-#ifdef USE_WIFI
+#if defined(USE_WIFI) || defined(USE_ETHERNET)
   return EspDnssdRemoveServices();
-#endif // USE_WIFI
+#endif // USE_WIFI || USE_ETHERNET
 }
 
 CHIP_ERROR ChipDnssdFinalizeServiceUpdate() {
@@ -322,10 +458,10 @@ CHIP_ERROR ChipDnssdBrowse(const char *type, DnssdServiceProtocol protocol,
   return OpenThreadDnssdBrowse(type, protocol, address_type, interface,
                                callback, context, browse_identifier);
 #endif // USE_OPENTHREAD
-#ifdef USE_WIFI
+#if defined(USE_WIFI) || defined(USE_ETHERNET)
   return EspDnssdBrowse(type, protocol, address_type, interface, callback,
                         context, browse_identifier);
-#endif // USE_WIFI
+#endif // USE_WIFI || USE_ETHERNET
 }
 
 CHIP_ERROR ChipDnssdStopBrowse(intptr_t) { return CHIP_ERROR_NOT_IMPLEMENTED; }
@@ -355,11 +491,10 @@ CHIP_ERROR ChipDnssdResolve(DnssdService *service,
 #ifdef USE_OPENTHREAD
   CHIP_ERROR error = OpenThreadDnssdResolve(service, interface,
                                             resolve_callback, resolve_context);
-#endif // USE_OPENTHREAD
-#ifdef USE_WIFI
+#elif defined(USE_WIFI) || defined(USE_ETHERNET)
   CHIP_ERROR error =
       EspDnssdResolve(service, interface, resolve_callback, resolve_context);
-#endif // USE_WIFI
+#endif // USE_WIFI || USE_ETHERNET
   if (error != CHIP_NO_ERROR) {
     ESP_LOGW(TAG, "Resolve start failed: %" CHIP_ERROR_FORMAT, error.Format());
     chip::Platform::Delete(resolve_context);
@@ -377,4 +512,4 @@ CHIP_ERROR ChipDnssdReconfirmRecord(const char *hostname, chip::Inet::IPAddress,
 } // namespace Dnssd
 } // namespace chip
 
-#endif // USE_MATTER && (USE_OPENTHREAD || USE_WIFI)
+#endif // USE_MATTER && (USE_OPENTHREAD || USE_WIFI || USE_ETHERNET)

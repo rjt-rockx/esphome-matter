@@ -10,6 +10,7 @@
 #include "matter_commissioning.h"
 #include "matter_component.h"
 #include "matter_identify.h"
+#include "matter_network.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -39,6 +40,7 @@ MatterComponent *global_matter_component =
 
 static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
   MatterCommissioning::instance().handle_event(event);
+  network_on_device_event(event);
   switch (event->Type) {
   case chip::DeviceLayer::DeviceEventType::kInterfaceIpAddressChanged:
     ESP_LOGD(TAG_EVENT, "Interface IP Address changed");
