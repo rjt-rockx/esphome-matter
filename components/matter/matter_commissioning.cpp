@@ -236,7 +236,11 @@ bool MatterCommissioning::init(bool persist_passcode) {
     if (!this->generate_passcode_(id))
       return false;
     changed = true;
+#ifdef MATTER_PASSCODE
+    ESP_LOGI(TAG, "Created the commissioning data from the passcode in the YAML");
+#else
     ESP_LOGI(TAG, "Generated a new commissioning passcode");
+#endif
   } else {
     id.discriminator = (uint16_t)disc;
 #ifdef MATTER_DISCRIMINATOR
@@ -374,7 +378,12 @@ void MatterCommissioning::on_server_ready_() {
     Identity fresh = this->identity_;
     if (this->generate_passcode_(fresh) && this->store_identity_(fresh)) {
       this->identity_ = fresh;
+#ifdef MATTER_PASSCODE
+      ESP_LOGI(TAG, "Device is not commissioned: reset the commissioning data "
+                    "(fixed passcode from the YAML)");
+#else
       ESP_LOGI(TAG, "Device is not commissioned: generated a new passcode");
+#endif
       wm.CloseCommissioningWindow();
       if (wm.OpenBasicCommissioningWindow() != CHIP_NO_ERROR)
         ESP_LOGW(TAG, "Failed to re-open the commissioning window");
