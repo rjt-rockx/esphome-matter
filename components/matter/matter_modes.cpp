@@ -104,7 +104,7 @@ MatterModeSelectManager &mode_select_manager() {
 // ---------------------------------------------------------------- MatterModeList
 
 MatterModeList::MatterModeList(uint16_t endpoint_id, uint32_t cluster_id)
-    : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id) {}
+    : MatterModeBinding(endpoint_id), cluster_id_(cluster_id) {}
 
 void MatterModeList::add_mode(const char *label, uint8_t mode,
                               const char *option) {
@@ -130,38 +130,41 @@ const MatterModeEntry *MatterModeList::find_mode(uint8_t mode) const {
   return nullptr;
 }
 
-void MatterModeList::initialize() {
+void MatterModeList::setup_() {
 #ifdef USE_SELECT
-  if (this->select_ == nullptr)
-    return;
-  this->select_->add_on_state_callback(
-      [this](auto &&...) { this->on_select_state_(); });
+  if (this->select_ != nullptr)
+    this->select_->add_on_state_callback(
+        [this](auto &&...) { this->on_select_state_(); });
+#endif
   // Boot rule: the select wins when it has a (restored) state and is pushed to Matter; otherwise the stored
-  // CurrentMode is replayed into the select. Done from the main loop so the select can be read safely.
-  global_matter_component->defer_to_main_loop([this]() {
-    if (this->select_->has_state())
-      this->on_select_state_();
-    else
-      this->replay_matter_mode_();
-  });
-#endif
+  // CurrentMode is shown in the select. Decided on the main loop so the select can be read safely.
+  this->start_boot_sync_();
 }
 
-void MatterModeList::show_matter_mode_(uint8_t mode) {
-  this->last_mode_ = mode;
+int MatterModeList::entity_mode_() {
 #ifdef USE_SELECT
-  const MatterModeEntry *entry = this->find_mode(mode);
-  if (this->select_ != nullptr && entry != nullptr)
-    this->select_->make_call().set_option(entry->option).perform();
+  if (this->select_ == nullptr || !this->select_->has_state())
+    return -1;
+  auto index = this->select_->active_index();
+  if (!index.has_value())
+    return -1;
+  auto option = this->select_->at(index.value());
+  if (!option.has_value())
+    return -1;
+  for (const auto &entry : this->modes_) {
+    if (entry.option == option.value())
+      return entry.mode;
+  }
 #endif
+  return -1;
 }
 
-void MatterModeList::apply_change_(uint8_t mode, MatterCommandOutcome &outcome) {
-  for (auto *trigger : this->triggers_)
-    trigger->trigger(mode);
-  if (outcome.rejected)
-    return;
-  this->last_mode_ = mode;
+// Main loop. Shows `mode` in the select and, unless this replays what Matter already holds, runs the automation.
+void MatterModeList::deliver_(uint8_t mode, bool silent) {
+  if (!silent) {
+    for (auto *trigger : this->triggers_)
+      trigger->trigger(mode);
+  }
 #ifdef USE_SELECT
   if (this->select_ != nullptr) {
     const MatterModeEntry *entry = this->find_mode(mode);
@@ -169,6 +172,23 @@ void MatterModeList::apply_change_(uint8_t mode, MatterCommandOutcome &outcome) 
       this->select_->make_call().set_option(entry->option).perform();
   }
 #endif
+}
+
+// Main loop, blocking decide_in_automation path: the automation may veto the mode.
+void MatterModeList::apply_change_(uint8_t mode, MatterCommandOutcome &outcome) {
+  for (auto *trigger : this->triggers_)
+    trigger->trigger(mode);
+  if (outcome.rejected)
+    return;
+#ifdef USE_SELECT
+  if (this->select_ != nullptr) {
+    const MatterModeEntry *entry = this->find_mode(mode);
+    if (entry != nullptr)
+      this->select_->make_call().set_option(entry->option).perform();
+  }
+#endif
+  // The SDK writes the accepted mode itself; refresh the outbound slot so an older snapshot cannot overwrite it.
+  this->set_mode_(mode);
 }
 
 void MatterModeList::on_select_state_() {
@@ -187,8 +207,7 @@ void MatterModeList::on_select_state_() {
     ESP_LOGD(TAG, "Select '%s' -> mode %u on endpoint %u cluster 0x%04x",
              option.value().c_str(), entry.mode, this->endpoint_id(),
              static_cast<unsigned>(this->cluster_id_));
-    this->last_mode_ = entry.mode;
-    this->push_mode_to_matter_(entry.mode);
+    this->entity_mode_changed_(entry.mode);
     return;
   }
   ESP_LOGW(TAG, "Select option '%s' is not one of the modes of endpoint %u "
@@ -205,12 +224,12 @@ void MatterModeList::set_current_mode(uint8_t mode) {
              mode, this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
     return;
   }
-  this->last_mode_ = mode;
+  // Always pushed, also when the mode did not change: matter.mode.set is an explicit write.
+  this->set_mode_(mode);
 #ifdef USE_SELECT
   if (this->select_ != nullptr)
     this->select_->make_call().set_option(entry->option).perform();
 #endif
-  this->push_mode_to_matter_(mode);
 }
 
 // ------------------------------------------------------------ MatterModeMapping
@@ -298,7 +317,7 @@ void MatterModeMapping::HandleChangeToMode(
         [this, new_mode](const MatterCommandOutcome &late) {
           if (!late.rejected) {
             ESP_LOGW(TAG, "ChangeToMode(%u) finished late; applying it to Matter", new_mode);
-            this->push_mode_to_matter_(new_mode);
+            this->set_mode_(new_mode);
           }
         });
     if (!answered) {
@@ -310,11 +329,9 @@ void MatterModeMapping::HandleChangeToMode(
       this->status_text_ = outcome.text;
     }
   } else if (has_handler) {
-    // Default: accept and let the automation/select follow asynchronously on the main loop.
-    defer_to_main_loop(global_matter_component, [this, new_mode]() {
-      MatterCommandOutcome unused;
-      this->apply_change_(new_mode, unused);
-    });
+    // Default: accept and let the automation/select follow asynchronously on the main loop. The framework queues
+    // the change (every accepted command runs the automation) and drops a stale push of the select.
+    this->matter_mode_changed_(new_mode);
   }
 
   ESP_LOGD(TAG, "ChangeToMode(%u) on endpoint %u cluster 0x%04x: status %u",
@@ -341,30 +358,27 @@ mode_base_ns::Instance *MatterModeMapping::instance_() {
       esp_matter::cluster::get_delegate_managed_instance(cluster));
 }
 
-void MatterModeMapping::push_mode_to_matter_(uint8_t mode) {
-  run_on_matter_thread([this, mode]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr) {
-      ESP_LOGW(TAG, "Mode cluster 0x%04x on endpoint %u is not running",
-               static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
-      return;
-    }
-    auto status = instance->UpdateCurrentMode(mode);
-    if (status != InteractionStatus::Success)
-      ESP_LOGW(TAG, "Cannot set mode %u on endpoint %u cluster 0x%04x", mode,
-               this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
-  });
+// CHIP task, inside the PushScope.
+void MatterModeMapping::write_mode_(uint8_t mode) {
+  auto *instance = this->instance_();
+  if (instance == nullptr) {
+    ESP_LOGW(TAG, "Mode cluster 0x%04x on endpoint %u is not running",
+             static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
+    return;
+  }
+  auto status = instance->UpdateCurrentMode(mode);
+  if (status != InteractionStatus::Success)
+    ESP_LOGW(TAG, "Cannot set mode %u on endpoint %u cluster 0x%04x", mode,
+             this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
 }
 
-void MatterModeMapping::replay_matter_mode_() {
-  run_on_matter_thread([this]() {
-    auto *instance = this->instance_();
-    if (instance == nullptr)
-      return;
-    uint8_t mode = instance->GetCurrentMode();
-    defer_to_main_loop(global_matter_component,
-                       [this, mode]() { this->show_matter_mode_(mode); });
-  });
+// CHIP task.
+bool MatterModeMapping::read_matter_mode_(uint8_t &mode) {
+  auto *instance = this->instance_();
+  if (instance == nullptr)
+    return false;
+  mode = instance->GetCurrentMode();
+  return true;
 }
 
 // ------------------------------------------------------- MatterModeSelectMapping
@@ -414,61 +428,41 @@ MatterModeSelectMapping::options() const {
       this->options_.data(), this->options_.data() + this->options_.size());
 }
 
-void MatterModeSelectMapping::initialize() {
-  MatterModeList::initialize();
-  global_matter_component->register_attribute_callback(
+void MatterModeSelectMapping::setup_() {
+  MatterModeList::setup_();
+  // CurrentMode is written by the SDK when a controller changes it (ChangeToMode) and by scene recalls. The updates
+  // caused by our own writes never reach on_attribute_().
+  this->watch_attribute(MODE_SELECT_ID, mode_select_ns::Attributes::CurrentMode::Id);
+}
+
+// CHIP task.
+void MatterModeSelectMapping::on_attribute_(uint32_t cluster, uint32_t attribute,
+                                            const esp_matter_attr_val_t &v) {
+  if (cluster == MODE_SELECT_ID &&
+      attribute == mode_select_ns::Attributes::CurrentMode::Id)
+    this->matter_mode_changed_(v.val.u8);
+}
+
+// CHIP task, inside the PushScope.
+void MatterModeSelectMapping::write_mode_(uint8_t mode) {
+  esp_matter_attr_val_t value = esp_matter_uint8(mode);
+  esp_err_t err = binding_platform()->write_attribute(
       this->endpoint_id(), MODE_SELECT_ID,
-      mode_select_ns::Attributes::CurrentMode::Id,
-      [this](const esp_matter_attr_val_t &value) {
-        this->on_matter_mode_(value.val.u8);
-      });
+      mode_select_ns::Attributes::CurrentMode::Id, value, false);
+  if (err != ESP_OK)
+    ESP_LOGW(TAG, "Cannot set mode %u on endpoint %u: %d", mode,
+             this->endpoint_id(), static_cast<int>(err));
 }
 
-// Called on the CHIP task after the SDK handled ChangeToMode (or a scene recall).
-void MatterModeSelectMapping::on_matter_mode_(uint8_t mode) {
-  defer_to_main_loop(global_matter_component, [this, mode]() {
-    if (!this->pending_echoes_.empty() &&
-        this->pending_echoes_.front().second == mode) {
-      // The update caused by our own push (sequence number in the front entry).
-      this->pending_echoes_.pop_front();
-      this->matter_mode_ = mode;
-      return;
-    }
-    this->matter_mode_ = mode;
-    if (static_cast<int>(mode) == this->last_mode_)
-      return;
-    // A controller (ChangeToMode) or a scene recall: select and automation follow.
-    MatterCommandOutcome unused;
-    this->apply_change_(mode, unused);
-  });
-}
-
-void MatterModeSelectMapping::push_mode_to_matter_(uint8_t mode) {
-  if (this->matter_mode_ == mode)
-    return; // Matter already has it: no write, so no echo to expect
-  this->matter_mode_ = mode;
-  this->push_sequence_++;
-  this->pending_echoes_.emplace_back(this->push_sequence_, mode);
-  while (this->pending_echoes_.size() > 8)
-    this->pending_echoes_.pop_front();
-  set_attribute_value(this->endpoint_id(), MODE_SELECT_ID,
-                      mode_select_ns::Attributes::CurrentMode::Id,
-                      static_cast<uint64_t>(mode));
-}
-
-void MatterModeSelectMapping::replay_matter_mode_() {
-  run_on_matter_thread([this]() {
-    esp_matter_attr_val_t value;
-    if (esp_matter::attribute::get_val(this->endpoint_id(), MODE_SELECT_ID,
-                                       mode_select_ns::Attributes::CurrentMode::Id,
-                                       &value) != ESP_OK)
-      return;
-    uint8_t mode = value.val.u8;
-    defer_to_main_loop(global_matter_component, [this, mode]() {
-      this->matter_mode_ = mode;
-      this->show_matter_mode_(mode);
-    });
-  });
+// CHIP task.
+bool MatterModeSelectMapping::read_matter_mode_(uint8_t &mode) {
+  esp_matter_attr_val_t value;
+  if (esp_matter::attribute::get_val(this->endpoint_id(), MODE_SELECT_ID,
+                                     mode_select_ns::Attributes::CurrentMode::Id,
+                                     &value) != ESP_OK)
+    return false;
+  mode = value.val.u8;
+  return true;
 }
 
 // --------------------------------------------------------------------- actions

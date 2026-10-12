@@ -5,7 +5,8 @@
 
 #include "esphome/components/fan/fan.h"
 #include "esphome/components/fan/fan_traits.h"
-#include "matter_endpoints.h"
+#include "matter_binding.h"
+#include "matter_fan_logic.h"
 
 #include <app/clusters/fan-control-server/fan-control-delegate.h>
 #include <esp_matter.h>
@@ -37,33 +38,34 @@ struct FanFeatureOptions {
 esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan,
                            const FanFeatureOptions &options = {});
 
-// Snapshot of the Fan Control cluster state, taken on the CHIP task.
-struct MatterFanState {
-  // False when the cluster is in Auto, which ESPHome can't represent.
-  bool has_speed_info{false};
-  bool off{true};
-  uint8_t percent{0};
-  uint8_t speed{0};
-  bool has_rock{false};
-  bool rocking{false};
-  bool has_direction{false};
-  bool reverse{false};
-};
-
-class MatterFanMapping : public MatterEndpointMappingBase,
-                        public chip::app::Clusters::FanControl::Delegate {
+// Binds an ESPHome fan to the Fan Control cluster of an endpoint, through the
+// binding framework (docs/dev/binding-framework.md).
+//
+// Matter -> ESPHome: controller writes to FanMode, PercentSetting, SpeedSetting,
+// RockSetting and AirflowDirection (attribute watches), the Step command and
+// WindSetting changes (delegate) all end in submit_inbound(): the settled
+// cluster state is read on the CHIP task and the main loop performs one fan
+// call. The cluster keeps its own state; the fan's own pushes are recognised as
+// echoes by the PushScope.
+//
+// ESPHome -> Matter: the fan state is pushed on every state callback. The
+// cluster settings are only written when the cluster no longer maps to the fan
+// (a refused or clamped request, an ESPHome side change); the Current
+// attributes, WindSetting, RockSetting and AirflowDirection always follow the
+// fan. After a controller request the binding waits (settle) for the fan to
+// publish, so a fan that publishes later does not see the old state pushed
+// back first.
+class MatterFanMapping
+    : public MatterBinding<MatterFanOutbound, MatterFanInbound>,
+      public chip::app::Clusters::FanControl::Delegate {
 public:
+  // How long to wait for the fan's own publish after applying a request.
+  static constexpr uint16_t SETTLE_MS = 200;
+
   // wind_natural / wind_sleep: preset mode names, see FanFeatureOptions.
   MatterFanMapping(fan::Fan *fan, uint16_t endpoint_id,
                    const char *wind_natural = nullptr,
                    const char *wind_sleep = nullptr);
-
-  void initialize() override;
-
-  // update_settings is false for changes that originate from Matter. The
-  // settings are already correct then, but the Current attributes are driven by
-  // the application and always need to be updated.
-  void push_state_to_matter(bool update_settings = true);
 
   // FanControl::Delegate. Called on the CHIP task.
   chip::Protocols::InteractionModel::Status
@@ -73,37 +75,30 @@ public:
       chip::BitMask<chip::app::Clusters::FanControl::WindBitmap> value) override;
 
 protected:
-  // Reads the cluster state (CHIP task) and applies it to the fan (main loop).
-  void sync_from_cluster_();
-  void apply_(const MatterFanState &state);
-  // Main loop: selects the preset mode for a WindSetting value.
+  void setup_() override;
+  MatterFanOutbound capture_() override;
+  void write_matter_(const MatterFanOutbound &s) override;
+  void merge_inbound_(MatterFanInbound &acc,
+                      const MatterFanInbound &in) override;
+  void apply_inbound_(const MatterFanInbound &in) override;
+  void on_attribute_(uint32_t cluster, uint32_t attribute,
+                     const esp_matter_attr_val_t &v) override;
+
+  // CHIP task: the settled cluster state, and its submission as a request.
+  MatterFanState read_cluster_state_() const;
+  void submit_cluster_state_();
+  // Main loop.
+  void apply_settings_(const MatterFanState &state);
   void apply_wind_(bool natural, bool sleep);
   // Name of the active preset mode ("" = none).
   std::string active_preset_() const;
 
-  // The ESPHome side state last seen or applied (main loop), to push only real
-  // ESPHome-side changes: a state callback that repeats the old state would
-  // otherwise overwrite a controller write that is still on its way to apply_().
-  struct FanSnapshot {
-    bool on{false};
-    int speed{0};
-    bool oscillating{false};
-    bool reverse{false};
-    std::string preset;
-    bool operator==(const FanSnapshot &o) const {
-      return on == o.on && speed == o.speed && oscillating == o.oscillating &&
-             reverse == o.reverse && preset == o.preset;
-    }
-  };
-  FanSnapshot snapshot_() const;
-  FanSnapshot last_;
-
   fan::Fan *fan_;
+  bool ready_{false};
   bool has_speed_{false};
   bool has_rocking_{false};
   bool has_direction_{false};
   int speed_count_{1};
-  bool synchronizing_from_matter_{false};
   // Wind feature: the fan's own spelling of the matching preset mode names
   // (empty = not available).
   std::string wind_natural_request_;
@@ -111,10 +106,12 @@ protected:
   std::string wind_natural_;
   std::string wind_sleep_;
   bool has_wind_{false};
-  // True while push_state_to_matter() writes the cluster (CHIP task only): the
-  // delegate callbacks run synchronously inside those writes and are echoes.
-  bool pushing_{false};
   bool has_step_{false};
+  // Main loop. The cluster was in Auto when the last request was applied, and
+  // the fan state at that time: Auto survives pushes until the fan changes.
+  bool auto_active_{false};
+  bool auto_on_{false};
+  int auto_speed_{0};
 };
 
 } // namespace esphome::matter

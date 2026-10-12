@@ -90,12 +90,12 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
   mutex-guarded coalesced pending value. The echo guard
   (`MatterAttributeDispatchGuard`) is only set and read on the main loop. OK.
 - `MatterLightMapping::color_update_pending_`: only touched on the CHIP task. OK.
-- `synchronizing_from_matter_` (light, fan): only set and read on the main loop,
+- `synchronizing_from_matter_` (light): only set and read on the main loop,
   so there is no data race. The residual issue is logical: an entity that
   publishes its state after `perform()` returned (asynchronously) is seen as a
   change that originated on the ESPHome side and is pushed back to Matter.
-- `MatterClimateMapping::push_state_to_matter`: closure too large for
-  `ScheduleLambda`; uses `run_on_matter_thread`.
+- Fan, climate fan, climate, filter monitoring: binding framework (see
+  `binding-framework.md`); one CHIP work item per binding.
 - Cover, lock, valve, fan, light, switch, climate: Matter to ESPHome through
   `defer_to_main_loop` with values copied on the CHIP task; ESPHome to Matter
   through `ScheduleLambda` / `run_on_matter_thread` with values copied on the

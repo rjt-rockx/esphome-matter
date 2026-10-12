@@ -6,7 +6,8 @@
 #if defined(USE_MATTER) && defined(USE_MATTER_FILTER_MONITORING)
 
 #include "esphome/core/automation.h"
-#include "matter_endpoints.h"
+#include "matter_binding.h"
+#include "matter_push_bindings.h"
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -45,6 +46,13 @@ public:
   void fire() { this->trigger(); }
 };
 
+// What is mirrored into the cluster (main loop capture).
+struct MatterFilterState {
+  bool has_condition{false};
+  uint8_t condition{0};
+  uint8_t indication{0};
+};
+
 // HEPA / Activated Carbon Filter Monitoring cluster of an air purifier or
 // extractor hood, fed by ESPHome entities:
 //
@@ -54,13 +62,19 @@ public:
 //
 // The ResourceMonitoringCluster object resets Condition and ChangeIndication
 // by itself; the bound sensors take over again with their next update.
-class MatterFilterMapping : public MatterEndpointMappingBase,
-                            public chip::app::Clusters::ResourceMonitoring::Delegate {
+//
+// Binding framework implementation: the bound entities' callbacks request a push
+// (coalesced to the latest state); there is no controller write to apply.
+// Condition and ChangeIndication are code driven (cluster setters).
+class MatterFilterMapping
+    : public MatterBinding<MatterFilterState, NoInbound>,
+      public chip::app::Clusters::ResourceMonitoring::Delegate {
 public:
   MatterFilterMapping(uint16_t endpoint_id, uint32_t cluster_id,
                       FilterLevels levels)
-      : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id),
-        levels_(levels) {}
+      : MatterBinding<MatterFilterState, NoInbound>(
+            endpoint_id, BindingPolicy{BootSync::ESPHOME_WINS, 0, false}),
+        cluster_id_(cluster_id), levels_(levels) {}
 
 #ifdef USE_SENSOR
   void set_condition_sensor(sensor::Sensor *sensor) { this->condition_ = sensor; }
@@ -77,15 +91,15 @@ public:
     this->reset_triggers_.push_back(trigger);
   }
 
-  void initialize() override;
-
   // ResourceMonitoring::Delegate. Called on the CHIP task.
   CHIP_ERROR Init() override { return CHIP_NO_ERROR; }
   chip::Protocols::InteractionModel::Status PostResetCondition() override;
 
 protected:
-  // Main loop: reports the state of the bound entities to the cluster.
-  void push_state_to_matter_();
+  void setup_() override;
+  MatterFilterState capture_() override;
+  void write_matter_(const MatterFilterState &s) override;
+  void apply_inbound_(const NoInbound &) override {}
 
   uint32_t cluster_id_;
   FilterLevels levels_;

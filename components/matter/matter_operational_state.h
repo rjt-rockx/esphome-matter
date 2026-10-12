@@ -5,7 +5,9 @@
 
 #include "esphome/core/automation.h"
 #include "matter_delegates.h"
+#include "matter_binding.h"
 #include "matter_endpoints.h"
+#include "matter_push_bindings.h"
 #ifdef USE_SELECT
 #include "esphome/components/select/select.h"
 #endif
@@ -37,6 +39,28 @@ enum class MatterOperationalCommand : uint8_t {
 
 class MatterOperationalCommandTrigger : public Trigger<> {};
 
+// ESPHome state mirrored into the cluster. -1 / -2: nothing to write.
+struct MatterOpStateSnapshot {
+  // OperationalStateEnum value; -1: leave the state alone.
+  int16_t state{-1};
+  // Index into the phase list; -1: null; -2: leave the phase alone.
+  int16_t phase{-2};
+  // CountdownTime in seconds; -1: null.
+  int64_t countdown{-1};
+};
+
+// A discrete event of the cluster. Never coalesced (MatterEventQueue).
+struct MatterOpEvent {
+  bool completion{false};
+  uint8_t error_id{0};
+  // OperationalError
+  std::string label;
+  std::string details;
+  // OperationCompletion; -1: absent
+  int64_t total_time{-1};
+  int64_t paused_time{-1};
+};
+
 // Delegate of the Operational State (0x0060) and RVC Operational State (0x0061) clusters.
 //
 // Matter -> ESPHome: Pause/Resume/Start/Stop/GoHome run on the CHIP task. By default the CHIP task decides at once
@@ -44,10 +68,12 @@ class MatterOperationalCommandTrigger : public Trigger<> {};
 // `decide_in_automation` the trigger runs first and `matter.operational_state.reject` turns the response into an error.
 // Commands without a trigger are not created in the data model at all.
 // ESPHome -> Matter: the bound select/text sensor (or `matter.operational_state.set`; one way, there is no write back to the select) updates OperationalState and
-// CurrentPhase through the OperationalState::Instance; the countdown sensor feeds CountdownTime. Errors and operation
-// completion are events raised by `matter.operational_state.error` / `.completed`.
+// CurrentPhase through the OperationalState::Instance; the countdown sensor feeds CountdownTime. These are state and go
+// through the binding framework (coalesced to the latest, PushScope echo suppression). Errors and operation
+// completion are discrete events raised by `matter.operational_state.error` / `.completed`; they go through a
+// MatterEventQueue and are never coalesced or dropped by a newer state.
 class MatterOperationalStateMapping
-    : public MatterEndpointMappingBase,
+    : public MatterBinding<MatterOpStateSnapshot, NoInbound>,
       public chip::app::Clusters::RvcOperationalState::Delegate {
 public:
   MatterOperationalStateMapping(uint16_t endpoint_id, uint32_t cluster_id);
@@ -109,8 +135,6 @@ public:
     return !this->triggers_[static_cast<size_t>(command)].empty();
   }
 
-  void initialize() override;
-
   // Main loop.
   void set_state(const std::string &state_name);
   void set_phase(const std::string &phase_name);
@@ -147,6 +171,11 @@ public:
   void *esp_matter_delegate();
 
 protected:
+  void setup_() override;
+  MatterOpStateSnapshot capture_() override;
+  void write_matter_(const MatterOpStateSnapshot &s) override;
+  void apply_inbound_(const NoInbound &) override {}
+
   struct StateEntry {
     uint8_t id;
     std::string label;
@@ -163,7 +192,11 @@ protected:
                uint8_t &id) const;
   void on_state_source_(const std::string &value);
   void on_phase_source_(const std::string &value);
-  // Matter thread.
+  // Push the restored state of the sources (main loop).
+  void push_source_states_();
+  // CHIP task: raises an event through the Instance.
+  void emit_event_(const MatterOpEvent &event);
+  // CHIP task.
   chip::app::Clusters::OperationalState::Instance *instance_();
   static std::string normalize_(const std::string &text);
 
@@ -192,6 +225,14 @@ protected:
 #endif
   // -1 = null. Written on the main loop, read on the CHIP task.
   std::atomic<int64_t> countdown_{-1};
+  // The state and phase the main loop wants Matter to show (main loop only), see capture_().
+  int16_t desired_state_{-1};
+  int16_t desired_phase_{-2};
+  // desired_state_ is the Error state entered by an OperationalError event: the state push leaves it to the event.
+  bool state_from_event_{false};
+  // CHIP task only: the countdown last handed to the Instance.
+  int64_t written_countdown_{INT64_MIN};
+  MatterEventQueue<MatterOpEvent> events_;
 };
 
 // Main loop: free functions behind the actions (implemented in matter_operational_state.cpp).

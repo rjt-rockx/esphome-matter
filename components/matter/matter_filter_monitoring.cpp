@@ -2,7 +2,6 @@
 #if defined(USE_MATTER) && defined(USE_MATTER_FILTER_MONITORING)
 
 #include "esphome/core/log.h"
-#include "matter_attributes.h"
 #include "matter_component.h"
 #include "matter_filter_monitoring.h"
 
@@ -44,7 +43,7 @@ uint8_t FilterLevels::change_indication(uint8_t condition) const {
   return INDICATION_OK;
 }
 
-void MatterFilterMapping::initialize() {
+void MatterFilterMapping::setup_() {
   auto *cluster = find_cluster(this->endpoint_id(), this->cluster_id_);
   if (cluster == nullptr) {
     ESP_LOGW(TAG, "Filter monitoring cluster 0x%04X not found on endpoint %u",
@@ -66,47 +65,45 @@ void MatterFilterMapping::initialize() {
 #ifdef USE_SENSOR
   if (this->condition_ != nullptr)
     this->condition_->add_on_state_callback(
-        [this](float) { this->push_state_to_matter_(); });
+        [this](float) { this->request_push(); });
 #endif
 #ifdef USE_BINARY_SENSOR
   if (this->replace_needed_ != nullptr)
     this->replace_needed_->add_on_state_callback(
-        [this](bool) { this->push_state_to_matter_(); });
+        [this](bool) { this->request_push(); });
 #endif
-  global_matter_component->defer_to_main_loop(
-      [this]() { this->push_state_to_matter_(); });
 }
 
-void MatterFilterMapping::push_state_to_matter_() {
-  uint16_t eid = this->endpoint_id();
-  uint32_t cid = this->cluster_id_;
-  bool has_condition = false;
-  uint8_t condition = 0;
-  uint8_t indication = INDICATION_OK;
+// Main loop.
+MatterFilterState MatterFilterMapping::capture_() {
+  MatterFilterState s;
+  s.indication = INDICATION_OK;
 #ifdef USE_SENSOR
   if (this->condition_ != nullptr && this->condition_->has_state() &&
       std::isfinite(this->condition_->state)) {
-    has_condition = true;
-    condition = static_cast<uint8_t>(
+    s.has_condition = true;
+    s.condition = static_cast<uint8_t>(
         std::clamp(std::lround(this->condition_->state), 0L, 100L));
-    indication = this->levels_.change_indication(condition);
+    s.indication = this->levels_.change_indication(s.condition);
   }
 #endif
 #ifdef USE_BINARY_SENSOR
   if (this->replace_needed_ != nullptr && this->replace_needed_->has_state() &&
       this->replace_needed_->state)
-    indication = INDICATION_CRITICAL;
+    s.indication = INDICATION_CRITICAL;
 #endif
+  return s;
+}
 
-  run_on_matter_thread([eid, cid, has_condition, condition, indication]() {
-    auto *cluster = find_cluster(eid, cid);
-    if (cluster == nullptr)
-      return;
-    if (has_condition)
-      cluster->UpdateCondition(condition);
-    cluster->UpdateChangeIndication(
-        static_cast<RM::ChangeIndicationEnum>(indication));
-  });
+// Runs on the CHIP task, inside a PushScope.
+void MatterFilterMapping::write_matter_(const MatterFilterState &s) {
+  auto *cluster = find_cluster(this->endpoint_id(), this->cluster_id_);
+  if (cluster == nullptr)
+    return;
+  if (s.has_condition)
+    cluster->UpdateCondition(s.condition);
+  cluster->UpdateChangeIndication(
+      static_cast<RM::ChangeIndicationEnum>(s.indication));
 }
 
 // Runs on the CHIP task, after the cluster reset Condition and ChangeIndication.

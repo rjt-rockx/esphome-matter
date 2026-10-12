@@ -31,36 +31,27 @@ BooleanStateConfigurationCluster *find_cluster(uint16_t endpoint_id) {
 } // namespace
 
 void MatterBooleanStateConfigMapping::initialize() {
+#ifdef USE_NUMBER
+  const bool number_has_state =
+      this->number_ != nullptr && this->number_->has_state();
+#endif
+  // The bindings exist before the CHIP task can look at them; they are
+  // initialized (which queues their first push) after the delegate work item.
 #ifdef USE_BINARY_SENSOR
-  if (this->source_ != nullptr) {
-    this->source_->add_on_state_callback([this](bool on) {
-      this->source_on_.store(on);
-      run_on_matter_thread([this, on]() { this->apply_source_(on); });
-    });
-    if (this->source_->has_state()) {
-      bool on = this->source_->state;
-      this->source_on_.store(on);
-      run_on_matter_thread([this, on]() { this->apply_source_(on); });
-    }
-  }
+  if (this->source_ != nullptr)
+    this->source_binding_ =
+        new MatterBscAlarmSource(this->endpoint_id_, this->source_);
 #endif
 #ifdef USE_NUMBER
-  bool number_has_state = false;
-  uint8_t number_level = 0;
-  if (this->number_ != nullptr) {
-    number_has_state = this->number_->has_state();
-    if (number_has_state)
-      number_level = static_cast<uint8_t>(std::clamp<long>(
-          std::lround(this->number_->state), 0, 9));
-    this->number_->add_on_state_callback(
-        [this](float value) { this->on_number_(value); });
-  }
+  if (this->number_ != nullptr)
+    this->sensitivity_binding_ =
+        new MatterBscSensitivity(this->endpoint_id_, this->number_);
 #endif
 
   run_on_matter_thread([this
 #ifdef USE_NUMBER
                         ,
-                        number_has_state, number_level
+                        number_has_state
 #endif
   ]() {
     auto *cluster = find_cluster(this->endpoint_id_);
@@ -71,28 +62,42 @@ void MatterBooleanStateConfigMapping::initialize() {
     }
     cluster->SetDelegate(this);
 #ifdef USE_NUMBER
-    if (this->number_ == nullptr)
-      return;
-    if (number_has_state) {
-      // The number (typically restored by ESPHome) is the source of truth.
-      if (cluster->GetCurrentSensitivityLevel() != number_level) {
-        MatterPushGuard push_guard;
-        CHIP_ERROR err = cluster->SetCurrentSensitivityLevel(number_level);
-        if (err != CHIP_NO_ERROR)
-          ESP_LOGW(TAG, "Cannot set sensitivity level %u on endpoint %u: %s",
-                   number_level, this->endpoint_id_, err.AsString());
-      }
-    } else {
-      uint8_t level = cluster->GetCurrentSensitivityLevel();
-      global_matter_component->defer_to_main_loop(
-          [this, level]() { this->publish_to_number_(level); });
-    }
+    // Without a (restored) number state Matter's level is shown in the number;
+    // otherwise the number wins and is pushed by its binding.
+    if (this->sensitivity_binding_ != nullptr && !number_has_state)
+      this->sensitivity_binding_->on_matter_level(
+          cluster->GetCurrentSensitivityLevel());
 #endif
   });
+
+#ifdef USE_BINARY_SENSOR
+  if (this->source_binding_ != nullptr)
+    this->source_binding_->initialize();
+#endif
+#ifdef USE_NUMBER
+  if (this->sensitivity_binding_ != nullptr)
+    this->sensitivity_binding_->initialize();
+#endif
 }
 
-// Matter thread.
-void MatterBooleanStateConfigMapping::apply_source_(bool on) {
+#ifdef USE_BINARY_SENSOR
+// ------------------------------------------------------- MatterBscAlarmSource
+
+void MatterBscAlarmSource::setup_() {
+  this->source_->add_on_state_callback([this](bool) { this->request_push(); });
+}
+
+// Main loop.
+bool MatterBscAlarmSource::source_state_(bool &on) {
+  if (!this->source_->has_state())
+    return false;
+  on = this->source_->state;
+  return true;
+}
+
+// Matter thread, inside the PushScope: ON makes the enabled alarms active, OFF
+// clears them.
+void MatterBscAlarmSource::apply_source_(bool on) {
   auto *cluster = find_cluster(this->endpoint_id_);
   if (cluster == nullptr)
     return;
@@ -101,14 +106,56 @@ void MatterBooleanStateConfigMapping::apply_source_(bool on) {
   else
     cluster->ClearAllAlarms();
 }
+#endif // USE_BINARY_SENSOR
+
+#ifdef USE_NUMBER
+// ------------------------------------------------------ MatterBscSensitivity
+
+void MatterBscSensitivity::setup_() {
+  this->number_->add_on_state_callback([this](float) { this->request_push(); });
+}
+
+// Main loop.
+bool MatterBscSensitivity::entity_value_(int32_t &out) {
+  if (!this->number_->has_state() || std::isnan(this->number_->state))
+    return false;
+  out = std::clamp<long>(std::lround(this->number_->state), 0, 9);
+  return true;
+}
+
+// Main loop. Shows the level that Matter holds.
+void MatterBscSensitivity::command_value_(int32_t level) {
+  if (this->number_->has_state() &&
+      std::lround(this->number_->state) == static_cast<long>(level))
+    return;
+  auto call = this->number_->make_call();
+  call.set_value(static_cast<float>(level));
+  call.perform();
+}
+
+// Matter thread, inside the PushScope.
+void MatterBscSensitivity::write_value_(int32_t level) {
+  auto *cluster = find_cluster(this->endpoint_id_);
+  if (cluster == nullptr)
+    return;
+  // No-op when Matter already holds the level.
+  CHIP_ERROR err =
+      cluster->SetCurrentSensitivityLevel(static_cast<uint8_t>(level));
+  if (err != CHIP_NO_ERROR)
+    ESP_LOGW(TAG, "Cannot set sensitivity level %d on endpoint %u: %s",
+             static_cast<int>(level), this->endpoint_id_, err.AsString());
+}
+#endif // USE_NUMBER
 
 // Matter thread, inside the EnableDisableAlarm command (AlarmsEnabled is
 // already updated). Alarms that were enabled while the source is ON become
 // active once the command is done.
 CHIP_ERROR MatterBooleanStateConfigMapping::HandleEnableDisableAlarms(
     chip::BitMask<chip::app::Clusters::BooleanStateConfiguration::AlarmModeBitmap>) {
-  if (this->source_on_.load())
-    run_on_matter_thread([this]() { this->apply_source_(true); });
+#ifdef USE_BINARY_SENSOR
+  if (this->source_binding_ != nullptr)
+    this->source_binding_->on_alarms_enabled();
+#endif
   return CHIP_NO_ERROR;
 }
 
@@ -116,9 +163,10 @@ CHIP_ERROR MatterBooleanStateConfigMapping::HandleEnableDisableAlarms(
 bool MatterBooleanStateConfigMapping::OnCurrentSensitivityLevelChanged(
     uint8_t new_value) {
 #ifdef USE_NUMBER
-  if (this->number_ != nullptr)
-    global_matter_component->defer_to_main_loop(
-        [this, new_value]() { this->publish_to_number_(new_value); });
+  // The updates caused by our own SetCurrentSensitivityLevel() are not controller writes.
+  if (this->sensitivity_binding_ != nullptr &&
+      !MatterBindingBase::is_echo(this->endpoint_id_))
+    this->sensitivity_binding_->on_matter_level(new_value);
 #endif
   return true;
 }
@@ -155,37 +203,6 @@ bool MatterBooleanStateConfigMapping::OnAlarmsActiveChanged(
   }
   return true;
 }
-
-#ifdef USE_NUMBER
-// Main loop.
-void MatterBooleanStateConfigMapping::on_number_(float value) {
-  if (std::isnan(value))
-    return;
-  uint8_t level =
-      static_cast<uint8_t>(std::clamp<long>(std::lround(value), 0, 9));
-  run_on_matter_thread([this, level]() {
-    auto *cluster = find_cluster(this->endpoint_id_);
-    if (cluster == nullptr)
-      return;
-    // No-op when the number only shows a value that a controller wrote.
-    MatterPushGuard push_guard;
-    CHIP_ERROR err = cluster->SetCurrentSensitivityLevel(level);
-    if (err != CHIP_NO_ERROR)
-      ESP_LOGW(TAG, "Cannot set sensitivity level %u on endpoint %u: %s", level,
-               this->endpoint_id_, err.AsString());
-  });
-}
-
-// Main loop.
-void MatterBooleanStateConfigMapping::publish_to_number_(uint8_t level) {
-  if (this->number_->has_state() &&
-      std::lround(this->number_->state) == static_cast<long>(level))
-    return;
-  auto call = this->number_->make_call();
-  call.set_value(static_cast<float>(level));
-  call.perform();
-}
-#endif // USE_NUMBER
 
 } // namespace esphome::matter
 
