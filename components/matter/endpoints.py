@@ -847,7 +847,7 @@ class Endpoint:
             cg.add(register_sensor_attribute)
 
     @staticmethod
-    def _standalone_cluster_config_lines(cluster: Cluster, config_var, features):
+    def _standalone_cluster_config_lines(cluster: Cluster, cfg, features):
         """Initial config of clusters that a device type would normally configure."""
         if cluster.name != "ColorControl":
             return []
@@ -862,8 +862,8 @@ class Endpoint:
             mode = 0
         enhanced = 3 if "EHUE" in codes and mode == 0 else mode
         return [
-            f"{config_var}.color_mode = {mode};",
-            f"{config_var}.enhanced_color_mode = {enhanced};",
+            f"{cfg}.color_mode = {mode};",
+            f"{cfg}.enhanced_color_mode = {enhanced};",
         ]
 
     @staticmethod

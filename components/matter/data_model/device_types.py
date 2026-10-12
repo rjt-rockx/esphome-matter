@@ -250,7 +250,7 @@ class DeviceType:
         enabled = list(config.get(CONF_WITH_FEATURES, ()))
 
         # Add the features that other enabled features depend on.
-        for name in list(enabled):
+        for name in enabled:  # also visits the features appended below
             for alternatives in FEATURE_DEPENDENCIES.get(name, ()):
                 if not any(alternative in enabled for alternative in alternatives):
                     enabled.append(alternatives[0])
