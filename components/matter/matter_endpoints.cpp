@@ -93,6 +93,9 @@ bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
     ESP_LOGD(TAG, "Endpoint created: id=%u", endpoint_id);
   }
 
+  if (!this->conformance_.apply(node))
+    return false;
+
   register_client_request_callbacks();
 
   return true;

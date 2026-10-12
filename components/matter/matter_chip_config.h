@@ -24,3 +24,12 @@
 #define CHIP_CONFIG_SUBSCRIPTION_TIMEOUT_RESUMPTION_WAIT_TIME_MULTIPLIER_SECS 10
 #define CHIP_CONFIG_SUBSCRIPTION_TIMEOUT_RESUMPTION_MAX_FIBONACCI_STEP_INDEX 10
 #define CHIP_CONFIG_SUBSCRIPTION_TIMEOUT_RESUMPTION_MAX_RETRY_INTERVAL_SECS 600
+
+// Basic Information ConfigurationVersion. The ESP32 ConfigurationManager serves
+// this constant and cannot store a new value, so it follows the endpoint
+// composition through a function that matter_conformance.cpp defines.
+#ifdef __cplusplus
+#include <stdint.h>
+extern "C" uint32_t esphome_matter_configuration_version(void);
+#define CHIP_DEVICE_CONFIG_DEVICE_CONFIGURATION_VERSION esphome_matter_configuration_version()
+#endif

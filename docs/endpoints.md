@@ -7,3 +7,7 @@ Beneath an endpoint are clusters. Clusters are collections of attributes and com
 To make cluster management more convenient, Matter defines device types. For example, the `Dimmable Light` creates clusters such as `OnOff` and `LevelControl`. Different device types may define the same clusters, so if you're not sure, it's best to assign only a single device type to each endpoint.
 
 For all supported device types, see the documentation on [device types](device-types.md).
+
+# Composition
+
+Sibling endpoints with a common device type get Descriptor tags automatically, and endpoints can have a `label:`, `tags:` and a `parent:`. See [endpoint composition](composition.md).

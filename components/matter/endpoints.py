@@ -11,10 +11,11 @@ from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.components.sensor import Sensor
 from esphome.config import Config
 from esphome.const import CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGER_ID
-from esphome.core import CORE, ID
+from esphome.core import CORE, ID, HexInt
 from esphome.types import ConfigType
 
 from . import binary_sensors
+from . import conformance
 from .const import *
 from .covers import WINDOW_COVERING
 from .covers import config_init as cover_config_init
@@ -144,6 +145,7 @@ ENDPOINT_SCHEMA = cv.All(
             # Battery level sensor (%) exposed through a Power Source cluster on this endpoint.
             cv.Optional(CONF_BATTERY): cv.use_id(Sensor),
         }
+        | conformance.SCHEMA_OPTIONS
         | {device_type.schema_key: device_type.schema() for device_type in DEVICE_TYPES}
     ),
     _validate_on_attribute_forms,
@@ -160,9 +162,15 @@ class _ClusterConfig:
 
 
 class Endpoint:
-    def __init__(self, endpoint_id: int, config: dict):
+    def __init__(
+        self,
+        endpoint_id: int,
+        config: dict,
+        plan: conformance.EndpointPlan | None = None,
+    ):
         self._endpoint_id = endpoint_id
         self._config = config
+        self.plan = plan or conformance.EndpointPlan()
 
         self.enabled_sdkconfig_options: set[str] = set()
         self.global_includes: set[str] = set()
@@ -220,10 +228,59 @@ class Endpoint:
             self.enabled_sdkconfig_options.add(cluster.sdkconfig_option)
             self._cluster_configs.setdefault(cluster_name, _ClusterConfig())
 
+        if self.plan.label is not None:
+            # The label is served by the FixedLabel cluster (see matter_conformance.cpp).
+            self.enabled_sdkconfig_options.add(
+                CLUSTERS_BY_NAME[conformance.FIXED_LABEL_CLUSTER].sdkconfig_option
+            )
+            self._cluster_configs.setdefault(
+                conformance.FIXED_LABEL_CLUSTER, _ClusterConfig()
+            )
+
         await self._register_attribute_automations(var)
+        self._register_conformance(var)
 
         build_fn = cg.RawExpression(self._make_build_callback())
         cg.add(var.register_endpoint(self._endpoint_id, build_fn))
+
+    def _register_conformance(self, var):
+        """Parent, label and semantic tags are applied by matter_conformance.cpp."""
+        plan = self.plan
+        cg.add(var.register_endpoint_parent(self._endpoint_id, plan.parent))
+        if plan.label is not None:
+            cg.add(var.register_endpoint_label(self._endpoint_id, plan.label))
+        for tag in plan.tags:
+            cg.add(
+                var.register_endpoint_tag(
+                    self._endpoint_id, tag.namespace, tag.tag, tag.label or ""
+                )
+            )
+
+    def structure_signature(self) -> str:
+        """Device types, server clusters and enabled features of this endpoint.
+
+        Hashed into the ConfigurationVersion trigger; keep it deterministic.
+        """
+        clusters: dict[int, set[str]] = {}
+        for device_type in self._device_types:
+            for cluster in device_type.server_clusters:
+                if cluster.required:
+                    clusters.setdefault(cluster.id, set())
+        for cluster_name, cluster_config in self._cluster_configs.items():
+            cluster = CLUSTERS_BY_NAME[cluster_name]
+            clusters.setdefault(cluster.id, set()).update(
+                name
+                for name, enabled in cluster_config.enabled_features.items()
+                if enabled
+            )
+        device_types = ",".join(
+            str(i) for i in sorted(t.id for t in self._device_types)
+        )
+        cluster_text = ",".join(
+            f"{cid}[{'+'.join(sorted(features))}]"
+            for cid, features in sorted(clusters.items())
+        )
+        return f"d{device_types}|c{cluster_text}"
 
     async def _register_attribute_automations(self, var):
         configured_clusters = self._config.get(CONF_ON_ATTRIBUTE, {})
@@ -657,11 +714,34 @@ async def register_endpoints(var, config: ConfigType):
         }
     )
 
+    plans = conformance.plan_endpoints(config[CONF_ENDPOINTS])
+    signatures = {}
     for endpoint_id, endpoint_config in config[CONF_ENDPOINTS].items():
-        endpoint = Endpoint(endpoint_id, endpoint_config)
+        endpoint = Endpoint(endpoint_id, endpoint_config, plans[endpoint_id])
         await endpoint.register(var)
+        signatures[endpoint_id] = endpoint.structure_signature()
         global_includes.update(endpoint.global_includes)
         enabled_sdkconfig_clusters.update(endpoint.enabled_sdkconfig_options)
+
+    cg.add(
+        var.set_structure_hash(
+            HexInt(
+                conformance.structure_hash(config[CONF_ENDPOINTS], plans, signatures)
+            )
+        )
+    )
+    # Exact limits: esp-matter sizes per-endpoint and per-device-type tables from them.
+    # The root node endpoint counts as a dynamic endpoint.
+    add_idf_sdkconfig_option(
+        "CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT", len(config[CONF_ENDPOINTS]) + 1
+    )
+    add_idf_sdkconfig_option(
+        "CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT",
+        conformance.max_device_types(config[CONF_ENDPOINTS]),
+    )
+    if any(plan.label is not None for plan in plans.values()):
+        # FixedLabel needs a DeviceInfoProvider; matter_conformance.cpp installs one.
+        add_idf_sdkconfig_option("CONFIG_CUSTOM_DEVICE_INFO_PROVIDER", True)
 
     # Set sdkconfig options to compile the correct clusters.
     for cluster in CLUSTERS:
