@@ -84,6 +84,32 @@ def test_second_battery_for_one_endpoint_goes_standalone():
     assert count(cfg, "power_source") == 2
 
 
+def test_battery_never_matches_on_a_trailing_number_alone():
+    raw = {
+        "switch": [ent("sw1"), ent("sw2")],
+        "sensor": [sens("b1", "battery", "%")],
+    }
+    cfg = run(raw, ["sw1", "sw2", "b1"])
+    assert types(endpoint_with(cfg, "b1")) == ["power_source"]
+    assert "battery" not in endpoint_with(cfg, "sw1")
+
+
+def test_number_relation_needs_a_numbered_family():
+    one_load = {"switch": [ent("sw1")], "sensor": [sens("power_1", "power", "W")]}
+    cfg = run(one_load, "all")  # a lone load is no family: not attached
+    assert "electrical_sensor" not in endpoint_with(cfg, "sw1")
+    family = {
+        "switch": [ent("relay_1"), ent("relay_2")],
+        "sensor": [sens("power_1", "power", "W"), sens("power_2", "power", "W")],
+    }
+    cfg = run(family, "all")
+    for n in (1, 2):
+        assert idof(endpoint_with(cfg, f"relay_{n}")["electrical_sensor"]["active_power"]) == f"power_{n}"
+    unnumbered = {**family, "switch": [ent("relay_1"), ent("lamp")]}
+    cfg = run(unnumbered, "all")  # lamp has no number: not a family
+    assert "electrical_sensor" not in endpoint_with(cfg, "relay_1")
+
+
 # --- a2, a8, a7, #2: multi-attribute `as:` and the rules share one table ------------------------
 
 

@@ -238,6 +238,7 @@ def _auto_target(
             for ep in planned.values()
             if application_device_type_ids(ep.device_types) and "battery" not in ep.extra
         ]
+    family = cands
     if kind == "meter":
         cands = [ep for ep in cands if not _collides(ep, lowered.device_types)]
     if not cands:
@@ -259,11 +260,20 @@ def _auto_target(
     for attr in ("id", "name"):
         if found := best(attr):
             return found
+    # A trailing number only counts inside a numbered family: at least two candidates with
+    # distinct numbers, one of which is the sensor's (relay_1/relay_2 with power_1/power_2).
+    # Batteries never match on the number alone.
     number = _trailing(entity.id)
-    if number is not None:
-        same = [ep.key for ep in cands if _trailing(ep.key) == number]
-        if len(same) == 1:
-            return same[0]
+    if kind == "meter" and number is not None:
+        numbers = [_trailing(ep.key) for ep in family]
+        if (
+            len(family) >= 2
+            and None not in numbers
+            and len(set(numbers)) == len(numbers)
+            and numbers.count(number) == 1
+        ):
+            owner = next(ep.key for ep in family if _trailing(ep.key) == number)
+            return owner if any(ep.key == owner for ep in cands) else None
     if kind == "meter" and explicit and len(cands) == 1:
         return cands[0].key
     return None

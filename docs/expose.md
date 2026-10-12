@@ -102,7 +102,8 @@ endpoint gets the Electrical Sensor device type next to its own) when:
 1. the item has `meters: <load id>` (or `attach_to:`), or
 2. the sensor is *related* to exactly one load: its id starts with the load's id (`relay_1_power` for
    `relay_1`), then its name starts with the load's name (`Relay 1 Power` for `Relay 1`), then its id ends
-   with the load's number (`power_2` for `relay_2`). Prefixes match on a word boundary, so `Relay 12 Power`
+   with the load's number (`power_2` for `relay_2`) when at least two loads carry distinct numbers and the
+   sensor's number matches exactly one. Batteries never match on a number alone. Prefixes match on a word boundary, so `Relay 12 Power`
    does not belong to `Relay 1`, or
 3. the sensor is listed by its own id (not picked by a glob or `all`) and only one load is exposed.
 
@@ -118,8 +119,8 @@ several meters declares its topology.
 ### Battery
 
 A battery sensor puts a Power Source on an application endpoint (`battery:` of the endpoint), like most real
-devices. It goes to the endpoint named with `attach_to:`, or to the one it is related to by id, name or
-trailing number (same rules as meters, without the lone-candidate shortcut). Otherwise it gets its own
+devices. It goes to the endpoint named with `attach_to:`, or to the one it is related to by id or name
+(same rules as meters, without the number rule and the lone-candidate shortcut). Otherwise it gets its own
 `power_source` endpoint. An endpoint that already has a battery is not a candidate: a second battery gets its
 own endpoint. (Power Source on endpoint 0 is not available yet.)
 
