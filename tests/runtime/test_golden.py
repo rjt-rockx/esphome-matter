@@ -148,8 +148,9 @@ def test_generic_switch_events(node, api, device):
     mark = m.mark()
     assert m.read(BUTTON, "Switch", "CurrentPosition") == 0
 
+    # TC_SWTCH 2.5: every momentary press is an InitialPress, presses 2.. are followed by a MultiPressOngoing.
     names = _press(m, api, "double", 2)
-    assert names == ["InitialPress", "ShortRelease", "MultiPressOngoing", "ShortRelease", "MultiPressComplete"], names
+    assert names == ["InitialPress", "ShortRelease", "InitialPress", "MultiPressOngoing", "ShortRelease", "MultiPressComplete"], names
     assert m.read(BUTTON, "Switch", "CurrentPosition") == 0
 
     names = _press(m, api, "long", 0)
