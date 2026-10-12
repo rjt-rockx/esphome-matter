@@ -916,9 +916,9 @@ class TestOtherRules:
         )
 
         assert application_device_type_ids({"aggregator": {}}) == set()
-        assert _duplicate_components({1: {"aggregator": {}}, 2: {"aggregator": {}}}) == [
-            [1, 2]
-        ]
+        assert _duplicate_components(
+            {1: {"aggregator": {}}, 2: {"aggregator": {}}}
+        ) == [[1, 2]]
 
     def test_unique_id_is_optional_in_old_clusters(self, spec):
         def ep(device_types, parts, bdbi=None, revision=4):

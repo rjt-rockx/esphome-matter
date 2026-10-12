@@ -53,6 +53,8 @@ from .expose import (
 from .fan_binding import fan_restore_warning
 from .fan_binding import final_validate as fan_final_validate
 from .icd import CONF_ICD, final_validate_icd, icd_to_code, validate_icd_schema
+from .incomplete import SCHEMA_OPTIONS as INCOMPLETE_SCHEMA_OPTIONS
+from .incomplete import validate_incomplete_device_types
 from .light_binding import (
     light_restore_warning,
     validate_light_effects,
@@ -183,6 +185,8 @@ CONFIG_SCHEMA = cv.All(
             # Log reconnect timing milestones (IP up, DNS-SD, SRP, CASE, subscription)
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             **OTA_SCHEMA_KEYS,  # ota / ota_requestor / software_version (ota.py)
+            # Opt-in for device types that cannot work yet (incomplete.py)
+            **INCOMPLETE_SCHEMA_OPTIONS,
             # Battery powered Thread device (Matter ICD), experimental (icd.py, docs/icd.md)
             cv.Optional(CONF_ICD): validate_icd_schema,
             # Entity-centric exposure, lowered into `endpoints` by lower_expose (docs/expose.md)
@@ -232,6 +236,7 @@ def _final_validate(config: dict):
     validate_ble_commissioning(config, full_config)
     validate_composition(config.get(CONF_ENDPOINTS, {}))
     validate_delegate_clusters(config, full_config)
+    validate_incomplete_device_types(config)
     validate_power_configuration(config)
     validate_topologies(config)
 

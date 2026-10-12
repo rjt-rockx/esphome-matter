@@ -111,9 +111,8 @@ def apply_switch_defaults(config: dict) -> dict:
     features = config[CONF_WITH_FEATURES]
     # esp-matter adds the multi press feature to every action switch, as the spec
     # makes it mandatory there.
-    if "ActionSwitch" in features and "MomentarySwitchMultiPress" not in features:
+    if "ActionSwitch" in features:
         features = [*features, "MomentarySwitchMultiPress"]
-        config[CONF_WITH_FEATURES] = features
     latching = "LatchingSwitch" in features
     for conf, feature in (
         (CONF_LONG_PRESS_TIME, "MomentarySwitchLongPress"),

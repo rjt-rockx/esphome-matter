@@ -103,7 +103,9 @@ _HAS_RE = re.compile(r"(!?)\s*has\(\s*feature::(\w+)::get_id\(\)\s*\)")
 # laundry washer mode creator, ``operational_state::attribute::create_x`` inside the RVC one).
 _QUALIFIER = r"(?:(?!global::)[a-z_0-9]+::)?"
 _ATTR_RE = re.compile(
-    r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"(global::)?attribute::create_(\w+)\s*\("
+    r"(?<![\w:])(?:esp_matter::)?"
+    + _QUALIFIER
+    + r"(global::)?attribute::create_(\w+)\s*\("
 )
 _CMD_RE = re.compile(
     r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"command::create_(\w+)\s*\("
@@ -112,9 +114,7 @@ _EVENT_RE = re.compile(
     r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"event::create_(\w+)\s*\("
 )
 _FEAT_ADD_RE = re.compile(r"feature::(\w+)::add\s*\(")
-_FEATURE_ALIAS_RE = re.compile(
-    r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;"
-)
+_FEATURE_ALIAS_RE = re.compile(r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;")
 
 
 def _join_multiline_ifs(body: str) -> list[str]:
@@ -231,7 +231,7 @@ def _scan_function(body: str):
 
 
 _DT_CREATE_RE = re.compile(
-    r"^\s*(?:cluster_t\s*\*\s*(\w+)\s*=\s*)?(?:cluster::)?(\w+)::create\((.*)\)\s*;"
+    r"^\s*(?:VerifyOrReturn\w*\(\s*)?(?:cluster_t\s*\*\s*(\w+)\s*=\s*)?(?:cluster::)?(\w+)::create\((.*)\)\s*;"
 )
 _DT_FEATURE_RE = re.compile(r"(?:cluster::)?(\w+)::feature::(\w+)::add\(\s*(\w+)")
 _DT_ELEM_RE = re.compile(
@@ -249,7 +249,25 @@ def _scan_device_type_add(body: str) -> list[dict]:
     pp: list[str] = []  # preprocessor condition stack
     ifs = 0  # runtime ``if (...) {`` nesting with the condition text
     cond_stack: list[str] = []
+    # A statement can span several lines (camera: ``cluster_t *x = cluster::y::create(\n endpoint, ...\n);``).
+    joined: list[str] = []
+    pending = ""
     for line in body.splitlines():
+        s = line.strip()
+        if pending:
+            pending += " " + s
+            if pending.count("(") <= pending.count(")"):
+                joined.append(pending)
+                pending = ""
+        elif (
+            not s.startswith("#")
+            and s.count("(") > s.count(")")
+            and not s.endswith("{")
+        ):
+            pending = s
+        else:
+            joined.append(s)
+    for line in joined + ([pending] if pending else []):
         s = line.strip()
         if s.startswith("#"):
             if re.match(r"#\s*(if|ifdef|ifndef)\b", s):
@@ -381,7 +399,9 @@ def _apply_code_driven_overlay(clusters: dict) -> None:
                     nc["base"][key].remove(name)
                     moved.append(name)
         for f in ("WiFiNetworkInterface", "ThreadNetworkInterface"):
-            lst = nc["features"].setdefault(f, dict(attrs=[], cmds=[], events=[]))["cmds"]
+            lst = nc["features"].setdefault(f, dict(attrs=[], cmds=[], events=[]))[
+                "cmds"
+            ]
             for name in moved:
                 if name not in lst:
                     lst.append(name)
@@ -593,7 +613,9 @@ class Profile:
             enabled.add(self._fnorm(imp))
         return enabled
 
-    def implied_features(self, cluster_name: str, feature_names: list[str]) -> list[str]:
+    def implied_features(
+        self, cluster_name: str, feature_names: list[str]
+    ) -> list[str]:
         """Feature names (esp-matter spelling) that the creator turns on besides ``feature_names``."""
         ns = self.namespace_for(cluster_name)
         if ns is None or self.data["clusters"][ns].get("cls") is None:

@@ -197,6 +197,7 @@ def _espm_device_type_namespaces() -> dict[str, str]:
 
 _DT_NAMESPACES: dict[str, str] | None = None
 
+
 def _predict_cluster(
     spec: Spec,
     profile: Profile,
@@ -281,7 +282,11 @@ def from_layout(
     dts = profile.data["device_types"]
 
     def build_endpoint(
-        ep_id: int, dt_names: list[str], cluster_layout: dict, dynamic: set[str]
+        ep_id: int,
+        dt_names: list[str],
+        cluster_layout: dict,
+        dynamic: set[str],
+        client_clusters: tuple[dict, ...] = (),
     ):
         ep = EndpointInst(ep_id)
         # Descriptor is added by esp-matter's endpoint::common::create() for every endpoint.
@@ -333,7 +338,10 @@ def from_layout(
                         "thread"
                     ):
                         continue
-                    if "optional_clusters_mask" in cond or "config->" in cond:
+                    if "CONFIG_ENABLE_OTA_REQUESTOR" in cond:
+                        if not layout.get("ota"):
+                            continue
+                    elif "optional_clusters_mask" in cond or "config->" in cond:
                         # created only if the component asks for it (layout lists it)
                         cspec = _cluster_for_ns(spec, profile, ns)
                         if cspec is None or cspec.id not in layout_by_id:
@@ -358,6 +366,33 @@ def from_layout(
                 key = (cspec.id, "server")
                 sdk_clusters.setdefault(
                     key, dict(features=[], attrs=[], cmds=[], events=[], cspec=cspec)
+                )
+
+        for client in client_clusters:
+            # client clusters that the component creates itself (endpoints.DEVICE_TYPE_CLIENT_CLUSTERS)
+            cspec = spec.clusters.get(client["id"])
+            if cspec is not None:
+                sdk_clusters.setdefault(
+                    (cspec.id, "client"),
+                    dict(features=[], attrs=[], cmds=[], events=[], cspec=cspec),
+                )
+
+        if ep_id == 0 and layout.get("ota"):
+            # esp_matter::start() -> esp_matter_ota_requestor_init() adds the OTA Requestor server and the
+            # OTA Provider client to endpoint 0 when CONFIG_ENABLE_OTA_REQUESTOR is set.
+            for ns, side in (
+                ("ota_software_update_requestor", "server"),
+                ("ota_software_update_provider", "client"),
+            ):
+                add_sdk(
+                    dict(
+                        ns=ns,
+                        sides=[side],
+                        features=[],
+                        attrs=[],
+                        cmds=[],
+                        events=[],
+                    )
                 )
 
         if ep_id == 0 and (0x31, "server") in sdk_clusters:
@@ -422,7 +457,11 @@ def from_layout(
         ep_id = int(key)
         names = [d["name"] for d in e["device_types"]]
         ep = build_endpoint(
-            ep_id, names, e["clusters"], set(e.get("dynamic_features", []))
+            ep_id,
+            names,
+            e["clusters"],
+            set(e.get("dynamic_features", [])),
+            tuple(e.get("client_clusters", ())),
         )
         model.endpoints[ep_id] = ep
         if "parent" in e:

@@ -72,6 +72,8 @@ matter:
   discriminator: 3841
   passcode: 20202021
   persist_passcode: true
+  # The chime endpoint needs a delegate that the component does not provide (components/matter/incomplete.py).
+  allow_incomplete_device_types: [chime]
   debug: true
 
   on_commissioned:
