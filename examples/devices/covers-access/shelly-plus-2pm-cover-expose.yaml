@@ -1,0 +1,110 @@
+# mirrors: shelly-plus-2pm-cover
+# Real device: Shelly Plus 2PM running ESPHome in cover mode (two relays + two ADE7953 channels), Wi-Fi.
+# Source: ESPHome devices page for the Shelly Plus 2PM (current_based cover) and the esphome-hardware catalog row
+# `shelly-plus-2pm-cover` (evidence=doc: a design target, no Matter dump of such a device exists).
+# Intended Matter shape of the catalog row: EP1 window_covering (LF+PA_LF, Rollershade), EP2 temperature_sensor
+# (board), EP3 electrical_sensor (parent EP1) with EPM(ALTC)+EEM(CUME) for the motor.
+# Mirrors: current_based cover (travel stops on a current threshold), NTC board temperature, ADE7953 power metering.
+#
+# Variant (a): expose shorthand. The temperature sensor is inferred (platform `ntc`). `meters:` is documented as
+# "reserved for the Electrical Sensor mapping" and has no effect yet, so the motor power cannot be expressed here.
+esphome:
+  name: matter-shelly-2pm-x
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: motor_cover, as: window_covering}
+    - {id: board_temp, label: Board}
+
+i2c:
+  sda: GPIO26
+  scl: GPIO25
+
+switch:
+  - platform: gpio
+    id: relay_up
+    pin: GPIO13
+    interlock: &motor [relay_up, relay_down]
+  - platform: gpio
+    id: relay_down
+    pin: GPIO12
+    interlock: *motor
+
+sensor:
+  - platform: ade7953_i2c
+    irq_pin: GPIO27
+    voltage:
+      name: Voltage
+      id: mains_voltage
+    current_a:
+      id: motor_up_current
+    current_b:
+      id: motor_down_current
+    active_power_a:
+      name: Motor power up
+      id: motor_power
+      filters: [{multiply: -1}]
+    active_power_b:
+      id: motor_power_b
+      internal: true
+  - platform: adc
+    id: ntc_adc
+    pin: GPIO35
+    attenuation: 12db
+    update_interval: 60s
+    internal: true
+  - platform: resistance
+    id: ntc_res
+    sensor: ntc_adc
+    configuration: DOWNSTREAM
+    resistor: 10kOhm
+    internal: true
+  - platform: ntc
+    id: board_temp
+    name: Board temperature
+    sensor: ntc_res
+    calibration:
+      b_constant: 3350
+      reference_resistance: 10kOhm
+      reference_temperature: 25 °C
+
+cover:
+  - platform: current_based
+    id: motor_cover
+    name: Roller shutter
+    device_class: shutter
+    open_sensor: motor_up_current
+    open_moving_current_threshold: 0.5
+    open_obstacle_current_threshold: 4
+    open_duration: 25s
+    open_action:
+      - switch.turn_on: relay_up
+    close_sensor: motor_down_current
+    close_moving_current_threshold: 0.5
+    close_obstacle_current_threshold: 4
+    close_duration: 23s
+    close_action:
+      - switch.turn_on: relay_down
+    stop_action:
+      - switch.turn_off: relay_up
+      - switch.turn_off: relay_down
+    max_duration: 60s

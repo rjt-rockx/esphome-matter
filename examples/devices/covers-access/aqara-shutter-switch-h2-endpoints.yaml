@@ -1,0 +1,85 @@
+# mirrors: aqara-shutter-switch-h2
+# Real device: Aqara Shutter Switch H2 EU (VID 4447 / PID 4109), Thread, wall switch for a roller shutter.
+# Source: HA fixture aqara_shutter_switch_h2.json (evidence=dump).
+# Real shape: EP1 window_covering LF+PA_LF (Type 0, TagList common_position/0); EP2+EP3 generic_switch MS (position tag 1
+# + common_number 1/2); root additionally carries an Electrical Sensor device type and a TagList (atypical).
+# Mirrors: two relays + two push buttons: time_based cover, two gpio buttons.
+# Differs: Switch MS only on the real device (no release/long/multi), no root electrical sensor.
+#
+# Variant (b): explicit endpoints with explicit `tags:` and the Switch features reduced to MomentarySwitch only.
+esphome:
+  name: matter-aqara-shutter
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      tags:
+        - {namespace: common_position, tag: 0}
+      window_covering:
+        cover_id: shutter
+        end_product_type: roller_shutter
+    2:
+      tags:
+        - {namespace: common_position, tag: 1}
+        - {namespace: common_number, tag: 1}
+      generic_switch:
+        binary_sensor_id: btn_up
+        with_features: [MomentarySwitch]
+    3:
+      tags:
+        - {namespace: common_position, tag: 1}
+        - {namespace: common_number, tag: 2}
+      generic_switch:
+        binary_sensor_id: btn_down
+        with_features: [MomentarySwitch]
+
+output:
+  - platform: gpio
+    id: up_out
+    pin: GPIO10
+  - platform: gpio
+    id: down_out
+    pin: GPIO11
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      - cover.open: shutter
+  - platform: gpio
+    id: btn_down
+    pin: {number: GPIO7, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      - cover.close: shutter
+
+cover:
+  - platform: time_based
+    id: shutter
+    name: Shutter
+    device_class: shutter
+    open_action:
+      - output.turn_on: up_out
+    open_duration: 30s
+    close_action:
+      - output.turn_on: down_out
+    close_duration: 28s
+    stop_action:
+      - output.turn_off: up_out
+      - output.turn_off: down_out

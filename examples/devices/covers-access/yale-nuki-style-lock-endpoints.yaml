@@ -1,0 +1,99 @@
+# mirrors: esphome-door-lock-contact
+# Real device family: Yale Linus / Durus / Assure, Nuki Smart Lock, SwitchBot Lock Pro / Vision (VID 5199/4125, 4957, 5015).
+# Evidence: DCL only (device type 0x000A for all); NO cluster dumps exist for these, so feature sets here are inferred.
+# What the task exercises: a lock that can JAM, with a door position sensor and a battery. ESPHome locks have the states
+# LOCKED, UNLOCKED, JAMMED, LOCKING, UNLOCKING, OPEN; Matter LockState has no jammed value, so jams go to
+# DoorState=DoorJammed which needs the DoorPositionSensor feature (docs/lock-valve.md).
+# Mirrors: a template lock whose state comes from a motor current / limit switch lambda, the common DIY smart-lock shape.
+#
+# Variant (b): explicit endpoints: lock with DoorPositionSensor + Unbolt, contact sensor, battery on the lock endpoint.
+esphome:
+  name: matter-smartlock
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Front door
+      door_lock:
+        lock_id: front_door
+        lock_type: DEAD_BOLT
+        with_features: [DoorPositionSensor, Unbolt]
+      battery: lock_battery
+    2:
+      label: Door sensor
+      contact_sensor:
+        boolean_state: door_reed
+
+binary_sensor:
+  - platform: gpio
+    id: bolt_extended
+    pin: {number: GPIO6, mode: INPUT_PULLUP}
+    internal: true
+  - platform: gpio
+    id: bolt_retracted
+    pin: {number: GPIO7, mode: INPUT_PULLUP}
+    internal: true
+  - platform: gpio
+    id: door_reed
+    name: Door closed
+    device_class: door
+    pin: {number: GPIO8, mode: INPUT_PULLUP, inverted: true}
+
+output:
+  - platform: gpio
+    id: motor_lock
+    pin: GPIO10
+  - platform: gpio
+    id: motor_unlock
+    pin: GPIO11
+
+lock:
+  - platform: template
+    id: front_door
+    name: Front door
+    optimistic: false
+    lambda: |-
+      if (id(bolt_extended).state && !id(bolt_retracted).state) return LOCK_STATE_LOCKED;
+      if (!id(bolt_extended).state && id(bolt_retracted).state) return LOCK_STATE_UNLOCKED;
+      return LOCK_STATE_JAMMED;      # neither / both switches closed
+    lock_action:
+      - output.turn_on: motor_lock
+      - delay: 1500ms
+      - output.turn_off: motor_lock
+    unlock_action:
+      - output.turn_on: motor_unlock
+      - delay: 1500ms
+      - output.turn_off: motor_unlock
+    open_action:
+      - output.turn_on: motor_unlock
+      - delay: 1500ms
+      - output.turn_off: motor_unlock
+
+sensor:
+  - platform: template
+    id: lock_battery
+    name: Lock battery
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: return 80.0;
+    update_interval: 10min

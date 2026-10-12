@@ -1,0 +1,51 @@
+# mirrors: esphome-door-lock-contact
+# Real device: ESPHome output lock + reed switch (esphome-hardware catalog row `esphome-door-lock-contact`, evidence=doc;
+# the shape follows docs/lock-valve.md).
+# Catalog shape: EP1 door_lock (UBOLT, LockState Locked/Unlocked only), EP2 contact_sensor on its own endpoint.
+# Matter keeps the door state (reed) separate from the lock state; BooleanState must not sit on the lock endpoint.
+#
+# Variant (a): expose shorthand. A lock has no inference rule yet, so `as: door_lock`; the reed switch (class door) is NOT inferred either (binary_sensor with a class is spec'd for contact_sensor in DIRECTION section 6 but no rule exists).
+esphome:
+  name: matter-lock-contact-x
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: front_door, as: door_lock, features: [Unbolt], label: Front door}
+    - {id: door_reed, as: contact_sensor, label: Door sensor}
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO10
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+binary_sensor:
+  - platform: gpio
+    id: door_reed
+    name: Door closed
+    device_class: door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}

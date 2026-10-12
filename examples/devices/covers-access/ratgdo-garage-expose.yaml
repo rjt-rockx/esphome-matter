@@ -1,0 +1,90 @@
+# mirrors: ratgdo-garage
+# Real device family: garage door openers. Evidence: ratgdo (esphome-hardware catalog, evidence=inferred: Closure by spec),
+# DCL rows of retail Matter openers (Konnected GDOv2 = Window Covering 514, Smart Garage Door Opener 3RDO01058W = On/Off
+# Light Switch, Sonoff SmartGarageDoorController = On/Off Plug-in Unit); Meross MSG has no cluster dump. The only real
+# Closure device is the HA test mock `mock_closure_covering_lift.json` (dump).
+# The ratgdo ESPHome component is an external component, so a template cover with device_class garage stands in for
+# `cover: platform: ratgdo` here (same entity interface: position, door state, open/close/stop).
+#
+# Variant (a): expose shorthand with the same workaround cover. Note `as: window_covering` is mandatory (a cover is
+# the only domain that maps) and the garage-class cover itself would be refused, see the report.
+esphome:
+  name: matter-garage-x
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: garage_matter, as: window_covering, label: Garage door}
+    - {id: door_reed, as: contact_sensor, label: Door sensor}
+    - garage_light
+
+output:
+  - platform: gpio
+    id: door_relay
+    pin: GPIO10
+  - platform: gpio
+    id: light_relay
+    pin: GPIO11
+
+binary_sensor:
+  - platform: gpio
+    id: door_reed
+    name: Garage door closed
+    device_class: garage_door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+
+light:
+  - platform: binary
+    id: garage_light
+    name: Garage light
+    output: light_relay
+
+cover:
+  - platform: template
+    id: garage_door
+    name: Garage door
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+    close_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+    stop_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+  - platform: template
+    id: garage_matter
+    name: Garage door (Matter)
+    has_position: true
+    lambda: |-
+      return id(garage_door).position;
+    open_action:
+      - cover.open: garage_door
+    close_action:
+      - cover.close: garage_door
+    stop_action:
+      - cover.stop: garage_door

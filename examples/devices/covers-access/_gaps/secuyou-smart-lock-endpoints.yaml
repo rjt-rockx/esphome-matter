@@ -1,0 +1,44 @@
+# Real device: Secuyou smart lock (VID 5149 / PID 111), Thread.
+# Source: HA fixture secuyou_smart_lock.json (evidence=dump).
+# Real shape: EP1 door_lock (rev 2) PIN+COTA+USR, LockType 2 (Other). No battery cluster.
+#
+# Variant (b): explicit endpoint.
+#
+# BLOCKED: the feature names below make the endpoint fail code generation with 'Unsupported conformance term operator: condition' (Door Lock) / 'rule type: described' (TimeSync).
+esphome:
+  name: matter-secuyou-lock
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        lock_type: OTHER
+        with_features: [PIN Credential, CredentialsOverTheAirAccess, User]
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO10
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay

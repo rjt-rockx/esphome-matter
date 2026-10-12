@@ -1,0 +1,69 @@
+# mirrors: sdk-chef-water-valve-flow
+# Real device: connectedhomeip chef water valve with flow (sdk-chef-water-valve-flow, rootnode_watervalve_*.zap).
+# Evidence: ZAP file (dump of the data model, not a live node).
+# Real shape: EP1 with device types water_valve + power_source, clusters ValveConfigurationAndControl (Level), PowerSource,
+# FlowMeasurement ALL on one endpoint.
+# Mirrors: a position-capable valve, a battery sensor and a flow meter (pulse_meter).
+#
+# Variant (a): expose shorthand. The flow sensor is not inferred (DIRECTION section 6 maps volume_flow_rate to flow_sensor, no rule yet), so `as: flow_sensor`.
+esphome:
+  name: matter-valve-flow-x
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: garden_valve, as: water_valve, features: [Level]}
+    - {id: water_flow, as: flow_sensor}
+    - {id: valve_battery, as: power_source, attach_to: garden_valve}
+
+output:
+  - platform: gpio
+    id: valve_relay
+    pin: GPIO10
+
+valve:
+  - platform: template
+    id: garden_valve
+    name: Garden valve
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: valve_relay
+    close_action:
+      - output.turn_off: valve_relay
+    position_action:
+      - logger.log: {format: "valve to %.2f", args: [pos]}
+
+sensor:
+  - platform: pulse_meter
+    id: water_flow
+    name: Water flow
+    pin: GPIO4
+    unit_of_measurement: "L/min"
+    device_class: volume_flow_rate
+    timeout: 30s
+  - platform: template
+    id: valve_battery
+    name: Valve battery
+    device_class: battery
+    unit_of_measurement: "%"
+    lambda: return 90.0;
+    update_interval: 10min

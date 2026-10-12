@@ -1,0 +1,51 @@
+# Real device: Matter SDK test valve as dumped by HA (mock_valve.json, evidence=dump, Ethernet).
+# Real shape: EP1 water_valve (rev 1) with ValveConfigurationAndControl feature TS (TimeSync), nothing else.
+# Mirrors: a relay-driven template valve.
+# Differs: TS (open duration) is a cluster feature the component leaves off by default; request it with `with_features`.
+#
+# Variant (b): explicit endpoint, TimeSync on.
+#
+# BLOCKED: the feature names below make the endpoint fail code generation with 'Unsupported conformance term operator: condition' (Door Lock) / 'rule type: described' (TimeSync).
+esphome:
+  name: matter-mock-valve
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      water_valve:
+        valve_id: garden_valve
+        with_features: [TimeSync]
+
+output:
+  - platform: gpio
+    id: valve_relay
+    pin: GPIO10
+
+valve:
+  - platform: template
+    id: garden_valve
+    name: Garden valve
+    optimistic: true
+    open_action:
+      - output.turn_on: valve_relay
+    close_action:
+      - output.turn_off: valve_relay
