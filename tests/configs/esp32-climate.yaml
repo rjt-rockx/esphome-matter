@@ -1,0 +1,74 @@
+esphome:
+  name: matter-ci-climate
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      thermostat:
+        climate_id: heater
+    2:
+      room_air_conditioner:
+        climate_id: aircon
+    3:
+      # Manual feature selection without a bound climate.
+      thermostat:
+        features: [Heating, Cooling, AutoMode]
+
+sensor:
+  - platform: internal_temperature
+    id: room_temp
+
+switch:
+  - platform: gpio
+    id: heater_relay
+    pin: GPIO4
+
+climate:
+  - platform: thermostat
+    id: heater
+    name: Heater
+    sensor: room_temp
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    min_idle_time: 1s
+    heat_action:
+      - switch.turn_on: heater_relay
+    idle_action:
+      - switch.turn_off: heater_relay
+  - platform: thermostat
+    id: aircon
+    name: Air conditioner
+    sensor: room_temp
+    min_cooling_off_time: 1s
+    min_cooling_run_time: 1s
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    min_idle_time: 1s
+    cool_action:
+      - switch.turn_on: heater_relay
+    heat_action:
+      - switch.turn_on: heater_relay
+    idle_action:
+      - switch.turn_off: heater_relay

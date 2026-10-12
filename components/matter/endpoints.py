@@ -23,6 +23,12 @@ from .data_model.device_types import (
     DEVICE_TYPES_BY_ID,
     DeviceType,
 )
+from .matter_climate import (
+    CLIMATE_INCLUDE,
+    CONF_CLIMATE_ID,
+    config_lines as climate_config_lines,
+    post_create_lines as climate_post_create_lines,
+)
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -130,6 +136,7 @@ class Endpoint:
         )
         self._device_types: list[DeviceType] = []
         self._light_variables = {}
+        self._climate_variables = {}
 
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
@@ -229,6 +236,13 @@ class Endpoint:
             self._light_variables[device_type.name] = light_
             cg.add(var.register_light(light_, self._endpoint_id))
 
+        if CONF_CLIMATE_ID in device_config:
+            climate_ = await cg.get_variable(device_config[CONF_CLIMATE_ID])
+            self._climate_variables[device_type.name] = climate_
+            self.global_includes.add(CLIMATE_INCLUDE)
+            prefer_cooling = device_type.name == "room_air_conditioner"
+            cg.add(var.register_climate(climate_, self._endpoint_id, prefer_cooling))
+
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
             for cluster in device_type.server_clusters:
@@ -285,12 +299,18 @@ class Endpoint:
                     f"{config_var}.{cluster.espm_namespace}.feature_flags = {' | '.join(feature_flags)};"
                 )
 
+        climate_ = self._climate_variables.get(device_type.name)
+        if climate_ is not None:
+            lines.extend(climate_config_lines(config_var, climate_, device_type.name))
+
         lines.extend(
             (
                 f"if (esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var}) != ESP_OK)",
                 "  return false;",
             )
         )
+        if climate_ is not None:
+            lines.extend(climate_post_create_lines(climate_, device_type.name))
         return lines
 
     async def _register_sensor_attribute(

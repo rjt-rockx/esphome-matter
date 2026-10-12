@@ -9,6 +9,7 @@ from esphome.components import light
 from esphome.const import CONF_LIGHT_ID
 
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
+from ..matter_climate import climate_schema, validate_climate_features
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
@@ -177,6 +178,8 @@ class DeviceType:
         if self.name.endswith("light"):
             schema[cv.Optional(CONF_LIGHT_ID)] = cv.use_id(light.LightState)
 
+        schema.update(climate_schema(self.name))
+
         if self.name.endswith("light") and any(
             cluster.name == "LevelControl" and cluster.required
             for cluster in self.server_clusters
@@ -198,7 +201,11 @@ class DeviceType:
 
     def schema(self):
         # TODO: only maybe_empty if there are no clusters or features for which a mandatory choice must be made.
-        return cv.All(maybe_empty(self._schema()), self._validate_features)
+        return cv.All(
+            maybe_empty(self._schema()),
+            self._validate_features,
+            validate_climate_features,
+        )
 
 
 # class ElectricalSensor(DeviceType):

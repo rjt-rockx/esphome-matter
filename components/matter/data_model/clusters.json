@@ -7453,14 +7453,19 @@
     "revision": 11,
     "features": [
       {
-        "type": "feature",
-        "code": "HEAT",
-        "name": "Heating"
-      },
-      {
-        "type": "feature",
-        "code": "COOL",
-        "name": "Cooling"
+        "type": "choice",
+        "min": 1,
+        "max": 2,
+        "features": [
+          {
+            "code": "HEAT",
+            "name": "Heating"
+          },
+          {
+            "code": "COOL",
+            "name": "Cooling"
+          }
+        ]
       },
       {
         "type": "feature",
