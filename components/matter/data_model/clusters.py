@@ -1,9 +1,10 @@
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from ..util import snake_case
+from . import espmatter_names
 from .attributes import Attribute
 
 _LOGGER = logging.getLogger(__name__)
@@ -15,6 +16,12 @@ class Feature:
     name: str  # CamelCase
     # Can be set to True by DeviceType config
     enabled: bool = False
+    # Resolved from espmatter_names.json by Cluster.from_dict.
+    espm_feature_namespace: str | None = None
+    # False if esp-matter has no such feature. Such features must be rejected at
+    # config time; using their namespace raises.
+    espm_available: bool = True
+    cluster_name: str = ""
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -23,9 +30,21 @@ class Feature:
     @property
     def namespace(self) -> str:
         """Feature name in esp_matter::cluster::<cluster>::feature::<feature> namespace."""
-        # "Hue And Saturation" is esp_matter's "hue_saturation"; other names
-        # contain spaces ("CO Alarm").
-        return snake_case(self.name.replace(" And ", "").replace(" ", ""))
+        if not self.espm_available:
+            raise ValueError(
+                f"Feature {self.name} of cluster {self.cluster_name} is not "
+                "available in esp-matter"
+            )
+        if self.espm_feature_namespace is None:
+            # Not resolved against the esp-matter table.
+            return espmatter_names._fallback_namespace(self.name)
+        return self.espm_feature_namespace
+
+    def unavailable_message(self) -> str:
+        return (
+            f"Feature {self.name} of the Matter {self.cluster_name} cluster is not "
+            "supported by esp-matter (1.6) and can't be enabled"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,11 +92,24 @@ class Cluster:
     # connectedhomeip include. e.g.: #include <app/clusters/temperature-measure-server/TemperatureMeasurementCluster.h>
     chip_include: str
     # esp_matter class namespace. e.g.:
-    espm_namespace: str
+    # None if esp-matter has no such cluster (see espm_namespace).
+    espm_cluster_namespace: str | None
     # ----------------------------------- #
     # Set by DeviceType                   #
     # ----------------------------------- #
     required: bool = False
+
+    @property
+    def espm_available(self) -> bool:
+        """Whether esp-matter 1.6 has this cluster."""
+        return self.espm_cluster_namespace is not None
+
+    @property
+    def espm_namespace(self) -> str:
+        """Namespace in esp_matter::cluster::<namespace>."""
+        if self.espm_cluster_namespace is None:
+            raise ValueError(f"Cluster {self.name} is not available in esp-matter")
+        return self.espm_cluster_namespace
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -87,7 +119,22 @@ class Cluster:
             name.replace("/", "").replace(" ", "").replace("-", "").replace(".", "")
         )
 
+        def resolve(feature: Feature) -> Feature:
+            ns = espmatter_names.feature_namespace(camel_case_name, feature.name)
+            return replace(
+                feature,
+                espm_feature_namespace=ns,
+                espm_available=ns is not None,
+                cluster_name=camel_case_name,
+            )
+
         all_features = tuple(_dict_to_feature(f) for f in data.get("features", ()))
+        all_features = tuple(
+            replace(f, features=tuple(resolve(x) for x in f.features))
+            if isinstance(f, FeatureChoice)
+            else resolve(f)
+            for f in all_features
+        )
         _features = []
         _choice_features = []
         for feature in all_features:
@@ -109,16 +156,18 @@ class Cluster:
                 f"#include <app/clusters/{cluster_path}-server/{chip_class}.h>"
             )
 
-        espm_namespace = (
+        fallback_namespace = (
             name.replace("/", "_")
             .replace(" ", "_")
             .replace("-", "")
             .replace(".", "")
             .lower()
         )
-        # "switch" is a C++ keyword, esp_matter names the namespace switch_cluster.
-        if espm_namespace == "switch":
-            espm_namespace = "switch_cluster"
+        if fallback_namespace == "switch":
+            fallback_namespace = "switch_cluster"
+        espm_namespace = espmatter_names.cluster_namespace(
+            camel_case_name, fallback_namespace
+        )
 
         return cls(
             id=data["id"],
@@ -134,7 +183,7 @@ class Cluster:
             sdkconfig_option=sdkconfig_option,
             chip_fqn=chip_fqn,
             chip_include=chip_include,
-            espm_namespace=espm_namespace,
+            espm_cluster_namespace=espm_namespace,
         )
 
     def get_attribute(self, name: str) -> Attribute:

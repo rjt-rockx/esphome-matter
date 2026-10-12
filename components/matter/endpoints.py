@@ -143,12 +143,22 @@ def _validate_on_attribute_forms(config):
     return config
 
 
+def _extra_cluster(value):
+    value = cv.one_of(*(cluster.name for cluster in CLUSTERS))(value)
+    if not CLUSTERS_BY_NAME[value].espm_available:
+        raise cv.Invalid(
+            f"The Matter {value} cluster is not supported by esp-matter (1.6) "
+            "and can't be added to an endpoint"
+        )
+    return value
+
+
 ENDPOINT_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(MatterEndpointRef),
             cv.Optional(CONF_EXTRA_CLUSTERS, default=list): cv.ensure_list(
-                cv.one_of(*(cluster.name for cluster in CLUSTERS))
+                _extra_cluster
             ),
             cv.Optional(CONF_ON_ATTRIBUTE): _on_attribute_schema(),
             # Battery level sensor (%) exposed through a Power Source cluster on this endpoint.
@@ -416,7 +426,7 @@ class Endpoint:
                 lines.append(line)
             if feature_flags:
                 lines.append(
-                    f"{config_var}.{cluster.espm_namespace}.feature_flags = {' | '.join(feature_flags)};"
+                    f"{config_var}.{device_type.config_member(cluster)}.feature_flags = {' | '.join(feature_flags)};"
                 )
 
         lines.extend(cover_lines)

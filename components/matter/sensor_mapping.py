@@ -26,7 +26,7 @@ from .data_model.units import (
     concentration_default_unit,
     concentration_scale,
 )
-from .util import snake_case
+from .data_model import espmatter_names
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -334,9 +334,16 @@ def optional_attribute_lines(created: list[tuple]) -> list[str]:
             continue
         seen.add((cluster.id, attribute.id))
         cluster_var = f"{cluster.espm_namespace}_cluster"
+        create_name = espmatter_names.attribute_create_function(
+            cluster.name, attribute.name
+        )
+        if create_name is None:
+            raise cv.Invalid(
+                f"esp-matter cannot create the {attribute.name} attribute of the "
+                f"{cluster.name} cluster"
+            )
         create_fn = (
-            f"esp_matter::cluster::{cluster.espm_namespace}::attribute::"
-            f"create_{snake_case(attribute.name)}"
+            f"esp_matter::cluster::{cluster.espm_namespace}::attribute::{create_name}"
         )
         lines.extend(
             (
@@ -422,7 +429,10 @@ def electrical_config_lines(
             if cluster_config.enabled_features.get(feature.name)
         ]
         if cluster_name == "ElectricalPowerMeasurement":
-            features.extend(snake_case(name) for name in extra_power_features)
+            features.extend(
+                espmatter_names.feature_namespace(cluster_name, name)
+                for name in extra_power_features
+            )
         flags = " | ".join(
             f"esp_matter::cluster::{cluster.espm_namespace}::feature::{name}::get_id()"
             for name in features

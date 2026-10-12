@@ -23,6 +23,7 @@ from ..sensor_mapping import (
 )
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
+from . import espmatter_names
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
 from .units import percentage
 
@@ -140,8 +141,45 @@ class DeviceType:
 
     @property
     def namespace(self) -> str:
-        """esp_matter::endpoints::<device_type>"""
-        return self.name
+        """esp_matter::endpoint::<namespace>"""
+        namespace = espmatter_names.device_type_namespace(self.name)
+        if namespace is None:
+            raise ValueError(f"Device type {self.name} is not available in esp-matter")
+        return namespace
+
+    @property
+    def espm_available(self) -> bool:
+        return espmatter_names.device_type_namespace(self.name) is not None
+
+    def config_member(self, cluster: Cluster) -> str:
+        """Member of esp_matter::endpoint::<namespace>::config_t that configures the cluster."""
+        entry = espmatter_names.device_type_entry(self.name)
+        if entry is None:
+            # Table out of date (warned about by device_type_namespace).
+            return cluster.espm_namespace
+        for member, cluster_type in entry["config_members"].items():
+            if cluster_type == f"cluster::{cluster.espm_namespace}":
+                return member
+        raise cv.Invalid(
+            f"esp-matter's {self.name} config has no member for the "
+            f"{cluster.name} cluster"
+        )
+
+    def _check_features_available(self, names, path=None) -> None:
+        """Reject features that esp-matter doesn't have in any cluster of this device type."""
+        for name in names:
+            candidates = [f for f in self.get_features() if f.name == name]
+            if candidates and not any(f.espm_available for f in candidates):
+                raise cv.Invalid(
+                    f"{self.name}: {candidates[0].unavailable_message()}",
+                    path=[CONF_FEATURES] if path is None else path,
+                )
+
+    def _validate_feature_name(self, value):
+        names = [feature.name for feature in self.get_features()]
+        value = cv.one_of(*names)(value)
+        self._check_features_available([value])
+        return value
 
     @property
     def conf_key(self) -> str:
@@ -242,6 +280,8 @@ class DeviceType:
                     )
                 enabled.append(default)
 
+        # Also covers features enabled implicitly (sensor attributes, dependencies).
+        self._check_features_available(enabled)
         if enabled:
             config = dict(config)
             config[CONF_FEATURES] = list(dict.fromkeys(enabled))
@@ -264,7 +304,7 @@ class DeviceType:
 
         if features := self.get_features():
             schema[cv.Optional(CONF_FEATURES)] = cv.ensure_list(
-                cv.one_of(*(feature.name for feature in features))
+                self._validate_feature_name
             )
 
         schema.update(binary_sensor_schema(self))

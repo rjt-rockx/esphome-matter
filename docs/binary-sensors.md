@@ -96,7 +96,8 @@ matter:
 ```
 
 Valid sensor-type features: `Other`, `PassiveInfrared`, `Ultrasonic`, `PhysicalContact`, `ActiveInfrared`, `Radar`,
-`RFSensing`, `Vision`. Non-sensor-type features (`Prediction`, `OccupancyEvent`) can be listed next to them.
+`RFSensing`, `Vision`. The `Prediction` and `OccupancyEvent` features are not available in esp-matter 1.6 and are
+rejected.
 
 ## Water leak, freeze and rain
 
