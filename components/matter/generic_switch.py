@@ -14,6 +14,8 @@ that are sent:
   MomentarySwitchRelease         short_release
   MomentarySwitchLongPress       long_press, long_release
   MomentarySwitchMultiPress      multi_press_ongoing, multi_press_complete
+  ActionSwitch                   like multi press, without short_release and
+                                 multi_press_ongoing
   LatchingSwitch                 switch_latched
   =============================  ===========================================
 """
@@ -96,6 +98,10 @@ def apply_switch_defaults(config: dict) -> dict:
             else _DEFAULT_FEATURES
         )
     features = config[CONF_FEATURES]
+    # esp-matter adds the multi press feature to every action switch, as the spec
+    # makes it mandatory there.
+    if "ActionSwitch" in features:
+        features = [*features, "MomentarySwitchMultiPress"]
     latching = "LatchingSwitch" in features
     for conf, feature in (
         (CONF_LONG_PRESS_TIME, "MomentarySwitchLongPress"),
@@ -137,7 +143,8 @@ def apply_switch_defaults(config: dict) -> dict:
 
 def multi_press_max_line(config_var: str, device_config: dict) -> str | None:
     """C++ line that sets MultiPressMax in the device type config, if configured."""
-    if "MomentarySwitchMultiPress" not in device_config.get(CONF_FEATURES, ()):
+    features = device_config.get(CONF_FEATURES, ())
+    if "MomentarySwitchMultiPress" not in features and "ActionSwitch" not in features:
         return None
     value = device_config.get(CONF_MULTI_PRESS_MAX, DEFAULT_MULTI_PRESS_MAX)
     return (

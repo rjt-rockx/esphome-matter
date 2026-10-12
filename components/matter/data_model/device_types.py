@@ -174,15 +174,13 @@ class DeviceType:
         cluster requires exactly one of LatchingSwitch/MomentarySwitch).
         esp-matter silently refuses to create such a cluster when the choice
         is missing, so it is resolved here: a default from
-        DEFAULT_CHOICE_FEATURES is applied when the user made no selection,
-        and an error is raised when there is no sensible default.
+        DEFAULT_CHOICE_FEATURES is applied when the user made no selection.
+        Choices without a default are left alone because bindings such as
+        climate_id, cover_id or a bound binary sensor select them later.
         """
         if self.has_required_cluster("Switch"):
             config = apply_switch_defaults(config)
         enabled = list(config.get(CONF_FEATURES, ()))
-        for sensor_attribute in self.sensor_attributes:
-            if config.get(sensor_attribute.conf_key) is not None:
-                enabled.extend(sensor_attribute.features)
 
         # Add the features that other enabled features depend on.
         for name in list(enabled):
@@ -208,13 +206,9 @@ class DeviceType:
                 default = DEFAULT_CHOICE_FEATURES.get((self.name, cluster.name))
                 default = default or DEFAULT_CHOICE_FEATURES.get(cluster.name)
                 if default not in names:
-                    raise cv.Invalid(
-                        f"{self.name}: cluster {cluster.name} requires "
-                        f"{'exactly' if choice.max == choice.min else 'at least'} "
-                        f"{choice.min} of these features to be enabled: "
-                        f"{', '.join(names)}. Select one with `features: [...]`.",
-                        path=[CONF_FEATURES],
-                    )
+                    # No sensible default: other integrations (climate_id, cover_id,
+                    # bound binary sensors) pick the feature while generating code.
+                    continue
                 enabled.append(default)
 
         if enabled:
