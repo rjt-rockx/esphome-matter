@@ -31,6 +31,11 @@ from .endpoints import (
     switch_restore_warning,
 )
 from .fan_binding import fan_restore_warning
+from .matter_ble import (
+    CONF_BLE_COMMISSIONING,
+    to_code_ble,
+    validate_ble_commissioning,
+)
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,6 +125,8 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(MatterComponent),
             cv.Optional(CONF_DISCRIMINATOR): cv.int_range(min=0, max=4095),
+            # BLE commissioning is automatic without wifi/openthread; this only asserts it.
+            cv.Optional(CONF_BLE_COMMISSIONING): cv.boolean,
             cv.Optional(CONF_PASSCODE): _validate_passcode,
             # Vendor name
             cv.Optional(CONF_VENDOR_NAME, default="ESPHome"): cv.All(
@@ -167,6 +174,8 @@ def _final_validate(config: dict):
             "Matter requires IPv6 to be enabled in the network component. "
             "Please set `enable_ipv6: true` in the `network` configuration."
         )
+
+    validate_ble_commissioning(config, full_config)
 
     light_restore_warning(config, full_config)
     switch_restore_warning(config, full_config)
@@ -296,12 +305,6 @@ async def to_code(config: ConfigType):
         add_idf_sdkconfig_option("CONFIG_OPENTHREAD_CONSOLE_ENABLE", False)
         add_idf_sdkconfig_option("CONFIG_OPENTHREAD_SRP_CLIENT", True)
 
-        # TODO: use CORE.data?
-        add_idf_sdkconfig_option("CONFIG_BT_ENABLED", True)
-        add_idf_sdkconfig_option("CONFIG_BT_BLUEDROID_ENABLED", False)
-        add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLED", True)
-        add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT", False)
-        # TODO: set USE_BLE_ONLY_FOR_COMMISSIONING to false if other esphome components need it?
-        # TODO: stop api from restarting device in commissioning mode?
+        await to_code_ble()
 
     await register_endpoints(var, config)
