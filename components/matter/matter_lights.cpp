@@ -102,6 +102,11 @@ bool is_before(uint32_t now, uint32_t until) {
 // exist or is null.
 bool read_attribute(uint16_t endpoint_id, uint32_t cluster_id,
                     uint32_t attribute_id, esp_matter_attr_val_t &value) {
+  // get_val logs "Attribute cannot be NULL" for an optional attribute the
+  // endpoint doesn't have: check quietly first.
+  if (esp_matter::attribute::get(endpoint_id, cluster_id, attribute_id) ==
+      nullptr)
+    return false;
   return esp_matter::attribute::get_val(endpoint_id, cluster_id, attribute_id,
                                         &value) == ESP_OK &&
          !value.is_null();

@@ -79,6 +79,10 @@ public:
   bool read_attribute(uint16_t endpoint_id, uint32_t cluster_id,
                       uint32_t attribute_id,
                       esp_matter_attr_val_t &out) override {
+    // Optional attributes may be absent: don't let get_val log an error.
+    if (esp_matter::attribute::get(endpoint_id, cluster_id, attribute_id) ==
+        nullptr)
+      return false;
     return esp_matter::attribute::get_val(endpoint_id, cluster_id,
                                           attribute_id, &out) == ESP_OK;
   }
