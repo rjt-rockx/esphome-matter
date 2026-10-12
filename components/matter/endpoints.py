@@ -22,7 +22,12 @@ from .covers import WINDOW_COVERING
 from .covers import config_init as cover_config_init
 from .covers import config_lines as cover_config_lines
 from .data_model.attributes import Attribute, SensorAttribute, attribute_value_type
-from .data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME, Cluster
+from .data_model.clusters import (
+    CLUSTERS,
+    CLUSTERS_BY_CONF_KEY,
+    CLUSTERS_BY_NAME,
+    Cluster,
+)
 from .data_model.conformance import (
     ConformanceDisposition,
     ConformanceError,
@@ -271,8 +276,8 @@ class Endpoint:
             if usage.conformance is not None:
                 usages_by_cluster[cluster.id].append(usage)
 
-        for cluster_name in self._config[CONF_CLUSTERS]:
-            cluster = CLUSTERS_BY_NAME[cluster_name]
+        for conf_key in self._config[CONF_CLUSTERS]:
+            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
             clusters_by_id[cluster.id] = cluster
 
         for config_key, device_config in self._config.items():
@@ -383,10 +388,10 @@ class Endpoint:
             self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
             await self._register_sensor_attribute(var, sensor_id, battery)
 
-        for cluster_name, config in self._config[CONF_CLUSTERS].items():
-            cluster = CLUSTERS_BY_NAME[cluster_name]
+        for conf_key, config in self._config[CONF_CLUSTERS].items():
+            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
             self.enabled_sdkconfig_options.add(cluster.sdkconfig_option)
-            cluster_config = self._cluster_configs[cluster_name]
+            cluster_config = self._cluster_configs[cluster.name]
             for configured_feature in config.get(CONF_WITH_FEATURES, ()):
                 if feature := cluster.get_feature(configured_feature):
                     cluster_config.enabled_features[feature.name] = True
