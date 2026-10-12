@@ -101,7 +101,7 @@ matter.set_attribute:
 
 Currently, the value must be a raw matter value, usually some kind of integer. Support for units (such as `50%` in the above example) will be added later.
 
-More complicated values such as structs aren't supported yet. Also, some attributes require delegates in esp-matter and this has also not been implemented yet.
+More complicated values such as structs aren't supported yet. Attributes of delegate-driven clusters (mode clusters, Operational State, Laundry Washer Controls) are not plain values; use the dedicated actions of [delegates.md](delegates.md) (`matter.mode.set`, `matter.operational_state.set`, ...). Other delegate-driven clusters (Energy EVSE, Device Energy Management, Service Area) have no delegate yet, see [design/delegates-evse-dem.md](design/delegates-evse-dem.md).
 
 # on_attribute
 

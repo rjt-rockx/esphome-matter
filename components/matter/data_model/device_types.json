@@ -308,6 +308,11 @@
         "required_attributes": [
           "STATE_VALUE"
         ]
+      },
+      "128": {
+        "name": "Boolean State Configuration",
+        "server": true,
+        "client_locked": true
       }
     }
   },
@@ -923,6 +928,17 @@
         "server_locked": true,
         "client_locked": true
       },
+      "82": {
+        "name": "Refrigerator And Temperature Controlled Cabinet Mode",
+        "client_locked": true,
+        "features": {
+          "OO": {
+            "conformance": {
+              "disallowed": true
+            }
+          }
+        }
+      },
       "87": {
         "name": "Refrigerator Alarm",
         "client_locked": true
@@ -938,6 +954,28 @@
         "server": true,
         "server_locked": true,
         "client_locked": true
+      },
+      "73": {
+        "name": "Oven Mode",
+        "client_locked": true,
+        "features": {
+          "OO": {
+            "conformance": {
+              "disallowed": true
+            }
+          }
+        }
+      },
+      "82": {
+        "name": "Refrigerator And Temperature Controlled Cabinet Mode",
+        "client_locked": true,
+        "features": {
+          "OO": {
+            "conformance": {
+              "disallowed": true
+            }
+          }
+        }
       },
       "86": {
         "name": "Temperature Control",
@@ -1145,6 +1183,17 @@
       "86": {
         "name": "Temperature Control",
         "client_locked": true
+      },
+      "89": {
+        "name": "Dishwasher Mode",
+        "client_locked": true,
+        "features": {
+          "OO": {
+            "conformance": {
+              "disallowed": true
+            }
+          }
+        }
       },
       "96": {
         "name": "Operational State",
@@ -2129,6 +2178,11 @@
         "required_attributes": [
           "BINDING"
         ]
+      },
+      "128": {
+        "name": "Boolean State Configuration",
+        "server": true,
+        "client_locked": true
       },
       "1030": {
         "name": "Occupancy Sensing",

@@ -102,3 +102,17 @@ def device_type_namespace(device_type_name: str) -> str | None:
         _warn_stale(f"Device type {device_type_name}")
         return device_type_name
     return entry["namespace"]
+
+
+def device_type_implied_clusters(device_type_name: str) -> tuple[str, ...]:
+    """Cluster names (Cluster.name) whose server esp-matter creates in ``endpoint::<x>::add()``.
+
+    Includes the clusters of nested device types (heat_pump adds a power_source
+    and an electrical_sensor). Their server code has to be compiled in even if
+    the device type's own cluster list doesn't mention them.
+    """
+    entry = device_type_entry(device_type_name)
+    if entry is None:
+        _warn_stale(f"Device type {device_type_name}")
+        return ()
+    return tuple(entry.get("implied_clusters", ()))

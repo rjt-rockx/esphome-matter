@@ -72,6 +72,62 @@ The valid values are `ppm`, `ppb`, `ppt`, `mgm3`, `ugm3`, `ngm3`, `pm3` and `bqm
 
 Note: the MeasurementUnit is part of the cluster server that esphome-matter registers for these clusters. If another server was already registered for the same cluster, the unit cannot be changed and a warning is logged at boot.
 
+### Air quality level (the `AirQuality` attribute)
+
+The Air Quality cluster of the `air_quality_sensor` has a single enumerated attribute: Unknown, Good, Fair, Moderate,
+Poor, VeryPoor, ExtremelyPoor (0 to 6). Controllers show it as the headline "air quality" of the device (Apple Home
+shows only this, not the concentrations). Without a source it stays **Unknown**. `air_quality` provides the source in two ways:
+
+```yaml
+matter:
+  endpoints:
+    # 1. A sensor that already reports the level as a number from 0 to 6 (for example from a template sensor).
+    1:
+      air_quality_sensor:
+        air_quality: air_quality_index
+        carbon_dioxide: co2
+
+    # 2. Derived from a measurement with thresholds.
+    2:
+      air_quality_sensor:
+        air_quality:
+          sensor: pm_2_5          # any sensor, usually one that is also mapped below
+          thresholds:             # optional for pm25, pm10 and carbon_dioxide sensors (device_class)
+            fair: 9.0
+            moderate: 35.4
+            poor: 55.4
+            very_poor: 125.4
+            extremely_poor: 225.4
+        pm_2_5: pm_2_5
+```
+
+* **Index form** (`air_quality: sensor_id`): the value is rounded and must be 0 to 6, anything else (including NaN)
+  reports Unknown. All optional levels (Fair, Moderate, VeryPoor, ExtremelyPoor) are enabled. A sensor with a
+  `unit_of_measurement` triggers a warning because it probably is a measurement; use the mapping form for those.
+* **Derived form** (`sensor` and `thresholds`): a level applies to values **strictly above** its threshold (the top
+  of the previous category), so a reading equal to a threshold is still the lower level. The level is Good up to and
+  including the lowest threshold. A small hysteresis (`hysteresis`, default `2%` of the threshold) keeps a reading that
+  hovers around a threshold from flipping the level: it only drops again at or below `threshold - 2%`. Higher levels win: with the values in the example above, 40 µg/m³ is Moderate and
+  60 µg/m³ is Poor. Thresholds must increase with the level. You may leave levels out (`fair: 800` and `poor: 1500`
+  only reports Good, Fair and Poor); only the levels you name enable their cluster feature. A `nan` reading reports Unknown.
+* **Default thresholds** when `thresholds` is omitted and the sensor has one of these `device_class` values. They are
+  indicative values, not a Matter requirement, and expect the listed unit:
+
+  | `device_class` | Unit | Fair above | Moderate above | Poor above | VeryPoor above | ExtremelyPoor above |
+  |---|---|---|---|---|---|---|
+  | `pm25` | µg/m³ | 9.0 | 35.4 | 55.4 | 125.4 | 225.4 |
+  | `pm10` | µg/m³ | 54 | 154 | 254 | 354 | 424 |
+  | `carbon_dioxide` | ppm | 800 | 1000 | 1500 | 2000 | 5000 |
+
+  PM2.5 follows the US EPA AQI breakpoints of the 2024 revision (Good 0-9.0, Moderate 9.1-35.4, Unhealthy for
+  Sensitive Groups 35.5-55.4, Unhealthy 55.5-125.4, Very Unhealthy 125.5-225.4, Hazardous 225.5 and up) and PM10 the
+  EPA PM10 breakpoints; Moderate ... Hazardous map to Fair ... ExtremelyPoor. The CO2 values are common indoor guidance.
+  The sensor's `unit_of_measurement` must match the table (`µg/m³`, `μg/m³` and `ug/m3` are all accepted) or the
+  configuration is rejected; with explicit `thresholds` the unit is not checked. Any other sensor
+  (VOC, formaldehyde, ...) needs explicit `thresholds`; the configuration is rejected otherwise.
+* The thresholds are fixed when the firmware is built. Combining several pollutants into one level (the worst of PM2.5
+  and CO2, for example) is not done: use a template sensor that returns the index of your choice and the index form.
+
 ## Battery
 
 The Matter `Power Source` cluster reports `BatPercentRemaining`. Battery sensors are bound with the `battery` option, which takes a sensor with a battery level in `%` (Matter has no way to report a battery voltage as a level; use a template sensor to calculate the level from a voltage, see the [example](../examples/all-sensors.yaml)).

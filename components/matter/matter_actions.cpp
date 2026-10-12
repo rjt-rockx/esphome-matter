@@ -204,22 +204,34 @@ void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
   }
 }
 
-void send_event(uint16_t endpoint_id, chip::ClusterId cluster,
-                chip::EventId event, uint8_t priority, const char *event_data) {
-  JsonEventWriter writer(event_data != nullptr ? event_data : "{}");
+namespace {
+
+struct EventRequest {
+  uint16_t endpoint_id;
+  chip::ClusterId cluster;
+  chip::EventId event;
+  uint8_t priority;
+  std::string data;
+};
+
+// Runs on the CHIP task, which holds the stack lock while it runs scheduled work.
+void send_event_on_matter_thread(intptr_t context) {
+  std::unique_ptr<EventRequest> request(reinterpret_cast<EventRequest *>(context));
+  JsonEventWriter writer(request->data.c_str());
   chip::app::EventOptions options;
-  options.mPath = chip::app::ConcreteEventPath(endpoint_id, cluster, event);
-  options.mPriority = static_cast<chip::app::PriorityLevel>(priority);
+  options.mPath = chip::app::ConcreteEventPath(request->endpoint_id,
+                                               request->cluster, request->event);
+  options.mPriority = static_cast<chip::app::PriorityLevel>(request->priority);
   chip::EventNumber event_number;
 
-  esp_matter::lock::ScopedChipStackLock scoped_lock(portMAX_DELAY);
-  auto *cluster_ptr = esp_matter::cluster::get(endpoint_id, cluster);
+  auto *cluster_ptr =
+      esp_matter::cluster::get(request->endpoint_id, request->cluster);
   if (cluster_ptr == nullptr ||
-      esp_matter::event::get(cluster_ptr, event) == nullptr) {
+      esp_matter::event::get(cluster_ptr, request->event) == nullptr) {
     ESP_LOGW(TAG,
              "Cannot send unavailable event: endpoint=%u cluster=%lu event=%lu",
-             endpoint_id, static_cast<unsigned long>(cluster),
-             static_cast<unsigned long>(event));
+             request->endpoint_id, static_cast<unsigned long>(request->cluster),
+             static_cast<unsigned long>(request->event));
     return;
   }
 
@@ -228,13 +240,29 @@ void send_event(uint16_t endpoint_id, chip::ClusterId cluster,
   if (err != CHIP_NO_ERROR) {
     ESP_LOGW(TAG,
              "Send event failed: endpoint=%u cluster=%lu event=%lu error=%s",
-             endpoint_id, static_cast<unsigned long>(cluster),
-             static_cast<unsigned long>(event), err.AsString());
+             request->endpoint_id, static_cast<unsigned long>(request->cluster),
+             static_cast<unsigned long>(request->event), err.AsString());
     return;
   }
   ESP_LOGD(TAG, "Sent event: endpoint=%u cluster=%lu event=%lu number=%" PRIu64,
-           endpoint_id, static_cast<unsigned long>(cluster),
-           static_cast<unsigned long>(event), event_number);
+           request->endpoint_id, static_cast<unsigned long>(request->cluster),
+           static_cast<unsigned long>(request->event), event_number);
+}
+
+} // namespace
+
+// Main loop: never takes the CHIP stack lock (a busy CHIP task, or one waiting for the main loop in a
+// decide_in_automation command, would stall ESPHome); the event is logged on the CHIP task.
+void send_event(uint16_t endpoint_id, chip::ClusterId cluster,
+                chip::EventId event, uint8_t priority, const char *event_data) {
+  auto *request = new EventRequest{endpoint_id, cluster, event, priority,
+                                   event_data != nullptr ? event_data : "{}"};
+  CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
+      send_event_on_matter_thread, reinterpret_cast<intptr_t>(request));
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGE(TAG, "Failed to schedule Matter event: %s", err.AsString());
+    delete request;
+  }
 }
 
 } // namespace esphome::matter

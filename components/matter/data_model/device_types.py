@@ -9,11 +9,23 @@ from esphome.components import switch
 from esphome.const import CONF_LIGHT_ID
 
 from ..binary_sensors import extra_schema as binary_sensor_schema
-from ..const import CONF_SWITCH_ID, CONF_WITH_FEATURES
-from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
+from ..const import (
+    CONF_MAX_LEVEL,
+    CONF_MIN_LEVEL,
+    CONF_SWITCH_ID,
+    CONF_WITH_FEATURES,
+)
+from ..fan_binding import (
+    CONF_FAN_ID,
+    FAN_CONTROL,
+    device_options as fan_device_options,
+    fan_id_schema,
+    validate_fan_features,
+)
 from ..light_binding import light_schema_options, validate_light_binding
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
+from .. import sensor_extras
 from ..matter_climate import climate_schema, validate_climate_features
 from ..power_topology import apply_topology
 from ..power_topology import schema_options as topology_schema_options
@@ -192,6 +204,13 @@ class DeviceType:
     def conf_key(self) -> str:
         return self.name
 
+    def has_fan_control_server(self) -> bool:
+        """Whether the Fan Control server cluster can be part of this device type."""
+        return any(
+            cluster.name == FAN_CONTROL and (cluster.server or not cluster.server_locked)
+            for cluster in self.clusters
+        )
+
     def has_required_cluster(self, name: str) -> bool:
         return any(c.name == name and c.required for c in self.server_clusters)
 
@@ -337,8 +356,8 @@ class DeviceType:
 
         if self.name in SWITCH_DEVICE_TYPES:
             schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
-        if self.name == "fan":
-            schema[cv.Optional(CONF_FAN_ID)] = fan_id_schema()
+        if self.has_fan_control_server():
+            schema.update(fan_device_options())
         if self.name == "window_covering":
             from ..covers import schema_options
 
@@ -350,6 +369,7 @@ class DeviceType:
         schema.update(climate_schema(self.name))
 
         extend_device_type_schema(self.name, schema)
+        sensor_extras.extend_schema(self, schema)
         if self.name == "power_source":
             from ..power_source import device_type_schema_options
 
@@ -377,6 +397,7 @@ class DeviceType:
         # TODO: only maybe_empty if there are no clusters or features for which a mandatory choice must be made.
         return cv.All(
             maybe_empty(self._schema()),
+            lambda config: sensor_extras.validate_device_config(self, config),
             self._validate_features,
             self._validate_entity_ids,
             validate_fan_features,

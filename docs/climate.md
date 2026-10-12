@@ -1,6 +1,6 @@
 # Climate (Thermostat and Room Air Conditioner)
 
-The `thermostat` (0x0301) and `room_air_conditioner` (0x0072) device types can be bound to an ESPHome `climate` entity with `climate_id`. State is synchronized both ways, like it is for lights.
+The `thermostat` (0x0301), `room_air_conditioner` (0x0072) and `water_heater` (0x050F) device types can be bound to an ESPHome `climate` entity with `climate_id`. State is synchronized both ways, like it is for lights.
 
 ```yaml
 matter:
@@ -23,6 +23,8 @@ climate:
 ```
 
 See `examples/thermostat.yaml` for a complete heat-only example.
+
+The fan modes and swing modes of a climate are exposed through the Fan Control cluster of a room air conditioner, see [hvac.md](hvac.md). `water_heater` takes `climate_id` too (heating only), and a heat pump keeps its thermostat on a child `thermostat` endpoint, see [hvac.md](hvac.md#water-heater-and-heat-pump).
 
 ## Features are derived from the climate
 
@@ -71,6 +73,7 @@ The command is part of the Thermostat cluster and is handled by the Matter stack
 
 ## Not supported yet
 
-- Fan modes (FanControl on the room air conditioner), swing modes, humidity, presets and schedules.
+- Humidity, schedules.
+- Presets, setback and schedules: the Thermostat `Presets`, `Setback`, `ScheduleConfiguration`, `MatterScheduleConfiguration` and `ThermostatSuggestions` features are rejected together with `climate_id`. ESPHome climate presets could back `Presets`, but that needs a Thermostat delegate (preset list, atomic requests, `SetActivePresetRequest`) which this component does not have. Tracked as gap G7 in [hvac.md](hvac.md#gaps).
 - ThermostatRunningState when the climate does not report actions.
 - Apple Home behaviour is untested. Apple does not publish its Thermostat requirements.

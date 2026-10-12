@@ -86,7 +86,7 @@ def test_identify_time_is_read_from_the_cluster():
 
 def test_no_per_mapping_echo_flags_left():
     for path in _sources():
-        assert "pushing_" not in path.read_text(), f"{path.name}: use MatterPushGuard"
+        assert "pushing_" not in path.read_text(), f"{path.name}: use MatterBindingBase::PushScope / is_echo()"
 
 
 def test_identify_effect_values_in_docs():

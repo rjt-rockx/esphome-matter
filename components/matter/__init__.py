@@ -28,6 +28,7 @@ from .conformance import validate_composition
 from .power_source import validate_power_configuration
 from .power_topology import validate_topologies
 from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
+from .delegates import validate_delegate_clusters
 from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .closure import validate_closure_bindings, validate_unique_cover_bindings
@@ -58,6 +59,7 @@ from .light_binding import (
     validate_light_effects,
     warn_missing_color_temperature,
 )
+from .fan_binding import final_validate as fan_final_validate
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
     add_ble_sdkconfig,
@@ -66,6 +68,7 @@ from .matter_ble import (
 from .network_config import configure_network
 from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
 from .sensor_mapping import validate_sensor_bindings
+from . import sensor_extras
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -221,6 +224,7 @@ def _final_validate(config: dict):
 
     validate_ble_commissioning(config, full_config)
     validate_composition(config.get(CONF_ENDPOINTS, {}))
+    validate_delegate_clusters(config, full_config)
     validate_power_configuration(config)
     validate_topologies(config)
 
@@ -230,10 +234,12 @@ def _final_validate(config: dict):
     switch_restore_warning(config, full_config)
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
+    fan_final_validate(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     validate_cover_bindings(config, full_config)
     validate_closure_bindings(config, full_config)
     validate_unique_cover_bindings(config)
     validate_sensor_bindings(config, full_config)
+    sensor_extras.check_final(config, full_config)
     final_validate_ota(config, full_config)
     check_expose(config, full_config)
 

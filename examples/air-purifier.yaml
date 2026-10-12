@@ -1,0 +1,111 @@
+# This is an example configuration for an air purifier with a four speed fan, natural and sleep wind, a speed
+# Step command and HEPA and activated carbon filter monitoring, based on an ESP32-C6.
+#
+# fan_id binds the Matter Fan Control cluster of the air purifier to an ESPHome fan, like it does for the fan
+# device type. `wind` maps the Matter WindSetting to the preset modes "natural" and "sleep" of the fan (names are
+# matched case insensitively, `wind_presets` selects other names). `step` lets controllers step the speed up or
+# down. Both are rejected when the fan can't back them, see docs/fan.md.
+#
+# The filter monitoring clusters are created in `clusters:` and bound to ESPHome entities. The HEPA condition
+# is a sensor with the remaining filter life in %, the carbon filter is only a "replace me" binary sensor.
+# The ResetCondition command presses a button and runs an automation. See docs/hvac.md.
+
+esphome:
+  name: air-purifier
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+api:
+
+ota:
+  platform: esphome
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      air_purifier:
+        fan_id: purifier_fan
+        with_features: [wind, step]
+      clusters:
+        hepa_filter_monitoring:
+          condition: hepa_life
+          warning_level: 20%
+          critical_level: 5%
+          reset_button: hepa_reset
+        activated_carbon_filter_monitoring:
+          replace_needed: carbon_replace_needed
+          on_reset:
+            - switch.turn_off: carbon_replace_flag
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO4
+    frequency: 25kHz
+
+fan:
+  - platform: speed
+    id: purifier_fan
+    name: Air purifier
+    output: fan_pwm
+    speed_count: 4
+    # Matter restores the fan state, so the ESPHome fan should always start off.
+    restore_mode: ALWAYS_OFF
+    preset_modes:
+      - Natural
+      - Sleep
+
+sensor:
+  # Remaining HEPA filter life in %. Counting down the fan run time is left to you (for example with an
+  # interval that lowers it); the reset button below publishes 100% again.
+  - platform: template
+    id: hepa_life
+    name: HEPA filter life
+    unit_of_measurement: "%"
+    state_class: measurement
+    update_interval: never
+
+# The carbon filter has no measurement, only a flag the user sets once the filter is used up.
+switch:
+  - platform: template
+    id: carbon_replace_flag
+    name: Carbon filter needs replacing
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+binary_sensor:
+  - platform: template
+    id: carbon_replace_needed
+    lambda: return id(carbon_replace_flag).state;
+
+button:
+  - platform: template
+    id: hepa_reset
+    name: Reset HEPA filter
+    on_press:
+      # Pressed by the Matter ResetCondition command and usable from the ESPHome UI.
+      - sensor.template.publish:
+          id: hepa_life
+          state: 100
+  - platform: template
+    name: "Matter Factory Reset"
+    entity_category: config
+    disabled_by_default: True
+    on_press:
+      matter.factory_reset:

@@ -16,8 +16,17 @@ EXPECTED = {
     "esp32-wifi": ["register_endpoint", "register_code_driven_sensor_attribute"],
     "esp32-switch": ["register_switch"],
     "esp32-fan": ["register_fan", "add_fan_features"],
+    "esp32-fan-hvac": [
+        "register_fan",
+        "register_climate_fan",
+        "FanFeatureOptions",
+        "MatterFilterMapping",
+        "hepa_filter_monitoring::feature::condition::add",
+        "esp_matter::endpoint::heat_pump::add",
+    ],
     "esp32-cover": ["register_cover", "configure_window_covering"],
-    "esp32-binary-sensors": ["register_binary_sensor_attribute"],
+    "esp32-binary-sensors": ["register_binary_sensor_attribute", "MatterSmokeCoAlarmMapping"],
+    "esp32-sensor-extras": ["MatterOccupancyHoldTimeMapping", "MatterRefrigeratorAlarmMapping"],
     "esp32-all-endpoints": ["register_endpoint"],
     "esp32-ble-commissioning": ["register_endpoint"],
     "esp32-power-source": [

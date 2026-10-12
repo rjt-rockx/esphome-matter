@@ -99,11 +99,18 @@ def _functions(body: str, names=("create", "add")):
 _IF_RE = re.compile(r"^\s*(?:\}\s*)?(?:else\s+)?if\s*\((.*)\)\s*\{\s*$")
 _ELSE_RE = re.compile(r"^\s*\}\s*else\s*\{\s*$")
 _HAS_RE = re.compile(r"(!?)\s*has\(\s*feature::(\w+)::get_id\(\)\s*\)")
+# An optional qualifier names the cluster namespace of a base cluster (``mode_base::attribute::create_x`` inside the
+# laundry washer mode creator, ``operational_state::attribute::create_x`` inside the RVC one).
+_QUALIFIER = r"(?:(?!global::)[a-z_0-9]+::)?"
 _ATTR_RE = re.compile(
-    r"(?<![\w:])(?:esp_matter::)?(global::)?attribute::create_(\w+)\s*\("
+    r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"(global::)?attribute::create_(\w+)\s*\("
 )
-_CMD_RE = re.compile(r"(?<![\w:])(?:esp_matter::)?command::create_(\w+)\s*\(")
-_EVENT_RE = re.compile(r"(?<![\w:])(?:esp_matter::)?event::create_(\w+)\s*\(")
+_CMD_RE = re.compile(
+    r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"command::create_(\w+)\s*\("
+)
+_EVENT_RE = re.compile(
+    r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"event::create_(\w+)\s*\("
+)
 _FEAT_ADD_RE = re.compile(r"feature::(\w+)::add\s*\(")
 _FEATURE_ALIAS_RE = re.compile(
     r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;"

@@ -113,7 +113,7 @@ ESPHome `cover:` to Matter Window Covering (`cover_id`) is documented in [cover.
 
 # Fans
 
-ESPHome `fan:` to Matter Fan Control (`fan_id`) is documented in [fan.md](fan.md).
+ESPHome `fan:` to Matter Fan Control (`fan_id`) is documented in [fan.md](fan.md). Fan Control on air purifiers, extractor hoods, room air conditioners (also bound to climate fan modes), filter monitoring, and `climate_id` on water heaters and heat pumps are in [hvac.md](hvac.md).
 
 # Locks & valves
 
@@ -224,7 +224,7 @@ The `generic_switch` is a stateless programmable button that emits Matter events
 
 # Untested / unsupported
 
-The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Some of them have entity bindings (`window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`, `room_air_conditioner`, `closure`, `water_leak_detector`, `water_freeze_detector`, `smoke_co_alarm`, `power_source`); those are described in the sections above and are listed here only because the list is generated from the device type table. Treat everything else in this list as untested.
+The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Some of them have entity bindings (`window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`, `room_air_conditioner`, `closure`, `water_leak_detector`, `water_freeze_detector`, `smoke_co_alarm`, `power_source`); those are described in the sections above and are listed here only because the list is generated from the device type table. Treat everything else in this list as untested. The appliance device types (`laundry_washer`, `dishwasher`, `robotic_vacuum_cleaner`, `refrigerator`, `water_heater`, `mode_select`, ...) create clusters that are driven by a delegate; configure them as described in [delegates.md](delegates.md) or the endpoint is structure only.
 
 - door_lock
 - aggregator
@@ -242,8 +242,8 @@ The device types below can usually be created (add the key under an endpoint), b
 - water_freeze_detector
 - water_valve
 - water_leak_detector
-- refrigerator
-- temperature_controlled_cabinet
+- refrigerator (mode list and door alarm bindings: [refrigerator.md](refrigerator.md))
+- temperature_controlled_cabinet (mode list: [refrigerator.md](refrigerator.md))
 - room_air_conditioner
 - laundry_washer
 - robotic_vacuum_cleaner

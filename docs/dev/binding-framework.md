@@ -3,7 +3,7 @@
 `components/matter/matter_binding.h` / `.cpp` is the shared core for entity
 bindings. It replaces five hand-rolled echo mechanisms and the per-change heap
 allocations in the push paths. Migrated so far: switch, valve, sensors, binary
-sensors and the power-source flag enums; see [Migration order](#migration-order). Thread names follow
+sensors, the power-source flag enums, fan, climate fan, climate and filter monitoring; see [Migration order](#migration-order). Thread names follow
 [threading.md](threading.md): "main" is the ESPHome main loop, "CHIP" is the CHIP
 task.
 
@@ -140,6 +140,46 @@ window expiry pushes the unchanged state and `CurrentState` leaves
 created on the CHIP task (queued ahead of the boot push) instead of under the
 CHIP lock on the main loop.
 
+## Fan, climate fan, climate, filter monitoring
+
+Pure decision code lives in `matter_fan_logic.h` and `matter_climate_logic.h`
+(no ESPHome or Matter dependencies, host-tested by
+`tests/cpp/test_hvac_bindings.cpp`); the `.cpp` files are thin glue.
+
+- **Fan** (`MatterFanMapping`, `MatterBinding<MatterFanOutbound, MatterFanInbound>`,
+  `NONE` boot sync plus a one-time submit of the persisted cluster state, 200 ms settle). FanMode / PercentSetting / SpeedSetting /
+  RockSetting / AirflowDirection watches and the Step command read the settled
+  cluster state on CHIP and submit it; WindSetting changes (delegate) submit a
+  wind request. The merge keeps the newest settings snapshot and the newest wind
+  request. The old `FanSnapshot`/`last_` compare is replaced by the stale-push
+  gate, and `update_settings` by `fan_settings_need_write()`: the cluster
+  settings are written only when the cluster no longer maps to the fan (refused
+  or clamped request, ESPHome-side change). A cluster in Auto stays in Auto until
+  the fan changes (`keep_auto`). The Current attributes, WindSetting, RockSetting
+  and AirflowDirection always follow the fan. `OnWindSettingChanged` starts with
+  `is_echo()`; `HandleStep` submits the settled state instead of calling the
+  mapping directly.
+- **Climate fan** (`ESPHOME_WINS`, 300 ms settle). `OnFanDriveStateChanged` and
+  `OnRockSettingChanged` start with `is_echo()` and submit; the two fields merge
+  independently. The `pushed_/last_*` dedupe is gone (the push coalesces and only
+  writes values that differ from the cluster). The Step level table is built at
+  setup so CHIP does not read the climate.
+- **Climate** (`ESPHOME_WINS`, 500 ms settle). SystemMode, the two occupied
+  setpoints and OnOff are watched; a burst merges per field and is applied in the
+  fixed order mode, on/off, heating, cooling (so a setpoint of the same burst is
+  judged against the new mode). A refused or clamped request is no longer
+  followed by an explicit `push_state_to_matter()`: the reconcile after the apply
+  restores Matter to the climate's state. The attribute reports go through
+  `BindingPlatform::write_attribute()` inside the PushScope.
+- **Filter monitoring** (`MatterBinding<MatterFilterState, NoInbound>`): sensor
+  callbacks call `request_push()`; Condition/ChangeIndication are written by the
+  cluster setters on CHIP. `PostResetCondition` still defers the button/trigger
+  to the main loop.
+
+Settle windows exist because these entities may publish later than they accept a
+command: without it the reconcile would push the old state back first and the
+controller would see the value flip.
+
 ## Migration order
 
 Each step is one change; codegen snapshots stay unchanged.
@@ -149,8 +189,8 @@ Each step is one change; codegen snapshots stay unchanged.
 3. Sensors, binary sensors, valve, power-source flag enums (done; removes the
    `new AttributeUpdate` per reading).
 4. Lock, cover, closure (`request_push_`/`push_done_`/`schedule_drain_` go away).
-5. Fan and climate fan (delete `pushing_`; wind and step hooks use `is_echo()`).
-6. Climate.
+5. Fan and climate fan (done; `pushing_` is gone, wind and step hooks use `is_echo()`).
+6. Climate (done), filter monitoring (done).
 7. Modes, operational state, Mode Select (drop `pending_echoes_`), sensor-extras
    delegates.
 8. Lights, last, behind the runtime golden test.
