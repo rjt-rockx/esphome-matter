@@ -19,7 +19,6 @@ ENV_VAR = "MATTER_LAYOUT_JSON"
 _TRAIT_DRIVEN = {
     "WindowCovering": "cover_id",
     "Thermostat": "climate_id",
-    "FanControl": "fan_id",
 }
 
 
@@ -85,6 +84,8 @@ def _endpoint_layout(endpoint) -> dict:
         for cluster_name, key in _TRAIT_DRIVEN.items():
             if isinstance(device_config, dict) and device_config.get(key) is not None:
                 dynamic.append(cluster_name)
+    if getattr(endpoint, "fan_control_binding", None) is not None:
+        dynamic.append("FanControl")
     return {
         "device_types": [
             {"name": device_type.name, "id": device_type.id}

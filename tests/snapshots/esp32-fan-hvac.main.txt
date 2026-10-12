@@ -1,0 +1,150 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-fan-hvac");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_fan(purifier_fan, 1, "Breeze", "Sleep");
+  new(matter_filter_1_113) matter::MatterFilterMapping(1, 113, esphome::matter::FilterLevels{0, 25, 10});
+  matter_filter_1_113->set_condition_sensor(hepa_life);
+  matter_filter_1_113->set_replace_needed_sensor(hepa_replace);
+  matter_filter_1_113->set_reset_button(hepa_reset_button);
+  new(matter_filterresettrigger_id) matter::FilterResetTrigger();
+  matter_filter_1_113->add_reset_trigger(matter_filterresettrigger_id);
+  new(automation_id) Automation<>(matter_filterresettrigger_id);
+  matter_mattercomponent_id->register_mapping(matter_filter_1_113);
+  new(matter_filter_1_114) matter::MatterFilterMapping(1, 114, esphome::matter::FilterLevels{0, -1, -1});
+  matter_filter_1_114->set_replace_needed_sensor(carbon_replace);
+  new(matter_filterresettrigger_id_2) matter::FilterResetTrigger();
+  matter_filter_1_114->add_reset_trigger(matter_filterresettrigger_id_2);
+  new(automation_id_2) Automation<>(matter_filterresettrigger_id_2);
+  matter_mattercomponent_id->register_mapping(matter_filter_1_114);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_purifier::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(purifier_fan->get_traits(), false);
+    if (esp_matter::endpoint::air_purifier::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::hepa_filter_monitoring::config_t hepa_filter_monitoring_config{};
+    auto *hepa_filter_monitoring_cluster = esp_matter::cluster::hepa_filter_monitoring::create(endpoint, &hepa_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (hepa_filter_monitoring_cluster == nullptr)
+      return false;
+    {
+      esp_matter::cluster::hepa_filter_monitoring::feature::condition::config_t condition_config{};
+      condition_config.condition = 100;
+      condition_config.degradation_direction = 0;
+      if (esp_matter::cluster::hepa_filter_monitoring::feature::condition::add(hepa_filter_monitoring_cluster, &condition_config) != ESP_OK)
+        return false;
+    }
+    if (esp_matter::cluster::hepa_filter_monitoring::feature::warning::add(hepa_filter_monitoring_cluster) != ESP_OK)
+      return false;
+    if (esp_matter::cluster::hepa_filter_monitoring::command::create_reset_condition(hepa_filter_monitoring_cluster) == nullptr)
+      return false;
+    esp_matter::cluster::activated_carbon_filter_monitoring::config_t activated_carbon_filter_monitoring_config{};
+    auto *activated_carbon_filter_monitoring_cluster = esp_matter::cluster::activated_carbon_filter_monitoring::create(endpoint, &activated_carbon_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (activated_carbon_filter_monitoring_cluster == nullptr)
+      return false;
+    if (esp_matter::cluster::activated_carbon_filter_monitoring::command::create_reset_condition(activated_carbon_filter_monitoring_cluster) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, purifier_fan, esphome::matter::FanFeatureOptions{true, "Breeze", "Sleep"}) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(hood_fan, 2);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extractor_hood::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(hood_fan->get_traits(), false);
+    if (esp_matter::endpoint::extractor_hood::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, hood_fan, esphome::matter::FanFeatureOptions{true, nullptr, nullptr}) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(ac, 3, true);
+  matter_mattercomponent_id->register_climate_fan(ac, 3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint_tag(3, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, ac, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    if (!esphome::matter::extend_climate_thermostat(endpoint, ac, true))
+      return false;
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::climate_fan_mode_sequence(ac);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_climate_fan_features(fan_control_cluster, ac, false) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(ac2, 4, true);
+  matter_mattercomponent_id->register_fan(indoor_fan, 4);
+  matter_mattercomponent_id->register_endpoint_parent(4, 0);
+  matter_mattercomponent_id->register_endpoint_tag(4, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, ac2, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    if (!esphome::matter::extend_climate_thermostat(endpoint, ac2, true))
+      return false;
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::fan_mode_sequence(indoor_fan->get_traits(), false);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, indoor_fan) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(boiler, 5, false);
+  matter_mattercomponent_id->register_endpoint_parent(5, 0);
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::heat_pump::config_t device_config_0{};
+    if (esp_matter::endpoint::heat_pump::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      esp_matter::cluster::thermostat::config_t thermostat_config{};
+      esphome::matter::configure_climate_thermostat(thermostat_config, boiler, false);
+      if (esp_matter::cluster::thermostat::create(endpoint, &thermostat_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+        return false;
+    }
+    if (!esphome::matter::extend_climate_thermostat(endpoint, boiler, false))
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(hall_thermostat, 6, false);
+  matter_mattercomponent_id->register_fan(stat_fan, 6);
+  matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, hall_thermostat, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    if (!esphome::matter::extend_climate_thermostat(endpoint, hall_thermostat, false))
+      return false;
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::fan_mode_sequence(stat_fan->get_traits(), false);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, stat_fan) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0xD8E0A5FC);

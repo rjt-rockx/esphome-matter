@@ -15,7 +15,11 @@ from ..const import (
     CONF_SWITCH_ID,
     CONF_WITH_FEATURES,
 )
-from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
+from ..fan_binding import (
+    FAN_CONTROL,
+    device_options as fan_device_options,
+    validate_fan_features,
+)
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
 from ..matter_climate import climate_schema, validate_climate_features
@@ -188,6 +192,13 @@ class DeviceType:
     def conf_key(self) -> str:
         return self.name
 
+    def has_fan_control_server(self) -> bool:
+        """Whether the Fan Control server cluster can be part of this device type."""
+        return any(
+            cluster.name == FAN_CONTROL and (cluster.server or not cluster.server_locked)
+            for cluster in self.clusters
+        )
+
     def has_required_cluster(self, name: str) -> bool:
         return any(c.name == name and c.required for c in self.server_clusters)
 
@@ -325,8 +336,8 @@ class DeviceType:
 
         if self.name in SWITCH_DEVICE_TYPES:
             schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
-        if self.name == "fan":
-            schema[cv.Optional(CONF_FAN_ID)] = fan_id_schema()
+        if self.has_fan_control_server():
+            schema.update(fan_device_options())
         if self.name == "window_covering":
             from ..covers import schema_options
 

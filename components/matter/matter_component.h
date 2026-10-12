@@ -9,10 +9,12 @@
 #include "matter_attributes.h"
 #include "matter_cover.h"
 #include "matter_climate.h"
+#include "matter_climate_fan.h"
 #include "matter_conformance.h"
 #include "matter_device_info.h"
 #include "matter_endpoints.h"
 #include "matter_fan.h"
+#include "matter_filter_monitoring.h"
 #include "matter_generic_switch.h"
 #include "matter_lights.h"
 #include "matter_lock.h"
@@ -102,7 +104,11 @@ public:
   void register_switch(switch_::Switch *sw, uint16_t endpoint_id);
 #endif // USE_SWITCH
 #ifdef USE_FAN
-  void register_fan(fan::Fan *fan, uint16_t endpoint_id);
+  // wind_natural / wind_sleep: names of the fan preset modes that stand for the
+  // Wind feature (nullptr = not mapped).
+  void register_fan(fan::Fan *fan, uint16_t endpoint_id,
+                    const char *wind_natural = nullptr,
+                    const char *wind_sleep = nullptr);
 #endif // USE_FAN
 #ifdef USE_COVER
   void register_cover(cover::Cover *cover, uint16_t endpoint_id);
@@ -110,6 +116,10 @@ public:
 #ifdef USE_CLIMATE
   void register_climate(climate::Climate *climate, uint16_t endpoint_id,
                         bool prefer_cooling);
+  // Fan Control cluster bound to the fan and swing modes of a climate.
+#ifdef USE_MATTER_CLIMATE_FAN
+  void register_climate_fan(climate::Climate *climate, uint16_t endpoint_id);
+#endif
 #endif // USE_CLIMATE
 #ifdef USE_LOCK
   void register_lock(lock::Lock *lock, uint16_t endpoint_id);

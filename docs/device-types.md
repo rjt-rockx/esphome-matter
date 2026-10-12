@@ -101,7 +101,7 @@ See [cover.md](cover.md).
 
 > **Placeholder.** ESPHome `fan:` to Matter Fan Control is documented in [fan.md](fan.md).
 
-See [fan.md](fan.md).
+See [fan.md](fan.md). Fan Control on air purifiers, extractor hoods, room air conditioners (also bound to climate fan modes), filter monitoring, and `climate_id` on water heaters and heat pumps are in [hvac.md](hvac.md).
 
 # Locks & valves
 

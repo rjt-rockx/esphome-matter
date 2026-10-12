@@ -4,9 +4,13 @@
 #include "esphome/core/log.h"
 #include "matter_component.h"
 #include "matter_fan.h"
+#include "matter_fan_step.h"
 
 #include <algorithm>
 #include <app/clusters/fan-control-server/FanControlCluster.h>
+#include <app/clusters/fan-control-server/fan-control-server.h>
+#include <cctype>
+#include <cstring>
 #include <data_model_provider/esp_matter_data_model_provider.h>
 #include <esp_matter_cluster.h>
 #include <platform/CHIPDeviceLayer.h>
@@ -35,6 +39,30 @@ uint8_t clamp_speed_count(int speed_count) {
   return static_cast<uint8_t>(std::clamp(speed_count, 1, 100));
 }
 
+bool equals_ignore_case(const std::string &a, const char *b) {
+  size_t len = strlen(b);
+  if (a.size() != len)
+    return false;
+  for (size_t i = 0; i < len; i++) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i])))
+      return false;
+  }
+  return true;
+}
+
+// The fan's own spelling of a preset mode name, or "" when it has none.
+std::string find_preset(const fan::FanTraits &traits, const char *name) {
+  if (name == nullptr || name[0] == 0)
+    return {};
+  for (const auto &mode : traits.supported_preset_modes()) {
+    std::string candidate(mode);
+    if (equals_ignore_case(candidate, name))
+      return candidate;
+  }
+  return {};
+}
+
 } // namespace
 
 uint8_t fan_mode_sequence(const fan::FanTraits &traits, bool with_auto) {
@@ -51,7 +79,8 @@ uint8_t fan_mode_sequence(const fan::FanTraits &traits, bool with_auto) {
   return static_cast<uint8_t>(sequence);
 }
 
-esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan) {
+esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan,
+                           const FanFeatureOptions &options) {
   if (fan == nullptr)
     return ESP_ERR_INVALID_ARG;
   auto traits = fan->get_traits();
@@ -75,15 +104,55 @@ esp_err_t add_fan_features(esp_matter::cluster_t *cluster, fan::Fan *fan) {
     if (feature::airflow_direction::add(cluster, &config) != ESP_OK)
       return ESP_FAIL;
   }
+  if (options.step) {
+    // Step moves the fan speed one step up or down.
+    if (!traits.supports_speed()) {
+      ESP_LOGE(TAG,
+               "Fan Control: the Step feature needs a fan with speed control, "
+               "'%s' has none",
+               fan->get_name().c_str());
+      return ESP_ERR_NOT_SUPPORTED;
+    }
+    if (feature::step::add(cluster) != ESP_OK)
+      return ESP_FAIL;
+  }
+  if (options.wind_natural != nullptr || options.wind_sleep != nullptr) {
+    uint8_t support = 0;
+    if (!find_preset(traits, options.wind_natural).empty())
+      support |= static_cast<uint8_t>(FanControl::WindBitmap::kNaturalWind);
+    if (!find_preset(traits, options.wind_sleep).empty())
+      support |= static_cast<uint8_t>(FanControl::WindBitmap::kSleepWind);
+    if (support == 0) {
+      ESP_LOGE(TAG,
+               "Fan Control: the Wind feature maps to the preset modes '%s' / "
+               "'%s' but fan '%s' has neither",
+               options.wind_natural == nullptr ? "" : options.wind_natural,
+               options.wind_sleep == nullptr ? "" : options.wind_sleep,
+               fan->get_name().c_str());
+      return ESP_ERR_NOT_FOUND;
+    }
+    feature::wind::config_t config;
+    config.wind_support = support;
+    if (feature::wind::add(cluster, &config) != ESP_OK)
+      return ESP_FAIL;
+  }
   return ESP_OK;
 }
 
-void MatterComponent::register_fan(fan::Fan *fan, uint16_t endpoint_id) {
-  this->mappings_.push_back(new MatterFanMapping(fan, endpoint_id));
+void MatterComponent::register_fan(fan::Fan *fan, uint16_t endpoint_id,
+                                   const char *wind_natural,
+                                   const char *wind_sleep) {
+  this->mappings_.push_back(
+      new MatterFanMapping(fan, endpoint_id, wind_natural, wind_sleep));
 }
 
-MatterFanMapping::MatterFanMapping(fan::Fan *fan, uint16_t endpoint_id)
-    : MatterEndpointMappingBase(endpoint_id), fan_(fan) {}
+MatterFanMapping::MatterFanMapping(fan::Fan *fan, uint16_t endpoint_id,
+                                   const char *wind_natural,
+                                   const char *wind_sleep)
+    : MatterEndpointMappingBase(endpoint_id),
+      chip::app::Clusters::FanControl::Delegate(endpoint_id), fan_(fan),
+      wind_natural_request_(wind_natural == nullptr ? "" : wind_natural),
+      wind_sleep_request_(wind_sleep == nullptr ? "" : wind_sleep) {}
 
 void MatterFanMapping::initialize() {
   if (this->fan_ == nullptr)
@@ -107,6 +176,23 @@ void MatterFanMapping::initialize() {
                        features.Has(FanControl::Feature::kRocking);
   this->has_direction_ = traits.supports_direction() &&
                          features.Has(FanControl::Feature::kAirflowDirection);
+  this->has_step_ =
+      this->has_speed_ && features.Has(FanControl::Feature::kStep);
+  this->has_wind_ = features.Has(FanControl::Feature::kWind);
+  if (this->has_wind_) {
+    this->wind_natural_ =
+        find_preset(traits, this->wind_natural_request_.c_str());
+    this->wind_sleep_ = find_preset(traits, this->wind_sleep_request_.c_str());
+    if (this->wind_natural_.empty() && this->wind_sleep_.empty()) {
+      ESP_LOGW(TAG, "Endpoint %u: no preset mode of the fan matches Wind",
+               this->endpoint_id());
+      this->has_wind_ = false;
+    }
+  }
+  // Without a delegate the cluster rejects the Step command, and WindSetting
+  // would change without any effect.
+  if (this->has_step_ || this->has_wind_)
+    FanControl::SetDefaultDelegate(this->endpoint_id(), this);
 
   // Controller writes to FanMode, PercentSetting and SpeedSetting all change
   // the same cluster state, but only the written attribute itself is passed to
@@ -242,6 +328,15 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
   bool has_rocking = this->has_rocking_;
   bool has_direction = this->has_direction_;
   int speed_count = this->speed_count_;
+  bool has_wind = this->has_wind_;
+  uint8_t wind = 0;
+  if (has_wind) {
+    std::string preset = this->active_preset_();
+    if (!preset.empty() && preset == this->wind_natural_)
+      wind |= static_cast<uint8_t>(FanControl::WindBitmap::kNaturalWind);
+    else if (!preset.empty() && preset == this->wind_sleep_)
+      wind |= static_cast<uint8_t>(FanControl::WindBitmap::kSleepWind);
+  }
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda([=]() {
     auto *cluster = find_fan_control_cluster(eid);
@@ -270,6 +365,11 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
     cluster->SetPercentCurrent(current_percent);
     if (has_speed)
       cluster->SetSpeedCurrent(current_speed);
+    // A manual speed change clears the preset mode, also when it comes from
+    // Matter. Calls OnWindSettingChanged() when the value changes, which finds
+    // the preset already active.
+    if (has_wind)
+      cluster->SetWindSetting(chip::BitMask<FanControl::WindBitmap>(wind));
 
     if (!update_settings)
       return;
@@ -283,6 +383,98 @@ void MatterFanMapping::push_state_to_matter(bool update_settings) {
           reverse ? FanControl::AirflowDirectionEnum::kReverse
                   : FanControl::AirflowDirectionEnum::kForward);
   });
+}
+
+std::string MatterFanMapping::active_preset_() const {
+  auto preset = this->fan_->get_preset_mode();
+  return std::string(preset.c_str(), preset.size());
+}
+
+// Runs on the CHIP task, from the cluster command handler.
+chip::Protocols::InteractionModel::Status
+MatterFanMapping::HandleStep(FanControl::StepDirectionEnum direction, bool wrap,
+                             bool lowest_off) {
+  using Status = chip::Protocols::InteractionModel::Status;
+  auto *cluster = find_fan_control_cluster(this->endpoint_id());
+  if (cluster == nullptr || !this->has_step_)
+    return Status::Failure;
+
+  // The speed the cluster reports. Auto (null speed) steps from Off.
+  int current = 0;
+  auto speed = cluster->GetSpeedSetting();
+  if (!speed.IsNull() && cluster->GetFanMode() != FanControl::FanModeEnum::kOff)
+    current = speed.Value();
+  int target = fan_step_target(
+      current, this->speed_count_,
+      direction == FanControl::StepDirectionEnum::kIncrease, wrap, lowest_off);
+  if (target == current)
+    return Status::Success;
+
+  // SpeedSetting makes the cluster derive PercentSetting and FanMode. Writes
+  // through the cluster object don't reach the attribute callbacks, so apply
+  // the settled state to the fan explicitly.
+  auto status = cluster->SetSpeedSetting(
+      chip::app::DataModel::MakeNullable<uint8_t>(static_cast<uint8_t>(target)));
+  if (status != Status::Success)
+    return status;
+  this->sync_from_cluster_();
+  return Status::Success;
+}
+
+// Runs on the CHIP task.
+void MatterFanMapping::OnWindSettingChanged(
+    chip::BitMask<FanControl::WindBitmap> value) {
+  if (!this->has_wind_)
+    return;
+  bool natural = value.Has(FanControl::WindBitmap::kNaturalWind);
+  bool sleep = value.Has(FanControl::WindBitmap::kSleepWind);
+  global_matter_component->defer_to_main_loop(
+      [this, natural, sleep]() { this->apply_wind_(natural, sleep); });
+}
+
+// Runs on the ESPHome main loop. ESPHome presets are exclusive: with both bits
+// set the one that is not active yet wins. Clearing the setting resets the
+// preset the way ESPHome does for a manual speed change.
+void MatterFanMapping::apply_wind_(bool natural, bool sleep) {
+  std::string current = this->active_preset_();
+  std::string wanted;
+  if (natural && sleep)
+    wanted = (current == this->wind_natural_) ? this->wind_sleep_
+                                              : this->wind_natural_;
+  else if (natural)
+    wanted = this->wind_natural_;
+  else if (sleep)
+    wanted = this->wind_sleep_;
+  if ((natural && this->wind_natural_.empty()) ||
+      (sleep && this->wind_sleep_.empty()) || (natural && sleep && wanted.empty())) {
+    ESP_LOGW(TAG, "Endpoint %u: WindSetting has no matching fan preset mode",
+             this->endpoint_id());
+    this->push_state_to_matter();
+    return;
+  }
+  if (wanted == current)
+    return;
+
+  auto call = this->fan_->make_call();
+  if (!wanted.empty()) {
+    call.set_preset_mode(wanted.c_str());
+  } else {
+    // ESPHome has no call that clears a preset; a speed change does.
+    if (!this->fan_->get_traits().supports_speed()) {
+      ESP_LOGW(TAG,
+               "Endpoint %u: fan has no speed control, its preset mode can't "
+               "be cleared",
+               this->endpoint_id());
+      this->push_state_to_matter();
+      return;
+    }
+    call.set_speed(std::max(this->fan_->speed, 1));
+  }
+  this->synchronizing_from_matter_ = true;
+  call.perform();
+  this->synchronizing_from_matter_ = false;
+  // The Wind setting is correct now; the Current attributes follow the fan.
+  this->push_state_to_matter(false);
 }
 
 } // namespace esphome::matter
