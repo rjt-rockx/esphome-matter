@@ -69,6 +69,7 @@ constexpr uint32_t RETRY_DELAY_MIN_MS = 1000;
 constexpr uint32_t RETRY_DELAY_MAX_MS = 30000;
 constexpr uint32_t THREAD_READVERTISE_DELAY_MS = 500;
 bool start_server_pending{false};
+bool update_failed{false};
 uint32_t retry_delay_ms{RETRY_DELAY_MIN_MS};
 const char *start_server_reason{""};
 
@@ -217,13 +218,19 @@ void network_mark(NetworkMark mark, const char *detail) {
 }
 
 void network_schedule_dnssd_retry(const char *reason) {
+  update_failed = true;
   const uint32_t delay = retry_delay_ms;
   if (!start_server_pending)
     retry_delay_ms = std::min(retry_delay_ms * 2, RETRY_DELAY_MAX_MS);
   schedule_start_server(delay, reason);
 }
 
-void network_dnssd_publish_succeeded() { retry_delay_ms = RETRY_DELAY_MIN_MS; }
+void network_dnssd_update_started() { update_failed = false; }
+
+void network_dnssd_update_finished() {
+  if (!update_failed)
+    retry_delay_ms = RETRY_DELAY_MIN_MS;
+}
 
 void network_on_device_event(const chip::DeviceLayer::ChipDeviceEvent *event) {
   using namespace chip::DeviceLayer;

@@ -95,6 +95,25 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
              s.PeerNodeId, s.FabricIndex, s.LocalSessionId);
     break;
   }
+  case chip::DeviceLayer::DeviceEventType::kCHIPoBLEAdvertisingChange:
+    ESP_LOGI(TAG_EVENT, "BLE advertising %s",
+             event->CHIPoBLEAdvertisingChange.Result ==
+                     chip::DeviceLayer::kActivity_Started
+                 ? "started"
+                 : "stopped");
+    break;
+  case chip::DeviceLayer::DeviceEventType::kCHIPoBLEConnectionEstablished:
+    ESP_LOGI(TAG_EVENT, "BLE connection established");
+    break;
+  case chip::DeviceLayer::DeviceEventType::kCHIPoBLEConnectionClosed:
+    ESP_LOGI(TAG_EVENT, "BLE connection closed");
+    break;
+  case chip::DeviceLayer::DeviceEventType::kCHIPoBLEConnectionError:
+    ESP_LOGW(TAG_EVENT, "BLE connection error");
+    break;
+  case chip::DeviceLayer::DeviceEventType::kBLEDeinitialized:
+    ESP_LOGI(TAG_EVENT, "BLE deinitialized and its memory reclaimed");
+    break;
   case chip::DeviceLayer::DeviceEventType::kWiFiConnectivityChange: // 0x8000
     ESP_LOGV(TAG_EVENT, "WiFiConnectivityChange");
     break;

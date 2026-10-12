@@ -42,7 +42,7 @@ from .endpoints import (
 from .fan_binding import fan_restore_warning
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
-    to_code_ble,
+    add_ble_sdkconfig,
     validate_ble_commissioning,
 )
 from .network_config import configure_network
@@ -336,7 +336,7 @@ async def to_code(config: ConfigType):
         add_idf_sdkconfig_option("CONFIG_OPENTHREAD_CONSOLE_ENABLE", False)
         add_idf_sdkconfig_option("CONFIG_OPENTHREAD_SRP_CLIENT", True)
 
-        await to_code_ble()
+        add_ble_sdkconfig()
 
     configure_network(debug=config[CONF_DEBUG])
     await to_code_ota(config)

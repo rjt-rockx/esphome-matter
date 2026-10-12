@@ -17,7 +17,7 @@
 // 345 and 555 s, then CHIP drops the persisted subscription (the controller
 // re-subscribes by itself when it notices the device again).
 //
-// CHIP requires:
+// CHIPConfig.h documents these constraints on the values (no compile-time check):
 //   MIN + Fib(MAX_STEP) * MULT < MAX < MIN + Fib(MAX_STEP + 1) * MULT
 //   5 + 55 * 10 = 555 < 600 < 5 + 89 * 10 = 895
 #define CHIP_CONFIG_SUBSCRIPTION_TIMEOUT_RESUMPTION_MIN_RETRY_INTERVAL_SECS 5

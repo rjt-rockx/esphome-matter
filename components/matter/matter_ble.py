@@ -1,7 +1,7 @@
 """BLE commissioning support for esphome-matter.
 
-BLE commissioning is selected automatically: when neither ``wifi`` nor
-``openthread`` is configured, the device has no network to be commissioned on, so
+BLE commissioning is selected automatically: when none of ``wifi``, ``openthread``
+or ``ethernet`` is configured, the device has no network to be commissioned on, so
 CHIP's CHIPoBLE rendezvous is compiled in (NimBLE) and the device advertises over
 BLE. The optional ``ble_commissioning`` key only *asserts* that choice so a
 forgotten ``wifi:`` block is a config error instead of a silently different
@@ -10,19 +10,14 @@ build. See docs/ble-commissioning.md.
 
 import logging
 
-import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.core import CORE
 from esphome.types import ConfigType
 
-from .types import matter_ns
-
 _LOGGER = logging.getLogger(__name__)
 
 CONF_BLE_COMMISSIONING = "ble_commissioning"
-
-MatterBle = matter_ns.class_("MatterBle", cg.Component)
 
 # esp32_ble (and everything built on it) is Bluedroid-only, while the BLE
 # commissioning build uses NimBLE. All of the components below load esp32_ble,
@@ -54,7 +49,7 @@ def has_ip_network(loaded_integrations=None) -> bool:
         if loaded_integrations is None
         else loaded_integrations
     )
-    return "wifi" in loaded or "openthread" in loaded
+    return bool({"wifi", "openthread", "ethernet"} & set(loaded))
 
 
 def validate_ble_commissioning(config: ConfigType, full_config: ConfigType) -> None:
@@ -64,16 +59,16 @@ def validate_ble_commissioning(config: ConfigType, full_config: ConfigType) -> N
 
     if requested is True and ip_network:
         raise cv.Invalid(
-            "ble_commissioning: true cannot be combined with `wifi` or `openthread`. "
-            "With either configured the device is commissioned on-network (the QR "
-            "code advertises on-network rendezvous) and the BLE stack is not "
-            "built. Remove `wifi`/`openthread` to commission over BLE, or remove "
+            "ble_commissioning: true cannot be combined with `wifi`, `openthread` or "
+            "`ethernet`. With any of them configured the device is commissioned "
+            "on-network (the QR code advertises on-network rendezvous) and the BLE "
+            "stack is not built. Remove them to commission over BLE, or remove "
             "`ble_commissioning`."
         )
     if requested is False and not ip_network:
         raise cv.Invalid(
-            "ble_commissioning: false requires `wifi` or `openthread`: without "
-            "either, BLE is the only way to commission the device."
+            "ble_commissioning: false requires `wifi`, `openthread` or `ethernet`: "
+            "without one of them, BLE is the only way to commission the device."
         )
     if ip_network:
         return
@@ -81,7 +76,7 @@ def validate_ble_commissioning(config: ConfigType, full_config: ConfigType) -> N
     conflicts = sorted(set(_BLE_COMPONENTS) & set(full_config))
     if conflicts:
         raise cv.Invalid(
-            "BLE commissioning (no `wifi`/`openthread` configured) cannot be "
+            "BLE commissioning (no `wifi`/`openthread`/`ethernet` configured) cannot be "
             "combined with ESPHome BLE components: "
             + ", ".join(conflicts)
             + ". Matter's BLE commissioning uses the NimBLE host stack while "
@@ -123,19 +118,9 @@ def add_ble_sdkconfig() -> None:
     add_idf_sdkconfig_option("CONFIG_BT_BLUEDROID_ENABLED", False)
     add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLED", True)
     add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT", False)
-    # Deinitialize BLE after a successful commissioning and do not start it on
-    # boot once the device holds a fabric. Default y in CHIP's Kconfig; pinned so
-    # a changed default cannot silently keep the BLE stack's RAM allocated.
+    # Deinitialize BLE after a successful commissioning, reclaim its memory
+    # (esp_bt_mem_release, so BLE cannot restart until the next reboot) and do not
+    # start it on boot once Wi-Fi/Thread credentials are provisioned. Default y in
+    # CHIP's Kconfig; pinned so a changed default cannot silently keep the BLE
+    # stack's RAM allocated.
     add_idf_sdkconfig_option("CONFIG_USE_BLE_ONLY_FOR_COMMISSIONING", True)
-
-
-async def to_code_ble() -> None:
-    """Codegen for the BLE commissioning build."""
-    add_ble_sdkconfig()
-    cg.add_define("USE_MATTER_BLE")
-    # Not part of the user's YAML, so the ID is created (and marked as a
-    # component) here instead of by the schema.
-    ble_id = cv.declare_id(MatterBle)("matter_ble")
-    CORE.component_ids.add(ble_id.id)
-    var = cg.new_Pvariable(ble_id)
-    await cg.register_component(var, {})

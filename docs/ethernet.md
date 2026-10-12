@@ -53,19 +53,11 @@ Requirements:
 | Second MAC/netif | The SDK's `ESPEthernetDriver::Init` creates its own IP101/RMII driver and netif. `esphome_matter_ethernet/CMakeLists.txt` replaces that source with `ethernet_driver.cpp`, which only checks that ESPHome's `ETH_DEF` netif exists (a `--wrap` cannot work since the vtable and `Init` share a translation unit). This also permits SPI-only targets |
 | Network Commissioning cluster | The SDK's inline `GetNetworks()` reports an empty NetworkID. A derived `ESPHomeEthernetDriver` reports `ETH_DEF` and its link state, selected via a build-local copy of the SDK's commissioning integration |
 | IPv4 event payload | The SDK copies `IP_EVENT_STA_GOT_IP` but not `IP_EVENT_ETH_GOT_IP` data. `matter_ethernet.cpp` wraps `PlatformManagerImpl::HandleESPSystemEvent` so `ConnectivityManager` sees the address and triggers a DNS-SD republish |
-| DNS-SD | esp_matter excludes `ESP32DnssdImpl.cpp` when both Wi-Fi modes are off. The CMake adapter adds it to the SDK target for Ethernet-only builds; it then picks the `ETH_DEF` netif (`kDefaultEthernetNetifKey`) |
+| DNS-SD | `matter_dnssd.cpp` routes Wi-Fi and Ethernet builds to CHIP's ESP32 mDNS backend. esp_matter excludes `ESP32DnssdImpl.cpp` when both Wi-Fi modes are off. The CMake adapter adds it to the SDK target for Ethernet-only builds; it then picks the `ETH_DEF` netif (`kDefaultEthernetNetifKey`) |
 | IPv6 | `CONFIG_LWIP_IPV6_NUM_ADDRESSES=6`, route-info option enabled for Thread border-router routes |
 
 All workarounds are specific to esp_matter `1.6.0~2` and are guarded by CMake checks that fail loudly if the SDK
 layout changes.
-
-## Integration patch for `matter_dnssd.cpp`
-
-`matter_dnssd.cpp` must also compile for Ethernet-only builds (otherwise no DnssdImpl is linked and the device is not
-discoverable). The change widens the guards from `USE_OPENTHREAD || USE_WIFI` to `... || USE_ETHERNET`, routes the
-ESP32 DNS-SD backend for `USE_WIFI || USE_ETHERNET`, and turns the resolve `#ifdef USE_WIFI` into an `#elif` so
-`error` is not declared twice when Thread is combined with another network. Until this change is in
-`matter_dnssd.cpp`, Ethernet-only builds will not provide DNS-SD.
 
 ## Validation checklist
 

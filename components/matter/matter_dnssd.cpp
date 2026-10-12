@@ -308,8 +308,6 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
     ESP_LOGW(TAG, "Publish %s.%s: OpenThread busy, will retry", service->mName,
              service->mType);
     esphome::matter::network_schedule_dnssd_retry("OpenThread lock busy");
-    if (callback != nullptr)
-      callback(context, nullptr, nullptr, CHIP_ERROR_INCORRECT_STATE);
     return CHIP_ERROR_INCORRECT_STATE;
   }
 
@@ -356,18 +354,15 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
   }
 
   if (chip_error == CHIP_NO_ERROR) {
-    esphome::matter::network_dnssd_publish_succeeded();
     esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
                                   service->mName);
 #ifdef MATTER_DEBUG_NETWORK
     start_srp_poll();
 #endif // MATTER_DEBUG_NETWORK
-  }
-
-  if (callback != nullptr) {
-    callback(context, chip_error == CHIP_NO_ERROR ? service->mType : nullptr,
-             chip_error == CHIP_NO_ERROR ? service->mName : nullptr,
-             chip_error);
+    // Failures are reported through the return value only: CHIP's callback
+    // would just log the same error a second time.
+    if (callback != nullptr)
+      callback(context, service->mType, service->mName, CHIP_NO_ERROR);
   }
   return chip_error;
 #endif // USE_OPENTHREAD
@@ -387,7 +382,6 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
              existing_hostname, service->mHostName);
     CHIP_ERROR err = EspDnssdPublishService(&adjusted, callback, context);
     if (err == CHIP_NO_ERROR) {
-      esphome::matter::network_dnssd_publish_succeeded();
       esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
                                     service->mName);
     } else {
@@ -397,7 +391,6 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
   }
   CHIP_ERROR err = EspDnssdPublishService(service, callback, context);
   if (err == CHIP_NO_ERROR) {
-    esphome::matter::network_dnssd_publish_succeeded();
     if (service != nullptr)
       esphome::matter::network_mark(esphome::matter::NetworkMark::DNSSD_PUBLISH,
                                     service->mName);
@@ -410,10 +403,10 @@ CHIP_ERROR ChipDnssdPublishService(const DnssdService *service,
 
 CHIP_ERROR ChipDnssdRemoveServices() {
   ESP_LOGD(TAG, "Remove services");
+  esphome::matter::network_dnssd_update_started();
 #ifdef USE_OPENTHREAD
-  auto lock = esphome::openthread::InstanceLock::try_acquire(2000);
-  VerifyOrReturnError(static_cast<bool>(lock), CHIP_ERROR_INCORRECT_STATE);
-
+  // Only marks our own bookkeeping (CHIP task only); the OpenThread lock is
+  // taken in ChipDnssdFinalizeServiceUpdate where the SRP client is touched.
   for (auto &entry : matter_services) {
     ESP_LOGD(TAG, "Marking service for removal: %s.%s", entry->instance.c_str(),
              entry->type.c_str());
@@ -430,7 +423,10 @@ CHIP_ERROR ChipDnssdFinalizeServiceUpdate() {
   ESP_LOGD(TAG, "Finalize service update");
 #ifdef USE_OPENTHREAD
   auto lock = esphome::openthread::InstanceLock::try_acquire(2000);
-  VerifyOrReturnError(static_cast<bool>(lock), CHIP_ERROR_INCORRECT_STATE);
+  if (!lock) {
+    esphome::matter::network_schedule_dnssd_retry("OpenThread lock busy");
+    return CHIP_ERROR_INCORRECT_STATE;
+  }
 
   otInstance *instance = lock.get_instance();
   for (auto it = matter_services.begin(); it != matter_services.end();) {
@@ -444,6 +440,7 @@ CHIP_ERROR ChipDnssdFinalizeServiceUpdate() {
     }
   }
 #endif // USE_OPENTHREAD
+  esphome::matter::network_dnssd_update_finished();
   return CHIP_NO_ERROR;
 }
 
