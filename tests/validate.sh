@@ -5,7 +5,7 @@
 set -u
 cd "$(dirname "$0")/.."
 ESPHOME="${1:-${ESPHOME:-esphome}}"
-# VALIDATE_DIRS (space separated) selects directories; default: tests/configs examples
+# VALIDATE_DIRS (space separated) selects directories; default: tests/configs examples examples/devices/*
 # The component needs the native ESP-IDF toolchain on ESPHome >= 2026.9.0 (and dev)
 # and `toolchain: platformio` on older releases; configs omit the line.
 toolchain=$("$ESPHOME" version 2>/dev/null | python3 -c '
@@ -17,15 +17,18 @@ echo "Toolchain: $toolchain"
 failed=()
 passed=0
 cleanup() {
-  rm -f tests/configs/ci_tmp_*.yaml examples/ci_tmp_*.yaml
-  for s in tests/configs/secrets.yaml examples/secrets.yaml; do
+  rm -f tests/configs/ci_tmp_*.yaml examples/ci_tmp_*.yaml examples/devices/*/ci_tmp_*.yaml
+  for s in tests/configs/secrets.yaml examples/secrets.yaml examples/devices/*/secrets.yaml; do
     [ -f "$s" ] && ! git ls-files --error-unmatch "$s" >/dev/null 2>&1 && rm -f "$s"
   done
 }
 trap cleanup EXIT
 
 shopt -s nullglob
-for dir in ${VALIDATE_DIRS:-tests/configs examples}; do
+# examples/devices/<category>/ hold device reproductions; their _gaps/ (or gaps/) subdirectories
+# document features that are not supported yet and are never validated.
+for dir in ${VALIDATE_DIRS:-tests/configs examples examples/devices/*}; do
+case "$dir" in */_gaps|*/gaps) continue ;; esac
 for f in "$dir"/*.yaml; do
   case "$f" in */ci_tmp_*|*/secrets.yaml) continue ;; esac
   echo "::group::esphome config $f"
