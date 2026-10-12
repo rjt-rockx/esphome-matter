@@ -46,8 +46,8 @@ from .matter_ble import (
     validate_ble_commissioning,
 )
 from .network_config import configure_network
-from .sensor_mapping import validate_sensor_bindings
 from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
+from .sensor_mapping import validate_sensor_bindings
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)

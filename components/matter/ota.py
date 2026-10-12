@@ -134,7 +134,7 @@ def final_validate_ota(config: ConfigType, full_config: ConfigType) -> None:
 
 
 def add_software_version_sdkconfig(config: ConfigType) -> None:
-    """Numeric Matter SoftwareVersion (+ the app descriptor version string)."""
+    """Numeric Matter SoftwareVersion."""
     version = config.get(CONF_SOFTWARE_VERSION)
     if version is None:
         return

@@ -21,6 +21,12 @@ class MatterComponent;
 
 void defer_to_main_loop(MatterComponent *component, std::function<void()> &&f);
 
+// Runs f on the CHIP task, in order with SystemLayer().ScheduleLambda() work.
+// Unlike ScheduleLambda the capture size is not limited to
+// CHIP_CONFIG_LAMBDA_EVENT_SIZE (24 bytes), at the price of one heap allocation.
+// Safe to call from the main loop; never blocks.
+void run_on_matter_thread(std::function<void()> &&f);
+
 using MatterAttributeValue =
     std::variant<bool, float, int64_t, uint64_t, std::string>;
 

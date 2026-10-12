@@ -3,6 +3,7 @@
 
 #include "esphome/core/log.h"
 #include "matter_climate.h"
+#include "matter_attributes.h"
 #include "matter_component.h"
 #include "matter_conversions.h"
 
@@ -385,7 +386,9 @@ void MatterClimateMapping::push_state_to_matter() {
   bool has_on_off = this->has_on_off_;
   bool on = climate->mode != climate::CLIMATE_MODE_OFF;
 
-  chip::DeviceLayer::SystemLayer().ScheduleLambda(
+  // The captures (an esp_matter_attr_val_t alone is 16 bytes) exceed
+  // CHIP_CONFIG_LAMBDA_EVENT_SIZE, so ScheduleLambda would not compile.
+  run_on_matter_thread(
       [this, eid, system_mode, local_temperature, write_heating, write_cooling,
        heating, cooling, has_running_state, running_state, has_on_off, on]() {
         using namespace chip::app::Clusters;

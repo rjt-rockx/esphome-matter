@@ -7,9 +7,13 @@
 
 #include <app/DeviceProxy.h>
 #include <app/clusters/bindings/binding-table.h>
+#include <platform/CHIPDeviceLayer.h>
+
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <inttypes.h>
+#include <memory>
 #include <string>
 
 static const char *const TAG = "matter.actions";
@@ -76,13 +80,43 @@ void register_client_request_callbacks() {
                                            client_group_invoke_cb, nullptr);
 }
 
-void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
-                         chip::CommandId command, const char *command_data) {
-  auto &binding_table = chip::app::Clusters::Binding::Table::GetInstance();
+namespace {
+
+// Request handed from the ESPHome main loop to the CHIP task. Heap allocated
+// because the work item is a single intptr_t.
+//
+// `data` is deliberately NOT copied: esp_matter::client::cluster_update() makes
+// a shallow copy of the request handle, and the copy (including request_data)
+// lives until the binding manager has an operational session to the bound node
+// and has called client_invoke_cb(), which may be seconds later (CASE
+// establishment). The pointer must therefore stay valid for the lifetime of the
+// firmware; see send_client_command() in matter_actions.h.
+struct ClientCommandRequest {
+  uint16_t endpoint_id;
+  chip::ClusterId cluster;
+  chip::CommandId command;
+  const char *data;
+};
+
+// Upper bound on requests queued towards the CHIP task. If the CHIP task is
+// stalled we drop new commands instead of growing the heap without bound.
+constexpr uint8_t MAX_PENDING_CLIENT_COMMANDS = 16;
+std::atomic<uint8_t> pending_client_commands{0};
+
+// Runs on the CHIP task. The CHIP event loop holds the chip stack lock while
+// executing scheduled work, so the binding table can be read safely and
+// cluster_update() needs no extra locking here.
+void send_client_command_on_matter_thread(intptr_t context) {
+  std::unique_ptr<ClientCommandRequest> request(
+      reinterpret_cast<ClientCommandRequest *>(context));
+  pending_client_commands.fetch_sub(1);
+
   std::string node_ids;
-  for (const auto &entry : binding_table) {
-    if (entry.local == endpoint_id &&
-        (!entry.clusterId.has_value() || entry.clusterId.value() == cluster)) {
+  for (const auto &entry :
+       chip::app::Clusters::Binding::Table::GetInstance()) {
+    if (entry.local == request->endpoint_id &&
+        (!entry.clusterId.has_value() ||
+         entry.clusterId.value() == request->cluster)) {
       if (!node_ids.empty())
         node_ids += ",";
       char node_id[21];
@@ -93,27 +127,50 @@ void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
   }
 
   if (node_ids.empty()) {
-    ESP_LOGW(TAG, "No bound nodes for endpoint=%u cluster=%lu", endpoint_id,
-             static_cast<uint32_t>(cluster));
+    ESP_LOGW(TAG, "No bound nodes for endpoint=%u cluster=%lu",
+             request->endpoint_id, static_cast<unsigned long>(request->cluster));
     return;
   }
-  ESP_LOGD(
-      TAG,
-      "Sending command: nodes=[%s] endpoint=%u cluster=%lu command=%lu data=%s",
-      node_ids.c_str(), endpoint_id, static_cast<uint32_t>(cluster),
-      static_cast<uint32_t>(command),
-      command_data != nullptr ? command_data : "{}");
+  ESP_LOGD(TAG,
+           "Sending command: nodes=[%s] endpoint=%u cluster=%lu command=%lu "
+           "data=%s",
+           node_ids.c_str(), request->endpoint_id,
+           static_cast<unsigned long>(request->cluster),
+           static_cast<unsigned long>(request->command), request->data);
 
   esp_matter::client::request_handle_t req;
   req.type = esp_matter::client::INVOKE_CMD;
-  req.command_path.mClusterId = cluster;
-  req.command_path.mCommandId = command;
-  req.request_data =
-      const_cast<char *>(command_data != nullptr ? command_data : "{}");
-  esp_matter::lock::ScopedChipStackLock scoped_lock(portMAX_DELAY);
-  esp_err_t err = esp_matter::client::cluster_update(endpoint_id, &req);
+  req.command_path.mClusterId = request->cluster;
+  req.command_path.mCommandId = request->command;
+  req.request_data = const_cast<char *>(request->data);
+  esp_err_t err = esp_matter::client::cluster_update(request->endpoint_id, &req);
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "cluster_update failed: %s", esp_err_to_name(err));
+  }
+}
+
+} // namespace
+
+// Called from the ESPHome main loop. Never blocks and never touches CHIP state:
+// the whole send path (binding table walk and cluster_update) runs on the CHIP
+// task. `command_data` is not copied and must outlive the call (see
+// ClientCommandRequest).
+void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
+                         chip::CommandId command, const char *command_data) {
+  if (pending_client_commands.load() >= MAX_PENDING_CLIENT_COMMANDS) {
+    ESP_LOGW(TAG, "Too many pending commands; dropping command=%lu",
+             static_cast<unsigned long>(command));
+    return;
+  }
+  auto *request = new ClientCommandRequest{
+      endpoint_id, cluster, command, command_data != nullptr ? command_data : "{}"};
+  pending_client_commands.fetch_add(1);
+  CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
+      send_client_command_on_matter_thread, reinterpret_cast<intptr_t>(request));
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGE(TAG, "Failed to schedule Matter command: %s", err.AsString());
+    pending_client_commands.fetch_sub(1);
+    delete request;
   }
 }
 
