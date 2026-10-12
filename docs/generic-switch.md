@@ -32,12 +32,12 @@ An event is only generated when the matching Switch cluster feature is enabled o
 
 | Feature                     | Events                                    |
 |-----------------------------|-------------------------------------------|
-| `MomentarySwitch`           | `initial_press`                           |
+| `MomentarySwitch`           | `initial_press` (every press, except for `ActionSwitch`) |
 | `MomentarySwitchRelease`    | `short_release`                           |
 | `MomentarySwitchLongPress`  | `long_press`, `long_release`              |
 | `MomentarySwitchMultiPress` | `multi_press_ongoing`, `multi_press_complete` |
 | `LatchingSwitch`            | `switch_latched`                          |
-| `ActionSwitch`              | Replaces `MomentarySwitchRelease`: one `initial_press` per sequence, no `short_release`, no `multi_press_ongoing`, `multi_press_complete` at the end. esp-matter always adds `MomentarySwitchMultiPress` to it. |
+| `ActionSwitch`              | Replaces `MomentarySwitchRelease`: one `initial_press` per sequence (not per press), no `short_release`, no `multi_press_ongoing`, `multi_press_complete` at the end. esp-matter always adds `MomentarySwitchMultiPress` to it. |
 
 The Switch cluster requires exactly one of `MomentarySwitch` and `LatchingSwitch`. esphome-matter selects `MomentarySwitch` automatically if neither is configured. Use `with_features: [LatchingSwitch]` for a toggle switch. Other features that a selected feature depends on (e.g. `MomentarySwitchRelease` for `MomentarySwitchLongPress`) are enabled automatically.
 
@@ -52,15 +52,32 @@ If `with_features` is not configured, `MomentarySwitchRelease` is enabled. When 
 | `multi_press_window` | `300ms` | Time after a release in which another press continues a multi-press sequence. Requires `MomentarySwitchMultiPress`. |
 | `multi_press_max`    | `2`     | Maximum number of presses of a multi-press sequence (2-255), exposed as the `MultiPressMax` attribute. Requires `MomentarySwitchMultiPress`. |
 
-The event sequences that are emitted (for the enabled features) are:
+The event sequences that are emitted follow the Matter certification tests TC-SWTCH-2.4, 2.5 and 2.6 (`src/python_testing/TC_SWTCH.py` in connectedhomeip). The feature set decides the sequence:
 
-| Gesture      | Events |
-|--------------|--------|
-| Short press  | `initial_press`, `short_release`, `multi_press_complete` (count 1) |
-| Double press | `initial_press`, `short_release`, `multi_press_ongoing` (count 2), `short_release`, `multi_press_complete` (count 2) |
-| Long press   | `initial_press`, `long_press` (after `long_press_time`), `long_release` |
+| Features | Gesture | Events | TC_SWTCH |
+|----------|---------|--------|----------|
+| MS + MSR | Short press | `initial_press`, `short_release` | 2.4 step 5 |
+| MS + MSR + MSL | Long press | `initial_press`, `long_press`, `long_release` | 2.4 step 5 |
+| MS + MSR + MSM | Short press | `initial_press`, `short_release`, `multi_press_complete(1)` | 2.5 steps 4a, 4b |
+| MS + MSR + MSM | Double press | `initial_press`, `short_release`, `initial_press`, `multi_press_ongoing(2)`, `short_release`, `multi_press_complete(2)` | 2.5 steps 5a, 5b |
+| MS + MSR + MSM (MultiPressMax 3) | Triple press | `initial_press`, `short_release`, `initial_press`, `multi_press_ongoing(2)`, `short_release`, `initial_press`, `multi_press_ongoing(3)`, `short_release`, `multi_press_complete(3)` | 2.5 steps 6b, 6c |
+| MS + MSR + MSL + MSM | Short, then long press | `initial_press`, `short_release`, `initial_press`, `multi_press_ongoing(2)`, `short_release`, `multi_press_complete(2)` | 2.5 steps 8a, 8b |
+| MS + MSR + MSL + MSM | Long, then short press | `initial_press`, `long_press`, `long_release`, `initial_press`, `short_release`, `multi_press_complete(1)` | 2.5 steps 9a, 9b |
+| AS + MSM | Short press | `initial_press`, `multi_press_complete(1)` | 2.6 steps 4a, 4b |
+| AS + MSM | Double press | `initial_press`, `multi_press_complete(2)` | 2.6 steps 5a, 5b |
+| AS + MSM | MultiPressMax + 1 presses | `initial_press`, `multi_press_complete(0)` | 2.6 steps 6a, 6b |
+| AS + MSL + MSM | Short, then long press | `initial_press`, `multi_press_complete(2)` | 2.6 steps 8a, 8b |
+| AS + MSL + MSM | Long, then short press | `initial_press`, `long_press`, `long_release`, `initial_press`, `multi_press_complete(1)` | 2.6 steps 9a, 9b |
 
-`multi_press_complete` is sent once `multi_press_window` has passed after the last release. Pressing more often than `multi_press_max` ends the sequence with `multi_press_complete` with count 0. Only the first press of a sequence can become a long press (as the Matter certification tests require): holding the second press of a double press is still a double press. A long press is not part of a multi-press sequence, so the next press starts a new one, and `short_release` is not sent after a long press.
+The rules behind the table:
+
+- A momentary switch (without `ActionSwitch`) sends `initial_press` on **every** press of a multi-press sequence. Presses 2 to `MultiPressMax` additionally send `multi_press_ongoing` with the running count, right after their `initial_press` (TC_SWTCH 2.5: `for pos_idx in range(count)`: wait for `InitialPress`, `if pos_idx > 0:` wait for `MultiPressOngoing` with `currentNumberOfPressesCounted == pos_idx + 1`, then `ShortRelease` if MSR).
+- An action switch sends `initial_press` only for the **first** press of a sequence and never `multi_press_ongoing` or `short_release` (TC_SWTCH 2.6: "InitialPress(one, not more than one)", "does not receive MultiPressOngoing", "does not receive ShortRelease").
+- Only the first press of a sequence can become a long press. Holding a later press does not send `long_press` or `long_release` (TC_SWTCH 2.5 step 8a and 2.6 step 8a). A long press ends the sequence without `multi_press_complete`, and the next press starts a new sequence (steps 9a).
+- `multi_press_complete` is sent once `multi_press_window` has passed after the last release. Its count is 0 when more than `multi_press_max` presses were made (TC_SWTCH 2.6 step 6b). For a momentary switch the spec has no test for this case: after `multi_press_max` presses esphome-matter keeps sending `initial_press` and `short_release` but no more `multi_press_ongoing` (its count is limited to `MultiPressMax`), and completes with 0.
+- Without `MomentarySwitchMultiPress` there is no sequence: every press sends `initial_press` (and `short_release` with MSR), and `short_release` is not sent after a long press.
+
+The sequences are cross-checked in `tests/unit/test_switch_sequences.py` with a Python model of the state machine (`tests/unit/switch_sequence_model.py`).
 
 The `CurrentPosition` attribute follows the button: it is `1` while the button is pressed and `0` otherwise (`NumberOfPositions` is 2), also when the enabled features have no event for the press or release. For a `LatchingSwitch`, the sensor state is the position and `switch_latched` is sent on each change.
 

@@ -181,16 +181,18 @@ void MatterGenericSwitchMapping::on_press_() {
   if (this->press_count_ > this->multi_press_max_)
     this->multi_press_overflow_ = true;
 
-  // Only the first press of a sequence is an InitialPress. The next presses are
-  // MultiPressOngoing (2..MultiPressMax), which an action switch never sends.
-  // More than MultiPressMax presses abort the sequence: no event is sent and the
-  // sequence completes with 0 presses.
-  if (this->press_count_ == 1) {
+  // TC_SWTCH 2.5 (momentary): every press is an InitialPress, and presses
+  // 2..MultiPressMax are followed by a MultiPressOngoing. TC_SWTCH 2.6 (action
+  // switch): only the first press of a sequence is an InitialPress and there is
+  // no MultiPressOngoing. More than MultiPressMax presses abort the sequence:
+  // no MultiPressOngoing, and the sequence completes with 0 presses.
+  const bool first_press = this->press_count_ == 1;
+  if (first_press || !this->action_switch_) {
     send_switch_event(this->endpoint_id(), MatterSwitchEvent::INITIAL_PRESS);
-  } else if (!this->action_switch_ && !this->multi_press_overflow_) {
-    send_switch_event(this->endpoint_id(),
-                      MatterSwitchEvent::MULTI_PRESS_ONGOING, 1,
-                      this->press_count_);
+    if (!first_press && this->multi_press_ && !this->multi_press_overflow_)
+      send_switch_event(this->endpoint_id(),
+                        MatterSwitchEvent::MULTI_PRESS_ONGOING, 1,
+                        this->press_count_);
   } else {
     // No event moves CurrentPosition for this press.
     set_switch_position(this->endpoint_id(), 1);
