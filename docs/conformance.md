@@ -212,7 +212,7 @@ for this; older layouts lack them and are compared without composition.
 
 ## CI
 
-Add a job next to `unit-tests` (the integrator edits `ci.yml`):
+The `conformance` job in `.github/workflows/ci.yml` (blocking) is:
 
 ```yaml
   conformance:

@@ -183,6 +183,40 @@ jobs:
         run: .venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py
 
   # ---------------------------------------------------------------------------
+  # Matter spec conformance of every test config (tools/conformance)
+  # ---------------------------------------------------------------------------
+  conformance:
+    name: Matter conformance
+    runs-on: ubuntu-24.04
+    env:
+      MATTER_CONFORMANCE_REQUIRE: "1"
+      MATTER_DATA_MODEL: ${{ github.workspace }}/connectedhomeip/data_model
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Fetch the Matter data model (public, not vendored)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/project-chip/connectedhomeip.git
+          git -C connectedhomeip sparse-checkout set data_model/1.6
+      - name: Install ESPHome and pytest
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev" pytest
+      - name: Conformance unit tests
+        run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
+      - name: Check every test config
+        run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-report
+          path: conformance.json
+
+  # ---------------------------------------------------------------------------
   # Validates the data model JSON against the esp-matter sources
   # ---------------------------------------------------------------------------
   integration:
