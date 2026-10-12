@@ -12,7 +12,7 @@ namespace esphome::matter {
 // Basic Information (cluster 0x0028) values configured from YAML. Empty strings mean "use the default":
 //   serial_number -> derived from the factory MAC address
 //   unique_id     -> random value generated and persisted by the CHIP ConfigurationManager
-// node_label, hardware_version_string and software_version_string are always filled in by codegen.
+// node_label (served via a persistence-provider default, see .cpp), hardware_version_string and software_version_string are always filled in by codegen.
 struct DeviceInfoConfig {
   std::string node_label;
   std::string serial_number;

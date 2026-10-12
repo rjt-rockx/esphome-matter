@@ -31,11 +31,18 @@ matter:
 
 CHIP reports `TEST_VERSION` as the hardware version string, and a placeholder serial number, unless a provider supplies real values. esphome-matter registers a small `DeviceInstanceInfoProvider` (it extends the stock ESP32 one) that returns the configured or derived `serial_number` and `hardware_version_string`. To enable it the component sets `CONFIG_CUSTOM_DEVICE_INSTANCE_INFO_PROVIDER=y`. All other values (vendor, product, part number, ...) still come from the stock provider.
 
+How each option reaches the controller:
+
+- `serial_number` and `hardware_version_string`: read by the cluster from the registered `DeviceInstanceInfoProvider`.
+- `software_version_string`: read from the firmware's application descriptor (`CONFIG_APP_PROJECT_VER`).
+- `unique_id`: read from the CHIP configuration store, where the component writes it right after Matter starts.
+- `node_label`: see the notes below.
+
 The software version string is read by CHIP from the application descriptor, so the component sets `CONFIG_APP_PROJECT_VER` (with `CONFIG_APP_PROJECT_VER_FROM_CONFIG`) to the value above. Set `esphome: project:` with a `version` to see your firmware version in the controller's device page.
 
 ### Notes
 
-- `node_label` is only the initial value. A controller can rename the node and the new label is stored and kept across reboots.
+- `node_label` is only the default. esp-matter 1.6 implements Basic Information with CHIP's code-driven cluster, which reads NodeLabel from CHIP's attribute persistence store and not from the esp-matter node config, so the component installs a thin wrapper around that store that answers "no value stored yet" with your `node_label`. When a controller renames the node the new label is stored in flash, kept across reboots, and wins over the YAML value from then on. Until a controller has set one, changing `node_label` in YAML and re-flashing changes what controllers see. A factory reset erases the controller's label and the YAML default applies again. The component never writes a label on the controller's behalf.
 - `unique_id` should be stable for the lifetime of the device. Changing it makes some controllers treat the node as a different device.
 - Controllers cache these values at commissioning time. Re-commission (or wait for the controller to refresh) to see changes.
 
