@@ -27,6 +27,9 @@ ethernet:
   type: OPENETH
 
 matter:
+  # Fixed commissioning data: manual pairing code 34970112332 (the Matter test default).
+  passcode: 20202021
+  discriminator: 3840
   endpoints:
     1:
       on_off_light:

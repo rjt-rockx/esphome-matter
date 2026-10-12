@@ -4,7 +4,7 @@
 #
 #   tools/qemu/run.sh build [yaml]      compile + merge a 4 MB flash image
 #   tools/qemu/run.sh run   [yaml]      boot the image (builds it first if missing)
-#   tools/qemu/run.sh test  [yaml]      boot, wait for "Matter ready", then exit 0/1
+#   tools/qemu/run.sh test  [yaml]      boot, wait for "Server ready!", then exit 0/1
 #
 # Environment:
 #   ESPHOME      esphome executable            (default: esphome from PATH)
@@ -13,6 +13,7 @@
 #   BUILD_DIR    build root                    (default: ~/build-qemu)
 #   MATTER_PORT  host UDP port -> guest 5540   (default: 5540)
 #   API_PORT     host TCP port -> guest 6053   (default: 6053)
+#   CMAKE_BUILD_PARALLEL_LEVEL compile jobs (default 3; cc1plus of CHIP needs ~1.5 GB each, OOM on small hosts)
 #   BOOT_TIMEOUT seconds to wait in `test`     (default: 240)
 #   FLASH_KEEP=1 keep the existing flash image (NVS/fabrics persist) on `run`
 set -euo pipefail
@@ -54,7 +55,7 @@ build() {
   sed -E "s#source: \.\./\.\./components#source: $REPO/components#" "$YAML" > "$WORK/$NAME.yaml"
   grep -q '^  toolchain:' "$WORK/$NAME.yaml" || \
     sed -i -E 's/^  framework:/  toolchain: esp-idf\n  framework:/' "$WORK/$NAME.yaml"
-  (cd "$WORK" && "$ESPHOME" compile "$NAME.yaml")
+  (cd "$WORK" && CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-3} "$ESPHOME" compile "$NAME.yaml")
   local b
   b=$(echo "$WORK"/.esphome/build/*/build)
   # Offsets come from the IDF-generated flasher_args.json, so partition layout changes are picked up.
@@ -74,10 +75,10 @@ EOF
 
 qemu_cmd() {
   # hostfwd: Matter (UDP 5540) and the ESPHome native API (TCP 6053). The guest gets
-  # 10.0.2.15 and, via slirp IPv6, an fec0::/64 address.
+  # 10.0.2.15 (slirp DHCP). Only IPv4 is forwarded; the host needs no IPv6.
   QEMU_CMD=("$QEMU_DIR/bin/qemu-system-xtensa" -M esp32 -m 4M -nographic
     -drive "file=$IMAGE,if=mtd,format=raw"
-    -nic "user,model=open_eth,ipv6=on,hostfwd=udp::$MATTER_PORT-:5540,hostfwd=tcp::$API_PORT-:6053"
+    -nic "user,model=open_eth,hostfwd=udp::$MATTER_PORT-:5540,hostfwd=tcp::$API_PORT-:6053"
     -global driver=timer.esp32.timg,property=wdt_disable,value=true)
 }
 
@@ -87,21 +88,21 @@ case "$MODE" in
     fetch_qemu
     [ -f "$IMAGE" ] || build
     qemu_cmd
-    [ "${FLASH_KEEP:-0}" = 1 ] || :  # image is modified in place by QEMU; rebuild to reset
+    # QEMU modifies the image in place (NVS, fabrics): boot a copy so flash.bin stays pristine.
+    [ "${FLASH_KEEP:-0}" = 1 ] && [ -f "$WORK/flash.run.bin" ] || cp "$IMAGE" "$WORK/flash.run.bin"
+    QEMU_CMD=("${QEMU_CMD[@]/$IMAGE/$WORK/flash.run.bin}")
     if [ "$MODE" = run ]; then
       exec "${QEMU_CMD[@]}" 2>&1 | tee "$LOG"
     fi
-    cp "$IMAGE" "$WORK/flash.run.bin"
-    QEMU_CMD=("${QEMU_CMD[@]/$IMAGE/$WORK/flash.run.bin}")
     : > "$LOG"
     "${QEMU_CMD[@]}" > "$LOG" 2>&1 &
     PID=$!
     trap 'kill $PID 2>/dev/null || true' EXIT
     for _ in $(seq "$BOOT_TIMEOUT"); do
-      if grep -q "Matter ready" "$LOG" 2>/dev/null; then echo "OK: Matter ready"; exit 0; fi
+      if grep -q "Server ready!" "$LOG" 2>/dev/null; then echo "OK: Server ready!"; exit 0; fi
       kill -0 $PID 2>/dev/null || { echo "QEMU exited early"; tail -30 "$LOG"; exit 1; }
       sleep 1
     done
-    echo "Timeout waiting for 'Matter ready'"; tail -40 "$LOG"; exit 1 ;;
+    echo "Timeout waiting for 'Server ready!'"; tail -40 "$LOG"; exit 1 ;;
   *) echo "usage: $0 build|run|test [yaml]" >&2; exit 2 ;;
 esac
