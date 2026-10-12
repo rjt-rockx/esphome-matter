@@ -2,6 +2,7 @@
 #ifdef USE_MATTER_OTA
 
 #include "esphome/core/log.h"
+#include "matter_component.h"
 
 #include <esp_matter_ota.h>
 #include <platform/ConfigurationManager.h>
@@ -90,6 +91,11 @@ void MatterOta::on_ota_state_(chip::DeviceLayer::OtaState state) {
 }
 
 void MatterOta::setup() {
+  // Without a running Matter stack there is nothing to configure or observe.
+  if (global_matter_component == nullptr || global_matter_component->is_failed()) {
+    this->mark_failed();
+    return;
+  }
   // The requestor itself is initialized and started by esp_matter::start()
   // (esp_matter_ota_requestor_init / _start) when CONFIG_ENABLE_OTA_REQUESTOR
   // is set; only tune it and observe its state here.
