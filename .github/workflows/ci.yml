@@ -207,11 +207,7 @@ jobs:
       - name: Conformance unit tests
         run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
       - name: Check every test config
-        # esp32-compile-all.yaml exists for code generation coverage and deliberately holds bare
-        # device types that are not complete devices, so it is not a conformance target.
-        run: |
-          configs=$(ls tests/configs/*.yaml | grep -v '/esp32-compile-all\.yaml$')
-          .venv/bin/python -m tools.conformance $configs --json conformance.json
+        run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -311,6 +307,7 @@ jobs:
           - c6-fan-hvac
           - c6-light-bindings
           - c6-power-source
+          - c6-compile-all
         include:
           # Extra properties per slug (matched on `slug`, applied to every ESPHome version).
           - { slug: c6-wifi, name: C6 wifi, variant: ESP32C6, config: tests/configs/esp32-wifi.yaml }
@@ -327,6 +324,7 @@ jobs:
           - { slug: c6-bridge-block, name: C6 bridge block, variant: ESP32C6, config: tests/configs/esp32-bridge-block.yaml }
           - { slug: c6-closure, name: C6 closure, variant: ESP32C6, config: tests/configs/esp32-closure.yaml }
           - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-compile-all, name: C6 compile all, variant: ESP32C6, config: tests/configs/esp32-compile-all.yaml }
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

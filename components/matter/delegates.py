@@ -730,6 +730,11 @@ def validate_delegate_clusters(matter_config: dict, full_config) -> None:
 def _validate_mode_cluster(
     where, cluster_name, config, full_config, sibling_state=False
 ):
+    if cluster_name == "MicrowaveOvenMode" and config.get(CONF_ON_CHANGE_TO_MODE):
+        raise cv.Invalid(
+            f"{where}: Microwave Oven Mode has no ChangeToMode command (Mode_MicrowaveOven.xml disallows it), so "
+            "`on_change_to_mode` never runs. The mode is changed through Microwave Oven Control"
+        )
     if cluster_name != MODE_SELECT:
         if config[CONF_ACCEPT] == "when_idle" and not sibling_state:
             raise cv.Invalid(
@@ -1040,7 +1045,10 @@ def layout_extras(cluster, config: dict) -> dict:
         return {
             "attrs": ["SupportedModes", "CurrentMode"],
             # Mode Select has no ChangeToModeResponse: the SDK answers with a plain status.
-            "cmds": ["ChangeToMode"]
+            # Microwave Oven Mode disallows both commands (Mode_MicrowaveOven.xml).
+            "cmds": []
+            if cluster.name == "MicrowaveOvenMode"
+            else ["ChangeToMode"]
             + ([] if cluster.name == MODE_SELECT else ["ChangeToModeResponse"]),
             "events": [],
         }

@@ -541,12 +541,16 @@ DelegateAttach attach_mode_delegate(esp_matter::endpoint_t *endpoint,
   if (attribute::get(cluster, mode_base_ns::Attributes::SupportedModes::Id) ==
       nullptr)
     cluster::mode_base::attribute::create_supported_modes(cluster, nullptr, 0, 0);
-  if (command::get(cluster, mode_base_ns::Commands::ChangeToMode::Id,
-                   COMMAND_FLAG_ACCEPTED) == nullptr)
-    cluster::mode_base::command::create_change_to_mode(cluster);
-  if (command::get(cluster, mode_base_ns::Commands::ChangeToModeResponse::Id,
-                   COMMAND_FLAG_GENERATED) == nullptr)
-    cluster::mode_base::command::create_change_to_mode_response(cluster);
+  // Microwave Oven Mode disallows ChangeToMode and ChangeToModeResponse (Mode_MicrowaveOven.xml): its mode is changed
+  // through Microwave Oven Control (SetCookingParameters), so the commands are not added there.
+  if (cluster_id != 0x005E) {
+    if (command::get(cluster, mode_base_ns::Commands::ChangeToMode::Id,
+                     COMMAND_FLAG_ACCEPTED) == nullptr)
+      cluster::mode_base::command::create_change_to_mode(cluster);
+    if (command::get(cluster, mode_base_ns::Commands::ChangeToModeResponse::Id,
+                     COMMAND_FLAG_GENERATED) == nullptr)
+      cluster::mode_base::command::create_change_to_mode_response(cluster);
+  }
 
   // On a microwave oven the Microwave Oven Control cluster creates (and Init()s) the mode instance itself once it
   // has a delegate; installing our own init callback as well would Init the instance twice. Only hand over the

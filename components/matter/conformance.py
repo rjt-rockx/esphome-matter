@@ -249,6 +249,22 @@ def application_device_type_ids(endpoint_config: dict) -> set[int]:
     return ids
 
 
+def duplicate_device_type_ids(endpoint_config: dict) -> set[int]:
+    """Device types that count for the Duplicate condition (Base Device Type, Descriptor TagList).
+
+    Application device types, plus the Aggregator: its classification is "simple"
+    (Aggregator.xml), so two Aggregators below the same parent overlap and both need a TagList.
+    """
+    ids = application_device_type_ids(endpoint_config)
+    if any(
+        (dt := DEVICE_TYPES_BY_CONF_KEY.get(k)) is not None
+        and dt.id == AGGREGATOR_DEVICE_TYPE_ID
+        for k in endpoint_config
+    ):
+        ids.add(AGGREGATOR_DEVICE_TYPE_ID)
+    return ids
+
+
 def _duplicate_components(endpoints: dict[int, dict]) -> list[list[int]]:
     """Group sibling endpoints (same parent) connected by overlapping application device types."""
     by_parent: dict[int, list[int]] = {}
@@ -260,7 +276,7 @@ def _duplicate_components(endpoints: dict[int, dict]) -> list[list[int]]:
     components: list[list[int]] = []
     for siblings in by_parent.values():
         siblings.sort()
-        types = {ep: application_device_type_ids(endpoints[ep]) for ep in siblings}
+        types = {ep: duplicate_device_type_ids(endpoints[ep]) for ep in siblings}
         remaining = list(siblings)
         while remaining:
             component = [remaining.pop(0)]

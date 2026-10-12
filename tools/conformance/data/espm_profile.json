@@ -5169,12 +5169,62 @@
    "version": 3
   },
   "camera": {
-   "clusters": [],
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [
+      "video",
+      "audio",
+      "snapshot"
+     ],
+     "ns": "camera_av_stream_management",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "webrtc_transport_provider",
+     "sides": [
+      "server"
+     ]
+    },
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "webrtc_transport_requestor",
+     "sides": [
+      "client"
+     ]
+    }
+   ],
    "id": 322,
    "version": 1
   },
   "chime": {
-   "clusters": [],
+   "clusters": [
+    {
+     "attrs": [],
+     "cmds": [],
+     "cond": null,
+     "events": [],
+     "features": [],
+     "ns": "chime",
+     "sides": [
+      "server"
+     ]
+    }
+   ],
    "id": 326,
    "version": 1
   },

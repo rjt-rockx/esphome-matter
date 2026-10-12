@@ -2003,12 +2003,22 @@
       return MATTER_BUILD_FAIL("endpoint 129: device type cook_surface");
     return true;
   });
+  new(matter_mattermodemapping_id_7) matter::MatterModeMapping(130, 94);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_7);
+  matter_mattermodemapping_id_7->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_7->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_7->add_mode("Defrost", 1, "Defrost");
+  matter_mattermodemapping_id_7->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_7->set_decision(false, 250);
+  matter_mattermodemapping_id_7->set_accept_when_idle(false);
   matter_mattercomponent_id->register_endpoint_parent(130, 0);
   matter_mattercomponent_id->register_endpoint(130, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::microwave_oven::config_t device_config_0{};
     device_config_0.microwave_oven_control.feature_flags = esp_matter::cluster::microwave_oven_control::feature::power_as_number::get_id();
     if (esp_matter::endpoint::microwave_oven::add(endpoint, &device_config_0) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 130: device type microwave_oven");
+    if (!esphome::matter::attach_delegate(endpoint, 0x005E))
+      return MATTER_BUILD_FAIL("endpoint 130: cluster delegate attach");
     return true;
   });
   matter_mattercomponent_id->register_endpoint_parent(131, 0);
@@ -2112,6 +2122,7 @@
     return true;
   });
   matter_mattercomponent_id->register_endpoint_parent(150, 0);
+  matter_mattercomponent_id->register_endpoint_tag(150, 7, 1, "");
   matter_mattercomponent_id->register_endpoint(150, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::aggregator::config_t device_config_0{};
     if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
@@ -2272,8 +2283,19 @@
   matter_mattercomponent_id->register_endpoint_parent(165, 0);
   matter_mattercomponent_id->register_endpoint(165, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::energy_evse::config_t device_config_0{};
+    device_config_0.device_energy_management.feature_flags = esp_matter::cluster::device_energy_management::feature::power_forecast_reporting::get_id();
     if (esp_matter::endpoint::energy_evse::add(endpoint, &device_config_0) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 165: device type evse");
+    {
+      auto *energy_evse_cluster = esp_matter::cluster::get(endpoint, 153);
+      if (energy_evse_cluster == nullptr ||
+          esp_matter::cluster::energy_evse::event::create_ev_connected(energy_evse_cluster) == nullptr ||
+          esp_matter::cluster::energy_evse::event::create_ev_not_detected(energy_evse_cluster) == nullptr ||
+          esp_matter::cluster::energy_evse::event::create_energy_transfer_started(energy_evse_cluster) == nullptr ||
+          esp_matter::cluster::energy_evse::event::create_energy_transfer_stopped(energy_evse_cluster) == nullptr ||
+          esp_matter::cluster::energy_evse::event::create_fault(energy_evse_cluster) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 165: sensor extras cluster create");
+    }
     return true;
   });
   matter_mattercomponent_id->register_endpoint_parent(166, 0);
@@ -2312,6 +2334,8 @@
     esp_matter::endpoint::control_bridge::config_t device_config_0{};
     if (esp_matter::endpoint::control_bridge::add(endpoint, &device_config_0) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 170: device type control_bridge");
+    if (esp_matter::cluster::scenes_management::create(endpoint, nullptr, esp_matter::CLUSTER_FLAG_CLIENT) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 170: client cluster ScenesManagement create");
     esp_matter::cluster::binding::config_t binding_config{};
     if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
       return MATTER_BUILD_FAIL("endpoint 170: cluster Binding create");
@@ -2501,10 +2525,11 @@
     return true;
   });
   matter_mattercomponent_id->register_endpoint_parent(60585, 0);
+  matter_mattercomponent_id->register_endpoint_tag(60585, 7, 2, "");
   matter_mattercomponent_id->register_endpoint(60585, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::aggregator::config_t device_config_0{};
     if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 60585: device type aggregator");
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0x13D53AC0);
+  matter_mattercomponent_id->set_structure_hash(0xAA886F82);

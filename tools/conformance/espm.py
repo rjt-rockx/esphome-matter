@@ -103,7 +103,9 @@ _HAS_RE = re.compile(r"(!?)\s*has\(\s*feature::(\w+)::get_id\(\)\s*\)")
 # laundry washer mode creator, ``operational_state::attribute::create_x`` inside the RVC one).
 _QUALIFIER = r"(?:(?!global::)[a-z_0-9]+::)?"
 _ATTR_RE = re.compile(
-    r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"(global::)?attribute::create_(\w+)\s*\("
+    r"(?<![\w:])(?:esp_matter::)?"
+    + _QUALIFIER
+    + r"(global::)?attribute::create_(\w+)\s*\("
 )
 _CMD_RE = re.compile(
     r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"command::create_(\w+)\s*\("
@@ -112,9 +114,7 @@ _EVENT_RE = re.compile(
     r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"event::create_(\w+)\s*\("
 )
 _FEAT_ADD_RE = re.compile(r"feature::(\w+)::add\s*\(")
-_FEATURE_ALIAS_RE = re.compile(
-    r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;"
-)
+_FEATURE_ALIAS_RE = re.compile(r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;")
 
 
 def _join_multiline_ifs(body: str) -> list[str]:
@@ -231,7 +231,7 @@ def _scan_function(body: str):
 
 
 _DT_CREATE_RE = re.compile(
-    r"^\s*(?:cluster_t\s*\*\s*(\w+)\s*=\s*)?(?:cluster::)?(\w+)::create\((.*)\)\s*;"
+    r"^\s*(?:VerifyOrReturn\w*\(\s*)?(?:cluster_t\s*\*\s*(\w+)\s*=\s*)?(?:cluster::)?(\w+)::create\((.*)\)\s*;"
 )
 _DT_FEATURE_RE = re.compile(r"(?:cluster::)?(\w+)::feature::(\w+)::add\(\s*(\w+)")
 _DT_ELEM_RE = re.compile(
@@ -249,7 +249,25 @@ def _scan_device_type_add(body: str) -> list[dict]:
     pp: list[str] = []  # preprocessor condition stack
     ifs = 0  # runtime ``if (...) {`` nesting with the condition text
     cond_stack: list[str] = []
+    # A statement can span several lines (camera: ``cluster_t *x = cluster::y::create(\n endpoint, ...\n);``).
+    joined: list[str] = []
+    pending = ""
     for line in body.splitlines():
+        s = line.strip()
+        if pending:
+            pending += " " + s
+            if pending.count("(") <= pending.count(")"):
+                joined.append(pending)
+                pending = ""
+        elif (
+            not s.startswith("#")
+            and s.count("(") > s.count(")")
+            and not s.endswith("{")
+        ):
+            pending = s
+        else:
+            joined.append(s)
+    for line in joined + ([pending] if pending else []):
         s = line.strip()
         if s.startswith("#"):
             if re.match(r"#\s*(if|ifdef|ifndef)\b", s):
@@ -381,7 +399,9 @@ def _apply_code_driven_overlay(clusters: dict) -> None:
                     nc["base"][key].remove(name)
                     moved.append(name)
         for f in ("WiFiNetworkInterface", "ThreadNetworkInterface"):
-            lst = nc["features"].setdefault(f, dict(attrs=[], cmds=[], events=[]))["cmds"]
+            lst = nc["features"].setdefault(f, dict(attrs=[], cmds=[], events=[]))[
+                "cmds"
+            ]
             for name in moved:
                 if name not in lst:
                     lst.append(name)
@@ -522,6 +542,32 @@ def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
 
 
 # --------------------------------------------------------------------- queries
+# Elements that esp-matter creates only for a combination of features. The extractor attributes
+# them to a single feature, so the missing half of the condition is listed here:
+# (cluster namespace, features that must be enabled, features that must be absent, removed).
+# The elements are removed from the prediction when the combination holds.
+#   switch_cluster::feature::momentary_switch_multi_press::add (esp_matter_feature.cpp) calls
+#   create_multi_press_ongoing() only when ActionSwitch is not in the feature map, matching the
+#   spec (MultiPressOngoing: MSM & !AS).
+#   door_lock::feature::credential_over_the_air_access::add and pin_credential::add create
+#   RequirePINforRemoteOperation only when the other feature is already in the feature map,
+#   matching the spec (COTA & PIN).
+GUARDED_AWAY = [
+    (
+        "switch_cluster",
+        ("action_switch",),
+        (),
+        {"events": ["multi_press_ongoing"]},
+    ),
+    (
+        "door_lock",
+        ("credential_over_the_air_access",),
+        ("pin_credential",),
+        {"attrs": ["require_pin_for_remote_operation"]},
+    ),
+]
+
+
 class Profile:
     def __init__(self, data: dict | None = None):
         if data is None:
@@ -550,17 +596,9 @@ class Profile:
         ns = self.namespace_for(cluster_name)
         return self.data["clusters"][ns].get("revision") if ns else None
 
-    def predict(self, cluster_name: str, feature_names: list[str]):
-        """(attributes, commands, events) esp-matter creates, as normalised-name
-        sets, or None if the cluster is not covered by the legacy model."""
-        ns = self.namespace_for(cluster_name)
-        if ns is None:
-            return None
-        c = self.data["clusters"][ns]
-        if c.get("cls") is None:
-            return None
+    def _closure(self, c: dict, feature_names) -> set[str]:
+        """Normalised feature names enabled by ``feature_names`` plus what esp-matter adds itself."""
         enabled = {self._fnorm(f) for f in feature_names}
-        # resolve implications
         changed = True
         by_norm = {self._fnorm(k): k for k in c["features"]}
         while changed:
@@ -573,6 +611,29 @@ class Profile:
                         changed = True
         for imp in c["implies"].get("*", []):
             enabled.add(self._fnorm(imp))
+        return enabled
+
+    def implied_features(
+        self, cluster_name: str, feature_names: list[str]
+    ) -> list[str]:
+        """Feature names (esp-matter spelling) that the creator turns on besides ``feature_names``."""
+        ns = self.namespace_for(cluster_name)
+        if ns is None or self.data["clusters"][ns].get("cls") is None:
+            return []
+        c = self.data["clusters"][ns]
+        enabled = self._closure(c, feature_names)
+        return [k for k in c["features"] if self._fnorm(k) in enabled]
+
+    def predict(self, cluster_name: str, feature_names: list[str]):
+        """(attributes, commands, events) esp-matter creates, as normalised-name
+        sets, or None if the cluster is not covered by the legacy model."""
+        ns = self.namespace_for(cluster_name)
+        if ns is None:
+            return None
+        c = self.data["clusters"][ns]
+        if c.get("cls") is None:
+            return None
+        enabled = self._closure(c, feature_names)
         attrs = {norm(a) for a in c["base"]["attrs"]}
         cmds = {norm(a) for a in c["base"]["cmds"]}
         events = {norm(a) for a in c["base"]["events"]}
@@ -586,6 +647,15 @@ class Profile:
                 attrs |= {norm(a) for a in f["attrs"]}
                 cmds |= {norm(a) for a in f["cmds"]}
                 events |= {norm(a) for a in f["events"]}
+        for gns, present, absent, gone in GUARDED_AWAY:
+            if (
+                gns == ns
+                and all(self._fnorm(f) in enabled for f in present)
+                and not any(self._fnorm(f) in enabled for f in absent)
+            ):
+                attrs -= {norm(a) for a in gone.get("attrs", ())}
+                cmds -= {norm(a) for a in gone.get("cmds", ())}
+                events -= {norm(a) for a in gone.get("events", ())}
         return attrs, cmds, events
 
 

@@ -87,6 +87,11 @@ from .util import iter_matter_actions, maybe_empty, restore_warning, snake_case
 
 _LOGGER = logging.getLogger(__name__)
 
+# Mandatory client clusters of a device type that esp-matter's add() does not create.
+#   Control Bridge (ControlBridge.xml): Scenes Management (client) is mandatory; esp-matter creates the
+#   Identify, Groups, On/Off, Level Control and Color Control clients only.
+DEVICE_TYPE_CLIENT_CLUSTERS = {"control_bridge": ("ScenesManagement",)}
+
 
 def switch_restore_warning(matter_config: dict, full_config: Config):
     restore_warning(matter_config, full_config, CONF_SWITCH_ID, "Switch")
@@ -252,6 +257,8 @@ class Endpoint:
         self.extras: list[sensor_extras.Extra] = []
         # Cluster ids whose delegate is installed at the end of the build callback (delegates.py).
         self._delegate_cluster_ids: list[int] = []
+        # Client clusters that the component creates next to a device type (DEVICE_TYPE_CLIENT_CLUSTERS).
+        self.client_clusters: list[Cluster] = []
 
     @property
     def endpoint_id(self) -> int:
@@ -776,6 +783,18 @@ class Endpoint:
             var, self._endpoint_id, device_config, device_type.name
         )
 
+        for client_name in DEVICE_TYPE_CLIENT_CLUSTERS.get(device_type.name, ()):
+            client = CLUSTERS_BY_NAME[client_name]
+            self.enabled_sdkconfig_options.add(client.sdkconfig_option)
+            self.client_clusters.append(client)
+
+        if device_type.name == "evse":
+            # esp-matter's evse add() also creates Device Energy Management, without a feature. The cluster
+            # needs PowerForecastReporting or StateForecastReporting (Device Energy Management cluster, choice a).
+            dem = self._cluster_configs["DeviceEnergyManagement"]
+            dem.created = True
+            dem.enabled_features["PowerForecastReporting"] = True
+
         # Register extra features
         for enabled_feature in device_config.get(CONF_WITH_FEATURES, ()):
             for cluster in device_type.server_clusters:
@@ -932,6 +951,12 @@ class Endpoint:
                     f"{config_var}.{device_type.config_member(cluster)}.feature_flags = {' | '.join(feature_flags)};"
                 )
 
+        if device_type.name == "evse":
+            lines.append(
+                f"{config_var}.device_energy_management.feature_flags = "
+                "esp_matter::cluster::device_energy_management::feature::power_forecast_reporting::get_id();"
+            )
+
         lines.extend(cover_lines)
         climate_ = self._climate_variables.get(device_type.name)
         if climate_ is not None and device_type.name not in self._thermostat_outside:
@@ -968,6 +993,17 @@ class Endpoint:
                 f'  return MATTER_BUILD_FAIL("device type {device_type.name}");',
             )
         )
+        for client in self.client_clusters:
+            if client.name in DEVICE_TYPE_CLIENT_CLUSTERS.get(device_type.name, ()):
+                lines.extend(
+                    (
+                        (
+                            f"if (esp_matter::cluster::{client.espm_namespace}::create(endpoint, nullptr, "
+                            "esp_matter::CLUSTER_FLAG_CLIENT) == nullptr)"
+                        ),
+                        f'  return MATTER_BUILD_FAIL("client cluster {client.name} create");',
+                    )
+                )
         if device_type.name == "soil_sensor":
             # The code driven Soil Measurement cluster aborts at startup without limits.
             self.global_includes.add(

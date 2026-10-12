@@ -103,6 +103,7 @@ CLUSTER_REFRIGERATOR_ALARM = 0x0057
 
 DEVICE_TYPE_OCCUPANCY_SENSOR = "occupancy_sensor"
 DEVICE_TYPE_SMOKE_CO_ALARM = "smoke_co_alarm"
+DEVICE_TYPE_EVSE = "evse"
 REFRIGERATOR = "refrigerator"
 
 CLUSTER_NAME_BSC = "BooleanStateConfiguration"
@@ -645,6 +646,8 @@ async def register(endpoint, var, device_type, device_config: dict) -> None:
         await _register_hold_time(endpoint, var, device_config)
     if device_type.name == DEVICE_TYPE_SMOKE_CO_ALARM:
         await _register_smoke_co(endpoint, var, device_config)
+    if device_type.name == DEVICE_TYPE_EVSE:
+        _register_evse_events(endpoint)
     if _has_server_cluster(device_type, CLUSTER_NAME_BSC) and creates_cluster(
         CLUSTER_NAME_BSC, device_config
     ):
@@ -731,6 +734,39 @@ async def _register_hold_time(endpoint, var, device_config: dict) -> None:
     if hold.get(CONF_NUMBER) is not None:
         cg.add(mapping.set_number(await cg.get_variable(hold[CONF_NUMBER])))
     cg.add(var.register_mapping(mapping))
+
+
+# -- Energy EVSE ------------------------------------------------------------ #
+
+# esp-matter's Energy EVSE creator makes none of the events that the cluster makes mandatory (Energy EVSE cluster,
+# Events: EVConnected, EVNotDetected, EnergyTransferStarted, EnergyTransferStopped, Fault).
+_EVSE_EVENTS = (
+    ("ev_connected", "EVConnected"),
+    ("ev_not_detected", "EVNotDetected"),
+    ("energy_transfer_started", "EnergyTransferStarted"),
+    ("energy_transfer_stopped", "EnergyTransferStopped"),
+    ("fault", "Fault"),
+)
+
+
+def _register_evse_events(endpoint) -> None:
+    cluster = CLUSTERS_BY_NAME["EnergyEVSE"]
+    namespace = f"esp_matter::cluster::{cluster.espm_namespace}"
+    cluster_var = f"{cluster.espm_namespace}_cluster"
+
+    def lines() -> list[str]:
+        return _create_block(
+            cluster,
+            [
+                f"{namespace}::event::create_{function}({cluster_var}) == nullptr"
+                for function, _name in _EVSE_EVENTS
+            ],
+        )
+
+    def elements() -> list[tuple[str, str]]:
+        return [("events", name) for _function, name in _EVSE_EVENTS]
+
+    endpoint.extras.append(Extra(cluster.name, lines, elements))
 
 
 # -- Smoke CO Alarm --------------------------------------------------------- #

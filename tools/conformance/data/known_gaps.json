@@ -1,20 +1,28 @@
 {
  "gaps": [
   {
-   "code": "CL-FEATURE-MISSING",
-   "where": "Switch",
-   "message": "MomentarySwitchMultiPress",
-   "scope": "component",
-   "reason": "component gap: generic_switch with ActionSwitch does not enable MomentarySwitchMultiPress although the spec makes it mandatory in this configuration (see docs/generic-switch.md); remove once fixed",
-   "ref": "components/matter/generic_switch.py"
-  },
-  {
    "code": "DT-CLUSTER-MISSING",
    "where": "Base Device Type",
    "message": "Binding",
    "scope": "component",
-   "reason": "component gap: audio_doorbell (Basic Video/Audio doorbell) endpoints lack the Binding server cluster required by the Base Device Type 'Client' condition; remove once fixed",
+   "reason": "component gap: endpoints with a client application cluster (camera: WebRTC Transport Requestor client; Basic Video/Audio doorbell) lack the Binding server cluster required by the Base Device Type 'Client' condition; remove once fixed",
    "ref": "components/matter/endpoints.py"
+  },
+  {
+   "code": "CL-EVENT-MISSING",
+   "where": "Chime",
+   "message": "ChimeStartedPlaying",
+   "scope": "sdk",
+   "reason": "esp-matter 1.6 gap: the legacy data model has no creator for the Chime ChimeStartedPlaying event (mandatory since Chime revision 2; only the generated data model creates it), and cluster::chime::create() returns NULL without a delegate, so the chime device type needs matter: allow_incomplete_device_types (components/matter/incomplete.py)",
+   "ref": "components/esp_matter/data_model/legacy/esp_matter_cluster.cpp namespace chime (create); esp_matter_event_impl.h (no chime event)"
+  },
+  {
+   "code": "CL-ATTR-NA",
+   "where": "Camera AV Stream Management",
+   "message": "LocalSnapshotRecordingEnabled",
+   "scope": "sdk",
+   "reason": "esp-matter 1.6 gap: legacy camera_av_stream_management::feature::snapshot::add() creates LocalSnapshotRecordingEnabled unconditionally, but the spec makes it conditional on SNP & STOR (the generated data model has the guard); the camera device type always enables SNP",
+   "ref": "components/esp_matter/data_model/legacy/esp_matter_feature.cpp:4125"
   }
  ]
 }

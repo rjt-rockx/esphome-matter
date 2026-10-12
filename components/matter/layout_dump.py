@@ -35,6 +35,14 @@ def _network() -> dict:
     return {"wifi": wifi, "thread": thread, "ethernet": ethernet}
 
 
+def _ota_enabled() -> bool:
+    """CONFIG_ENABLE_OTA_REQUESTOR: esp-matter then adds the OTA Requestor to endpoint 0 and enables its device type."""
+    from . import ota
+    from .const import CONF_MATTER
+
+    return ota.ota_config(CORE.config.get(CONF_MATTER, {})) is not None
+
+
 def dump_layout(endpoints) -> None:
     path = os.environ.get(ENV_VAR)
     if not path:
@@ -42,6 +50,7 @@ def dump_layout(endpoints) -> None:
     out = {
         "format": 1,
         "network": _network(),
+        "ota": _ota_enabled(),
         "endpoints": {},
     }
     for endpoint in endpoints:
@@ -144,6 +153,11 @@ def _endpoint_layout(endpoint) -> dict:
         "device_types": device_types,
         "clusters": clusters,
         "dynamic_features": sorted(set(dynamic)),
+        # client clusters that the component creates next to a device type (endpoints.DEVICE_TYPE_CLIENT_CLUSTERS)
+        "client_clusters": [
+            {"name": cluster.name, "id": cluster.id}
+            for cluster in endpoint.client_clusters
+        ],
         # composition (conformance.EndpointPlan): parent 0 = child of the root node
         "parent": endpoint.plan.parent,
         "label": endpoint.plan.label,

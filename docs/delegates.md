@@ -73,6 +73,8 @@ The specification (and the Matter certification tests) require some tags and the
 | `rvc_clean_mode` | a mode with `vacuum` or `mop` |
 | `device_energy_management_mode` | a mode with `no_optimization`, which is not combined with the other optimization tags |
 
+Microwave Oven Mode is the exception to the `ChangeToMode` rules above: the specification disallows `ChangeToMode` and `ChangeToModeResponse` on it (the mode is changed through Microwave Oven Control), so the component does not add them and `on_change_to_mode` is rejected there.
+
 > YAML turns an unquoted `off`/`on` into a boolean. `tags: [off]` works (the component maps it back), a label has to be quoted: `label: "Off"`.
 
 ## Select binding

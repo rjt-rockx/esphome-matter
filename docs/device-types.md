@@ -222,6 +222,18 @@ This device type exposes clusters and attributes for power and energy measuremen
 
 The `generic_switch` is a stateless programmable button that emits Matter events (press, long press, multi press). See [generic-switch.md](./generic-switch.md).
 
+# Incomplete device types
+
+Some device types need an application delegate that esphome-matter has no YAML layer for yet. The config validator tells you:
+
+| Device type | What happens | Config time |
+|---|---|---|
+| `chime` | esp-matter 1.6 only creates the Chime cluster with a Chime delegate, so the endpoint fails to build at boot. | Error, unless `matter: allow_incomplete_device_types: [chime]` |
+| `camera` | Camera AV Stream Management and WebRTC Transport Provider/Requestor exist without a delegate: structure only. | Warning |
+| `evse`, `device_energy_management` | Energy EVSE and Device Energy Management exist without a delegate: structure only (see [design/delegates-evse-dem.md](design/delegates-evse-dem.md)). | Warning |
+
+For `evse` the component enables the Device Energy Management `PowerForecastReporting` feature (the cluster requires `PFR` or `SFR`), creates the mandatory Energy EVSE events and relies on esp-matter enabling `ChargingPreferences`. `control_bridge` gets its mandatory Scenes Management client cluster.
+
 # Untested / unsupported
 
 The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Some of them have entity bindings (`window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`, `room_air_conditioner`, `closure`, `water_leak_detector`, `water_freeze_detector`, `smoke_co_alarm`, `power_source`); those are described in the sections above and are listed here only because the list is generated from the device type table. Treat everything else in this list as untested. The appliance device types (`laundry_washer`, `dishwasher`, `robotic_vacuum_cleaner`, `refrigerator`, `water_heater`, `mode_select`, ...) create clusters that are driven by a delegate; configure them as described in [delegates.md](delegates.md) or the endpoint is structure only.
