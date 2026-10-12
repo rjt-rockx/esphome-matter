@@ -33,7 +33,7 @@ def _default_disabled(config):
     # Runs before the schema fills in its own default.
     if (
         isinstance(config, dict)
-        and config.get(CONF_TYPE) in _SECRET_TYPES
+        and str(config.get(CONF_TYPE, "")).lower() in _SECRET_TYPES
         and CONF_DISABLED_BY_DEFAULT not in config
     ):
         config = {**config, CONF_DISABLED_BY_DEFAULT: True}

@@ -17,6 +17,8 @@ void MatterTextSensor::setup() {
 
 void MatterTextSensor::update_() {
   const CommissioningState &s = MatterCommissioning::instance().state();
+  if (!s.valid)
+    return;
   std::string value;
   switch (this->type_) {
   case MatterTextSensorType::PAIRING_CODE:
