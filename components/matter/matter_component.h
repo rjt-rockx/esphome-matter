@@ -139,6 +139,10 @@ public:
   void defer_to_main_loop(std::function<void()> &&f) {
     this->defer(std::move(f));
   }
+  // Main loop only: runs `f` on the main loop after `delay_ms`.
+  void run_on_main_loop_after(uint32_t delay_ms, std::function<void()> &&f) {
+    this->set_timeout(delay_ms, std::move(f));
+  }
 
 private:
   // Defined in matter_endpoints.cpp

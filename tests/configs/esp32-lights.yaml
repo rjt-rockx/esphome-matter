@@ -2,7 +2,7 @@ esphome:
   name: matter-ci-lights
 
 esp32:
-  variant: ESP32C6
+  variant: ESP32S3
   framework:
     type: esp-idf
 
@@ -45,63 +45,79 @@ matter:
       extended_color_light:
         light_id: rgb_light
 
+# One output per channel, nothing shared between lights. The ESP32-S3 has 8 LEDC
+# channels, which the dimmable, color temperature and RGBWW lights use up. The
+# binary light uses a GPIO and the RGB light template outputs, so that no LEDC
+# channel is used twice.
 output:
+  - platform: gpio
+    id: output_binary
+    pin: GPIO10
   - platform: ledc
-    id: output_1
+    id: output_dimmable
     pin: GPIO1
   - platform: ledc
-    id: output_2
+    id: output_ct_cold
     pin: GPIO2
   - platform: ledc
-    id: output_3
-    pin: GPIO3
-  - platform: ledc
-    id: output_4
+    id: output_ct_warm
     pin: GPIO4
   - platform: ledc
-    id: output_5
+    id: output_rgbww_red
     pin: GPIO5
   - platform: ledc
-    id: output_6
+    id: output_rgbww_green
     pin: GPIO6
   - platform: ledc
-    id: output_7
+    id: output_rgbww_blue
     pin: GPIO7
   - platform: ledc
-    id: output_8
+    id: output_rgbww_cold
     pin: GPIO8
   - platform: ledc
-    id: output_9
+    id: output_rgbww_warm
     pin: GPIO9
-  - platform: ledc
-    id: output_10
-    pin: GPIO10
+  - platform: template
+    id: output_rgb_red
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: output_rgb_green
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: output_rgb_blue
+    type: float
+    write_action:
+      - lambda: ""
 
 light:
   - platform: binary
     id: binary_light
-    output: output_1
+    output: output_binary
   - platform: monochromatic
     id: dimmable_light
-    output: output_2
+    output: output_dimmable
   - platform: cwww
     id: ct_light
-    cold_white: output_3
-    warm_white: output_4
+    cold_white: output_ct_cold
+    warm_white: output_ct_warm
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
   - platform: rgbww
     id: rgbww_light
-    red: output_5
-    green: output_6
-    blue: output_7
-    cold_white: output_8
-    warm_white: output_9
+    red: output_rgbww_red
+    green: output_rgbww_green
+    blue: output_rgbww_blue
+    cold_white: output_rgbww_cold
+    warm_white: output_rgbww_warm
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 3000 K
     color_interlock: false
   - platform: rgb
     id: rgb_light
-    red: output_5
-    green: output_6
-    blue: output_10
+    red: output_rgb_red
+    green: output_rgb_green
+    blue: output_rgb_blue
