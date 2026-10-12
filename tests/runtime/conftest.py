@@ -126,7 +126,9 @@ class QemuDevice:
         out = subprocess.run([str(RUN_SH), "cmd", str(self.yaml)], env=env, capture_output=True, text=True)
         if out.returncode != 0:
             pytest.fail(f"run.sh cmd failed: {out.stderr}", pytrace=False)
-        cmd = shlex.split(out.stdout)
+        # Only the last line is the command; run.sh may print progress before it.
+        lines = [line for line in out.stdout.splitlines() if line.strip()]
+        cmd = shlex.split(lines[-1]) if lines else []
         self._log = open(self.log_path, "wb")
         t0 = time.monotonic()
         self.proc = subprocess.Popen(cmd, stdout=self._log, stderr=subprocess.STDOUT, start_new_session=True)
