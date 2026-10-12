@@ -145,6 +145,26 @@ TEST(lock_remote_operation_is_attributed_once) {
   CHECK(l.all_writes_in_scope);
 }
 
+TEST(lock_ignored_command_does_not_leak_its_origin) {
+  Rig r;
+  TestLock l(EP);  // locked
+  l.reaction = TestLock::Reaction::REFUSES;
+  l.initialize();
+  r.p.settle();
+  size_t before = l.writes.size();
+
+  l.remote(MatterLockOperation::UNLOCK, 3, 0xABCD);  // ignored by the lock: nothing is published
+  r.p.settle();
+  CHECK_EQ(l.commands.size(), (size_t) 1);
+  CHECK_EQ(l.writes.size(), before);
+
+  r.p.advance(20000);
+  l.entity_changed(LockEntityState::UNLOCKED);  // an unrelated, manual change much later
+  r.p.settle();
+  CHECK_EQ(l.writes.size(), before + 1);
+  CHECK(!l.writes.back().origin.valid);
+}
+
 TEST(lock_already_in_requested_state_is_acknowledged) {
   Rig r;
   TestLock l(EP);  // locked

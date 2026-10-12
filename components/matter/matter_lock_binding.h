@@ -97,8 +97,10 @@ protected:
 
   // Main loop: the entity's state callback.
   void on_entity_state_() {
-    if (this->entity_state_() == LockEntityState::TRANSITIONAL)
+    if (this->entity_state_() == LockEntityState::TRANSITIONAL) {
+      this->transitional_since_command_ = true;
       return;
+    }
     this->publish_();
   }
 
@@ -137,6 +139,15 @@ protected:
     p.announce = this->booted_;
     p.origin = this->pending_origin_;
     this->pending_origin_ = MatterLockOperationOrigin{};
+    // A command the lock ignored never publishes, so its origin would be
+    // attributed to the next, unrelated change (e.g. a keypad or ESPHome
+    // action). Keep the origin only while the lock reacted (went through a
+    // transitional state) or the publish follows the command closely.
+    if (p.origin.valid && !this->transitional_since_command_ &&
+        binding_platform() != nullptr &&
+        binding_platform()->now_ms() - this->pending_origin_ms_ >
+            ORIGIN_WINDOW_MS)
+      p.origin = MatterLockOperationOrigin{};
 
     // esp-matter creates DoorState as DoorOpen, which would be a false claim.
     // The boot publish (and any change of the jam state) updates it.
@@ -182,6 +193,9 @@ protected:
     ESP_LOGD("matter.lock", "Matter door lock operation on endpoint %u: %u",
              this->endpoint_id(), static_cast<unsigned>(req.operation));
     this->pending_origin_ = req.origin;
+    this->transitional_since_command_ = false;
+    if (binding_platform() != nullptr)
+      this->pending_origin_ms_ = binding_platform()->now_ms();
 
     // The lock may already be in the requested state, in which case it won't
     // publish anything. Report right away so the operation is acknowledged.
@@ -201,6 +215,9 @@ private:
   bool door_jammed_{false};
   // Origin of the pending remote operation.
   MatterLockOperationOrigin pending_origin_;
+  uint32_t pending_origin_ms_{0};
+  bool transitional_since_command_{false};
+  static constexpr uint32_t ORIGIN_WINDOW_MS = 5000;
   uint32_t seq_{0};
   MatterLockPush last_;
   // CHIP task writes, main loop reads.
