@@ -212,12 +212,7 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
 
 void MatterComponent::setup() {
   global_matter_component = this;
-#ifdef MATTER_PERSIST_PASSCODE
-  constexpr bool persist_passcode = true;
-#else
-  constexpr bool persist_passcode = false;
-#endif
-  if (!MatterCommissioning::instance().init(persist_passcode)) {
+  if (!MatterCommissioning::instance().init(MATTER_PERSIST_PASSCODE_MODE)) {
     this->mark_failed();
     return;
   }

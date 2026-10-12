@@ -36,7 +36,7 @@ Use "Share" / "Turn on pairing mode" in the first ecosystem to get a temporary c
 
 ### How do I factory reset the Matter part?
 
-Add a button with the `matter.factory_reset` action (see the README example config). It removes all fabrics and reopens the commissioning window after the reboot. The device shows a new setup code (see [commissioning](commissioning.md#passcode-storage)), unless `persist_passcode` or `passcode:` is set.
+Add a button with the `matter.factory_reset` action (see the README example config). It removes all fabrics and reopens the commissioning window after the reboot. The device shows a new setup code (see [commissioning](commissioning.md#passcode-storage)), unless `persist_passcode: true` or `passcode:` is set.
 
 ### How do I update the firmware?
 
