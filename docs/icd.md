@@ -12,7 +12,7 @@ It is **not** deep sleep. `deep_sleep:` reboots the chip on every wake: Thread r
 
 ```yaml
 esphome:
-  suspend_loop: true          # recommended; a warning is logged otherwise
+  loop_interval: 1s           # recommended; a warning is logged otherwise (`suspend_loop: true` is better on ESPHome versions that have it)
 esp32:
   variant: ESP32H2
   watchdog_timeout: 60s       # lets the main loop sleep up to 24 s (default 5s caps it at 2 s)
@@ -96,7 +96,7 @@ If the device is shared between several controllers (multi-admin), every one of 
 
 The goal is that the CPU is in light sleep almost all the time. These stop it, and the validator warns about most of them:
 
-* **The ESPHome main loop.** By default it wakes every 16 ms. `esphome: suspend_loop: true` removes the periodic loop wakeups, but the loop still wakes at least every `2 * watchdog_timeout / 5` (2 s with the default `esp32: watchdog_timeout: 5s`, 24 s at 60 s) and for every scheduler item such as a sensor `update_interval`.
+* **The ESPHome main loop.** By default it wakes every 16 ms. `esphome: loop_interval: 1s` (or, on ESPHome versions that have it, `suspend_loop: true`) reduces the periodic loop wakeups, but the loop still wakes at least every `2 * watchdog_timeout / 5` (2 s with the default `esp32: watchdog_timeout: 5s`, 24 s at 60 s) and for every scheduler item such as a sensor `update_interval`.
 * **`api:`.** The native API connection has keepalive traffic the sleepy device has to poll for. Leave it out of battery builds.
 * **`ota: platform: esphome`.** Does not work while `openthread: poll_period` is set. Use [Matter OTA](matter-ota.md). A running Matter OTA transfer keeps the device active (unverified).
 * **The logger.** The serial port, in particular USB-Serial-JTAG on the C6 and H2, keeps the chip awake. Use `logger: baud_rate: 0`.

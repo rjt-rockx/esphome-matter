@@ -1,7 +1,7 @@
 # EXPERIMENTAL, not verified on hardware: battery powered Thread sensor, Long Idle Time ICD (docs/icd.md).
 esphome:
   name: matter-ci-c6-icd
-  suspend_loop: true
+  loop_interval: 1s
 
 substitutions:
   esp32_variant: ESP32C6

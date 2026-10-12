@@ -28,7 +28,7 @@ openthread:
 BASE = """
 esphome:
   name: matter-icd-unit
-  suspend_loop: true
+  loop_interval: 1s
 
 esp32:
   variant: ESP32H2
@@ -390,18 +390,18 @@ def test_warns_deep_sleep(run_icd):
 
 
 def test_warns_loop_and_watchdog_and_logger(run_icd):
-    base = BASE.replace("  suspend_loop: true\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
+    base = BASE.replace("  loop_interval: 1s\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
         "  baud_rate: 0\n", ""
     )
     result = run_icd("matter:\n  icd: {}\n", base=base)
     assert result.ok, result.output[-2000:]
-    assert "suspend_loop: true" in result.output
+    assert "loop_interval" in result.output
     assert "watchdog_timeout" in result.output
     assert "baud_rate: 0" in result.output
 
 
 def test_light_sleep_off_skips_light_sleep_warnings(run_icd):
-    base = BASE.replace("  suspend_loop: true\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
+    base = BASE.replace("  loop_interval: 1s\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
         "  baud_rate: 0\n", ""
     )
     result = run_icd("matter:\n  icd:\n    light_sleep: false\n", base=base)

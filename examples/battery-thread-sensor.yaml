@@ -6,7 +6,7 @@
 # How it saves power:
 #  * `matter: icd:` makes the device a Thread sleepy end device. The ICD manager owns the poll period and the
 #    CPU light-sleeps between polls.
-#  * `suspend_loop`, a 60 s watchdog and a silent logger let the ESPHome main loop sleep instead of waking every
+#  * `loop_interval: 1s`, a 60 s watchdog and a silent logger let the ESPHome main loop sleep instead of waking every
 #    16 ms. There is no `api:` and no `ota: platform: esphome`: both keep the radio busy. Update over Matter OTA.
 #  * The sensor does not poll on its own (`update_interval: never`). It is read when the ICD enters active mode
 #    (`on_active`), which happens at least every `idle_interval`, so each reading rides along with the keepalive
@@ -15,7 +15,7 @@
 esphome:
   name: battery-sensor
   friendly_name: Battery Sensor
-  suspend_loop: true
+  loop_interval: 1s
 
 esp32:
   variant: ESP32H2

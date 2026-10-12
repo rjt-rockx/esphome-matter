@@ -1,7 +1,7 @@
 # EXPERIMENTAL, not verified on hardware: battery powered Thread sensor, Short Idle Time ICD (docs/icd.md).
 esphome:
   name: matter-ci-h2-icd
-  suspend_loop: true
+  loop_interval: 1s
 
 substitutions:
   esp32_variant: ESP32H2

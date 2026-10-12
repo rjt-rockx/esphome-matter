@@ -84,3 +84,6 @@ tests/configs/secrets.yaml
 /examples/secrets.yaml
 /examples/.esphome/
 /examples/ci_tmp_*.yaml
+/examples/**/secrets.yaml
+/examples/**/.esphome/
+/examples/**/ci_tmp_*.yaml

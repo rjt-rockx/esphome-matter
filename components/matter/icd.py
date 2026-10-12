@@ -411,14 +411,14 @@ def _warn_light_sleep(full_config) -> None:
     from esphome.const import CONF_WATCHDOG_TIMEOUT
 
     esphome_cfg = full_config.get("esphome", {})
-    suspend = esphome_cfg.get("suspend_loop", False)
+    suspend = esphome_cfg.get("suspend_loop", False)  # only on newer ESPHome
     loop_interval = esphome_cfg.get("loop_interval")
     if not suspend and (
         loop_interval is None or loop_interval.total_milliseconds < 1000
     ):
         _LOGGER.warning(
             "matter icd: the ESPHome main loop wakes every 16 ms by default, which keeps the chip out of "
-            "light sleep. Set `esphome: suspend_loop: true` (or a `loop_interval` of 1s or more)"
+            "light sleep. Set `esphome: loop_interval: 1s` (or longer; `suspend_loop: true` on ESPHome versions that have it)"
         )
     esp32 = full_config.get("esp32", {})
     wdt = esp32.get(CONF_WATCHDOG_TIMEOUT)
