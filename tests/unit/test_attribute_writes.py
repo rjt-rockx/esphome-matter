@@ -96,23 +96,52 @@ def test_identify_effect_values_in_docs():
     assert "255 stop effect" in doc
 
 
+GUARD_DECL_RE = re.compile(r"\bMatterPushGuard\s+\w+\s*(?:[;({=]|$)|\bMatterPushGuard\s*[({]")
+
+
+def _strip_comments_and_strings(text: str) -> str:
+    text = re.sub(r"//[^\n]*", "", text)
+    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    return re.sub(r'"(?:\\.|[^"\\\n])*"', '""', text)
+
+
+def _unguarded_write_sites(text: str) -> list[int]:
+    """Line numbers of attribute::report/update calls with no MatterPushGuard declared earlier
+    in the same or an enclosing `{}` block."""
+    stack: list[bool] = [False]  # per open block: a guard was declared in it
+    offenders = []
+    for number, line in enumerate(_strip_comments_and_strings(text).splitlines(), 1):
+        # Walk the line so a guard declared before a call on the same line counts.
+        position = 0
+        for match in re.finditer(r"[{}]|MatterPushGuard\b[^;{}]*|esp_matter::attribute::(?:report|update)\(", line):
+            token = match.group(0)
+            if token == "{":
+                stack.append(False)
+            elif token == "}":
+                if len(stack) > 1:
+                    stack.pop()
+            elif token.startswith("MatterPushGuard"):
+                if GUARD_DECL_RE.match(token):
+                    stack[-1] = True
+            elif not any(stack):
+                offenders.append(number)
+            position = match.end()
+    return offenders
+
+
 def test_every_mirrored_write_site_is_preceded_by_a_push_guard():
-    """Per call site, not per file: a MatterPushGuard must appear between the start of the
-    enclosing top-level function (a column-0 line ending in `{`, or an indented member
-    function of a header class) and each attribute::report/update call."""
+    """Per call site: an actual `MatterPushGuard name;` declaration must precede each
+    attribute::report/update call in the same or an enclosing block (comments don't count)."""
     offenders = []
     for path in _sources():
         if path.name in UNGUARDED_ALLOWED:
             continue
-        lines = path.read_text().splitlines()
-        start = 0
-        for number, line in enumerate(lines):
-            if line and not line[0].isspace() and line.rstrip().endswith("{"):
-                start = number
-            if ANY_WRITE_RE.search(line) and not line.lstrip().startswith("//"):
-                lo = max(start, 0)
-                if path.suffix == ".h":
-                    lo = max(0, number - 80)
-                if not any("MatterPushGuard" in prev for prev in lines[lo:number]):
-                    offenders.append(f"{path.name}:{number + 1}")
+        offenders += [f"{path.name}:{n}" for n in _unguarded_write_sites(path.read_text())]
     assert not offenders, f"attribute::report/update without a MatterPushGuard in scope: {offenders}"
+
+
+def test_guard_check_rejects_comments_and_other_blocks():
+    call = "esp_matter::attribute::report(a, b, c, &v);"
+    assert _unguarded_write_sites(f"void f() {{\n// MatterPushGuard g;\n{call}\n}}") == [3]
+    assert _unguarded_write_sites(f"void f() {{\n{{ MatterPushGuard g; }}\n{call}\n}}") == [3]
+    assert _unguarded_write_sites(f"void f() {{\nMatterPushGuard g;\nif (x) {{\n{call}\n}}\n}}") == []

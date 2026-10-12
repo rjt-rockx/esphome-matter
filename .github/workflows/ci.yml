@@ -301,6 +301,7 @@ jobs:
           - s3-wifi
           - c3-wifi
           - c6-closure
+          - c6-light-bindings
           - c6-power-source
         include:
           # Extra properties per slug (matched on `slug`, applied to every ESPHome version).
@@ -309,6 +310,7 @@ jobs:
           - { slug: h2-thread, name: H2 thread, variant: ESP32H2, config: tests/configs/esp32-thread.yaml }
           - { slug: s3-wifi, name: S3 wifi, variant: ESP32S3, config: tests/configs/esp32-wifi.yaml }
           - { slug: c6-power-source, name: C6 power source, variant: ESP32C6, config: tests/configs/esp32-power-source.yaml }
+          - { slug: c6-light-bindings, name: C6 light bindings, variant: ESP32C6, config: tests/configs/esp32-light-bindings.yaml }
           - { slug: c6-closure, name: C6 closure, variant: ESP32C6, config: tests/configs/esp32-closure.yaml }
           - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
     steps:
