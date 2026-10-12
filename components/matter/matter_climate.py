@@ -46,15 +46,15 @@ def validate_climate_features(config: dict) -> dict:
     return config
 
 
-def prefer_cooling(device_type_name: str) -> str:
-    return "true" if CLIMATE_DEVICE_TYPES[device_type_name] else "false"
+def prefer_cooling(device_type_name: str) -> bool:
+    return CLIMATE_DEVICE_TYPES[device_type_name]
 
 
 def config_lines(config_var: str, climate_var, device_type_name: str) -> list[str]:
     """Lines run before esp_matter::endpoint::<type>::add()."""
     return [
         f"esphome::matter::configure_climate_thermostat({config_var}.thermostat, "
-        f"{climate_var}, {prefer_cooling(device_type_name)});"
+        f"{climate_var}, {str(prefer_cooling(device_type_name)).lower()});"
     ]
 
 
@@ -62,6 +62,6 @@ def post_create_lines(climate_var, device_type_name: str) -> list[str]:
     """Lines run after the device type has been added to the endpoint."""
     return [
         f"if (!esphome::matter::extend_climate_thermostat(endpoint, {climate_var}, "
-        f"{prefer_cooling(device_type_name)}))",
+        f"{str(prefer_cooling(device_type_name)).lower()}))",
         "  return false;",
     ]

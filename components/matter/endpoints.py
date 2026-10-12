@@ -32,6 +32,7 @@ from .matter_climate import (
     CONF_CLIMATE_ID,
     config_lines as climate_config_lines,
     post_create_lines as climate_post_create_lines,
+    prefer_cooling as climate_prefer_cooling,
 )
 from .lock_valve import device_config_lines, register_entity
 from .types import MatterAttributeTrigger, MatterEndpointRef
@@ -286,8 +287,13 @@ class Endpoint:
             climate_ = await cg.get_variable(device_config[CONF_CLIMATE_ID])
             self._climate_variables[device_type.name] = climate_
             self.global_includes.add(CLIMATE_INCLUDE)
-            prefer_cooling = device_type.name == "room_air_conditioner"
-            cg.add(var.register_climate(climate_, self._endpoint_id, prefer_cooling))
+            cg.add(
+                var.register_climate(
+                    climate_,
+                    self._endpoint_id,
+                    climate_prefer_cooling(device_type.name),
+                )
+            )
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):

@@ -46,6 +46,10 @@ int16_t to_centi(float celsius) {
   return static_cast<int16_t>(std::clamp(scaled, -27315.0f, 32767.0f));
 }
 
+bool same_centi(float celsius, int16_t centi) {
+  return std::isfinite(celsius) && to_centi(celsius) == centi;
+}
+
 // ESPHome modes are mapped by name. HEAT_COOL and AUTO both become Matter Auto.
 bool to_system_mode(ClimateMode mode, uint8_t &system_mode) {
   switch (mode) {
@@ -121,6 +125,14 @@ uint16_t to_running_state(climate::ClimateAction action) {
 
 } // namespace
 
+int16_t MatterClimateSpec::clamp_heating(int16_t centi) const {
+  return std::clamp(centi, this->heat_min, this->heat_max);
+}
+
+int16_t MatterClimateSpec::clamp_cooling(int16_t centi) const {
+  return std::clamp(centi, this->cool_min, this->cool_max);
+}
+
 MatterClimateSpec derive_climate_spec(climate::Climate *climate,
                                       bool prefer_cooling) {
   auto traits = climate->get_traits();
@@ -147,8 +159,17 @@ MatterClimateSpec derive_climate_spec(climate::Climate *climate,
       spec.heating && spec.cooling
           ? SEQUENCE_COOLING_AND_HEATING
           : (spec.cooling ? SEQUENCE_COOLING_ONLY : SEQUENCE_HEATING_ONLY);
-  spec.min_centi = to_centi(traits.get_visual_min_temperature());
-  spec.max_centi = to_centi(traits.get_visual_max_temperature());
+  int16_t min_centi = to_centi(traits.get_visual_min_temperature());
+  int16_t max_centi = to_centi(traits.get_visual_max_temperature());
+  spec.heat_min = spec.cool_min = min_centi;
+  spec.heat_max = spec.cool_max = max_centi;
+  if (spec.auto_mode) {
+    int range_dc = (max_centi - min_centi) / 10;
+    spec.dead_band = static_cast<int8_t>(
+        std::clamp(std::min(DEFAULT_DEAD_BAND, range_dc / 2), 0, 127));
+    spec.heat_max = static_cast<int16_t>(max_centi - spec.dead_band * 10);
+    spec.cool_min = static_cast<int16_t>(min_centi + spec.dead_band * 10);
+  }
   return spec;
 }
 
@@ -177,24 +198,27 @@ void configure_climate_thermostat(
     low = climate->target_temperature_low;
     high = climate->target_temperature_high;
   }
-  auto clamp_centi = [&](float value, int16_t fallback) {
-    int16_t centi = std::isfinite(value) ? to_centi(value) : fallback;
-    return std::clamp(centi, spec.min_centi, spec.max_centi);
-  };
-  config.features.heating.occupied_heating_setpoint = clamp_centi(low, 2000);
-  config.features.heating.unoccupied_heating_setpoint =
-      config.features.heating.occupied_heating_setpoint;
-  config.features.cooling.occupied_cooling_setpoint = clamp_centi(high, 2600);
-  config.features.cooling.unoccupied_cooling_setpoint =
-      config.features.cooling.occupied_cooling_setpoint;
-  int range_dc = (spec.max_centi - spec.min_centi) / 10;
-  config.features.auto_mode.min_setpoint_dead_band = static_cast<int8_t>(
-      std::clamp(std::min(DEFAULT_DEAD_BAND, range_dc / 2), 0, 127));
+  int16_t heating =
+      spec.clamp_heating(std::isfinite(low) ? to_centi(low) : 2000);
+  int16_t cooling =
+      spec.clamp_cooling(std::isfinite(high) ? to_centi(high) : 2600);
+  // A single point climate has one target for both; keep the dead band anyway.
+  if (spec.auto_mode)
+    cooling = spec.clamp_cooling(std::max<int16_t>(
+        cooling, static_cast<int16_t>(heating + spec.dead_band * 10)));
+  config.features.heating.occupied_heating_setpoint = heating;
+  config.features.heating.unoccupied_heating_setpoint = heating;
+  config.features.cooling.occupied_cooling_setpoint = cooling;
+  config.features.cooling.unoccupied_cooling_setpoint = cooling;
+  config.features.auto_mode.min_setpoint_dead_band = spec.dead_band;
 }
 
 // Creates the attributes esp-matter does not create on its own: the absolute
-// and user setpoint limits (taken from the climate's visual min/max) and
-// ThermostatRunningState (only if the climate reports actions).
+// setpoint limits (from the climate's visual min/max) and ThermostatRunningState
+// (only if the climate reports actions). The user limits (Min/Max*SetpointLimit)
+// are left out: they default to the absolute ones, and esp-matter makes them
+// writable and persistent, so a stale stored value would outlive a changed
+// visual range.
 bool extend_climate_thermostat(esp_matter::endpoint_t *endpoint,
                                climate::Climate *climate,
                                bool prefer_cooling) {
@@ -205,23 +229,15 @@ bool extend_climate_thermostat(esp_matter::endpoint_t *endpoint,
   auto spec = derive_climate_spec(climate, prefer_cooling);
   if (spec.heating) {
     thermostat::attribute::create_abs_min_heat_setpoint_limit(cluster,
-                                                              spec.min_centi);
+                                                              spec.heat_min);
     thermostat::attribute::create_abs_max_heat_setpoint_limit(cluster,
-                                                              spec.max_centi);
-    thermostat::attribute::create_min_heat_setpoint_limit(cluster,
-                                                          spec.min_centi);
-    thermostat::attribute::create_max_heat_setpoint_limit(cluster,
-                                                          spec.max_centi);
+                                                              spec.heat_max);
   }
   if (spec.cooling) {
     thermostat::attribute::create_abs_min_cool_setpoint_limit(cluster,
-                                                              spec.min_centi);
+                                                              spec.cool_min);
     thermostat::attribute::create_abs_max_cool_setpoint_limit(cluster,
-                                                              spec.max_centi);
-    thermostat::attribute::create_min_cool_setpoint_limit(cluster,
-                                                          spec.min_centi);
-    thermostat::attribute::create_max_cool_setpoint_limit(cluster,
-                                                          spec.max_centi);
+                                                              spec.cool_max);
   }
   if (spec.has_action)
     thermostat::attribute::create_thermostat_running_state(cluster, 0);
@@ -257,6 +273,8 @@ void MatterClimateMapping::initialize() {
       this->endpoint_id(), Thermostat::Id,
       Thermostat::Attributes::SystemMode::Id,
       [this](const esp_matter_attr_val_t &value) {
+        if (this->pushing_)
+          return;
         uint8_t mode = value.val.u8;
         global_matter_component->defer_to_main_loop(
             [this, mode]() { this->apply_system_mode_(mode); });
@@ -266,6 +284,8 @@ void MatterClimateMapping::initialize() {
         this->endpoint_id(), Thermostat::Id,
         Thermostat::Attributes::OccupiedHeatingSetpoint::Id,
         [this](const esp_matter_attr_val_t &value) {
+          if (this->pushing_)
+            return;
           int16_t centi = value.val.i16;
           global_matter_component->defer_to_main_loop(
               [this, centi]() { this->apply_setpoint_(true, centi); });
@@ -276,6 +296,8 @@ void MatterClimateMapping::initialize() {
         this->endpoint_id(), Thermostat::Id,
         Thermostat::Attributes::OccupiedCoolingSetpoint::Id,
         [this](const esp_matter_attr_val_t &value) {
+          if (this->pushing_)
+            return;
           int16_t centi = value.val.i16;
           global_matter_component->defer_to_main_loop(
               [this, centi]() { this->apply_setpoint_(false, centi); });
@@ -318,6 +340,8 @@ void MatterClimateMapping::push_state_to_matter() {
 
   // Which setpoints to write. For single point climates only the setpoint
   // belonging to the active mode follows the target; the other is untouched.
+  // Values are clamped to the absolute limits: the Thermostat cluster rejects
+  // reports outside them (and, with AutoMode, inside the dead band margins).
   bool write_heating = false;
   bool write_cooling = false;
   int16_t heating = 0;
@@ -353,15 +377,19 @@ void MatterClimateMapping::push_state_to_matter() {
     }
   }
 
+  heating = this->spec_.clamp_heating(heating);
+  cooling = this->spec_.clamp_cooling(cooling);
+
   bool has_running_state = this->has_running_state_;
   uint16_t running_state = to_running_state(climate->action);
   bool has_on_off = this->has_on_off_;
   bool on = climate->mode != climate::CLIMATE_MODE_OFF;
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
-      [eid, system_mode, local_temperature, write_heating, write_cooling,
+      [this, eid, system_mode, local_temperature, write_heating, write_cooling,
        heating, cooling, has_running_state, running_state, has_on_off, on]() {
         using namespace chip::app::Clusters;
+        this->pushing_ = true;
         auto mode_val = esp_matter_enum8(system_mode);
         esp_matter::attribute::report(
             eid, Thermostat::Id, Thermostat::Attributes::SystemMode::Id,
@@ -393,6 +421,7 @@ void MatterClimateMapping::push_state_to_matter() {
           esp_matter::attribute::report(eid, OnOff::Id,
                                         OnOff::Attributes::OnOff::Id, &val);
         }
+        this->pushing_ = false;
       });
 }
 
@@ -407,7 +436,9 @@ void MatterClimateMapping::apply_system_mode_(uint8_t system_mode) {
     this->push_state_to_matter();
     return;
   }
-  if (this->climate_->mode == mode)
+  // Also stops the echo of our own report from turning AUTO into HEAT_COOL.
+  uint8_t current = 0;
+  if (to_system_mode(this->climate_->mode, current) && current == system_mode)
     return;
   auto call = this->climate_->make_call();
   call.set_mode(mode);
@@ -419,9 +450,9 @@ void MatterClimateMapping::apply_setpoint_(bool heating, int16_t centi) {
   float target = static_cast<float>(centi) / 100.0f;
   auto call = climate->make_call();
   if (this->spec_.two_point) {
-    float current = heating ? climate->target_temperature_low
-                            : climate->target_temperature_high;
-    if (std::fabs(current - target) < 0.005f)
+    if (same_centi(heating ? climate->target_temperature_low
+                           : climate->target_temperature_high,
+                   centi))
       return;
     if (heating)
       call.set_target_temperature_low(target);
@@ -452,7 +483,7 @@ void MatterClimateMapping::apply_setpoint_(bool heating, int16_t centi) {
       this->push_state_to_matter();
       return;
     }
-    if (std::fabs(climate->target_temperature - target) < 0.005f)
+    if (same_centi(climate->target_temperature, centi))
       return;
     call.set_target_temperature(target);
   }

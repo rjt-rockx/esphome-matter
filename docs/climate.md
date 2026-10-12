@@ -31,7 +31,7 @@ Do not configure `Heating`, `Cooling` or `AutoMode` in `features` when `climate_
 | `COOL` mode | Cooling feature |
 | `HEAT_COOL` or `AUTO` mode, or two-point target temperature | Heating and Cooling features, plus AutoMode if `HEAT_COOL` or `AUTO` is supported |
 | Heating only / cooling only / both | ControlSequenceOfOperation HeatingOnly / CoolingOnly / CoolingAndHeating |
-| `visual` min/max temperature | Abs, Min and Max setpoint limits |
+| `visual` min/max temperature | AbsMin/AbsMax heat and cool setpoint limits |
 | Action support | ThermostatRunningState attribute |
 
 If a climate supports neither heating nor cooling, a thermostat exposes Heating and a room air conditioner exposes Cooling (Matter requires at least one).
@@ -48,12 +48,14 @@ Without `climate_id` you can still select features by hand, for example `feature
 | `target_temperature_low` / `_high` (two point) | OccupiedHeatingSetpoint / OccupiedCoolingSetpoint |
 | `current_temperature` | LocalTemperature (0.01 C, null when unknown) |
 | action `HEATING`, `COOLING` (and `DRYING`), `FAN` | ThermostatRunningState Heat, Cool, Fan bits |
-| `visual` min / max | Abs/Min/Max Heat and Cool setpoint limits |
-| (none) | MinSetpointDeadBand: 2.0 C (AutoMode only) |
+| `visual` min / max | AbsMin/AbsMax Heat and Cool setpoint limits (see below) |
+| (none) | MinSetpointDeadBand: 2.0 C, less for a very narrow visual range (AutoMode only) |
+
+The user limits (MinHeat/MaxHeat/MinCool/MaxCool) are not created; they default to the absolute limits. With AutoMode the Thermostat cluster requires the cooling setpoint to stay at least the dead band above the heating setpoint, so AbsMaxHeatSetpointLimit is the visual maximum minus the dead band and AbsMinCoolSetpointLimit is the visual minimum plus the dead band. The setpoints reported from ESPHome are clamped to these limits, because the cluster rejects values outside them. A `visual` range that is wide enough for the dead band is therefore needed for a `HEAT_COOL` or `AUTO` climate.
 
 Modes are mapped by name. Note that ClimateAction `FAN` (6) and ClimateMode `FAN_ONLY` (4) have different values.
 
-Matter requests are checked against the climate traits before a `ClimateCall` is made, because ESPHome silently drops unsupported values. A rejected request is logged and the Matter attribute is set back to the climate state. This applies to:
+Matter requests are checked against the climate traits before a `ClimateCall` is made, because ESPHome silently drops unsupported values. A rejected request is logged and the climate is left unchanged; an unsupported SystemMode is also set back to the climate mode. This applies to:
 
 - SystemModes the climate does not support, and EmergencyHeat, Precooling and Sleep, which have no ESPHome equivalent.
 - Writes to the setpoint that is not active for a single-point climate (for example the cooling setpoint while in `HEAT` mode). In `HEAT_COOL` and `AUTO` mode a single-point target is not adjustable.
@@ -62,14 +64,10 @@ For a room air conditioner the OnOff cluster follows the climate mode: off sets 
 
 ## SetpointRaiseLower
 
-The command is part of the Thermostat cluster and is handled by the Matter stack, which writes the setpoint attributes. These writes are expected to reach the binding like any other attribute write, but this has not been verified on hardware.
+The command is part of the Thermostat cluster and is handled by the Matter stack, which writes the setpoint attributes through the same path as a controller write, so the writes reach the binding like any other attribute write (read from the esp-matter and connectedhomeip sources, not verified on hardware). In AutoMode the stack also moves the other setpoint to keep the dead band; the binding sees that as a second write.
 
 ## Not supported yet
 
 - Fan modes (FanControl on the room air conditioner), swing modes, humidity, presets and schedules.
 - ThermostatRunningState when the climate does not report actions.
 - Apple Home behaviour is untested. Apple does not publish its Thermostat requirements.
-
-Some controllers expect the heating setpoint to stay below the cooling setpoint (by the dead band in AutoMode). Use a sensible `visual` range and defaults.
-
-The feature-selection approach was informed by the esp-matter thermostat requirements; the fork github.com/eth2353/esphome-matter was checked for prior art and has no thermostat or climate support.
