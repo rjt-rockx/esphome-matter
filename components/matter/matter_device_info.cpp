@@ -5,11 +5,16 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include <esp_mac.h>
 #include <sdkconfig.h>
 
 #include <esp_matter_providers.h>
+#include <app/persistence/AttributePersistenceProviderInstance.h>
+#include <app/persistence/DefaultAttributePersistenceProvider.h>
+#include <app/server/Server.h>
+#include <clusters/BasicInformation/Ids.h>
 #include <platform/CHIPDeviceLayer.h>
 #include <platform/ConfigurationManager.h>
 #include <platform/ESP32/ConfigurationManagerImpl.h>
@@ -68,16 +73,81 @@ EsphomeDeviceInstanceInfoProvider *s_provider = nullptr;
 
 #endif  // CONFIG_CUSTOM_DEVICE_INSTANCE_INFO_PROVIDER
 
+// esp-matter 1.6 implements Basic Information with CHIP's code-driven BasicInformationCluster. It keeps NodeLabel only
+// in the AttributePersistenceProvider (key = endpoint 0 / cluster 0x28 / attribute 0x05, a length prefixed string) and
+// ignores the esp-matter attribute store, so basic_information.node_label in the node config never reaches a controller.
+// This provider wraps the stock persistence provider and answers reads of a NodeLabel that has never been written with
+// the configured default. Writes (from a controller) go straight to storage and win from then on; a factory reset
+// erases them and the default comes back. Nothing is ever written on the controller's behalf.
+class NodeLabelDefaultPersistence : public chip::app::AttributePersistenceProvider {
+ public:
+  void set_default(const std::string &label) { this->default_ = label; }
+
+  CHIP_ERROR WriteValue(const chip::app::ConcreteAttributePath &path, const chip::ByteSpan &value) override {
+    ReturnErrorOnFailure(this->ensure_init_());
+    return this->inner_.WriteValue(path, value);
+  }
+
+  CHIP_ERROR ReadValue(const chip::app::ConcreteAttributePath &path, chip::MutableByteSpan &value) override {
+    ReturnErrorOnFailure(this->ensure_init_());
+    CHIP_ERROR err = this->inner_.ReadValue(path, value);
+    // Any failure other than a too-small buffer means "nothing usable stored yet" (the stock KVS reports
+    // CHIP_ERROR_PERSISTED_STORAGE_VALUE_NOT_FOUND), so the default is served.
+    if (err == CHIP_NO_ERROR || err == CHIP_ERROR_BUFFER_TOO_SMALL || !this->is_node_label_(path) ||
+        this->default_.empty())
+      return err;
+    // Pascal string as stored by CHIP: one length byte followed by the characters.
+    size_t len = this->default_.size();
+    VerifyOrReturnError(value.size() >= len + 1, CHIP_ERROR_BUFFER_TOO_SMALL);
+    value.data()[0] = static_cast<uint8_t>(len);
+    memcpy(value.data() + 1, this->default_.data(), len);
+    value.reduce_size(len + 1);
+    return CHIP_NO_ERROR;
+  }
+
+ protected:
+  static bool is_node_label_(const chip::app::ConcreteAttributePath &path) {
+    return path.mEndpointId == chip::kRootEndpointId &&
+           path.mClusterId == chip::app::Clusters::BasicInformation::Id &&
+           path.mAttributeId == chip::app::Clusters::BasicInformation::Attributes::NodeLabel::Id;
+  }
+
+  // The persistent storage only exists once the CHIP server is initialised, which is before the first read/write.
+  CHIP_ERROR ensure_init_() {
+    if (this->inited_)
+      return CHIP_NO_ERROR;
+    ReturnErrorOnFailure(this->inner_.Init(&chip::Server::GetInstance().GetPersistentStorage()));
+    this->inited_ = true;
+    return CHIP_NO_ERROR;
+  }
+
+  chip::app::DefaultAttributePersistenceProvider inner_;
+  std::string default_;
+  bool inited_{false};
+};
+
+NodeLabelDefaultPersistence s_node_label_persistence;
+
 }  // namespace
 
 void device_info_fill_root_config(const DeviceInfoConfig &cfg, ::esp_matter::node::config_t &node_config) {
   auto &bi = node_config.root_node.basic_information;
+  // Only seeds the esp-matter attribute store (and creates the attribute); see NodeLabelDefaultPersistence for the
+  // value controllers actually read.
   snprintf(bi.node_label, sizeof(bi.node_label), "%s", cfg.node_label.c_str());
   if (!cfg.unique_id.empty())
     snprintf(bi.unique_id, sizeof(bi.unique_id), "%s", cfg.unique_id.c_str());
 }
 
 void device_info_install_provider(const DeviceInfoConfig &cfg) {
+  // Must be installed before esp_matter::start(): the data model provider only installs its own persistence provider
+  // when none is set, and BasicInformation loads NodeLabel from it while the server starts.
+  if (chip::app::GetAttributePersistenceProvider() == nullptr) {
+    s_node_label_persistence.set_default(cfg.node_label.substr(0, 32));
+    chip::app::SetAttributePersistenceProvider(&s_node_label_persistence);
+  } else {
+    ESP_LOGW(TAG, "an attribute persistence provider is already installed; node_label default is not applied");
+  }
 #if CONFIG_CUSTOM_DEVICE_INSTANCE_INFO_PROVIDER
   // The provider is only *registered* by esp-matter inside esp_matter::start() -> setup_providers(), after the CHIP
   // stack (and therefore ConfigurationManagerImpl) is initialised. Constructing it here only stores references.

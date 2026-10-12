@@ -8,7 +8,7 @@ Check these in order:
 
 1. **Window closed.** The commissioning window is open for 15 minutes after boot, and only if the device has not joined any fabric. Restart the device to reopen it. If the device already belongs to a fabric, the window is not opened on restart; use "Share" in the owning ecosystem to get a temporary code (see [ecosystems.md](ecosystems.md#multi-admin-sharing-a-device-with-more-than-one-ecosystem)). A report of the window staying closed after reboot and reinstall exists upstream ([issue #61](https://github.com/DavidvtWout/esphome-matter/issues/61)); a Matter factory reset (`matter.factory_reset`) reopens it.
 2. **Certificate rejection.** Home Assistant (matterjs-server) refuses test credentials unless test-net DCL is enabled. Google Home needs a developer console project. Apple needs "Add Anyway".
-3. **Use the log.** `dump_config` prints the QR code, QR URL, manual pairing code, the state of the commissioning window and the number of fabrics on every boot. The setup code is a secret: do not paste it in public reports.
+3. **Use the log.** The log prints the QR code, QR URL and manual pairing code whenever a commissioning window is open (also from `dump_config`), plus the state of the window and the number of fabrics on every boot. The setup code is a secret: do not paste it in public reports.
 4. **Network.** The controller must reach the device over IPv6 (see below).
 
 ## IPv6, mDNS and networking
@@ -76,8 +76,8 @@ Matter-over-Thread requires the `openthread` component, ESPHome 2026.6.0 or newe
 
 ## Setup code and reset
 
-- The setup QR code is stored in flash and survives OTA updates. You can re-commission with the original code.
-- `matter.factory_reset` wipes fabrics and reopens the commissioning window. It does not change the setup passcode or discriminator.
+- By default only the SPAKE2+ verifier is stored in flash, not the passcode. The setup code is shown in the log while a commissioning window is open. See [commissioning](commissioning.md#passcode-storage).
+- `matter.factory_reset` wipes fabrics and reopens the commissioning window. The discriminator is kept, and the passcode is new unless `persist_passcode` or `passcode:` is set. `matter.reset_identity` also creates a new discriminator.
 - Fabric data is stored in flash (NVS) and survives OTA updates.
 
 ## Other known issues

@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <atomic>
 #include <functional>
 #include <string>
 #include <vector>
@@ -17,6 +18,9 @@ namespace esphome::matter {
 // Snapshot of the commissioning state. Only read and written on the ESPHome
 // main loop: the CHIP task builds a new snapshot and defers it.
 struct CommissioningState {
+  // False until the CHIP task published the first snapshot, so listeners do not
+  // report "uncommissioned" for a few seconds after every reboot.
+  bool valid{false};
   bool window_open{false};
   uint8_t fabric_count{0};
   // Both are empty unless a commissioning window is open AND the passcode is
@@ -43,11 +47,12 @@ public:
 
   // Any thread. Opens a commissioning window protected by a fresh random
   // one-time passcode. If the device is not commissioned yet, the basic window
-  // is re-opened with a fresh passcode instead.
+  // is re-opened instead (with a fresh passcode if the current one is unknown).
   void open_window(uint32_t timeout_s);
 
   // Main loop. Removes all fabrics plus esp-matter and CHIP persistent data,
-  // then reboots. The commissioning identity (verifier, discriminator) is kept.
+  // then reboots. The commissioning identity (salt, verifier, discriminator) is
+  // kept; without a known passcode the next boot derives a fresh one.
   void factory_reset();
   // Like factory_reset() but also erases the commissioning identity, so a new
   // passcode and discriminator are generated on the next boot.
@@ -90,11 +95,14 @@ protected:
   bool build_codes_(uint32_t passcode, uint16_t discriminator, bool ecm,
                     std::string &qr, std::string &manual) const;
   void erase_identity_keys_();
-  void reboot_after_reset_();
 
   Identity identity_;
   bool persist_passcode_{false};
   bool fixed_passcode_{false};
+  // Set (main loop) once a factory reset was requested. The CHIP task then
+  // leaves the identity alone: the fabric removal events of the reset must not
+  // regenerate or re-store what reset_identity() just erased.
+  std::atomic<bool> resetting_{false};
 
   // One-time passcode of a window opened by open_window().
   bool ephemeral_active_{false};
