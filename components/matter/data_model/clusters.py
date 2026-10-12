@@ -9,6 +9,14 @@ from .attributes import Attribute
 _LOGGER = logging.getLogger(__name__)
 
 
+# Feature names whose esp_matter namespace is not the snake_case of the spec name.
+_FEATURE_NAMESPACE_OVERRIDES = {
+    "Unbolt": "unbolting",
+    "WeekDayAccessSchedules": "weekday_access_schedules",
+    "CredentialsOverTheAirAccess": "credential_over_the_air_access",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class Feature:
     code: str
@@ -25,6 +33,8 @@ class Feature:
         """Feature name in esp_matter::cluster::<cluster>::feature::<feature> namespace."""
         # "Hue And Saturation" is esp_matter's "hue_saturation"; other names
         # contain spaces ("CO Alarm").
+        if self.name in _FEATURE_NAMESPACE_OVERRIDES:
+            return _FEATURE_NAMESPACE_OVERRIDES[self.name]
         name = snake_case(self.name.replace(" And ", "").replace(" ", ""))
         # "auto" is a C++ keyword; esp_matter calls the Fan Control feature "fan_auto".
         return "fan_auto" if name == "auto" else name

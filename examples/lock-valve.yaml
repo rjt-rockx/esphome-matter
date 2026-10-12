@@ -33,7 +33,8 @@ matter:
     2:
       water_valve:
         valve_id: garden_valve
-        # Allows controllers to open the valve to a specific level.
+        # Adds CurrentLevel and TargetLevel. Levels below 100 only have an effect on
+        # valves that support position; this template valve is simply opened.
         features:
           - Level
 
