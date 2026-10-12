@@ -393,15 +393,7 @@ matter.send_event:
 
 > This cluster is not supported by esp-matter.
 
-# OvenMode
-
-> This cluster is not supported by esp-matter.
-
 # TemperatureControlledCabinetTopology
-
-> This cluster is not supported by esp-matter.
-
-# RefrigeratorAndTemperatureControlledCabinetMode
 
 > This cluster is not supported by esp-matter.
 
@@ -419,10 +411,6 @@ matter.send_event:
     # state: # bitmap: door_open
     # mask: # bitmap: door_open
 ```
-
-# DishwasherMode
-
-> This cluster is not supported by esp-matter.
 
 # SmokeCOAlarm
 

@@ -54,6 +54,21 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
 7. State used by both contexts must be an atomic or mutex-guarded value, or be
    passed by value through the hand-off.
 
+8. **The one case where the CHIP task waits for the main loop**: commands whose
+   answer depends on a user automation (`ChangeToMode`, Operational State
+   `Start`/`Stop`/`Pause`/`Resume`/`GoHome`, see [../delegates.md](../delegates.md)).
+   The SDK delegate must return the response synchronously, so
+   `run_on_main_loop_and_wait` (`matter_delegates.h`) defers the work and blocks the
+   CHIP task on a condition variable for at most `MATTER_DELEGATE_TIMEOUT_MS`
+   (750 ms). It is only used when an automation is configured; otherwise the
+   command is accepted without a hop. The request state is shared through a
+   `shared_ptr`, a request the CHIP task gave up on is dropped if it did not start,
+   and the active outcome pointer (`active_command_outcome`) is only set and read on
+   the main loop. Main-loop code that waits for the CHIP stack lock (`dump_config`,
+   `setup`) can make such a command time out; it never deadlocks because the wait
+   is bounded. Do not use this pattern for anything that has a non-blocking
+   alternative.
+
 ## Audit (current state)
 
 - `send_client_command`: the whole send path (binding table walk and
@@ -82,6 +97,14 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
   Mappings call `esp_matter::attribute::get` / cluster `Get*` from `initialize()`
   on the main loop once, after `esp_matter::start()`; this only reads
   structures that are not modified afterwards.
+- Delegate layer (`matter_modes.cpp`, `matter_operational_state.cpp`,
+  `matter_laundry_controls.cpp`): delegate callbacks read lists (`modes_`,
+  `states_`, `phases_`, ...) that are filled before `esp_matter::start()` and never
+  change; the countdown value is an atomic; the mode, state and phase pushes use
+  `run_on_matter_thread` and the SDK `Instance` is only touched there. Echo loops
+  between a bound select and a Matter attribute are cut with `last_*_` values that
+  are only used on the main loop (attribute callbacks defer first). See rule 8 for
+  the blocking command path.
 - Commissioning: `identity_` and the ephemeral passcode belong to the CHIP task
   (`handle_event`, `open_window`'s lambda); `state_` and the callback vectors
   belong to the main loop and are filled before `esp_matter::start()`.

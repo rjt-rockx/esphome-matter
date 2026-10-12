@@ -1,0 +1,111 @@
+# A washing machine retrofit: program, spin speed and the Start/Stop/Pause commands
+# of a washer are exposed to Matter controllers. The machine itself is driven by
+# relays and reports its cycle through a text sensor. See docs/delegates.md.
+esphome:
+  name: matter-washer
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter
+    components: [matter]
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      laundry_washer: {}
+      clusters:
+        laundry_washer_mode:
+          modes:
+            - {label: Cottons, mode: 0, tags: [normal]}
+            - {label: Delicate, mode: 1, tags: [delicate, quiet]}
+            - {label: Heavy, mode: 2, tags: [heavy, max]}
+          select: washer_program          # kept in sync with Matter
+        laundry_washer_controls:
+          spin_speeds: ["Off", "400", "800", "1200"]
+          spin_speed: washer_spin
+          rinses: [none, normal, extra]
+          number_of_rinses: washer_rinses
+        operational_state:
+          phases: [Pre-wash, Wash, Rinse, Spin]
+          state: washer_state              # text sensor, see below
+          phase: washer_phase
+          countdown_time: washer_remaining
+          on_start:
+            # Refuse to start with the door open: the controller sees the error.
+            - if:
+                condition:
+                  binary_sensor.is_on: washer_door
+                then:
+                  - matter.operational_state.reject:
+                      error: unable_to_start_or_resume
+                      label: Door open
+            - switch.turn_on: start_relay
+          on_stop:
+            - switch.turn_off: start_relay
+          on_pause:
+            - switch.turn_on: pause_relay
+          on_resume:
+            - switch.turn_off: pause_relay
+
+# Wiring of the machine (relays, door switch and the program selector are examples)
+switch:
+  - platform: gpio
+    id: start_relay
+    pin: GPIO10
+  - platform: gpio
+    id: pause_relay
+    pin: GPIO11
+
+binary_sensor:
+  - platform: gpio
+    id: washer_door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+
+select:
+  # Writing the select changes the program of the machine (replace with your own control)
+  - platform: template
+    id: washer_program
+    optimistic: true
+    options: [Cottons, Delicate, Heavy]
+  - platform: template
+    id: washer_spin
+    optimistic: true
+    options: ["Off", "400", "800", "1200"]
+  - platform: template
+    id: washer_rinses
+    optimistic: true
+    options: [none, normal, extra]
+
+sensor:
+  - platform: template
+    id: washer_remaining
+    unit_of_measurement: s
+    update_interval: 10s
+    lambda: |-
+      return id(washer_state).state == "running" ? 1800 : NAN;
+
+text_sensor:
+  # stopped / running / paused: derive from the machine, here from the mains power
+  - platform: template
+    id: washer_state
+    update_interval: 5s
+    lambda: |-
+      return id(start_relay).state ? std::string("running") : std::string("stopped");
+  - platform: template
+    id: washer_phase
+    update_interval: 5s
+    lambda: |-
+      return id(start_relay).state ? std::string("Wash") : std::string("");

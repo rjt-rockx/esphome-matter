@@ -1,0 +1,513 @@
+#include "esphome/core/defines.h"
+#if defined(USE_MATTER) && defined(USE_MATTER_OPERATIONAL_STATE)
+
+#include "esphome/core/log.h"
+#include "matter_attributes.h"
+#include "matter_component.h"
+#include "matter_operational_state.h"
+
+#include <cctype>
+#include <cmath>
+#include <esp_matter_cluster.h>
+#include <esp_matter_command.h>
+#include <esp_matter_data_model.h>
+#include <esp_matter_delegate_callbacks.h>
+#include <esp_matter_event.h>
+#include <lib/support/Span.h>
+
+static const char *const TAG = "matter.opstate";
+
+namespace esphome::matter {
+
+namespace {
+
+namespace opstate_ns = chip::app::Clusters::OperationalState;
+namespace rvc_ns = chip::app::Clusters::RvcOperationalState;
+
+constexpr uint32_t OPERATIONAL_STATE_ID = 0x0060;
+constexpr uint32_t RVC_OPERATIONAL_STATE_ID = 0x0061;
+
+constexpr size_t LABEL_MAX = 64;
+
+std::vector<MatterOperationalStateMapping *> &opstate_mappings() {
+  static std::vector<MatterOperationalStateMapping *> mappings;
+  return mappings;
+}
+
+chip::CharSpan span_of(const std::string &text) {
+  return chip::CharSpan(text.c_str(), std::min(text.size(), LABEL_MAX));
+}
+
+} // namespace
+
+MatterOperationalStateMapping::MatterOperationalStateMapping(
+    uint16_t endpoint_id, uint32_t cluster_id)
+    : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id) {
+  opstate_mappings().push_back(this);
+}
+
+MatterOperationalStateMapping *
+MatterOperationalStateMapping::find(uint16_t endpoint_id, uint32_t cluster_id) {
+  for (auto *mapping : opstate_mappings()) {
+    if (mapping->endpoint_id() == endpoint_id &&
+        mapping->cluster_id() == cluster_id)
+      return mapping;
+  }
+  return nullptr;
+}
+
+std::string MatterOperationalStateMapping::normalize_(const std::string &text) {
+  std::string result;
+  for (char c : text) {
+    if (c == '_' || c == ' ' || c == '-')
+      continue;
+    result.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+  }
+  return result;
+}
+
+void MatterOperationalStateMapping::add_state(uint8_t id, const char *label) {
+  this->states_.push_back({id, label});
+}
+
+void MatterOperationalStateMapping::add_state_name(const char *name, uint8_t id) {
+  this->state_names_.push_back({normalize_(name), id});
+}
+
+void MatterOperationalStateMapping::add_error_name(const char *name, uint8_t id) {
+  this->error_names_.push_back({normalize_(name), id});
+}
+
+void MatterOperationalStateMapping::add_phase(const char *name) {
+  this->phases_.push_back(name);
+}
+
+void MatterOperationalStateMapping::add_command_trigger(
+    MatterOperationalCommand command, MatterOperationalCommandTrigger *trigger) {
+  this->triggers_[static_cast<size_t>(command)].push_back(trigger);
+}
+
+bool MatterOperationalStateMapping::lookup_(const std::vector<NameEntry> &names,
+                                            const std::string &name,
+                                            uint8_t &id) const {
+  std::string normalized = normalize_(name);
+  for (const auto &entry : names) {
+    if (entry.name == normalized) {
+      id = entry.id;
+      return true;
+    }
+  }
+  return false;
+}
+
+void *MatterOperationalStateMapping::esp_matter_delegate() {
+  if (this->cluster_id_ == RVC_OPERATIONAL_STATE_ID)
+    return static_cast<rvc_ns::Delegate *>(this);
+  return static_cast<opstate_ns::Delegate *>(this);
+}
+
+// ---------------------------------------------------------------- delegate
+
+chip::app::DataModel::Nullable<uint32_t>
+MatterOperationalStateMapping::GetCountdownTime() {
+  int64_t value = this->countdown_.load();
+  if (value < 0)
+    return chip::app::DataModel::NullNullable;
+  return chip::app::DataModel::MakeNullable(static_cast<uint32_t>(value));
+}
+
+CHIP_ERROR MatterOperationalStateMapping::GetOperationalStateAtIndex(
+    size_t index, opstate_ns::GenericOperationalState &operational_state) {
+  if (index >= this->states_.size())
+    return CHIP_ERROR_NOT_FOUND;
+  const StateEntry &entry = this->states_[index];
+  if (entry.label.empty())
+    operational_state.Set(entry.id);
+  else
+    operational_state.Set(
+        entry.id, chip::MakeOptional(span_of(entry.label)));
+  return CHIP_NO_ERROR;
+}
+
+CHIP_ERROR MatterOperationalStateMapping::GetOperationalPhaseAtIndex(
+    size_t index, chip::MutableCharSpan &phase) {
+  if (index >= this->phases_.size())
+    return CHIP_ERROR_NOT_FOUND;
+  return chip::CopyCharSpanToMutableCharSpan(span_of(this->phases_[index]),
+                                             phase);
+}
+
+void MatterOperationalStateMapping::run_command_(
+    MatterOperationalCommand command, opstate_ns::GenericOperationalError &err,
+    uint8_t default_error) {
+  const auto &triggers = this->triggers_[static_cast<size_t>(command)];
+  if (triggers.empty()) {
+    err.Set(default_error);
+    return;
+  }
+  MatterCommandOutcome outcome;
+  bool answered = run_on_main_loop_and_wait(
+      [&triggers](MatterCommandOutcome &) {
+        for (auto *trigger : triggers)
+          trigger->trigger();
+      },
+      outcome);
+  if (!answered) {
+    err.Set(default_error, chip::MakeOptional(chip::CharSpan::fromCharString("Timed out")));
+  } else if (outcome.rejected) {
+    err.Set(outcome.status,
+            outcome.text.empty() ? chip::NullOptional
+                                 : chip::MakeOptional(span_of(outcome.text)),
+            outcome.details.empty() ? chip::NullOptional
+                                    : chip::MakeOptional(span_of(outcome.details)));
+  }
+}
+
+void MatterOperationalStateMapping::HandlePauseStateCallback(
+    opstate_ns::GenericOperationalError &err) {
+  this->run_command_(MatterOperationalCommand::PAUSE, err,
+                     chip::to_underlying(opstate_ns::ErrorStateEnum::kCommandInvalidInState));
+}
+
+void MatterOperationalStateMapping::HandleResumeStateCallback(
+    opstate_ns::GenericOperationalError &err) {
+  this->run_command_(MatterOperationalCommand::RESUME, err,
+                     chip::to_underlying(opstate_ns::ErrorStateEnum::kUnableToStartOrResume));
+}
+
+void MatterOperationalStateMapping::HandleStartStateCallback(
+    opstate_ns::GenericOperationalError &err) {
+  this->run_command_(MatterOperationalCommand::START, err,
+                     chip::to_underlying(opstate_ns::ErrorStateEnum::kUnableToStartOrResume));
+}
+
+void MatterOperationalStateMapping::HandleStopStateCallback(
+    opstate_ns::GenericOperationalError &err) {
+  this->run_command_(MatterOperationalCommand::STOP, err,
+                     chip::to_underlying(opstate_ns::ErrorStateEnum::kUnableToCompleteOperation));
+}
+
+void MatterOperationalStateMapping::HandleGoHomeCommandCallback(
+    opstate_ns::GenericOperationalError &err) {
+  this->run_command_(MatterOperationalCommand::GO_HOME, err,
+                     chip::to_underlying(opstate_ns::ErrorStateEnum::kCommandInvalidInState));
+}
+
+// ------------------------------------------------------- ESPHome -> Matter
+
+opstate_ns::Instance *MatterOperationalStateMapping::instance_() {
+  auto *cluster =
+      esp_matter::cluster::get(this->endpoint_id(), this->cluster_id_);
+  if (cluster == nullptr)
+    return nullptr;
+  void *managed = esp_matter::cluster::get_delegate_managed_instance(cluster);
+  if (this->cluster_id_ == RVC_OPERATIONAL_STATE_ID)
+    return static_cast<rvc_ns::Instance *>(managed);
+  return static_cast<opstate_ns::Instance *>(managed);
+}
+
+void MatterOperationalStateMapping::initialize() {
+#ifdef USE_SENSOR
+  if (this->countdown_sensor_ != nullptr) {
+    auto update = [this](float value) {
+      int64_t seconds = std::isfinite(value) && value >= 0
+                            ? static_cast<int64_t>(std::lround(value))
+                            : -1;
+      if (seconds == this->countdown_.exchange(seconds))
+        return;
+      run_on_matter_thread([this]() {
+        if (auto *instance = this->instance_())
+          instance->UpdateCountdownTimeFromDelegate();
+      });
+    };
+    this->countdown_sensor_->add_on_state_callback(update);
+    if (this->countdown_sensor_->has_state())
+      update(this->countdown_sensor_->state);
+  }
+#endif
+#ifdef USE_SELECT
+  if (this->state_select_ != nullptr) {
+    this->state_select_->add_on_state_callback([this](auto &&...) {
+      auto index = this->state_select_->active_index();
+      if (!index.has_value())
+        return;
+      auto option = this->state_select_->at(index.value());
+      if (option.has_value())
+        this->on_state_source_(option.value());
+    });
+  }
+  if (this->phase_select_ != nullptr) {
+    this->phase_select_->add_on_state_callback([this](auto &&...) {
+      auto index = this->phase_select_->active_index();
+      if (!index.has_value())
+        return;
+      auto option = this->phase_select_->at(index.value());
+      if (option.has_value())
+        this->on_phase_source_(option.value());
+    });
+  }
+#endif
+#ifdef USE_TEXT_SENSOR
+  if (this->state_text_sensor_ != nullptr)
+    this->state_text_sensor_->add_on_state_callback(
+        [this](const std::string &value) { this->on_state_source_(value); });
+  if (this->phase_text_sensor_ != nullptr)
+    this->phase_text_sensor_->add_on_state_callback(
+        [this](const std::string &value) { this->on_phase_source_(value); });
+#endif
+  // Push the restored state of the sources (read on the main loop).
+  global_matter_component->defer_to_main_loop([this]() {
+#ifdef USE_SELECT
+    if (this->state_select_ != nullptr && this->state_select_->has_state()) {
+      auto index = this->state_select_->active_index();
+      if (index.has_value()) {
+        auto option = this->state_select_->at(index.value());
+        if (option.has_value())
+          this->on_state_source_(option.value());
+      }
+    }
+    if (this->phase_select_ != nullptr && this->phase_select_->has_state()) {
+      auto index = this->phase_select_->active_index();
+      if (index.has_value()) {
+        auto option = this->phase_select_->at(index.value());
+        if (option.has_value())
+          this->on_phase_source_(option.value());
+      }
+    }
+#endif
+#ifdef USE_TEXT_SENSOR
+    if (this->state_text_sensor_ != nullptr &&
+        this->state_text_sensor_->has_state())
+      this->on_state_source_(this->state_text_sensor_->state);
+    if (this->phase_text_sensor_ != nullptr &&
+        this->phase_text_sensor_->has_state())
+      this->on_phase_source_(this->phase_text_sensor_->state);
+#endif
+  });
+}
+
+void MatterOperationalStateMapping::on_state_source_(const std::string &value) {
+  this->set_state(value);
+}
+
+void MatterOperationalStateMapping::on_phase_source_(const std::string &value) {
+  this->set_phase(value);
+}
+
+void MatterOperationalStateMapping::set_state(const std::string &state_name) {
+  uint8_t id = 0;
+  if (!this->lookup_(this->state_names_, state_name, id)) {
+    ESP_LOGW(TAG, "Unknown operational state '%s' on endpoint %u cluster 0x%04x",
+             state_name.c_str(), this->endpoint_id(),
+             static_cast<unsigned>(this->cluster_id_));
+    return;
+  }
+  run_on_matter_thread([this, id]() {
+    auto *instance = this->instance_();
+    if (instance == nullptr) {
+      ESP_LOGW(TAG, "Operational state cluster 0x%04x on endpoint %u is not running",
+               static_cast<unsigned>(this->cluster_id_), this->endpoint_id());
+      return;
+    }
+    if (id == chip::to_underlying(opstate_ns::OperationalStateEnum::kError)) {
+      // The Error state can only be entered by reporting an OperationalError (matter.operational_state.error does that
+      // with a specific error). A bare "error" state without one reports a generic error.
+      if (instance->GetCurrentOperationalState() != id) {
+        opstate_ns::Structs::ErrorStateStruct::Type error;
+        error.errorStateID = chip::to_underlying(
+            opstate_ns::ErrorStateEnum::kUnableToCompleteOperation);
+        instance->OnOperationalErrorDetected(error);
+      }
+    } else if (instance->SetOperationalState(id) != CHIP_NO_ERROR) {
+      ESP_LOGW(TAG, "Operational state %u rejected by endpoint %u cluster 0x%04x",
+               id, this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
+    }
+  });
+}
+
+void MatterOperationalStateMapping::set_phase(const std::string &phase_name) {
+  chip::app::DataModel::Nullable<uint8_t> phase = chip::app::DataModel::NullNullable;
+  if (!phase_name.empty()) {
+    std::string wanted = normalize_(phase_name);
+    bool found = false;
+    for (size_t i = 0; i < this->phases_.size(); i++) {
+      if (normalize_(this->phases_[i]) == wanted) {
+        phase = chip::app::DataModel::MakeNullable(static_cast<uint8_t>(i));
+        found = true;
+        break;
+      }
+    }
+    if (!found && wanted != "none" && wanted != "null") {
+      ESP_LOGW(TAG, "Unknown phase '%s' on endpoint %u cluster 0x%04x",
+               phase_name.c_str(), this->endpoint_id(),
+               static_cast<unsigned>(this->cluster_id_));
+      return;
+    }
+  }
+  run_on_matter_thread([this, phase]() {
+    auto *instance = this->instance_();
+    if (instance == nullptr)
+      return;
+    if (instance->SetCurrentPhase(phase) != CHIP_NO_ERROR)
+      ESP_LOGW(TAG, "Current phase rejected by endpoint %u cluster 0x%04x",
+               this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
+  });
+}
+
+void MatterOperationalStateMapping::raise_error(uint8_t error_id,
+                                                const std::string &label,
+                                                const std::string &details) {
+  run_on_matter_thread([this, error_id, label, details]() {
+    auto *instance = this->instance_();
+    if (instance == nullptr)
+      return;
+    opstate_ns::Structs::ErrorStateStruct::Type error;
+    error.errorStateID = error_id;
+    if (!label.empty())
+      error.errorStateLabel.SetValue(span_of(label));
+    if (!details.empty())
+      error.errorStateDetails.SetValue(span_of(details));
+    instance->OnOperationalErrorDetected(error);
+  });
+}
+
+void MatterOperationalStateMapping::signal_completion(uint8_t error_id,
+                                                      int64_t total_time,
+                                                      int64_t paused_time) {
+  run_on_matter_thread([this, error_id, total_time, paused_time]() {
+    auto *instance = this->instance_();
+    if (instance == nullptr)
+      return;
+    chip::Optional<chip::app::DataModel::Nullable<uint32_t>> total;
+    chip::Optional<chip::app::DataModel::Nullable<uint32_t>> paused;
+    if (total_time >= 0)
+      total.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(total_time)));
+    if (paused_time >= 0)
+      paused.SetValue(chip::app::DataModel::MakeNullable(static_cast<uint32_t>(paused_time)));
+    instance->OnOperationCompletionDetected(error_id, total, paused);
+  });
+}
+
+// --------------------------------------------------------------------- actions
+
+namespace {
+MatterOperationalStateMapping *find_or_warn(uint16_t endpoint_id,
+                                            uint32_t cluster_id) {
+  auto *mapping = MatterOperationalStateMapping::find(endpoint_id, cluster_id);
+  if (mapping == nullptr)
+    ESP_LOGW(TAG, "No operational state cluster 0x%04x configured on endpoint %u",
+             static_cast<unsigned>(cluster_id), endpoint_id);
+  return mapping;
+}
+} // namespace
+
+void operational_state_set(uint16_t endpoint_id, uint32_t cluster_id,
+                           const std::string &state, const std::string &phase,
+                           bool has_phase) {
+  auto *mapping = find_or_warn(endpoint_id, cluster_id);
+  if (mapping == nullptr)
+    return;
+  if (has_phase)
+    mapping->set_phase(phase);
+  if (!state.empty())
+    mapping->set_state(state);
+}
+
+void operational_state_error(uint16_t endpoint_id, uint32_t cluster_id,
+                             uint8_t error_id, const std::string &label,
+                             const std::string &details) {
+  if (auto *mapping = find_or_warn(endpoint_id, cluster_id))
+    mapping->raise_error(error_id, label, details);
+}
+
+void operational_state_completed(uint16_t endpoint_id, uint32_t cluster_id,
+                                 uint8_t error_id, int64_t total_time,
+                                 int64_t paused_time) {
+  if (auto *mapping = find_or_warn(endpoint_id, cluster_id))
+    mapping->signal_completion(error_id, total_time, paused_time);
+}
+
+void operational_state_reject(uint8_t error_id, const std::string &label,
+                              const std::string &details) {
+  MatterCommandOutcome *outcome = active_command_outcome();
+  if (outcome == nullptr) {
+    ESP_LOGW(TAG, "matter.operational_state.reject ignored: no command is "
+                  "being handled (use it directly in on_start/on_stop/"
+                  "on_pause/on_resume/on_go_home, before any delay)");
+    return;
+  }
+  outcome->rejected = true;
+  outcome->status = error_id;
+  outcome->text = label;
+  outcome->details = details;
+}
+
+// ---------------------------------------------------------------------- attach
+
+DelegateAttach attach_operational_state_delegate(esp_matter::endpoint_t *endpoint,
+                                                 uint32_t cluster_id) {
+  if (cluster_id != OPERATIONAL_STATE_ID && cluster_id != RVC_OPERATIONAL_STATE_ID)
+    return DelegateAttach::NOT_HANDLED;
+  const uint16_t endpoint_id = esp_matter::endpoint::get_id(endpoint);
+  auto *mapping = MatterOperationalStateMapping::find(endpoint_id, cluster_id);
+  if (mapping == nullptr)
+    return DelegateAttach::NOT_HANDLED;
+
+  esp_matter::cluster_t *cluster = esp_matter::cluster::get(endpoint, cluster_id);
+  if (cluster == nullptr) {
+    ESP_LOGE(TAG, "Operational state cluster 0x%04x missing on endpoint %u",
+             static_cast<unsigned>(cluster_id), endpoint_id);
+    return DelegateAttach::FAILED;
+  }
+
+  using namespace esp_matter;
+  using Cmd = MatterOperationalCommand;
+  // The OperationalState::Instance serves the commands, but only the ones in the data model are advertised.
+  bool any_command = false;
+  if (mapping->has_command(Cmd::PAUSE)) {
+    cluster::operational_state::command::create_pause(cluster);
+    any_command = true;
+  }
+  if (mapping->has_command(Cmd::RESUME)) {
+    cluster::operational_state::command::create_resume(cluster);
+    any_command = true;
+  }
+  if (cluster_id == OPERATIONAL_STATE_ID) {
+    if (mapping->has_command(Cmd::START)) {
+      cluster::operational_state::command::create_start(cluster);
+      any_command = true;
+    }
+    if (mapping->has_command(Cmd::STOP)) {
+      cluster::operational_state::command::create_stop(cluster);
+      any_command = true;
+    }
+  } else if (mapping->has_command(Cmd::GO_HOME)) {
+    // esp-matter has no creator for GoHome (0x80); the command id is RvcOperationalState::Commands::GoHome.
+    command::create(cluster, rvc_ns::Commands::GoHome::Id, COMMAND_FLAG_ACCEPTED, nullptr);
+    any_command = true;
+  }
+  if (any_command &&
+      command::get(cluster, opstate_ns::Commands::OperationalCommandResponse::Id,
+                   COMMAND_FLAG_GENERATED) == nullptr)
+    cluster::operational_state::command::create_operational_command_response(cluster);
+
+  // Events: OperationalError (mandatory) and OperationCompletion (mandatory) for both clusters. The plain Operational
+  // State creator already makes OperationalError.
+  if (event::get(cluster, opstate_ns::Events::OperationalError::Id) == nullptr)
+    cluster::operational_state::event::create_operational_error(cluster);
+  if (event::get(cluster, opstate_ns::Events::OperationCompletion::Id) == nullptr)
+    cluster::operational_state::event::create_operation_completion(cluster);
+
+  esp_matter::cluster::delegate_init_callback_t init_callback =
+      cluster_id == RVC_OPERATIONAL_STATE_ID
+          ? esp_matter::cluster::delegate_cb::RvcOperationalStateDelegateInitCB
+          : esp_matter::cluster::delegate_cb::OperationalStateDelegateInitCB;
+  if (cluster::set_delegate_and_init_callback(cluster, init_callback,
+                                              mapping->esp_matter_delegate()) != ESP_OK)
+    return DelegateAttach::FAILED;
+  return DelegateAttach::OK;
+}
+
+} // namespace esphome::matter
+
+#endif // USE_MATTER && USE_MATTER_OPERATIONAL_STATE

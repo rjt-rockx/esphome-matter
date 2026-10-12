@@ -241,6 +241,10 @@ class Cluster:
             schema[cv.Optional(CONF_WITH_FEATURES, default=list)] = cv.ensure_list(
                 cv.one_of(*(feature.conf_key for feature in self.features))
             )
+        # Delegate driven clusters (modes, operational state) take more options.
+        from ..delegates import extend_cluster_schema
+
+        extend_cluster_schema(self.name, schema)
         return schema
 
 

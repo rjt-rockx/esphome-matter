@@ -1,0 +1,89 @@
+# A robot vacuum controller: run mode, clean mode and the RVC operational state
+# (Pause, Resume, GoHome) with the robot's own state machine in ESPHome.
+# Home Assistant and other controllers drive a vacuum through the RVC Run Mode
+# and the RVC Operational State. See docs/delegates.md.
+esphome:
+  name: matter-vacuum
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter
+    components: [matter]
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      robotic_vacuum_cleaner: {}
+      clusters:
+        rvc_run_mode:
+          modes:
+            - {label: Idle, tags: [idle]}
+            - {label: Cleaning, tags: [cleaning]}
+          select: vacuum_run_mode
+          on_change_to_mode:
+            - if:
+                condition:
+                  lambda: 'return mode == 1 && id(dust_bin_full).state;'
+                then:
+                  # The controller gets ChangeToModeResponse(DustBinFull, "Empty the dust bin first")
+                  - matter.mode.reject:
+                      status: dust_bin_full
+                      text: Empty the dust bin first
+        rvc_clean_mode:
+          modes:
+            - {label: Vacuum, tags: [vacuum]}
+            - {label: Mop, tags: [mop]}
+            - {label: Vacuum then mop, tags: [vacuum_then_mop]}
+          select: vacuum_clean_mode
+        rvc_operational_state:
+          state: vacuum_state
+          on_pause:
+            - logger.log: pause the robot
+          on_resume:
+            - logger.log: resume the robot
+          on_go_home:
+            - select.set: {id: vacuum_state, option: seeking_charger}
+
+binary_sensor:
+  - platform: gpio
+    id: dust_bin_full
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+
+select:
+  - platform: template
+    id: vacuum_run_mode
+    optimistic: true
+    options: [Idle, Cleaning]
+    on_value:
+      - select.set:
+          id: vacuum_state
+          option: !lambda 'return x == "Cleaning" ? "running" : "docked";'
+  - platform: template
+    id: vacuum_clean_mode
+    optimistic: true
+    options: [Vacuum, Mop, Vacuum then mop]
+  # The operational state of the robot; the options are the RVC state names
+  - platform: template
+    id: vacuum_state
+    optimistic: true
+    options: [stopped, running, paused, error, seeking_charger, charging, docked]
+    initial_option: docked
+
+# Report a stuck robot to the controller:
+#   - matter.operational_state.error:
+#       endpoint: 1
+#       cluster: rvc_operational_state
+#       error: stuck

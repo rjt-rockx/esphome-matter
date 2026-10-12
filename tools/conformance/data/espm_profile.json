@@ -1388,8 +1388,14 @@
   },
   "device_energy_management_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode_response",
+     "change_to_mode"
+    ],
     "events": []
    },
    "cls": "DeviceEnergyManagementMode",
@@ -1443,7 +1449,10 @@
   },
   "dish_washer_mode": {
    "base": {
-    "attrs": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
     "cmds": [],
     "events": []
    },
@@ -1864,8 +1873,14 @@
   },
   "energy_evse_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode",
+     "change_to_mode_response"
+    ],
     "events": []
    },
    "cls": "EnergyEvseMode",
@@ -2467,7 +2482,10 @@
   },
   "laundry_washer_mode": {
    "base": {
-    "attrs": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
     "cmds": [],
     "events": []
    },
@@ -2570,7 +2588,10 @@
   },
   "microwave_oven_control": {
    "base": {
-    "attrs": [],
+    "attrs": [
+     "cook_time",
+     "max_cook_time"
+    ],
     "cmds": [
      "set_cooking_parameters"
     ],
@@ -2619,7 +2640,10 @@
   },
   "microwave_oven_mode": {
    "base": {
-    "attrs": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
     "cmds": [],
     "events": []
    },
@@ -3677,8 +3701,14 @@
   },
   "refrigerator_and_tcc_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode",
+     "change_to_mode_response"
+    ],
     "events": []
    },
    "cls": "RefrigeratorAndTemperatureControlledCabinetMode",
@@ -3737,8 +3767,14 @@
   },
   "rvc_clean_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode",
+     "change_to_mode_response"
+    ],
     "events": []
    },
    "cls": "RvcCleanMode",
@@ -3749,7 +3785,13 @@
   },
   "rvc_operational_state": {
    "base": {
-    "attrs": [],
+    "attrs": [
+     "phase_list",
+     "current_phase",
+     "operational_state_list",
+     "operational_state",
+     "operational_error"
+    ],
     "cmds": [],
     "events": []
    },
@@ -3761,8 +3803,14 @@
   },
   "rvc_run_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode",
+     "change_to_mode_response"
+    ],
     "events": []
    },
    "cls": "RvcRunMode",
@@ -4655,8 +4703,14 @@
   },
   "water_heater_mode": {
    "base": {
-    "attrs": [],
-    "cmds": [],
+    "attrs": [
+     "supported_modes",
+     "current_mode"
+    ],
+    "cmds": [
+     "change_to_mode",
+     "change_to_mode_response"
+    ],
     "events": []
    },
    "cls": "WaterHeaterMode",

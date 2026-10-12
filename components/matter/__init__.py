@@ -26,6 +26,7 @@ from .actions import register_bound_command_actions
 from .binary_sensors import check_binary_sensors
 from .conformance import validate_composition
 from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
+from .delegates import validate_delegate_clusters
 from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .covers import validate_cover_bindings
@@ -201,6 +202,7 @@ def _final_validate(config: dict):
 
     validate_ble_commissioning(config, full_config)
     validate_composition(config.get(CONF_ENDPOINTS, {}))
+    validate_delegate_clusters(config, full_config)
 
     light_restore_warning(config, full_config)
     switch_restore_warning(config, full_config)
