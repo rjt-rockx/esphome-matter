@@ -67,23 +67,23 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 
 | ESPHome domain | Matter device type(s) | Status | Docs |
 |---|---|---|---|
-| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (hue/saturation commands and transition times not implemented) | [lights.md](docs/lights.md) |
+| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (untested on hardware) | [lights.md](docs/lights.md) |
 | `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (scaling to be verified) | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (measurement unit not set per sensor) | [device-types.md](docs/device-types.md#sensors) |
+| `sensor`: pressure, flow | Pressure, Flow Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
+| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
 | `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: power, energy, voltage, current | Electrical Sensor | Planned (device type cannot be created yet) | [ROADMAP.md](docs/ROADMAP.md) |
-| `sensor`: battery | Power Source | Planned | [ROADMAP.md](docs/ROADMAP.md) |
+| `sensor`: power, energy, voltage, current | Electrical Sensor | Supported (untested on hardware) | [sensors.md](docs/sensors.md#electrical-measurements) |
+| `sensor`: battery | Power Source | Supported (untested on hardware) | [sensors.md](docs/sensors.md) |
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |
-| `switch` | On/Off Plug-in Unit | In progress | [switch.md](docs/switch.md) |
-| `cover` | Window Covering | In progress | [cover.md](docs/cover.md) |
-| `fan` | Fan | In progress | [fan.md](docs/fan.md) |
-| `lock` | Door Lock | In progress | [lock-valve.md](docs/lock-valve.md) |
-| `valve` | Water Valve | In progress | [lock-valve.md](docs/lock-valve.md) |
-| `button`, `event` | Generic Switch | Planned | [ROADMAP.md](docs/ROADMAP.md) |
-| `climate` | Thermostat / Room Air Conditioner | Planned | [ROADMAP.md](docs/ROADMAP.md) |
+| `switch` | On/Off Plug-in Unit | Supported (untested on hardware) | [switch.md](docs/switch.md) |
+| `cover` | Window Covering | Supported (untested on hardware) | [cover.md](docs/cover.md) |
+| `fan` | Fan | Supported (untested on hardware) | [fan.md](docs/fan.md) |
+| `lock` | Door Lock | Supported (untested on hardware) | [lock-valve.md](docs/lock-valve.md) |
+| `valve` | Water Valve | Supported (untested on hardware) | [lock-valve.md](docs/lock-valve.md) |
+| `button`, `event` | Generic Switch | Supported (untested on hardware) | [generic-switch.md](docs/generic-switch.md) |
+| `climate` | Thermostat / Room Air Conditioner | Supported (untested on hardware) | [climate.md](docs/climate.md) |
 | Physical buttons controlling other Matter devices | On/Off Light Switch, Dimmer Switch, Color Dimmer Switch (bindings) | Supported (a command can take a few seconds) | [binding.md](docs/binding.md), [actions.md](docs/actions.md) |
 | `select` | Mode Select | Planned (weak mapping) | [ROADMAP.md](docs/ROADMAP.md) |
 | `number`, `text_sensor`, `alarm_control_panel` | none | Not planned (no good mapping) | [ROADMAP.md](docs/ROADMAP.md) |
@@ -251,6 +251,7 @@ More information about endpoints and a full list of supported device types can b
 - [docs/device-types.md](docs/device-types.md): device types and entity mapping
 - [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
 - [docs/lights.md](docs/lights.md): lights
+- [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
 - Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/commands-full.md](docs/commands-full.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread

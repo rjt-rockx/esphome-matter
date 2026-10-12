@@ -80,10 +80,13 @@ def default_node_label() -> str:
     return _truncate(label, NODE_LABEL_MAX, "node_label")
 
 
-def default_software_version() -> str:
+def default_software_version(config=None) -> str:
+    """software_version_string default: project version, else the numeric software_version, else ESPHome's."""
     project = CORE.config.get(CONF_ESPHOME, {}).get(CONF_PROJECT)
     if project and project.get(CONF_VERSION):
         return project[CONF_VERSION]
+    if config is not None and config.get("software_version") is not None:
+        return str(config["software_version"])
     return ESPHOME_VERSION
 
 
@@ -104,11 +107,13 @@ async def setup_device_info(var, config) -> None:
     hw_string = config.get("hardware_version_string") or default_hardware_version_string()
     cg.add(info.set_hardware_version_string(_truncate(hw_string, 64, "hardware_version_string")))
 
+    # This is the only place that sets CONFIG_APP_PROJECT_VER(_FROM_CONFIG); the numeric
+    # `software_version` (ota.py) only adds CONFIG_DEVICE_SOFTWARE_VERSION_NUMBER.
     # Software version string comes from the app descriptor (esp_app_desc_t::version), which is
     # what CHIP's ESP32 ConfigurationManager reports. Without this it is the ESP-IDF default
     # (git describe or "1"), not the firmware version.
     sw_string = _truncate(
-        config.get(CONF_SOFTWARE_VERSION_STRING, default_software_version()),
+        config.get(CONF_SOFTWARE_VERSION_STRING, default_software_version(config)),
         SOFTWARE_VERSION_STRING_MAX,
         "software_version_string",
     )
