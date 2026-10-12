@@ -114,6 +114,9 @@ class Cluster:
             .replace(".", "")
             .lower()
         )
+        # "switch" is a C++ keyword, esp_matter names the namespace switch_cluster.
+        if espm_namespace == "switch":
+            espm_namespace = "switch_cluster"
 
         return cls(
             id=data["id"],
