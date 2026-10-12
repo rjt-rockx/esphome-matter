@@ -12,6 +12,7 @@
 #include "esphome/core/log.h"
 #include "matter_attributes.h"
 #include "matter_endpoints.h"
+#include "matter_push_bindings.h"
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -62,7 +63,7 @@ protected:
 // As long as no sensor has a state, `unknown_value` is published (or nothing
 // for -1, which keeps the initial value). Used for BatChargeLevel (low /
 // critical), BatChargeState (charging / full) and the Power Source Status.
-class MatterFlagEnumMapping : public MatterEndpointMappingBase {
+class MatterFlagEnumMapping : public MatterAttributePushBinding {
 public:
   struct Flag {
     binary_sensor::BinarySensor *sensor;
@@ -72,21 +73,21 @@ public:
   MatterFlagEnumMapping(uint16_t endpoint_id, uint32_t cluster_id,
                         uint32_t attribute_id, uint8_t default_value,
                         int unknown_value, std::vector<Flag> flags)
-      : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id),
-        attribute_id_(attribute_id), default_value_(default_value),
-        unknown_value_(unknown_value), flags_(std::move(flags)) {}
+      : MatterAttributePushBinding(endpoint_id, cluster_id, attribute_id),
+        default_value_(default_value), unknown_value_(unknown_value),
+        flags_(std::move(flags)) {}
 
-  void initialize() override {
+protected:
+  void setup_() override {
     for (const auto &flag : this->flags_) {
       if (flag.sensor == nullptr)
         continue;
-      flag.sensor->add_on_state_callback([this](bool) { this->publish_(); });
+      flag.sensor->add_on_state_callback([this](bool) { this->request_push(); });
     }
-    this->publish_();
   }
 
-protected:
-  void publish_() {
+  ValueState capture_() override {
+    ValueState s;
     uint8_t value = this->default_value_;
     bool any_state = false;
     bool matched = false;
@@ -101,28 +102,14 @@ protected:
     }
     if (!any_state) {
       if (this->unknown_value_ < 0)
-        return;
+        return s; // keep the initial value
       value = static_cast<uint8_t>(this->unknown_value_);
     }
-    uint16_t endpoint_id = this->endpoint_id_;
-    uint32_t cluster_id = this->cluster_id_;
-    uint32_t attribute_id = this->attribute_id_;
-    run_on_matter_thread([endpoint_id, cluster_id, attribute_id, value]() {
-      MatterPushGuard push_guard;  // ESPHome -> Matter push, not a controller write (see MatterPushGuard)
-      esp_matter_attr_val_t val = esp_matter_enum8(value);
-      esp_err_t err = esp_matter::attribute::update(endpoint_id, cluster_id,
-                                                    attribute_id, &val);
-      if (err != ESP_OK) {
-        ESP_LOGE("matter.power",
-                 "Failed to update attribute 0x%08" PRIX32
-                 " on cluster 0x%08" PRIX32 ", endpoint %u: %s",
-                 attribute_id, cluster_id, endpoint_id, esp_err_to_name(err));
-      }
-    });
+    s.valid = true;
+    s.value = esp_matter_enum8(value);
+    return s;
   }
 
-  uint32_t cluster_id_;
-  uint32_t attribute_id_;
   uint8_t default_value_;
   int unknown_value_;
   std::vector<Flag> flags_;
