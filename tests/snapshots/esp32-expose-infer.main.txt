@@ -1,0 +1,307 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-expose-infer");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_endpoint_parent(1946, 0);
+  matter_mattercomponent_id->register_endpoint_label(1946, "Knob");
+  matter_mattercomponent_id->register_endpoint_tag(1946, 7, 1, "Knob");
+  matter_mattercomponent_id->register_endpoint(1946, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(fan_1, 2652);
+  matter_mattercomponent_id->register_endpoint_parent(2652, 0);
+  matter_mattercomponent_id->register_endpoint_label(2652, "Fan");
+  matter_mattercomponent_id->register_endpoint_tag(2652, 7, 1, "Fan");
+  matter_mattercomponent_id->register_endpoint(2652, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::fan::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(fan_1->get_traits(), false);
+    if (esp_matter::endpoint::fan::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, fan_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(heater, 4556, false);
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(heater_hum, 4556, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(4556, 0);
+  matter_mattercomponent_id->register_endpoint(4556, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, heater, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    if (!esphome::matter::extend_climate_thermostat(endpoint, heater, false))
+      return false;
+    esp_matter::endpoint::humidity_sensor::config_t device_config_1{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(fan_1_extra, 9268);
+  matter_mattercomponent_id->register_endpoint_parent(9268, 0);
+  matter_mattercomponent_id->register_endpoint_label(9268, "Fan Extra");
+  matter_mattercomponent_id->register_endpoint_tag(9268, 7, 2, "Fan Extra");
+  matter_mattercomponent_id->register_endpoint(9268, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::fan::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(fan_1_extra->get_traits(), false);
+    if (esp_matter::endpoint::fan::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_fan_features(fan_control_cluster, fan_1_extra) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_sensor_attribute(batt, 12192, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_endpoint_parent(12192, 0);
+  matter_mattercomponent_id->register_endpoint(12192, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::power_source::config_t device_config_0{};
+    device_config_0.power_source.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    if (esp_matter::endpoint::power_source::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}) == nullptr)
+        return false;
+      auto *status_attr = esp_matter::attribute::get(power_source_cluster, 0x0000);
+      esp_matter_attr_val_t status_val = esp_matter_enum8(1);
+      if (status_attr != nullptr)
+        esp_matter::attribute::set_val(status_attr, &status_val, false);
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(hall_motion, 15266, 1030, 0, esphome::matter::conversion::occupancy, esphome::matter::update_occupancy_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(15266, 0);
+  matter_mattercomponent_id->register_endpoint(15266, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
+    device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::passive_infrared::get_id();
+    if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_lock(lock_door, 16409);
+  matter_mattercomponent_id->register_endpoint_parent(16409, 0);
+  matter_mattercomponent_id->register_endpoint(16409, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::door_lock::config_t device_config_0{};
+    device_config_0.door_lock.actuator_enabled = true;
+    device_config_0.door_lock.lock_type = 0;
+    if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::IlluminanceMeasurementCluster, uint16_t, &chip::app::Clusters::IlluminanceMeasurementCluster::SetMeasuredValue>(lux, 17429, 1024, 0, esphome::matter::conversion::illuminance);
+  matter_mattercomponent_id->register_endpoint_parent(17429, 0);
+  matter_mattercomponent_id->register_endpoint(17429, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::light_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::light_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay_10, 17841);
+  matter_mattercomponent_id->register_endpoint_parent(17841, 0);
+  matter_mattercomponent_id->register_endpoint_label(17841, "Relay 10");
+  matter_mattercomponent_id->register_endpoint_tag(17841, 7, 10, "Relay 10");
+  matter_mattercomponent_id->register_endpoint(17841, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay_2, 18953);
+  matter_mattercomponent_id->register_electrical_power_sensor(relay_2_power, 18953, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(18953, 0);
+  matter_mattercomponent_id->register_endpoint_label(18953, "Relay 2");
+  matter_mattercomponent_id->register_endpoint_tag(18953, 7, 2, "Relay 2");
+  matter_mattercomponent_id->register_endpoint(18953, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::endpoint::electrical_sensor::config_t device_config_1{};
+    device_config_1.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_1.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_1.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(18953, true);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  new(matter_generic_switch_mapping_20526) matter::MatterGenericSwitchMapping(wall_button_2, 20526, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_20526, 17);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_20526);
+  matter_mattercomponent_id->register_endpoint_parent(20526, 0);
+  matter_mattercomponent_id->register_endpoint_label(20526, "Button right");
+  matter_mattercomponent_id->register_endpoint_tag(20526, 8, 1, "");
+  matter_mattercomponent_id->register_endpoint(20526, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 2;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(room_ac, 25629, true);
+  matter_mattercomponent_id->register_endpoint_parent(25629, 0);
+  matter_mattercomponent_id->register_endpoint(25629, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, room_ac, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    if (!esphome::matter::extend_climate_thermostat(endpoint, room_ac, true))
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::PressureMeasurementCluster, int16_t, &chip::app::Clusters::PressureMeasurementCluster::SetMeasuredValue>(pressure, 27659, 1027, 0, esphome::matter::conversion::pressure);
+  matter_mattercomponent_id->register_endpoint_parent(27659, 0);
+  matter_mattercomponent_id->register_endpoint(27659, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::pressure_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::pressure_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay_1, 30374);
+  matter_mattercomponent_id->register_electrical_power_sensor(relay_1_power, 30374, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(30374, 0);
+  matter_mattercomponent_id->register_endpoint_label(30374, "Relay 1");
+  matter_mattercomponent_id->register_endpoint_tag(30374, 7, 1, "Relay 1");
+  matter_mattercomponent_id->register_endpoint(30374, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::endpoint::electrical_sensor::config_t device_config_1{};
+    device_config_1.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_1.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_1.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(30374, true);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_concentration_sensor(co2, 31397, 1037, 0, esphome::matter::conversion::concentration, 0);
+  matter_mattercomponent_id->register_concentration_sensor(pm25, 31397, 1066, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(voc, 31397, 1070, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_endpoint_parent(31397, 0);
+  matter_mattercomponent_id->register_endpoint(31397, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::carbon_dioxide_concentration_measurement::config_t carbon_dioxide_concentration_measurement_config{};
+    carbon_dioxide_concentration_measurement_config.feature_flags = esp_matter::cluster::carbon_dioxide_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::carbon_dioxide_concentration_measurement::create(endpoint, &carbon_dioxide_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::pm25_concentration_measurement::config_t pm25_concentration_measurement_config{};
+    pm25_concentration_measurement_config.feature_flags = esp_matter::cluster::pm25_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm25_concentration_measurement::create(endpoint, &pm25_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::config_t total_volatile_organic_compounds_concentration_measurement_config{};
+    total_volatile_organic_compounds_concentration_measurement_config.feature_flags = esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::create(endpoint, &total_volatile_organic_compounds_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(child_temp, 32102, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(32102, 4556);
+  matter_mattercomponent_id->register_endpoint(32102, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  new(matter_generic_switch_mapping_32894) matter::MatterGenericSwitchMapping(wall_button, 32894, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_32894, 17);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_32894);
+  matter_mattercomponent_id->register_endpoint_parent(32894, 0);
+  matter_mattercomponent_id->register_endpoint_label(32894, "Button left");
+  matter_mattercomponent_id->register_endpoint_tag(32894, 8, 0, "");
+  matter_mattercomponent_id->register_endpoint(32894, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 2;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(smoke_alarm, 36088, 92, 1, esphome::matter::conversion::alarm_state, esphome::matter::update_smoke_state_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(co_alarm, 36088, 92, 2, esphome::matter::conversion::alarm_state, esphome::matter::update_co_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(36088, 0);
+  matter_mattercomponent_id->register_endpoint(36088, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
+    device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id() | esp_matter::cluster::smoke_co_alarm::feature::co_alarm::get_id();
+    if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(blind, 37846);
+  matter_mattercomponent_id->register_endpoint_parent(37846, 0);
+  matter_mattercomponent_id->register_endpoint(37846, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(37846, "blind", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 37846, "blind");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_valve(valve_1, 41990);
+  matter_mattercomponent_id->register_endpoint_parent(41990, 0);
+  matter_mattercomponent_id->register_endpoint(41990, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_valve::config_t device_config_0{};
+    device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
+    device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(41990);
+    if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::FlowMeasurementCluster, uint16_t, &chip::app::Clusters::FlowMeasurementCluster::SetMeasuredValue>(flow, 43870, 1028, 0, [](float v) { return esphome::matter::conversion::flow(v * 0.06f); });
+  matter_mattercomponent_id->register_endpoint_parent(43870, 0);
+  matter_mattercomponent_id->register_endpoint(43870, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::flow_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::flow_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(door_contact, 54338, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(54338, 0);
+  matter_mattercomponent_id->register_endpoint(54338, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(leak, 64327, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(64327, 0);
+  matter_mattercomponent_id->register_endpoint(64327, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_leak_detector::config_t device_config_0{};
+    if (esp_matter::endpoint::water_leak_detector::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0xCAE53D86);
+  esphome::matter::set_plan(MATTER_PLAN, sizeof(MATTER_PLAN) / sizeof(MATTER_PLAN[0]));
