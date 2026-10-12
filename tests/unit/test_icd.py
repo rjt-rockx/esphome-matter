@@ -24,7 +24,7 @@ openthread:
   channel: 15
 """
 
-# Quiet baseline: no api (warns), no logger output (warns), suspend_loop and a long watchdog.
+# Quiet baseline: no api (warns), no logger output (warns), loop_interval and a long watchdog.
 BASE = """
 esphome:
   name: matter-icd-unit
