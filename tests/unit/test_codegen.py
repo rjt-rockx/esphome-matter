@@ -22,7 +22,7 @@ EXPECTED = {
         "FanFeatureOptions",
         "MatterFilterMapping",
         "hepa_filter_monitoring::feature::condition::add",
-        "esp_matter::cluster::thermostat::create",
+        "esp_matter::endpoint::heat_pump::add",
     ],
     "esp32-cover": ["register_cover", "configure_window_covering"],
     "esp32-binary-sensors": ["register_binary_sensor_attribute"],

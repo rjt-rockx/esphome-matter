@@ -37,8 +37,8 @@ matter:
           - CredentialsOverTheAirAccess
           - DoorPositionSensor
     2:
+      # Auto has no ESPHome equivalent, so it can't be combined with fan_id.
       fan:
-        fan_id: ceiling_fan
         with_features:
           - Auto
     3:
