@@ -37,7 +37,7 @@ An event is only generated when the matching Switch cluster feature is enabled o
 | `MomentarySwitchLongPress`  | `long_press`, `long_release`              |
 | `MomentarySwitchMultiPress` | `multi_press_ongoing`, `multi_press_complete` |
 | `LatchingSwitch`            | `switch_latched`                          |
-| `ActionSwitch`              | (replaces `MomentarySwitchRelease`)       |
+| `ActionSwitch`              | Replaces `MomentarySwitchRelease`: one `initial_press` per sequence, no `short_release`, no `multi_press_ongoing`, `multi_press_complete` at the end. esp-matter always adds `MomentarySwitchMultiPress` to it. |
 
 The Switch cluster requires exactly one of `MomentarySwitch` and `LatchingSwitch`. esphome-matter selects `MomentarySwitch` automatically if neither is configured. Use `features: [LatchingSwitch]` for a toggle switch. Other features that a selected feature depends on (e.g. `MomentarySwitchRelease` for `MomentarySwitchLongPress`) are enabled automatically.
 
@@ -60,9 +60,9 @@ The event sequences that are emitted (for the enabled features) are:
 | Double press | `initial_press`, `short_release`, `multi_press_ongoing` (count 2), `short_release`, `multi_press_complete` (count 2) |
 | Long press   | `initial_press`, `long_press` (after `long_press_time`), `long_release` |
 
-`multi_press_complete` is sent once `multi_press_window` has passed after the last release. Pressing more often than `multi_press_max` ends the sequence with `multi_press_complete` with count 0. A long press in the middle of a sequence that was already announced with `multi_press_ongoing` also reports count 0. `ShortRelease` is not sent after a long press.
+`multi_press_complete` is sent once `multi_press_window` has passed after the last release. Pressing more often than `multi_press_max` ends the sequence with `multi_press_complete` with count 0. Only the first press of a sequence can become a long press (as the Matter certification tests require): holding the second press of a double press is still a double press. A long press is not part of a multi-press sequence, so the next press starts a new one, and `short_release` is not sent after a long press.
 
-The `CurrentPosition` attribute follows the button: it is `1` while the button is pressed and `0` otherwise (`NumberOfPositions` is 2). For a `LatchingSwitch`, the sensor state is the position and `switch_latched` is sent on each change.
+The `CurrentPosition` attribute follows the button: it is `1` while the button is pressed and `0` otherwise (`NumberOfPositions` is 2), also when the enabled features have no event for the press or release. For a `LatchingSwitch`, the sensor state is the position and `switch_latched` is sent on each change.
 
 ## matter.send_switch_event
 
@@ -102,4 +102,4 @@ Do not combine `binary_sensor_id` with manual events on the same endpoint unless
 
 ## Choosing features for other device types
 
-The Switch cluster feature choice described above is an instance of a more general rule. Some clusters that a device type requires have a mandatory choice between features (for example, `WindowCovering` requires `Lift` or `Tilt`, `audio_doorbell` requires one of the camera stream types). Select these with `features:`. When there is a sensible default, such as `MomentarySwitch` for the Switch cluster, it is applied automatically. Otherwise the configuration fails with an error that lists the options.
+The Switch cluster feature choice described above is an instance of a more general rule: a cluster that a device type requires may have a mandatory choice between features, and esp-matter refuses to create the cluster when the choice is missing. The choice is resolved when the configuration is validated. For the Switch cluster (`generic_switch`, `doorbell`, `audio_doorbell`) `MomentarySwitch` is the default and at most one of `LatchingSwitch` and `MomentarySwitch` is accepted. Other choices (`Lift`/`Tilt` of `window_covering`, `Heating`/`Cooling` of `thermostat`, the sensor types of `occupancy_sensor`, ...) are not validated here. They are selected with `features:` or derived from the bound `cover_id`, `climate_id` or binary sensor.
