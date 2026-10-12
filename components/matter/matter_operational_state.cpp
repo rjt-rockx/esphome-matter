@@ -611,9 +611,9 @@ DelegateAttach attach_operational_state_delegate(esp_matter::endpoint_t *endpoin
   // Events: OperationalError is mandatory, OperationCompletion is optional in the XML but required by the washer,
   // dishwasher and RVC device types, so both are created. The plain Operational State creator already makes
   // OperationalError.
-  if (event::get(cluster, opstate_ns::Events::OperationalError::Id) == nullptr)
+  if (esp_matter::event::get(cluster, opstate_ns::Events::OperationalError::Id) == nullptr)
     cluster::operational_state::event::create_operational_error(cluster);
-  if (event::get(cluster, opstate_ns::Events::OperationCompletion::Id) == nullptr)
+  if (esp_matter::event::get(cluster, opstate_ns::Events::OperationCompletion::Id) == nullptr)
     cluster::operational_state::event::create_operation_completion(cluster);
 
   esp_matter::cluster::delegate_init_callback_t init_callback =
