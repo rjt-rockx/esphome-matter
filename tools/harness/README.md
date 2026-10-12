@@ -26,6 +26,7 @@ State (controller fabric, commissioned nodes) lives in `./.harness-state` (overr
 | `invoke --node --ep --cluster --command [--args <json>]` | Invoke a command, e.g. `--command MoveToLevel --args '{"level":128,"transitionTime":0,"optionsMask":{},"optionsOverride":{}}'`. Bitmaps are objects of booleans, enums numbers, octet strings `"hex:0a0b"`, 64 bit ints `{"$big":"123"}`. |
 | `subscribe --node [--duration 30] [--min 0] [--max 60] [--out file.jsonl]` | Subscribes to all attributes and events and prints one JSON line per attribute report / event / connection state change, with ISO timestamp and `dtMs` since start. Use it to time reconnects and subscription resumption (see below). |
 | `remove --node <id>` | Decommission (RemoveFabric on the device, then forget it locally). |
+| `serve [--node <id>]` | Long-running mode for test drivers (`tests/runtime`): reads one JSON request per line from stdin (`{"id":1,"op":"read\|write\|invoke\|subscribe\|unsubscribe\|ping","ep":1,"cluster":"OnOff","attribute":"OnOff"}`, same fields as the CLI options), answers `{"id":1,"result":...}` or `{"id":1,"error":"..."}` on stdout, and after `subscribe` also emits `{"record":{...}}` lines. Requests run concurrently over one CASE session. |
 | `selftest [--transport sim\|real] [--restart]` | End-to-end self check, see below. |
 | `scenario <files...> [--node] [--var ep=2,...] [--junit out.xml] [--code/--ip/--port --keep]` | Declarative test scripts. |
 
