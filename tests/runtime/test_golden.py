@@ -18,7 +18,7 @@ pytestmark = pytest.mark.golden
 REPORT = 6  # seconds a Matter report may take after an ESPHome-side change
 QUIET = 3  # seconds without any further report that count as "settled"
 
-BINARY, MONO, SWITCH, TEMP, BUTTON, FAN = 1, 2, 3, 4, 5, 6  # endpoints of golden.yaml
+BINARY, MONO, SWITCH, TEMP, BUTTON, FAN, HEATER, AC = 1, 2, 3, 4, 5, 6, 7, 8  # endpoints of golden.yaml
 
 
 def oscillates(values: list) -> bool:
@@ -231,3 +231,71 @@ def test_interleaved_toggles_converge(node, api, device):
     last_report = (m.reports(SWITCH, "OnOff", "OnOff", since=mark) or [None])[-1]
     assert matter_state == api_state, f"Matter OnOff={matter_state} but API switch={api_state} (last report {last_report})"
     assert last_report in (None, matter_state), f"last report {last_report} != attribute {matter_state}"
+
+
+# -- 6. climate ----------------------------------------------------------------------------------------------------
+def _heater_to_heat(m, api) -> None:
+    from aioesphomeapi import ClimateMode
+
+    mark = m.mark()
+    api.climate("golden_heater", mode=ClimateMode.HEAT, target_temperature=20.0)
+    assert api.wait_state("golden_heater", lambda s: s.mode == ClimateMode.HEAT, 5)
+    assert m.wait_report(HEATER, "Thermostat", "SystemMode", 4, since=mark, timeout=REPORT) or m.read(HEATER, "Thermostat", "SystemMode") == 4
+    time.sleep(QUIET)
+
+
+def test_thermostat_setpoint_both_directions(node, api, device):
+    m = node
+    _heater_to_heat(m, api)
+
+    # Matter -> ESPHome
+    m.write(HEATER, "Thermostat", "OccupiedHeatingSetpoint", 2250)
+    st = api.wait_state("golden_heater", lambda s: abs(s.target_temperature - 22.5) < 0.05, REPORT)
+    assert st is not None, f"API target {api.state('golden_heater').target_temperature}, expected 22.5"
+
+    # ESPHome -> Matter
+    mark = m.mark()
+    api.climate("golden_heater", target_temperature=19.0)
+    assert m.wait_report(HEATER, "Thermostat", "OccupiedHeatingSetpoint", 1900, since=mark, timeout=REPORT), (
+        f"setpoint reports: {m.reports(HEATER, 'Thermostat', 'OccupiedHeatingSetpoint', since=mark)}"
+    )
+    time.sleep(QUIET)
+    seq = m.reports(HEATER, "Thermostat", "OccupiedHeatingSetpoint", since=mark)
+    assert not oscillates(seq), f"setpoint echo: {seq}"
+
+
+def test_thermostat_setpoint_out_of_range_reconciles(node, api, device):
+    m = node
+    _heater_to_heat(m, api)
+    # visual max is 30 C. The write may be refused outright or clamped; either way Matter and ESPHome must agree afterwards.
+    try:
+        m.write(HEATER, "Thermostat", "OccupiedHeatingSetpoint", 3500)
+        refused = False
+    except Exception as e:  # noqa: BLE001
+        refused = True
+        print(f"write refused: {e}")
+    time.sleep(2 * QUIET)
+    matter_sp = m.read(HEATER, "Thermostat", "OccupiedHeatingSetpoint")
+    target = api.state("golden_heater").target_temperature
+    print(f"refused={refused} matter={matter_sp} api={target}")
+    assert target <= 30.0 + 1e-3, f"ESPHome accepted a target above visual max: {target}"
+    assert matter_sp <= 3000, f"Matter keeps an out-of-range setpoint: {matter_sp}"
+    assert abs(matter_sp / 100 - target) < 0.06, f"Matter {matter_sp / 100} and ESPHome {target} disagree"
+
+
+def test_ac_fan_mode_both_directions(node, api, device):
+    from aioesphomeapi import ClimateFanMode, ClimateMode
+
+    m = node
+    LOW, HIGH = 1, 3
+    mark = m.mark()
+    api.climate("golden_ac", mode=ClimateMode.COOL, fan_mode=ClimateFanMode.LOW)
+    assert api.wait_state("golden_ac", lambda s: s.mode == ClimateMode.COOL and s.fan_mode == ClimateFanMode.LOW, 5)
+    assert m.wait_report(AC, "FanControl", "FanMode", LOW, since=mark, timeout=REPORT) or m.read(AC, "FanControl", "FanMode") == LOW
+    time.sleep(QUIET)
+
+    m.write(AC, "FanControl", "FanMode", HIGH)
+    st = api.wait_state("golden_ac", lambda s: s.fan_mode == ClimateFanMode.HIGH, REPORT)
+    assert st is not None, f"API fan_mode {api.state('golden_ac').fan_mode}, expected HIGH"
+    time.sleep(QUIET)
+    assert m.read(AC, "FanControl", "FanMode") == HIGH

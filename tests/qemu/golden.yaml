@@ -8,6 +8,8 @@
 #   4  temperature_sensor   template sensor (api action set_temp)
 #   5  generic_switch       template binary_sensor driven by api action press (short|double|long)
 #   6  fan                  3-speed template-output fan
+#   7  thermostat           heat-only thermostat climate, visual range 10..30 C
+#   8  room_air_conditioner cool/heat climate with low/high fan modes (Fan Control bound to the climate)
 # Passcode 20202021 / discriminator 3840 give the manual code 34970112332.
 esphome:
   # Same name as esp32-openeth.yaml so that both can share one build directory (incremental rebuilds).
@@ -113,6 +115,15 @@ matter:
     6:
       fan:
         fan_id: golden_fan
+    7:
+      thermostat:
+        climate_id: golden_heater
+    8:
+      room_air_conditioner:
+        climate_id: golden_ac
+      clusters:
+        fan_control:
+          climate_id: golden_ac
 
 globals:
   - id: refuse_on
@@ -172,7 +183,59 @@ switch:
           id: golden_switch
           state: false
 
+climate:
+  - platform: thermostat
+    id: golden_heater
+    name: Golden Heater
+    sensor: golden_room_temp
+    default_preset: home
+    preset:
+      - name: home
+        default_target_temperature_low: 18
+    min_idle_time: 1s
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    heat_action:
+      - logger.log: "golden_heater: heating"
+    idle_action:
+      - logger.log: "golden_heater: idle"
+    visual:
+      min_temperature: 10
+      max_temperature: 30
+      temperature_step: 0.5
+  - platform: thermostat
+    id: golden_ac
+    name: Golden AC
+    sensor: golden_room_temp
+    min_idle_time: 1s
+    min_cooling_off_time: 1s
+    min_cooling_run_time: 1s
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    cool_action:
+      - logger.log: "golden_ac: cooling"
+    heat_action:
+      - logger.log: "golden_ac: heating"
+    idle_action:
+      - logger.log: "golden_ac: idle"
+    min_fan_mode_switching_time: 1s
+    fan_mode_low_action:
+      - logger.log: "golden_ac: fan low"
+    fan_mode_high_action:
+      - logger.log: "golden_ac: fan high"
+    visual:
+      min_temperature: 10
+      max_temperature: 30
+      temperature_step: 0.5
+
 sensor:
+  - platform: template
+    id: golden_room_temp
+    name: Golden Room Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: "return 20.0f;"
+    update_interval: 60s
   - platform: template
     id: golden_temp
     name: Golden Temperature

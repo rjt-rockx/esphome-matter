@@ -434,6 +434,9 @@ class Api:
     def fan(self, object_id: str, **kw: Any) -> None:
         self._call(self._cli.fan_command, self.entities[object_id].key, **kw)
 
+    def climate(self, object_id: str, **kw: Any) -> None:
+        self._call(self._cli.climate_command, self.entities[object_id].key, **kw)
+
     def action(self, name: str, **data: Any) -> None:
         self._run(self._cli.execute_service(self.services[name], data), 60)
 
