@@ -1,13 +1,11 @@
 #include "esphome/core/defines.h"
 #if defined(USE_MATTER) && defined(USE_COVER)
 
-#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "matter_component.h"
 #include "matter_cover.h"
 
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 #include <platform/CHIPDeviceLayer.h>
 #include <vector>
@@ -37,23 +35,42 @@ constexpr uint8_t kEndAwningTerracePatio = 0x13;
 
 // ConfigStatus bits.
 constexpr uint8_t kConfigOperational = 0x01;
-constexpr uint8_t kConfigLiftPositionAware = 0x08;
-constexpr uint8_t kConfigTiltPositionAware = 0x10;
-
-// Requests for the same target closer together than this are the same Matter
-// command seen twice (TargetPosition POST_UPDATE and HandleMovement).
-constexpr uint32_t kDuplicateWindowMs = 250;
-constexpr uint32_t kStopGuardMs = 500;
-// Differences up to 1% are considered "already there".
-constexpr uint16_t kPositionTolerance = 100;
 
 std::vector<MatterCoverMapping *> &registry() {
   static std::vector<MatterCoverMapping *> mappings;
   return mappings;
 }
 
+MatterCoverMapping *find_mapping(uint16_t endpoint_id) {
+  for (auto *mapping : registry()) {
+    if (mapping->endpoint_id() == endpoint_id)
+      return mapping;
+  }
+  ESP_LOGE(TAG, "No cover registered for endpoint %u", endpoint_id);
+  return nullptr;
+}
+
 bool is_class(const char *device_class, const char *name) {
   return device_class != nullptr && strcmp(device_class, name) == 0;
+}
+
+struct CoveringKind {
+  uint8_t type;
+  uint8_t end_product;
+};
+
+CoveringKind classify(bool has_tilt, const char *device_class) {
+  if (is_class(device_class, "awning"))
+    return {kTypeAwning, kEndAwningTerracePatio};
+  if (is_class(device_class, "curtain"))
+    return {kTypeDrapery, kEndCentralCurtain};
+  if (is_class(device_class, "shutter"))
+    return {kTypeShutter, kEndRollerShutter};
+  if (has_tilt)
+    return {kTypeTiltBlindLiftAndTilt, kEndInteriorVenetianBlind};
+  if (is_class(device_class, "blind"))
+    return {kTypeRollerShade, kEndInteriorBlind};
+  return {kTypeRollerShade, kEndRollerShade};
 }
 
 } // namespace
@@ -86,20 +103,26 @@ MatterCoverMapping::MatterCoverMapping(cover::Cover *cover, uint16_t endpoint_id
   registry().push_back(this);
 }
 
+uint8_t window_covering_end_product_type(uint16_t endpoint_id, const char *device_class,
+                                         int end_product_type) {
+  auto *mapping = find_mapping(endpoint_id);
+  return mapping == nullptr ? kEndRollerShade : mapping->end_product_type(device_class, end_product_type);
+}
+
 void configure_window_covering(esp_matter::cluster::window_covering::config_t &config,
-                               uint16_t endpoint_id, const char *device_class,
-                               int end_product_type) {
-  for (auto *mapping : registry()) {
-    if (mapping->endpoint_id() == endpoint_id) {
-      mapping->configure(config, device_class, end_product_type);
-      return;
-    }
-  }
-  ESP_LOGE(TAG, "No cover registered for endpoint %u", endpoint_id);
+                               uint16_t endpoint_id, const char *device_class) {
+  if (auto *mapping = find_mapping(endpoint_id))
+    mapping->configure(config, device_class);
+}
+
+uint8_t MatterCoverMapping::end_product_type(const char *device_class, int end_product_type) const {
+  if (end_product_type >= 0)
+    return static_cast<uint8_t>(end_product_type);
+  return classify(this->cover_->get_traits().get_supports_tilt(), device_class).end_product;
 }
 
 void MatterCoverMapping::configure(esp_matter::cluster::window_covering::config_t &config,
-                                   const char *device_class, int end_product_type) {
+                                   const char *device_class) {
   namespace espm = esp_matter::cluster::window_covering;
 
   auto traits = this->cover_->get_traits();
@@ -110,41 +133,22 @@ void MatterCoverMapping::configure(esp_matter::cluster::window_covering::config_
   // connectedhomeip only calls the delegate for position aware features, so a
   // cover without position support is exposed as position aware too. It then
   // only ever reports fully open or fully closed, and in-between targets are
-  // rounded to the closest end.
+  // rounded to the closest end. esp-matter sets the ConfigStatus position
+  // aware bits when it adds the features.
   uint32_t flags = espm::feature::lift::get_id() | espm::feature::position_aware_lift::get_id();
-  uint8_t config_status = kConfigOperational | kConfigLiftPositionAware;
-  if (this->has_tilt_) {
+  if (this->has_tilt_)
     flags |= espm::feature::tilt::get_id() | espm::feature::position_aware_tilt::get_id();
-    config_status |= kConfigTiltPositionAware;
-  }
   config.feature_flags |= flags;
-  config.config_status = config_status;
-
-  uint8_t type = this->has_tilt_ ? kTypeTiltBlindLiftAndTilt : kTypeRollerShade;
-  uint8_t end_product = this->has_tilt_ ? kEndInteriorVenetianBlind : kEndRollerShade;
-  if (is_class(device_class, "awning")) {
-    type = kTypeAwning;
-    end_product = kEndAwningTerracePatio;
-  } else if (is_class(device_class, "curtain")) {
-    type = kTypeDrapery;
-    end_product = kEndCentralCurtain;
-  } else if (is_class(device_class, "shutter")) {
-    type = kTypeShutter;
-    end_product = kEndRollerShutter;
-  } else if (is_class(device_class, "blind") && !this->has_tilt_) {
-    end_product = kEndInteriorBlind;
-  }
-  config.type = type;
-  config.end_product_type = end_product_type >= 0 ? static_cast<uint8_t>(end_product_type) : end_product;
-
+  config.config_status = kConfigOperational;
+  config.type = classify(this->has_tilt_, device_class).type;
   config.delegate = static_cast<void *>(static_cast<wc::Delegate *>(this));
 
+  // Only the position aware features have attributes to initialise. The values
+  // are null until the cover knows its position.
   uint16_t lift = 0;
   nullable<uint16_t> lift_value = conversion::cover_to_matter(this->cover_->position, lift)
                                       ? nullable<uint16_t>(lift)
                                       : nullable<uint16_t>();
-  config.features.lift.current_position_lift_percent_100ths = lift_value;
-  config.features.lift.target_position_lift_percent_100ths = lift_value;
   config.features.position_aware_lift.current_position_lift_percent_100ths = lift_value;
   config.features.position_aware_lift.target_position_lift_percent_100ths = lift_value;
   if (this->has_tilt_) {
@@ -152,8 +156,6 @@ void MatterCoverMapping::configure(esp_matter::cluster::window_covering::config_
     nullable<uint16_t> tilt_value = conversion::cover_to_matter(this->cover_->tilt, tilt)
                                         ? nullable<uint16_t>(tilt)
                                         : nullable<uint16_t>();
-    config.features.tilt.current_position_tilt_percent_100ths = tilt_value;
-    config.features.tilt.target_position_tilt_percent_100ths = tilt_value;
     config.features.position_aware_tilt.current_position_tilt_percent_100ths = tilt_value;
     config.features.position_aware_tilt.target_position_tilt_percent_100ths = tilt_value;
   }
@@ -168,25 +170,6 @@ void MatterCoverMapping::initialize() {
   this->has_tilt_ = traits.get_supports_tilt();
   this->has_stop_ = traits.get_supports_stop();
 
-  // Fallback for target changes that are observed as attribute updates. The
-  // delegate is the primary path; duplicates are filtered in request_*_().
-  global_matter_component->register_attribute_callback(
-      this->endpoint_id(), wc::Id, wc::Attributes::TargetPositionLiftPercent100ths::Id,
-      [this](const esp_matter_attr_val_t &value) {
-        uint16_t target = value.val.u16;
-        global_matter_component->defer_to_main_loop(
-            [this, target]() { this->request_lift_(target, false); });
-      });
-  if (this->has_tilt_) {
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), wc::Id, wc::Attributes::TargetPositionTiltPercent100ths::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          uint16_t target = value.val.u16;
-          global_matter_component->defer_to_main_loop(
-              [this, target]() { this->request_tilt_(target, false); });
-        });
-  }
-
   this->cover_->add_on_state_callback([this]() { this->on_cover_state_(); });
   this->push_state_to_matter_();
 }
@@ -195,6 +178,9 @@ void MatterCoverMapping::initialize() {
 // Matter -> ESPHome
 // ---------------------------------------------------------------------------
 
+// connectedhomeip sets the TargetPosition attribute, then calls HandleMovement
+// for every position aware axis, for UpOrOpen, DownOrClose and GoTo*Percentage.
+// The target attributes are not writable by clients, so this is the only entry.
 CHIP_ERROR MatterCoverMapping::HandleMovement(wc::WindowCoveringType type) {
   bool lift = type == wc::WindowCoveringType::Lift;
   if (!lift && !this->has_tilt_)
@@ -208,12 +194,7 @@ CHIP_ERROR MatterCoverMapping::HandleMovement(wc::WindowCoveringType type) {
     return CHIP_ERROR_INCORRECT_STATE;
 
   uint16_t target = value.val.u16;
-  global_matter_component->defer_to_main_loop([this, lift, target]() {
-    if (lift)
-      this->request_lift_(target, true);
-    else
-      this->request_tilt_(target, true);
-  });
+  global_matter_component->defer_to_main_loop([this, lift, target]() { this->request_(lift, target); });
   return CHIP_NO_ERROR;
 }
 
@@ -225,47 +206,14 @@ CHIP_ERROR MatterCoverMapping::HandleStopMotion() {
   return this->has_stop_ ? CHIP_ERROR_IN_PROGRESS : CHIP_ERROR_NOT_IMPLEMENTED;
 }
 
-void MatterCoverMapping::request_lift_(uint16_t target, bool from_delegate) {
-  uint32_t now = millis();
-  if (this->have_lift_request_ && this->last_lift_request_ == target &&
-      now - this->last_lift_request_ms_ < kDuplicateWindowMs)
-    return;
-  if (!from_delegate) {
-    uint16_t current;
-    if (this->stop_seen_ && now - this->last_stop_ms_ < kStopGuardMs)
-      return;
-    if (this->cover_->current_operation == cover::COVER_OPERATION_IDLE &&
-        conversion::cover_to_matter(this->cover_->position, current) &&
-        std::abs(static_cast<int>(current) - static_cast<int>(target)) <= kPositionTolerance)
-      return;
+void MatterCoverMapping::request_(bool lift, uint16_t target) {
+  if (lift) {
+    this->pending_lift_ = target;
+    this->target_lift_ = target;
+  } else {
+    this->pending_tilt_ = target;
+    this->target_tilt_ = target;
   }
-  this->have_lift_request_ = true;
-  this->last_lift_request_ = target;
-  this->last_lift_request_ms_ = now;
-  this->pending_lift_ = target;
-  this->target_lift_ = target;
-  this->schedule_drain_();
-}
-
-void MatterCoverMapping::request_tilt_(uint16_t target, bool from_delegate) {
-  uint32_t now = millis();
-  if (this->have_tilt_request_ && this->last_tilt_request_ == target &&
-      now - this->last_tilt_request_ms_ < kDuplicateWindowMs)
-    return;
-  if (!from_delegate) {
-    uint16_t current;
-    if (this->stop_seen_ && now - this->last_stop_ms_ < kStopGuardMs)
-      return;
-    if (this->cover_->current_operation == cover::COVER_OPERATION_IDLE &&
-        conversion::cover_to_matter(this->cover_->tilt, current) &&
-        std::abs(static_cast<int>(current) - static_cast<int>(target)) <= kPositionTolerance)
-      return;
-  }
-  this->have_tilt_request_ = true;
-  this->last_tilt_request_ = target;
-  this->last_tilt_request_ms_ = now;
-  this->pending_tilt_ = target;
-  this->target_tilt_ = target;
   this->schedule_drain_();
 }
 
@@ -300,24 +248,18 @@ void MatterCoverMapping::drain_() {
   if (this->pending_tilt_.has_value()) {
     uint16_t target = *this->pending_tilt_;
     this->pending_tilt_.reset();
-    if (this->has_tilt_) {
-      call.set_tilt(conversion::cover_from_matter(target));
-      any = true;
-    }
+    call.set_tilt(conversion::cover_from_matter(target));
+    any = true;
   }
   if (any)
     call.perform();
 }
 
 void MatterCoverMapping::stop_() {
-  this->stop_seen_ = true;
-  this->last_stop_ms_ = millis();
   this->pending_lift_.reset();
   this->pending_tilt_.reset();
   this->target_lift_.reset();
   this->target_tilt_.reset();
-  this->have_lift_request_ = false;
-  this->have_tilt_request_ = false;
   if (this->has_stop_)
     this->cover_->make_call().set_command_stop().perform();
   // The cover might not publish a state when it was already idle.
@@ -360,13 +302,13 @@ void MatterCoverMapping::push_state_to_matter_() {
 
   uint16_t eid = this->endpoint_id();
   bool has_tilt = this->has_tilt_;
-  // Global status follows lift (bits 0-1), then lift (bits 2-3). Tilt (bits
+  // Global (bits 0-1) and lift (bits 2-3) follow the cover operation. Tilt (bits
   // 4-5) is left at stopped because ESPHome has a single operation.
   uint8_t operational_status = static_cast<uint8_t>(state | (state << 2));
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
       [eid, has_tilt, lift_known, lift, lift_target, tilt_known, tilt, tilt_target, operational_status]() {
-                auto report_position = [eid](uint32_t attribute_id, bool known, uint16_t value) {
+        auto report_position = [eid](uint32_t attribute_id, bool known, uint16_t value) {
           esp_matter_attr_val_t val =
               esp_matter_nullable_uint16(known ? nullable<uint16_t>(value) : nullable<uint16_t>());
           esp_matter::attribute::report(eid, wc::Id, attribute_id, &val);
