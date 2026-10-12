@@ -207,7 +207,11 @@ jobs:
       - name: Conformance unit tests
         run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
       - name: Check every test config
-        run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
+        # esp32-compile-all.yaml exists for code generation coverage and deliberately holds bare
+        # device types that are not complete devices, so it is not a conformance target.
+        run: |
+          configs=$(ls tests/configs/*.yaml | grep -v '/esp32-compile-all\.yaml$')
+          .venv/bin/python -m tools.conformance $configs --json conformance.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

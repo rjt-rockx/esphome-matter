@@ -5,6 +5,9 @@
 # Not covered, because they exclude each other or need another radio setup: Thread / ICD
 # (esp32-thread.yaml, esp32-*-icd.yaml), BLE only commissioning (esp32-ble-commissioning.yaml),
 # Ethernet (esp32-ethernet.yaml).
+#
+# Several endpoints are bare device types that are not complete devices, so the Matter
+# conformance CI job skips this file.
 esphome:
   name: matter-ci-compile-all
   friendly_name: Compile All
