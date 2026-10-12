@@ -12,7 +12,6 @@
 
 #include <vector>
 
-static const char *const TAG = "matter.lock";
 
 namespace esphome::matter {
 
@@ -34,7 +33,7 @@ void MatterComponent::register_lock(lock::Lock *lock, uint16_t endpoint_id) {
 }
 
 MatterLockMapping::MatterLockMapping(lock::Lock *lock, uint16_t endpoint_id)
-    : MatterEndpointMappingBase(endpoint_id), lock_(lock) {}
+    : MatterLockBinding(endpoint_id), lock_(lock) {}
 
 MatterLockMapping *MatterLockMapping::find(uint16_t endpoint_id) {
   for (auto *mapping : lock_mappings()) {
@@ -44,7 +43,8 @@ MatterLockMapping *MatterLockMapping::find(uint16_t endpoint_id) {
   return nullptr;
 }
 
-void MatterLockMapping::initialize() {
+void MatterLockMapping::setup_() {
+  MatterLockBinding::setup_();
   if (this->lock_ == nullptr)
     return;
 
@@ -54,53 +54,40 @@ void MatterLockMapping::initialize() {
                                  DoorLock::Attributes::DoorState::Id) != nullptr;
 
   this->lock_->add_on_state_callback(
-      [this](lock::LockState state) { this->on_lock_state_(state); });
-
-  // Publish the initial state from the main loop to read the lock state
-  // safely. No LockOperation event: nothing was operated.
-  global_matter_component->defer_to_main_loop(
-      [this]() { this->push_state_to_matter_(this->lock_->state, false); });
+      [this](lock::LockState) { this->on_entity_state_(); });
 }
 
-void MatterLockMapping::handle_operation(
-    MatterLockOperation operation, const MatterLockOperationOrigin &origin) {
-  global_matter_component->defer_to_main_loop(
-      [this, operation, origin]() { this->apply_operation_(operation, origin); });
-}
-
-void MatterLockMapping::apply_operation_(
-    MatterLockOperation operation, const MatterLockOperationOrigin &origin) {
-  lock::LockState target = lock::LOCK_STATE_UNLOCKED;
-  switch (operation) {
-  case MatterLockOperation::LOCK:
-    target = lock::LOCK_STATE_LOCKED;
-    break;
-  case MatterLockOperation::UNLOCK:
-    target = lock::LOCK_STATE_UNLOCKED;
-    break;
-  case MatterLockOperation::UNBOLT:
-    target = this->lock_->traits.get_supports_open()
-                 ? lock::LOCK_STATE_OPEN
-                 : lock::LOCK_STATE_UNLOCKED;
-    break;
-  }
-
-  ESP_LOGD(TAG, "Matter door lock operation on endpoint %u: %u",
-           this->endpoint_id(), static_cast<unsigned>(operation));
-  this->pending_origin_ = origin;
-
-  // The lock may already be in the requested state, in which case it won't
-  // publish anything. Report right away so the operation is acknowledged.
-  if (this->lock_->state == target) {
-    this->on_lock_state_(target);
-    return;
-  }
-
-  switch (target) {
+LockEntityState MatterLockMapping::entity_state_() {
+  if (this->lock_ == nullptr)
+    return LockEntityState::NONE;
+  switch (this->lock_->state) {
   case lock::LOCK_STATE_LOCKED:
+    return LockEntityState::LOCKED;
+  case lock::LOCK_STATE_UNLOCKED:
+    return LockEntityState::UNLOCKED;
+  case lock::LOCK_STATE_OPEN:
+    return LockEntityState::OPEN;
+  case lock::LOCK_STATE_JAMMED:
+    return LockEntityState::JAMMED;
+  case lock::LOCK_STATE_LOCKING:
+  case lock::LOCK_STATE_UNLOCKING:
+  case lock::LOCK_STATE_OPENING:
+    return LockEntityState::TRANSITIONAL;
+  default:
+    return LockEntityState::NONE;
+  }
+}
+
+bool MatterLockMapping::supports_open_() {
+  return this->lock_->traits.get_supports_open();
+}
+
+void MatterLockMapping::command_(LockEntityState target) {
+  switch (target) {
+  case LockEntityState::LOCKED:
     this->lock_->lock();
     break;
-  case lock::LOCK_STATE_OPEN:
+  case LockEntityState::OPEN:
     this->lock_->open();
     break;
   default:
@@ -109,21 +96,8 @@ void MatterLockMapping::apply_operation_(
   }
 }
 
-void MatterLockMapping::on_lock_state_(lock::LockState state) {
-  switch (state) {
-  case lock::LOCK_STATE_LOCKING:
-  case lock::LOCK_STATE_UNLOCKING:
-  case lock::LOCK_STATE_OPENING:
-    // Matter has no transitional lock states. Keep the previous state and
-    // report the final state when the lock settles.
-    return;
-  default:
-    this->push_state_to_matter_(state);
-    break;
-  }
-}
-
-// Pushes a settled ESPHome lock state to the Matter Door Lock cluster.
+// Writes a settled ESPHome lock state to the Matter Door Lock cluster (CHIP
+// task).
 //
 // ESPHome LOCKED   -> LockState Locked
 // ESPHome UNLOCKED -> LockState Unlocked
@@ -131,65 +105,46 @@ void MatterLockMapping::on_lock_state_(lock::LockState state) {
 // ESPHome JAMMED   -> LockState NotFullyLocked (+ DoorState DoorJammed when the
 //                     DoorPositionSensor feature is enabled)
 // ESPHome NONE     -> LockState NotFullyLocked
-void MatterLockMapping::push_state_to_matter_(lock::LockState state,
-                                              bool announce) {
+void MatterLockMapping::write_door_lock_(const MatterLockPush &push) {
+  using namespace chip::app::Clusters;
   using chip::app::Clusters::DoorLock::DlLockState;
   DlLockState matter_state = DlLockState::kNotFullyLocked;
-  bool jammed = false;
-  switch (state) {
-  case lock::LOCK_STATE_LOCKED:
+  switch (push.position) {
+  case MatterLockPosition::LOCKED:
     matter_state = DlLockState::kLocked;
     break;
-  case lock::LOCK_STATE_UNLOCKED:
+  case MatterLockPosition::UNLOCKED:
     matter_state = DlLockState::kUnlocked;
     break;
-  case lock::LOCK_STATE_OPEN:
+  case MatterLockPosition::UNLATCHED:
     matter_state = DlLockState::kUnlatched;
-    break;
-  case lock::LOCK_STATE_JAMMED:
-    jammed = true;
     break;
   default:
     break;
   }
 
-  // Attribute a state change to the remote operation only once.
-  MatterLockOperationOrigin origin = this->pending_origin_;
-  this->pending_origin_ = MatterLockOperationOrigin{};
-
   uint16_t eid = this->endpoint_id();
-  // esp-matter creates DoorState as DoorOpen, which would be a false claim.
-  // The initial publish (and any change of the jam state) updates it.
-  bool update_door_state =
-      this->has_door_state_ && (jammed || this->door_jammed_ || !announce);
-  this->door_jammed_ = jammed;
-
-  chip::DeviceLayer::SystemLayer().ScheduleLambda(
-      [eid, matter_state, jammed, update_door_state, origin, announce]() {
-        using namespace chip::app::Clusters;
-        auto &server = DoorLockServer::Instance();
-        if (origin.valid) {
-          server.SetLockState(
-              eid, matter_state, DoorLock::OperationSourceEnum::kRemote,
-              chip::app::DataModel::NullNullable,
-              chip::app::DataModel::NullNullable,
-              chip::app::DataModel::MakeNullable(
-                  static_cast<chip::FabricIndex>(origin.fabric_index)),
-              chip::app::DataModel::MakeNullable(
-                  static_cast<chip::NodeId>(origin.node_id)));
-        } else if (announce) {
-          server.SetLockState(eid, matter_state,
-                              DoorLock::OperationSourceEnum::kManual);
-        } else {
-          server.SetLockState(eid, matter_state);
-        }
-        if (update_door_state) {
-          if (jammed)
-            server.SetDoorState(eid, DoorLock::DoorStateEnum::kDoorJammed);
-          else
-            DoorLock::Attributes::DoorState::SetNull(eid);
-        }
-      });
+  auto &server = DoorLockServer::Instance();
+  if (push.origin.valid) {
+    server.SetLockState(
+        eid, matter_state, DoorLock::OperationSourceEnum::kRemote,
+        chip::app::DataModel::NullNullable, chip::app::DataModel::NullNullable,
+        chip::app::DataModel::MakeNullable(
+            static_cast<chip::FabricIndex>(push.origin.fabric_index)),
+        chip::app::DataModel::MakeNullable(
+            static_cast<chip::NodeId>(push.origin.node_id)));
+  } else if (push.announce) {
+    server.SetLockState(eid, matter_state,
+                        DoorLock::OperationSourceEnum::kManual);
+  } else {
+    server.SetLockState(eid, matter_state);
+  }
+  if (push.update_door_state) {
+    if (push.jammed)
+      server.SetDoorState(eid, DoorLock::DoorStateEnum::kDoorJammed);
+    else
+      DoorLock::Attributes::DoorState::SetNull(eid);
+  }
 }
 
 } // namespace esphome::matter

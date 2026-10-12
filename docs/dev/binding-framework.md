@@ -3,7 +3,7 @@
 `components/matter/matter_binding.h` / `.cpp` is the shared core for entity
 bindings. It replaces five hand-rolled echo mechanisms and the per-change heap
 allocations in the push paths. Migrated so far: switch, valve, sensors, binary
-sensors and the power-source flag enums; see [Migration order](#migration-order). Thread names follow
+sensors, the power-source flag enums, lock, cover and closure; see [Migration order](#migration-order). Thread names follow
 [threading.md](threading.md): "main" is the ESPHome main loop, "CHIP" is the CHIP
 task.
 
@@ -140,6 +140,27 @@ window expiry pushes the unchanged state and `CurrentState` leaves
 created on the CHIP task (queued ahead of the boot push) instead of under the
 CHIP lock on the main loop.
 
+Lock, cover and closure each split into a header-only state machine
+(`matter_lock_binding.h`, `matter_cover_binding.h`, `matter_closure_binding.h`;
+no entity or cluster headers, host-tested in `tests/cpp/test_entity_bindings.cpp`)
+and the existing `Matter*Mapping` class, which only supplies the entity hooks and
+the cluster writes.
+
+- Lock: `BootSync::ESPHOME_WINS`, `reconcile_after_apply = false`. Only settled
+  states are published; transitional ones keep the previous Matter state. The
+  state carries a publish `seq` so reconcile pushes and skipped pushes resend the
+  newest publish without a second `SetLockState`; the remote origin and the boot
+  DoorState fix-up of a replaced publish are inherited by the one that replaces it.
+- Cover: `settle_ms = 200`. A burst of Matter requests merges into one cover call
+  (lift and tilt together; a stop discards earlier movement and runs before later
+  movement). A stop pushes at once. If the cover never publishes after a command,
+  the window expiry pushes the unchanged state (target back to the current
+  position). Targets are forgotten when the cover reports idle.
+- Closure: no settle. `MovementCompleted` is counted on the main loop
+  (`completed_count`) and emitted on CHIP when the count moves, so coalesced
+  snapshots cannot lose or duplicate it. A missing cluster at startup is retried
+  every 500 ms (20 times) from `write_matter_()`.
+
 ## Migration order
 
 Each step is one change; codegen snapshots stay unchanged.
@@ -148,7 +169,7 @@ Each step is one change; codegen snapshots stay unchanged.
 2. Switch (done).
 3. Sensors, binary sensors, valve, power-source flag enums (done; removes the
    `new AttributeUpdate` per reading).
-4. Lock, cover, closure (`request_push_`/`push_done_`/`schedule_drain_` go away).
+4. Lock, cover, closure (done; `request_push_`/`push_done_`/`schedule_drain_` are gone).
 5. Fan and climate fan (delete `pushing_`; wind and step hooks use `is_echo()`).
 6. Climate.
 7. Modes, operational state, Mode Select (drop `pending_echoes_`), sensor-extras
