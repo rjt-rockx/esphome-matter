@@ -7,200 +7,276 @@ on:
     paths:
       - "components/**"
       - "tests/**"
-      - ".github/workflows/ci.yml"
-
+      - "examples/**"
+      - "packages/**"
+      - ".github/**"
   pull_request:
     paths:
       - "components/**"
       - "tests/**"
-      - ".github/workflows/ci.yml"
+      - "examples/**"
+      - "packages/**"
+      - ".github/**"
+  workflow_dispatch:
+    inputs:
+      toolchain:
+        description: >-
+          ESP32 toolchain used by the compile jobs. "esp-idf" (native, default)
+          rewrites "toolchain: platformio" in a temporary copy of the test
+          config; "platformio" compiles the configs unmodified.
+        type: choice
+        options:
+          - esp-idf
+          - platformio
+        default: esp-idf
+
+# Cancel superseded runs of the same PR/branch. Runs on main are kept so that
+# every merge gets to save its caches (ccache, IDF tools, managed components).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 env:
-  DEFAULT_PYTHON: "3.12"  # Same as ESPHome
+  DEFAULT_PYTHON: "3.12" # Same as ESPHome
+  # Native ESP-IDF toolchain by default; platformio only via workflow_dispatch.
+  CI_TOOLCHAIN: ${{ inputs.toolchain || 'esp-idf' }}
 
 jobs:
-  validate:
-    name: Validate config (ESPHome ${{ matrix.esphome-version }})
+  # ---------------------------------------------------------------------------
+  # Lint (non-blocking for now)
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (non-blocking)
     runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ruff
+        run: python -m pip install ruff
+      - name: ruff check
+        continue-on-error: true
+        run: ruff check --output-format=github components .github tests
+      - name: ruff format --check
+        continue-on-error: true
+        run: ruff format --check --diff components .github tests
+      - name: Detect clang-format config
+        id: clang
+        run: |
+          if [ -f .clang-format ] || [ -f _clang-format ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .clang-format found; skipping clang-format check." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: clang-format check
+        if: steps.clang.outputs.present == 'true'
+        continue-on-error: true
+        run: |
+          mapfile -t files < <(git ls-files 'components/**/*.h' 'components/**/*.cpp' 'components/**/*.c' 'components/**/*.hpp')
+          if [ ${#files[@]} -eq 0 ]; then echo "No C/C++ files."; exit 0; fi
+          clang-format --version
+          clang-format --dry-run --Werror "${files[@]}"
+
+  # ---------------------------------------------------------------------------
+  # `esphome config` on every YAML in tests/configs/ and examples/
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate configs (ESPHome ${{ matrix.esphome-version }})
+    runs-on: ubuntu-24.04
+    # ESPHome dev can break independently of this repository; report it, but
+    # do not block on it.
+    continue-on-error: ${{ matrix.esphome-version == 'dev' }}
     strategy:
+      fail-fast: false
       matrix:
         esphome-version:
           - 2026.6.0
           - 2026.7.4
+          - dev
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        id: python
         uses: actions/setup-python@v7
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
       - name: Install ESPHome
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          if [ "${{ matrix.esphome-version }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          fi
+          .venv/bin/esphome version
 
-      - name: Check tests/configs/esp32-all-endpoints.yaml
-        run: .venv/bin/esphome config tests/configs/esp32-all-endpoints.yaml
-      - name: Check tests/configs/esp32-thread.yaml
-        run: .venv/bin/esphome config tests/configs/esp32-thread.yaml
-      - name: Check tests/configs/esp32-wifi.yaml
-        run: .venv/bin/esphome config tests/configs/esp32-wifi.yaml
+      # Every tests/configs/*.yaml is picked up automatically (glob).
+      - name: Validate tests/configs/*.yaml
+        env:
+          VALIDATE_DIRS: tests/configs
+        run: tests/validate.sh .venv/bin/esphome
 
+      # The examples are user-facing templates; several need user-specific
+      # values (SSID, variant, ...) and do not validate as-is. Report only.
+      - name: Validate examples/*.yaml (non-blocking)
+        continue-on-error: true
+        env:
+          VALIDATE_DIRS: examples
+        run: tests/validate.sh .venv/bin/esphome
+
+  # ---------------------------------------------------------------------------
+  # Compile matrix (native ESP-IDF toolchain)
+  # ---------------------------------------------------------------------------
   compile:
-    name: Compile ${{ matrix.config }} (ESPHome ${{ matrix.esphome-version }})
+    name: Compile ${{ matrix.name }} (ESPHome ${{ matrix.esphome }})
     runs-on: ubuntu-24.04
     needs: validate
-    if: github.ref != 'refs/heads/main'
+    timeout-minutes: 120
+    continue-on-error: ${{ matrix.esphome == 'dev' }}
     strategy:
+      fail-fast: false
       matrix:
-        config:
-          - tests/configs/esp32-thread.yaml
-          - tests/configs/esp32-wifi.yaml
-        esphome-version:
-          # - 2026.6.0
-          - 2026.7.4
-
+        esphome:
+          - dev
+          - release
+        slug:
+          - c6-wifi
+          - c6-thread
+          - h2-thread
+          - s3-wifi
+          - c3-wifi
+        include:
+          # Extra properties per slug (matched on `slug`, applied to every ESPHome version).
+          - { slug: c6-wifi, name: C6 wifi, variant: ESP32C6, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-thread, name: C6 thread, variant: ESP32C6, config: tests/configs/esp32-thread.yaml }
+          - { slug: h2-thread, name: H2 thread, variant: ESP32H2, config: tests/configs/esp32-thread.yaml }
+          - { slug: s3-wifi, name: S3 wifi, variant: ESP32S3, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        id: python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ env.DEFAULT_PYTHON }}
-      - name: Install ESPHome
+
+      - name: Free disk space
         run: |
-          python -m venv .venv
-          .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
 
-      - name: Cache PlatformIO
-        uses: actions/cache@v6
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-${{ matrix.config }}
-          restore-keys: |
-            ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-
-      - name: Cache ESPHome build
-        uses: actions/cache@v6
-        with:
-          path: tests/configs/.esphome/build
-          key: ${{ runner.os }}-build-${{ matrix.esphome-version }}-${{ matrix.config }}
-
-      #  - name: Install ccache
-      #    run: sudo apt-get update && sudo apt-get install -y ccache
-
-      #  - name: Cache ccache
-      #    uses: actions/cache@v6
-      #    with:
-      #      path: ${{ github.workspace }}/.ccache
-      #      key: ${{ runner.os }}-ccache-${{ matrix.esphome-version }}-${{ matrix.config }}
-
-      - name: Compile ESPHome config
-        #  env:
-        #    IDF_CCACHE_ENABLE: "1"
-        #    CCACHE_DIR: ${{ github.workspace }}/.ccache
-        #    CCACHE_BASEDIR: ${{ github.workspace }}
-        #    CCACHE_COMPILERCHECK: content
-        run: .venv/bin/esphome compile "${{ matrix.config }}"
-
-      #  - name: Print ccache statistics
-      #    env:
-      #      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      #    run: ccache -s
-
-  compile-all-wifi-variants:
-    name: Compile matter-over-wifi ${{ matrix.esp32-variant }} (ESPHome ${{ matrix.esphome-version }})
-    runs-on: ubuntu-24.04
-    needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      matrix:
-        esphome-version:
-          - 2026.7.4
-        esp32-variant:
-          # - ESP32
-          # - ESP32C2
-          - ESP32C3
-          # - ESP32C5
-          # - ESP32C6
-          # - ESP32S2
-          - ESP32S3
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
         uses: actions/setup-python@v7
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+
+      - name: Install ccache
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache
+
+      - name: Configure cache locations
+        id: cfg
+        run: |
+          # ESPHome uses ccache automatically when it is on PATH. Keep the IDF
+          # tools and the ccache directory in separate, individually cached
+          # folders (ESPHome would otherwise nest ccache inside the IDF prefix).
+          echo "ESPHOME_ESP_IDF_PREFIX=$HOME/.cache/esphome-idf" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
       - name: Install ESPHome
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          if [ "${{ matrix.esphome }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install --upgrade esphome
+          fi
+          .venv/bin/esphome version | tee esphome-version.txt
 
-      - name: Cache PlatformIO
+      # ESP-IDF toolchains + python env (several GB; refreshed weekly).
+      - name: Cache ESP-IDF install
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ESPHOME_ESP_IDF_PREFIX }}
+            ~/.espressif
+          key: idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-${{ steps.cfg.outputs.week }}
+          restore-keys: |
+            idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-
+            idf-${{ runner.os }}-${{ matrix.esphome }}-
+
+      # esp_matter (+ connectedhomeip) fetched by the IDF component manager.
+      - name: Cache managed_components (esp_matter)
+        uses: actions/cache@v6
+        with:
+          path: |
+            tests/configs/.esphome/build/*/managed_components
+            tests/configs/.esphome/build/*/dependencies.lock
+          key: managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-${{ hashFiles('components/matter/__init__.py') }}
+          restore-keys: |
+            managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-
+            managed-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Cache PlatformIO (only with platformio toolchain)
+        if: env.CI_TOOLCHAIN == 'platformio'
         uses: actions/cache@v6
         with:
           path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-${{ matrix.esp32-variant }}-wifi
+          key: pio-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-${{ steps.cfg.outputs.week }}
           restore-keys: |
-            ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-
-      - name: Cache ESPHome build
-        uses: actions/cache@v6
-        with:
-          path: tests/configs/.esphome/build
-          key: ${{ runner.os }}-build-${{ matrix.esphome-version }}-${{ matrix.esp32-variant }}-wifi
-          restore-keys: |
-            ${{ runner.os }}-build-${{ matrix.esphome-version }}-
+            pio-${{ runner.os }}-${{ matrix.esphome }}-
 
-      - name: Compile ESPHome config
-        run: .venv/bin/esphome -s esp32_variant "${{ matrix.esp32-variant }}" compile tests/configs/esp32-wifi.yaml
-
-  compile-all-thread-variants:
-    name: Compile matter-over-thread ${{ matrix.esp32-variant }} (ESPHome ${{ matrix.esphome-version }})
-    runs-on: ubuntu-24.04
-    needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      matrix:
-        esphome-version:
-          - 2026.7.4
-        esp32-variant:
-          # - ESP32C5
-          # - ESP32C6
-          - ESP32H2
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ env.DEFAULT_PYTHON }}
-      - name: Install ESPHome
+      - name: Prepare config (local components, toolchain ${{ env.CI_TOOLCHAIN }})
+        id: prep
         run: |
-          python -m venv .venv
-          .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          if [ "$CI_TOOLCHAIN" = "platformio" ]; then tc=keep; else tc=esp-idf; fi
+          path=$(python .github/scripts/ci_prepare.py "${{ matrix.config }}" --toolchain "$tc")
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          grep -n "toolchain" "$path" || echo "(no toolchain line; ESPHome default applies)"
 
-      - name: Cache PlatformIO
-        uses: actions/cache@v6
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-${{ matrix.esp32-variant }}-thread
-          restore-keys: |
-            ${{ runner.os }}-platformio-${{ matrix.esphome-version }}-
-      - name: Cache ESPHome build
-        uses: actions/cache@v6
-        with:
-          path: tests/configs/.esphome/build
-          key: ${{ runner.os }}-build-${{ matrix.esphome-version }}-${{ matrix.esp32-variant }}-thread
-          restore-keys: |
-            ${{ runner.os }}-build-${{ matrix.esphome-version }}-
+      - name: Compile
+        run: |
+          set -o pipefail
+          ccache --zero-stats || true
+          .venv/bin/esphome -s esp32_variant "${{ matrix.variant }}" compile "${{ steps.prep.outputs.path }}" 2>&1 | tee compile.log
 
-      - name: Compile ESPHome config
-        run: .venv/bin/esphome -s esp32_variant "${{ matrix.esp32-variant }}" compile tests/configs/esp32-thread.yaml
+      - name: Firmware size summary
+        if: always()
+        run: |
+          python .github/scripts/size_summary.py compile.log tests/configs/.esphome/build \
+            "${{ matrix.name }}, ESPHome ${{ matrix.esphome }} ($(tail -n1 esphome-version.txt)), toolchain ${CI_TOOLCHAIN}"
+
+      - name: ccache statistics
+        if: always()
+        run: |
+          {
+            echo "<details><summary>ccache statistics (${{ matrix.name }}, ESPHome ${{ matrix.esphome }})</summary>"
+            echo
+            echo '```'
+            ccache --show-stats || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compile log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compile-log-${{ matrix.slug }}-${{ matrix.esphome }}
+          path: compile.log
+          retention-days: 7
