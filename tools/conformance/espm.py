@@ -522,15 +522,30 @@ def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
 
 
 # --------------------------------------------------------------------- queries
-# Elements that a feature's add() creates only when another feature is absent. The extractor
-# does not follow such guards, so they are listed here: (cluster namespace, enabled feature) ->
-# {"events": [...]} removed again.
+# Elements that esp-matter creates only for a combination of features. The extractor attributes
+# them to a single feature, so the missing half of the condition is listed here:
+# (cluster namespace, features that must be enabled, features that must be absent, removed).
+# The elements are removed from the prediction when the combination holds.
 #   switch_cluster::feature::momentary_switch_multi_press::add (esp_matter_feature.cpp) calls
 #   create_multi_press_ongoing() only when ActionSwitch is not in the feature map, matching the
 #   spec (MultiPressOngoing: MSM & !AS).
-GUARDED_AWAY = {
-    ("switch_cluster", "action_switch"): {"events": ["multi_press_ongoing"]},
-}
+#   door_lock::feature::credential_over_the_air_access::add and pin_credential::add create
+#   RequirePINforRemoteOperation only when the other feature is already in the feature map,
+#   matching the spec (COTA & PIN).
+GUARDED_AWAY = [
+    (
+        "switch_cluster",
+        ("action_switch",),
+        (),
+        {"events": ["multi_press_ongoing"]},
+    ),
+    (
+        "door_lock",
+        ("credential_over_the_air_access",),
+        ("pin_credential",),
+        {"attrs": ["require_pin_for_remote_operation"]},
+    ),
+]
 
 
 class Profile:
@@ -597,8 +612,14 @@ class Profile:
                 attrs |= {norm(a) for a in f["attrs"]}
                 cmds |= {norm(a) for a in f["cmds"]}
                 events |= {norm(a) for a in f["events"]}
-        for (gns, gfeat), gone in GUARDED_AWAY.items():
-            if gns == ns and self._fnorm(gfeat) in enabled:
+        for gns, present, absent, gone in GUARDED_AWAY:
+            if (
+                gns == ns
+                and all(self._fnorm(f) in enabled for f in present)
+                and not any(self._fnorm(f) in enabled for f in absent)
+            ):
+                attrs -= {norm(a) for a in gone.get("attrs", ())}
+                cmds -= {norm(a) for a in gone.get("cmds", ())}
                 events -= {norm(a) for a in gone.get("events", ())}
         return attrs, cmds, events
 
