@@ -1,17 +1,30 @@
-esphome:
+# Hardware: any ESP32-C6 board (default esp32-c6-devkitc-1) with a dimmable LED/MOSFET on a PWM-capable GPIO.
+# Demonstrates: implementing a Matter dimmable light by pulling in this repository's remote package
+# (packages/dimmable-light.yaml) instead of the built-in `light_id` mapping. The package wires the Matter
+# on_off/level_control attributes to an ESPHome light. For normal use prefer `dimmable_light: light_id:`
+# (see extended-color-light.yaml); this example shows how packages with variables work.
+
+substitutions:
   name: matter-dimmer-light-package
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  light_pin: GPIO8
+
+esphome:
+  name: ${name}
 
 esp32:
-  variant: ESP32C6
+  board: ${board}
+  variant: ${variant}
   framework:
     type: esp-idf
 
 external_components:
-  - source: github://DavidvtWout/esphome-matter@main
+  - source: github://rjt-rockx/esphome-matter@main
 
 packages:
   matter_devices:
-    url: https://github.com/DavidvtWout/esphome-matter
+    url: https://github.com/rjt-rockx/esphome-matter
     ref: main
     files:
       - path: packages/dimmable-light.yaml
@@ -26,13 +39,14 @@ api:
 network:
   enable_ipv6: true
 
-openthread:
-  tlv: !secret thread_tlv
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 output:
   - platform: ledc
     id: dimmable_light_output
-    pin: GPIO8
+    pin: ${light_pin}
 
 light:
   - platform: monochromatic
