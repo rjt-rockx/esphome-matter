@@ -53,7 +53,7 @@ The tradeoff is that the device can not show its original passcode later. This i
 | Last fabric removed | The device becomes commissionable again with a freshly generated passcode (shown in the log / text sensors). |
 | `passcode:` set in YAML | The passcode is fixed, compiled into the firmware and shared by every device built from that YAML. It is always known, but still only printed while the window is open. Prefer the random passcode. |
 
-If you want the old behaviour (a sticker on the device that stays valid forever), set `persist_passcode: true`. The plaintext passcode is then kept in flash and CHIP logs it at boot.
+If you want the old behaviour (a sticker on the device that stays valid forever), set `persist_passcode: true`. The plaintext passcode is then kept in flash (`pin-code` key), so the same code is shown whenever a window opens. It is still only logged while a window is open: the provider never hands the passcode to CHIP.
 
 ```yaml
 matter:
@@ -121,19 +121,16 @@ button:
 ```
 
 - `matter.open_commissioning_window` opens a commissioning window for 3 to 15 minutes with a new random passcode, and logs/publishes it. On an uncommissioned device it re-opens the normal window instead.
-- `matter.factory_reset` removes all fabrics: it clears the esp-matter data and the CHIP configuration, counters and key-value store (fabrics, ACLs, groups, ...) via the CHIP task and reboots. The passcode verifier and discriminator are kept, and after the reboot the device is commissionable again. (An uncommissioned device after a reset gets a fresh passcode, because the old one is no longer known.)
+- `matter.factory_reset` removes all fabrics: it clears the esp-matter data and the CHIP configuration, counters and key-value store (fabrics, ACLs, groups, ...) via the CHIP task and reboots. The discriminator is kept and after the reboot the device is commissionable again. Unless the passcode is persisted or fixed in the YAML the device no longer knows it, so a fresh passcode is generated on that boot and shown in the log.
 - `matter.reset_identity` does the same and additionally erases the commissioning identity: a new passcode and discriminator are generated on the next boot. Previously printed codes become invalid. If `passcode:` or `discriminator:` are set in the YAML, those values are used again.
 
 Neither action asks for confirmation. Put them behind something deliberate (a long button press, a config-category button).
 
 # Multiple fabrics
 
-Up to 5 fabrics are supported by default, but if needed, this can be increased with the `CONFIG_MAX_FABRICS` sdkconfig option:
+Up to 5 fabrics are supported by default. To raise the limit use the `max_fabrics` option (5 to 254), see [device-info.md](device-info.md#fabric-limit):
 
 ```yaml
-esp32:
-  framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_MAX_FABRICS: # Set to anything from 5 to 255
+matter:
+  max_fabrics: 8
 ```

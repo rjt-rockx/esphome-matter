@@ -3,7 +3,6 @@
 
 #include "matter_commissioning.h"
 
-#include "esphome/core/application.h"
 #include "esphome/core/log.h"
 #include "matter_component.h"
 
@@ -124,11 +123,12 @@ public:
   CHIP_ERROR GetSpake2pVerifier(chip::MutableByteSpan &verifier,
                                 size_t &out_len) override {
     const auto &id = this->owner_->identity_;
+    // Valid for CHIP_ERROR_BUFFER_TOO_SMALL as well (see CommissionableDataProvider.h).
+    out_len = id.verifier_len;
     VerifyOrReturnError(verifier.size() >= id.verifier_len,
                         CHIP_ERROR_BUFFER_TOO_SMALL);
     memcpy(verifier.data(), id.verifier, id.verifier_len);
     verifier.reduce_size(id.verifier_len);
-    out_len = id.verifier_len;
     return CHIP_NO_ERROR;
   }
   CHIP_ERROR GetSetupPasscode(uint32_t &) override {
@@ -322,6 +322,7 @@ void MatterCommissioning::refresh_(bool log_codes, bool publish) {
   auto &server = chip::Server::GetInstance();
   auto &wm = server.GetCommissioningWindowManager();
   CommissioningState s;
+  s.valid = true;
   s.window_open = wm.IsCommissioningWindowOpen();
   s.fabric_count = server.GetFabricTable().FabricCount();
   if (s.window_open) {
@@ -349,8 +350,9 @@ void MatterCommissioning::refresh_(bool log_codes, bool publish) {
                s.qr_code.c_str());
       ESP_LOGI(TAG, "Manual pairing code: %s", s.manual_code.c_str());
     } else {
-      ESP_LOGI(TAG, "Commissioning window open (pairing code is not "
-                    "available on this device; see docs/commissioning.md)");
+      ESP_LOGI(TAG, "Commissioning window open (the device does not know the "
+                    "pairing code; the controller that opened it does, see "
+                    "docs/commissioning.md)");
     }
   }
   if (!publish || global_matter_component == nullptr)
@@ -384,14 +386,16 @@ void MatterCommissioning::on_server_ready_() {
 void MatterCommissioning::on_fabric_removed_() {
   auto &server = chip::Server::GetInstance();
   auto &wm = server.GetCommissioningWindowManager();
+  const bool resetting = this->resetting_.load();
   if (server.GetFabricTable().FabricCount() == 0) {
-    // Last fabric gone: the device must become commissionable again.
-    if (!this->identity_.passcode_known) {
+    // Last fabric gone: the device must become commissionable again. (Not when
+    // resetting: the reboot follows right away and handles that.)
+    if (!resetting && !this->identity_.passcode_known) {
       Identity fresh = this->identity_;
       if (this->generate_passcode_(fresh) && this->store_identity_(fresh))
         this->identity_ = fresh;
     }
-    if (!wm.IsCommissioningWindowOpen() &&
+    if (!resetting && !wm.IsCommissioningWindowOpen() &&
         wm.OpenBasicCommissioningWindow() != CHIP_NO_ERROR)
       ESP_LOGW(TAG, "Failed to re-open the commissioning window");
     if (global_matter_component != nullptr)
@@ -400,7 +404,8 @@ void MatterCommissioning::on_fabric_removed_() {
           cb();
       });
   }
-  this->refresh_(true);
+  if (!resetting)
+    this->refresh_(true);
 }
 
 void MatterCommissioning::handle_event(const ChipDeviceEvent *event) {
@@ -523,31 +528,22 @@ void MatterCommissioning::erase_identity_keys_() {
   nvs_close(h);
 }
 
-// Fallback if esp_matter could not schedule the CHIP factory reset.
-void MatterCommissioning::reboot_after_reset_() {
-  for (const char *ns : {"chip-config", "chip-counters", "CHIP_KVS"}) {
-    nvs_handle_t h;
-    if (nvs_open(ns, NVS_READWRITE, &h) == ESP_OK) {
-      nvs_erase_all(h);
-      nvs_commit(h);
-      nvs_close(h);
-    }
-  }
-  App.safe_reboot();
-}
-
 void MatterCommissioning::factory_reset() {
   ESP_LOGW(TAG, "Matter factory reset: removing all fabrics and rebooting");
-  // Erases esp-matter's own KVS namespace, then asks the CHIP task to clear
-  // chip-config, chip-counters and the CHIP KVS (fabrics, ACLs, groups,
-  // sessions) and to restart.
+  this->resetting_ = true;
+  // Erases esp-matter's own KVS namespace, then asks the CHIP task to delete
+  // all fabrics, clear chip-config, chip-counters and the CHIP KVS (fabrics,
+  // ACLs, groups, sessions, subscriptions), restore the Wi-Fi settings and
+  // restart. Only the esp-matter step can report an error, and the CHIP part
+  // is scheduled regardless.
   if (esp_matter::factory_reset() != ESP_OK)
-    this->reboot_after_reset_();
+    ESP_LOGE(TAG, "Failed to erase the esp-matter data; the CHIP reset still runs");
 }
 
 void MatterCommissioning::reset_identity() {
   ESP_LOGW(TAG, "Matter identity reset: removing all fabrics and creating a "
                 "new passcode and discriminator on the next boot");
+  this->resetting_ = true;
   this->erase_identity_keys_();
   this->factory_reset();
 }
