@@ -18,12 +18,13 @@ from . import binary_sensors
 from .const import *
 from .covers import WINDOW_COVERING
 from .covers import config_lines as cover_config_lines
-from .data_model.attributes import SensorAttribute, attribute_value_type
+from .data_model.attributes import Attribute, SensorAttribute, attribute_value_type
 from .data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME, Cluster
 from .data_model.device_types import (
     DEVICE_TYPES,
     DEVICE_TYPES_BY_CONF_KEY,
     DEVICE_TYPES_BY_ID,
+    FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
 from . import fan_binding
@@ -34,6 +35,20 @@ from .matter_climate import (
     post_create_lines as climate_post_create_lines,
 )
 from .lock_valve import device_config_lines, register_entity
+from .generic_switch import multi_press_max_line, register_switch_binding
+from .data_model.units import MEASUREMENT_UNITS
+from .sensor_mapping import (
+    CONF_BATTERY,
+    CONF_MEASUREMENT_UNITS,
+    battery_sensor_attribute,
+    configure_electrical_sensor,
+    converter_expression,
+    electrical_config_lines,
+    optional_attribute_lines,
+    plan_sensor,
+    sensor_unit_info,
+    validate_battery_binding,
+)
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -136,10 +151,13 @@ ENDPOINT_SCHEMA = cv.All(
                 cv.one_of(*(cluster.name for cluster in CLUSTERS))
             ),
             cv.Optional(CONF_ON_ATTRIBUTE): _on_attribute_schema(),
+            # Battery level sensor (%) exposed through a Power Source cluster on this endpoint.
+            cv.Optional(CONF_BATTERY): cv.use_id(Sensor),
         }
         | {device_type.schema_key: device_type.schema() for device_type in DEVICE_TYPES}
     ),
     _validate_on_attribute_forms,
+    validate_battery_binding,
 )
 
 
@@ -166,6 +184,9 @@ class Endpoint:
         self._light_variables = {}
         self._fan_variable = None
         self._climate_variables = {}
+        # (Cluster, Attribute) of sensor attributes that esp-matter does not create itself.
+        self._optional_attributes: list[tuple[Cluster, Attribute]] = []
+        self._electrical_power_features: list[str] = []
 
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
@@ -198,6 +219,11 @@ class Endpoint:
             device_type = DEVICE_TYPES_BY_CONF_KEY.get(conf_key)
             if device_type:
                 await self._configure_device_type(var, device_type, device_config)
+
+        if sensor_id := self._config.get(CONF_BATTERY):
+            battery = battery_sensor_attribute()
+            self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
+            await self._register_sensor_attribute(var, sensor_id, battery)
 
         for cluster_name in self._config[CONF_EXTRA_CLUSTERS]:
             cluster = CLUSTERS_BY_NAME[cluster_name]
@@ -261,6 +287,14 @@ class Endpoint:
                     var, sensor_id, sensor_attr, device_type, device_config
                 )
 
+        if device_type.name == "electrical_sensor":
+            self._electrical_power_features = configure_electrical_sensor(
+                self._cluster_configs, device_type, device_config
+            )
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_sensors.h"'
+            )
+
         # Register ESPHome entities
         if CONF_LIGHT_ID in device_config:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
@@ -289,11 +323,16 @@ class Endpoint:
             prefer_cooling = device_type.name == "room_air_conditioner"
             cg.add(var.register_climate(climate_, self._endpoint_id, prefer_cooling))
 
+        # Register Switch cluster event bindings
+        await register_switch_binding(var, self._endpoint_id, device_config)
+
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
             for cluster in device_type.server_clusters:
-                cluster_config = self._cluster_configs[cluster.name]
+                # Only touch clusters that have the feature. Looking up the config
+                # of every cluster would mark all optional clusters as to be created.
                 if enabled_feature in (f.name for f in cluster.features):
+                    cluster_config = self._cluster_configs[cluster.name]
                     cluster_config.enabled_features[enabled_feature] = True
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
@@ -364,10 +403,17 @@ class Endpoint:
                 if not enabled:
                     continue
                 feature = features_by_name[feature_name]
-                if cluster.is_choice_feature(feature):
+                if (
+                    cluster.is_choice_feature(feature)
+                    or cluster.name in FLAG_DRIVEN_CLUSTERS
+                ):
                     feature_flags.append(
                         f"esp_matter::cluster::{cluster.espm_namespace}::feature::{feature.namespace}::get_id()"
                     )
+            if cluster.name == "Switch" and (
+                line := multi_press_max_line(config_var, device_config)
+            ):
+                lines.append(line)
             if feature_flags:
                 lines.append(
                     f"{config_var}.{cluster.espm_namespace}.feature_flags = {' | '.join(feature_flags)};"
@@ -377,6 +423,16 @@ class Endpoint:
         climate_ = self._climate_variables.get(device_type.name)
         if climate_ is not None:
             lines.extend(climate_config_lines(config_var, climate_, device_type.name))
+
+        if device_type.name == "electrical_sensor":
+            lines.extend(
+                electrical_config_lines(
+                    config_var,
+                    self._endpoint_id,
+                    self._cluster_configs,
+                    self._electrical_power_features,
+                )
+            )
 
         lines.extend(
             (
@@ -393,8 +449,8 @@ class Endpoint:
         var,
         sensor_id: ID,
         sensor_attribute: SensorAttribute,
-        device_type: DeviceType,
-        device_config: dict,
+        device_type: DeviceType | None = None,
+        device_config: dict | None = None,
     ):
         cluster = sensor_attribute.cluster
         attribute = sensor_attribute.attribute
@@ -406,24 +462,39 @@ class Endpoint:
         self._cluster_configs[cluster.name].created |= False
         for feature_name in sensor_attribute.features:
             self._cluster_configs[cluster.name].enabled_features[feature_name] = True
+        if sensor_attribute.create_attribute:
+            self._optional_attributes.append((cluster, attribute))
+
+        # Warnings were already logged during final validation.
+        override = (device_config or {}).get(CONF_MEASUREMENT_UNITS, {})
+        unit, device_class = (None, None)
+        if sensor_attribute.family is not None:
+            unit, device_class = sensor_unit_info(CORE.config, sensor_id)
+        plan = plan_sensor(
+            sensor_attribute,
+            unit,
+            device_class,
+            override.get(sensor_attribute.conf_key),
+        )
 
         sensor = await cg.get_variable(sensor_id)
-        converter_name = sensor_attribute.converter
         binding = None
+        converter = converter_expression(sensor_attribute, plan)
         if sensor_attribute.sensor_type is BinarySensor:
             # Polarity, occupancy sensor type and alarm levels depend on the device_class (see binary_sensors.py).
             device_class = binary_sensors.get_device_class(CORE.config, sensor_id)
             binding = binary_sensors.resolve_binding(
                 device_type, sensor_attribute, device_config, device_class
             )
-            converter_name = binding.converter
+            converter = cg.RawExpression(
+                f"esphome::matter::conversion::{binding.converter}"
+            )
             if cluster.name == "OccupancySensing" and (
                 feature := binary_sensors.implied_occupancy_feature(
                     device_config, device_class
                 )
             ):
                 self._cluster_configs[cluster.name].enabled_features[feature] = True
-        converter = cg.RawExpression(f"esphome::matter::conversion::{converter_name}")
         if binding is not None:
             self.global_includes.add(binding.include)
             if binding.converter != sensor_attribute.converter:
@@ -432,6 +503,29 @@ class Endpoint:
             if sensor_attribute.code_driven:
                 args.append(cg.RawExpression(f"esphome::matter::{binding.updater}"))
             cg.add(var.register_binary_sensor_attribute(*args))
+        elif sensor_attribute.kind == "concentration":
+            cg.add(
+                var.register_concentration_sensor(
+                    sensor,
+                    self._endpoint_id,
+                    cluster.id,
+                    attribute.id,
+                    converter,
+                    MEASUREMENT_UNITS[plan.measurement_unit],
+                )
+            )
+        elif sensor_attribute.kind == "electrical_power":
+            cg.add(
+                var.register_electrical_power_sensor(
+                    sensor, self._endpoint_id, attribute.id, converter
+                )
+            )
+        elif sensor_attribute.kind == "electrical_energy":
+            cg.add(
+                var.register_electrical_energy_sensor(
+                    sensor, self._endpoint_id, attribute.id, converter
+                )
+            )
         elif sensor_attribute.code_driven:
             self.global_includes.add(cluster.chip_include)
             cluster_type = cg.RawExpression(cluster.chip_fqn)
@@ -507,6 +601,8 @@ class Endpoint:
             if not cluster_config.created:
                 continue
             cluster = CLUSTERS_BY_NAME[cluster_name]
+            if cluster_name in FLAG_DRIVEN_CLUSTERS:
+                continue  # All features are already set through feature_flags.
             features_by_name = {feature.name: feature for feature in cluster.features}
             direct_features = [
                 features_by_name[feature_name]
@@ -542,6 +638,9 @@ class Endpoint:
                         "  return false;",
                     )
                 )
+
+        # Optional attributes can only be created once their cluster exists.
+        lines.extend(optional_attribute_lines(self._optional_attributes))
 
         lines.extend(("return true;", "}"))
         return "\n".join(lines)

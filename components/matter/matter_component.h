@@ -11,6 +11,7 @@
 #include "matter_device_info.h"
 #include "matter_endpoints.h"
 #include "matter_fan.h"
+#include "matter_generic_switch.h"
 #include "matter_lights.h"
 #include "matter_lock.h"
 #include "matter_sensors.h"
@@ -103,6 +104,21 @@ public:
         sensor, endpoint_id, cluster_id, attribute_id, converter,
         update_code_driven_sensor_attribute<ClusterT, ValueT, Setter>));
   }
+
+  // Defined in matter_sensors.cpp
+  void register_concentration_sensor(sensor::Sensor *sensor,
+                                     uint16_t endpoint_id, uint32_t cluster_id,
+                                     uint32_t attribute_id,
+                                     SensorValueConverter converter,
+                                     uint8_t measurement_unit);
+  void register_electrical_power_sensor(sensor::Sensor *sensor,
+                                        uint16_t endpoint_id,
+                                        uint32_t attribute_id,
+                                        SensorValueConverter converter);
+  void register_electrical_energy_sensor(sensor::Sensor *sensor,
+                                         uint16_t endpoint_id,
+                                         uint32_t attribute_id,
+                                         SensorValueConverter converter);
 #endif // USE_SENSOR
 #ifdef USE_BINARY_SENSOR
   void
@@ -112,6 +128,11 @@ public:
                                    BinarySensorValueConverter converter,
                                    SensorAttributeUpdater updater = nullptr);
 #endif // USE_BINARY_SENSOR
+
+  // Register an ESPHome entity mapping created by codegen.
+  void register_mapping(MatterEndpointMappingBase *mapping) {
+    this->mappings_.push_back(mapping);
+  }
 
   // Public wrapper around the protected Component scheduler; used by the
   // Matter-thread callbacks to hop onto the main loop (defer is thread-safe).

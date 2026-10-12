@@ -1,0 +1,52 @@
+# A wireless (Thread) button exposed as a Matter Generic Switch.
+#
+# After commissioning, the controller gets a switch endpoint that emits press events: short press, double press and
+# long press. In Home Assistant these show up as an event entity. See docs/generic-switch.md.
+
+esphome:
+  name: matter-button
+  friendly_name: Matter Button
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://DavidvtWout/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      generic_switch:
+        binary_sensor_id: button
+        # Hold the button for 600ms for a long press.
+        long_press_time: 600ms
+        # Count presses that are at most 350ms apart as one multi-press sequence, up to triple press.
+        multi_press_window: 350ms
+        multi_press_max: 3
+
+# The button is triggered when the GPIO pin is pulled down to GND.
+binary_sensor:
+  - id: button
+    platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    # Simple debouncing.
+    filters:
+      - delayed_on_off: 20ms

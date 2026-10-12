@@ -217,11 +217,13 @@ matter:
         radon: radon_id
 ```
 
-Known gap: the concentration measurement unit is not set per attribute, so Matter reports the default unit (ppm) for every concentration. Treat PM and radon values with care until this is fixed (see [ROADMAP.md](ROADMAP.md)).
-
 ### electrical_sensor
 
-This device type exposes power and energy measurement clusters. It currently can't be created successfully in esphome-matter. Electrical power and energy is among the most requested sensor features (see [ROADMAP.md](ROADMAP.md)).
+This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the configuration.
+
+# generic_switch
+
+The `generic_switch` is a stateless programmable button that emits Matter events (press, long press, multi press). See [generic-switch.md](./generic-switch.md).
 
 # Untested / unsupported
 
@@ -229,7 +231,6 @@ The device types below can usually be created (add the key under an endpoint), b
 
 - door_lock
 - aggregator
-- generic_switch
 - power_source
 - ota_requestor
 - bridged_node
