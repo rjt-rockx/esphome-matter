@@ -1,0 +1,64 @@
+# mirrors: mock-doorbell,mock-chime
+# Doorbell push button + local buzzer chime. VARIANT (a): explicit `endpoints:` with the Doorbell device type.
+#
+# Mirrors: HA fixtures mock_doorbell.json (Doorbell 0x0148: Identify, Descriptor, Switch MS+MSR+MSL, NumberOfPositions 2,
+#   events InitialPress/ShortRelease/LongPress/LongRelease) and mock_chime.json (Chime 0x0146 with Identify + Chime
+#   server cluster), evidence=dump (HA SDK test mocks, not retail products).
+# Matches: doorbell endpoint, Switch feature map MS+MSR+MSL (no multi-press), press events from the push button.
+# Differs:
+#   - GAP-COMPONENT / EXPECTED CONFORMANCE ERROR (DT-CLUSTER-MISSING): the Chime device type (EP2) is created, but
+#     its mandatory Chime server cluster (ChimeSounds, SelectedChime, Enabled, PlayChimeSound) is neither created by
+#     esp-matter's device type add() nor by the component, and there is no ESPHome mapping (rtttl / buzzer / speaker).
+#     `esphome config` accepts this file; `python -m tools.conformance` reports the error. Drop endpoint 2 for a valid
+#     node (see doorbell-expose.yaml). ESPHome automation (rtttl.play) is the only local sound.
+#   - A Doorbell with a Chime sibling is the "pairing" a spec-aware controller would link; the link (Binding of the
+#     doorbell to the Chime) is a controller-side Binding on the doorbell, not expressible from YAML.
+#   - The real mock has FixedLabel/UserLabel on the root; we do not.
+esphome:
+  name: doorbell-chime
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      label: "Front door"
+      doorbell:
+        binary_sensor_id: doorbell_button
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress]
+    2:
+      label: "Chime"
+      chime:
+
+binary_sensor:
+  - platform: gpio
+    id: doorbell_button
+    name: "Doorbell"
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 30ms
+    on_press:
+      then:
+        - rtttl.play: "doorbell:d=4,o=5,b=140:e6,8c6,8d6,2g5"
+
+output:
+  - platform: ledc
+    id: buzzer
+    pin: GPIO8
+
+rtttl:
+  output: buzzer

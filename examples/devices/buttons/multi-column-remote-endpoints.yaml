@@ -1,0 +1,166 @@
+# mirrors: sdk-chef-multi-column-switch-9ep
+# Multi-column wall remote: 3 columns x (up, down, push) = 9 Generic Switch endpoints, each with its own Power Source
+# device type on the same endpoint. VARIANT (a): explicit `endpoints:` (two device types per endpoint).
+#
+# Mirrors: connectedhomeip chef "multi_column_switch" (sdk-reference, evidence=dump of the ZAP): EP1..EP9, device types
+#   [Generic Switch 0x000F, Power Source 0x0011] on each, Switch FM 22 (MS+MSR+MSM) for up/down, FM 30 (+MSL) for push.
+#   The ZAP carries no TagList although the Duplicate rule applies.
+# Matches: 9 endpoints, two device types per endpoint, Switch feature maps 22/30, PowerSource (BAT) on each endpoint.
+# Differs:
+#   - we ADD a Common Number TagList (1..9) and labels, which the spec requires (REAL-DEVICE-NONCONFORMANT: the chef
+#     ZAP has none).
+#   - GAP-COMPONENT: nine Power Source clusters would all report the same battery; the `power_source:` block binds the
+#     same sensor on each endpoint (no sharing/`attach_to`). A real device has one battery and one Power Source.
+#   - ESP_MATTER_MAX_DEVICE_TYPE_COUNT / dynamic endpoint count are derived from this layout (10 endpoints).
+esphome:
+  name: multi-column-remote
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      label: "Col 1 up"
+      generic_switch:
+        binary_sensor_id: col1_up
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    2:
+      label: "Col 1 down"
+      generic_switch:
+        binary_sensor_id: col1_down
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    3:
+      label: "Col 1 push"
+      generic_switch:
+        binary_sensor_id: col1_push
+      power_source:
+        battery: batt
+    4:
+      label: "Col 2 up"
+      generic_switch:
+        binary_sensor_id: col2_up
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    5:
+      label: "Col 2 down"
+      generic_switch:
+        binary_sensor_id: col2_down
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    6:
+      label: "Col 2 push"
+      generic_switch:
+        binary_sensor_id: col2_push
+      power_source:
+        battery: batt
+    7:
+      label: "Col 3 up"
+      generic_switch:
+        binary_sensor_id: col3_up
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    8:
+      label: "Col 3 down"
+      generic_switch:
+        binary_sensor_id: col3_down
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 3
+      power_source:
+        battery: batt
+    9:
+      label: "Col 3 push"
+      generic_switch:
+        binary_sensor_id: col3_push
+      power_source:
+        battery: batt
+
+binary_sensor:
+  - platform: gpio
+    id: col1_up
+    name: "Column 1 up"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col1_down
+    name: "Column 1 down"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col1_push
+    name: "Column 1 push"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col2_up
+    name: "Column 2 up"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col2_down
+    name: "Column 2 down"
+    pin: {number: GPIO4, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col2_push
+    name: "Column 2 push"
+    pin: {number: GPIO5, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col3_up
+    name: "Column 3 up"
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col3_down
+    name: "Column 3 down"
+    pin: {number: GPIO7, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: col3_push
+    name: "Column 3 push"
+    pin: {number: GPIO8, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return 100.0;

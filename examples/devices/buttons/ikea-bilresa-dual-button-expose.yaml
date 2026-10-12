@@ -1,0 +1,64 @@
+# mirrors: ikea-bilresa-dual-button
+# IKEA BILRESA two-button remote rebuilt as an ESPHome node. VARIANT (b): `expose:` shorthand.
+#
+# Mirrors: HA fixture ikea_bilresa_dual_button.json (evidence=dump). See ikea-bilresa-dual-button-endpoints.yaml.
+# This is what a user who just wants "two buttons" writes. What it loses against the dump:
+#   - no `tags:` key on an expose item: the position (left/right) and switches (on/off/up/down/custom) semantic tags
+#     are not expressible, only the automatic Common Number tags. HA then names the entities after the FixedLabel
+#     (the entity name) which is fine for HA but Apple/Google cannot tell left from right (GAP-COMPONENT: `tags:`
+#     on expose items).
+#   - the auto Common Number tag follows the hashed endpoint number, not the order in the YAML.
+#   - the battery needs `attach_to:`/inference that expose does not have yet for `battery`; falls back to a hand
+#     written `endpoints:` entry next to `expose:`.
+esphome:
+  name: bilresa-dual-expose
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  ota: true
+  software_version: 1
+  expose:
+    - {id: btn_left, as: generic_switch, label: "Left", options: {multi_press_max: 2}}
+    - {id: btn_right, as: generic_switch, label: "Right", options: {multi_press_max: 2}}
+  endpoints:
+    10:
+      power_source:
+        battery: batt
+
+binary_sensor:
+  - platform: gpio
+    id: btn_left
+    name: "Button left"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_right
+    name: "Button right"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return 100.0;

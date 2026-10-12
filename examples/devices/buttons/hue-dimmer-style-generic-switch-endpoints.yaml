@@ -1,0 +1,80 @@
+# mirrors: generic-thread-3button-scene-switch
+# 4-button dimmer remote as four Generic Switches with Switches-namespace tags. VARIANT (c): explicit `endpoints:`.
+#
+# Mirrors: bridge-presented Hue dimmer switch / BILRESA-style tagging (HA fixtures ikea_bilresa_dual_button.json,
+#   inovelli_vtm31.json EP3-5): Descriptor TagList = [Position, Switches:<On|Up|Down|Off>, Number n], per-button label.
+# Matches: 4 sibling generic_switch endpoints, TagList with Switches namespace (0x43) On/Up/Down/Off + Common Number,
+#   label per button, long press and multi press enabled.
+# Differs: see hue-dimmer-style-generic-switch-expose.yaml for what the shorthand loses. Position tag omitted to stay
+#   within the 3 tags per endpoint that esp-matter stores.
+esphome:
+  name: hue-style-dimmer-tagged
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      label: "On"
+      tags:
+        - {namespace: common_number, tag: one}
+        - {namespace: switches, tag: "on"}
+      generic_switch: {binary_sensor_id: btn_on}
+    2:
+      label: "Brighter"
+      tags:
+        - {namespace: common_number, tag: two}
+        - {namespace: switches, tag: up}
+      generic_switch: {binary_sensor_id: btn_up}
+    3:
+      label: "Dimmer"
+      tags:
+        - {namespace: common_number, tag: three}
+        - {namespace: switches, tag: down}
+      generic_switch: {binary_sensor_id: btn_down}
+    4:
+      label: "Off"
+      tags:
+        - {namespace: common_number, tag: four}
+        - {namespace: switches, tag: "off"}
+      generic_switch: {binary_sensor_id: btn_off}
+
+binary_sensor:
+  - platform: gpio
+    id: btn_on
+    name: "On"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_up
+    name: "Brighter"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_down
+    name: "Dimmer"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_off
+    name: "Off"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms

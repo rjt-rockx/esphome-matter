@@ -1,0 +1,59 @@
+# mirrors: mock-doorbell
+# Doorbell push button with a local buzzer chime. VARIANT (b): Doorbell endpoint only (valid node).
+#
+# Mirrors: HA fixture mock_doorbell.json (evidence=dump, SDK test-app mock). EP1 Doorbell (0x0148): Identify,
+#   Descriptor, Switch MS+MSR+MSL, NumberOfPositions 2.
+# Matches: one Doorbell endpoint with Switch MS+MSR+MSL, press/release/long events from the button.
+# Differs:
+#   - GAP-COMPONENT: `expose: [{id: doorbell_button, as: doorbell}]` is rejected ("`as: doorbell` cannot bind a
+#     binary_sensor (it has 0 sensor attributes); use `endpoints:`"): only generic_switch has the binary_sensor
+#     binding key in expose's TYPE_ID_KEYS. Hence explicit endpoints here.
+#   - the Binding server cluster is added by the doorbell device type (the HA mock has none): ACCEPTABLE.
+#   - no Chime (see doorbell-chime-endpoints.yaml); audio_doorbell (0x0141) needs Camera AV Stream Management + WebRTC
+#     clusters, which neither the component nor esp-matter's device type add() can provide (GAP-SDK, none).
+#   - the local chime is plain ESPHome (rtttl) triggered by the same button.
+esphome:
+  name: doorbell
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      label: "Front door"
+      doorbell:
+        binary_sensor_id: doorbell_button
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress]
+
+binary_sensor:
+  - platform: gpio
+    id: doorbell_button
+    name: "Doorbell"
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 30ms
+    on_press:
+      then:
+        - rtttl.play: "doorbell:d=4,o=5,b=140:e6,8c6,8d6,2g5"
+
+output:
+  - platform: ledc
+    id: buzzer
+    pin: GPIO8
+
+rtttl:
+  output: buzzer

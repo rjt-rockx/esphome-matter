@@ -1,0 +1,54 @@
+# mirrors: wago-home-relay-16a
+# Relay with a local push button (WAGO Home Relay 16A Thread / Shelly Plus 1PM pattern) using `expose:`.
+#
+# Mirrors: HA fixture wago_home_relay_16a.json (evidence=dump, Thread): EP1 on_off_plug_in_unit (Identify, Groups,
+#   Scenes, OnOff), EP2 generic_switch rev 2 (Switch MS+MSR+MSL+MSM, MultiPressMax 2); NO tags/labels because the
+#   two endpoints have different device types (no Duplicate condition).
+# Matches: 2 sibling endpoints with different device types, no TagList needed, generic switch features, MultiPressMax.
+# Differs:
+#   - FixedLabel "name" labels are added from the entity names on both endpoints (extra, harmless; HA reads them).
+#   - Groups/Scenes clusters are created on the plug like on the real device (EQUIVALENT).
+#   - the local toggle (button -> relay) is plain ESPHome automation; Matter only sees the relay state change.
+#   - manufacturer specific cluster 0x1534FC00 on the root is vendor behaviour.
+esphome:
+  name: relay-button-expose
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  expose:
+    - relay
+    - {id: button, as: generic_switch, options: {multi_press_max: 2}}
+
+switch:
+  - platform: gpio
+    id: relay
+    name: Relay
+    pin: GPIO4
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: Button
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      min_length: 20ms
+      max_length: 400ms
+      then:
+        - switch.toggle: relay

@@ -1,0 +1,98 @@
+# mirrors: haojai-switch
+# Haojai 6-button Thread scene switch rebuilt as an ESPHome node. VARIANT (a): `expose:` glob.
+#
+# Mirrors: HA fixture haojai_switch.json (evidence=dump), ESP32-H2/C6 on Thread, six Generic Switch endpoints
+#   (each MS+MSR+MSL+MSM, NumberOfPositions=2) with Descriptor TagList = Common Number 1..6 and a battery
+#   Power Source (BAT+RECHG) on the root endpoint.
+# Matches: 6 generic_switch endpoints, feature maps, one TagList (Common Number) tag per endpoint (auto, numbered
+#   from the trailing integer of the ids btn_1..btn_6), buttons -> Switch events.
+# Differs: the battery is not on EP0 (see the battery endpoint at the end; NODE-LEVEL POWER SOURCE gap);
+#   no ICD / Intermittently Connected Device (LIT) server; no `rechargeable` feature (RECHG);
+#   endpoint numbers are hashes instead of 1..6.
+esphome:
+  name: haojai-6gang-expose
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  expose:
+    # binary_sensor with a device_class-less GPIO is never inferred: say what it is.
+    - {id: "btn_*", as: generic_switch}
+  endpoints:
+    # The battery cannot go on EP0 today; a separate power_source endpoint is the closest legal shape.
+    100:
+      power_source:
+        battery: batt
+
+binary_sensor:
+  - platform: gpio
+    id: btn_1
+    name: "Button 1"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_2
+    name: "Button 2"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_3
+    name: "Button 3"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_4
+    name: "Button 4"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_5
+    name: "Button 5"
+    pin: {number: GPIO4, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_6
+    name: "Button 6"
+    pin: {number: GPIO5, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+
+sensor:
+  - platform: adc
+    id: batt_v
+    pin: GPIO6
+    attenuation: 12db
+    update_interval: 10min
+    internal: true
+    filters:
+      - multiply: 2.0          # 1:1 divider
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return id(batt_v).state;
+    filters:
+      - calibrate_linear:      # CR2032 curve, 2.0 V = 0 %, 3.0 V = 100 %
+          - 2.0 -> 0.0
+          - 3.0 -> 100.0

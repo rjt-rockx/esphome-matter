@@ -1,0 +1,62 @@
+# mirrors: silabs-light-switch
+# Light switch (Matter CLIENT) plus a separate Generic Switch for controller automations.
+# VARIANT (a): explicit `endpoints:` (the only way: `expose:` has no rule for client device types).
+#
+# Mirrors: HA fixture silabs_light_switch.json (evidence=dump, SDK light-switch example on Thread).
+#   EP1 on_off_light_switch (server: Identify, Groups, Descriptor, Binding; CLIENT: Identify, OnOff, ScenesManagement,
+#   ColorControl), EP2 generic_switch rev 1 (Switch MS+MSR, NumberOfPositions 2), no TagList (different device types).
+# Matches: EP1/EP2 device types, server clusters (Binding + Groups), OnOff/Identify client clusters, Switch MS+MSR.
+# Differs:
+#   - GAP-COMPONENT/SDK: the client cluster set is fixed by the device type (Identify, OnOff); the real device also
+#     lists ScenesManagement and ColorControl as client clusters. `clusters:` only adds server clusters.
+#   - the Binding table is filled by a controller; commands only go out through `matter.send_command` (no event or
+#     entity driven "controller" mode, see GAP list: binding driver/subscription).
+#   - the generic switch here gives MS+MSR (+ what the binding enables by default: MSL, MSM); to match exactly
+#     use `with_features: [MomentarySwitchRelease]` and leave `binary_sensor_id` events manual.
+esphome:
+  name: light-switch
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      id: light_switch
+      on_off_light_switch:
+    2:
+      generic_switch:
+        binary_sensor_id: scene_button
+        with_features: [MomentarySwitchRelease]
+
+binary_sensor:
+  - platform: gpio
+    id: toggle_button
+    name: "Toggle"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      min_length: 20ms
+      max_length: 600ms
+      then:
+        - matter.send_command: light_switch.on_off.toggle
+  - platform: gpio
+    id: scene_button
+    name: "Scene"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms

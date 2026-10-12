@@ -1,0 +1,96 @@
+# mirrors: mock-generic-switch
+# ESPHome `event:` entity (template event, as produced by IR/RF/remote integrations) turned into a Matter Generic Switch.
+# VARIANT (c): `endpoints:` + `on_event` -> `matter.send_switch_event` (the only way on this branch).
+#
+# Mirrors: the ESPHome analogue the device catalog lists for every Generic Switch ("event: component, exposed as
+#   generic_switch"); target shape = HA mock_generic_switch.json (Switch MS+MSR+MSL, MultiPressMax 2).
+# Matches: one Generic Switch endpoint, Switch features MS+MSR+MSL+MSM, one Matter event per ESPHome event type.
+# Differs:
+#   - GAP-COMPONENT (M3, "event_id binding"): `expose: [remote_button]` is an error ("no device type is inferred for
+#     this event; use `as:`") and `as: generic_switch` fails with "[event] is an invalid option for [generic_switch]"
+#     (expose binds an event entity through the key `event`, which the device type schema does not have). The glue
+#     below is what a binding would generate.
+#   - the event entity only reports a finished gesture, so the Matter press sequence (InitialPress, release, ...) is
+#     synthesised in the automation; exact sequences are specified by the TC_SWTCH work, not here.
+esphome:
+  name: event-switch
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      id: remote_switch
+      label: "Remote"
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress, MomentarySwitchMultiPress]
+        multi_press_max: 2
+
+event:
+  - platform: template
+    id: remote_button
+    name: "Remote button"
+    event_types:
+      - press
+      - double_press
+      - long_press
+    on_event:
+      - if:
+          condition:
+            lambda: return event_type == "press";
+          then:
+            - matter.send_switch_event: {endpoint: remote_switch, event: initial_press}
+            - matter.send_switch_event: {endpoint: remote_switch, event: short_release}
+            - matter.send_switch_event: {endpoint: remote_switch, event: multi_press_complete, count: 1}
+      - if:
+          condition:
+            lambda: return event_type == "double_press";
+          then:
+            - matter.send_switch_event: {endpoint: remote_switch, event: initial_press}
+            - matter.send_switch_event: {endpoint: remote_switch, event: short_release}
+            - matter.send_switch_event: {endpoint: remote_switch, event: multi_press_ongoing, count: 2}
+            - matter.send_switch_event: {endpoint: remote_switch, event: short_release}
+            - matter.send_switch_event: {endpoint: remote_switch, event: multi_press_complete, count: 2}
+      - if:
+          condition:
+            lambda: return event_type == "long_press";
+          then:
+            - matter.send_switch_event: {endpoint: remote_switch, event: initial_press}
+            - matter.send_switch_event: {endpoint: remote_switch, event: long_press}
+            - matter.send_switch_event: {endpoint: remote_switch, event: long_release}
+
+binary_sensor:
+  - platform: gpio
+    id: raw_button
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    on_multi_click:
+      - timing:
+          - ON for at most 400ms
+          - OFF for at least 300ms
+        then:
+          - event.trigger: {id: remote_button, event_type: press}
+      - timing:
+          - ON for at most 400ms
+          - OFF for at most 300ms
+          - ON for at most 400ms
+          - OFF for at least 100ms
+        then:
+          - event.trigger: {id: remote_button, event_type: double_press}
+      - timing:
+          - ON for at least 600ms
+        then:
+          - event.trigger: {id: remote_button, event_type: long_press}
