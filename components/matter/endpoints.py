@@ -170,7 +170,6 @@ ENDPOINT_SCHEMA = cv.All(
     ),
     _validate_on_attribute_forms,
     validate_battery_binding,
-    sensor_extras.validate_endpoint,
 )
 
 

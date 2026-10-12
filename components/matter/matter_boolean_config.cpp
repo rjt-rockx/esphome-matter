@@ -31,6 +31,19 @@ BooleanStateConfigurationCluster *find_cluster(uint16_t endpoint_id) {
 } // namespace
 
 void MatterBooleanStateConfigMapping::initialize() {
+#ifdef USE_BINARY_SENSOR
+  if (this->source_ != nullptr) {
+    this->source_->add_on_state_callback([this](bool on) {
+      this->source_on_.store(on);
+      run_on_matter_thread([this, on]() { this->apply_source_(on); });
+    });
+    if (this->source_->has_state()) {
+      bool on = this->source_->state;
+      this->source_on_.store(on);
+      run_on_matter_thread([this, on]() { this->apply_source_(on); });
+    }
+  }
+#endif
 #ifdef USE_NUMBER
   bool number_has_state = false;
   uint8_t number_level = 0;
@@ -63,6 +76,7 @@ void MatterBooleanStateConfigMapping::initialize() {
     if (number_has_state) {
       // The number (typically restored by ESPHome) is the source of truth.
       if (cluster->GetCurrentSensitivityLevel() != number_level) {
+        MatterPushGuard push_guard;
         CHIP_ERROR err = cluster->SetCurrentSensitivityLevel(number_level);
         if (err != CHIP_NO_ERROR)
           ESP_LOGW(TAG, "Cannot set sensitivity level %u on endpoint %u: %s",
@@ -77,6 +91,27 @@ void MatterBooleanStateConfigMapping::initialize() {
   });
 }
 
+// Matter thread.
+void MatterBooleanStateConfigMapping::apply_source_(bool on) {
+  auto *cluster = find_cluster(this->endpoint_id_);
+  if (cluster == nullptr)
+    return;
+  if (on)
+    cluster->SetAllEnabledAlarmsActive();
+  else
+    cluster->ClearAllAlarms();
+}
+
+// Matter thread, inside the EnableDisableAlarm command (AlarmsEnabled is
+// already updated). Alarms that were enabled while the source is ON become
+// active once the command is done.
+CHIP_ERROR MatterBooleanStateConfigMapping::HandleEnableDisableAlarms(
+    chip::BitMask<chip::app::Clusters::BooleanStateConfiguration::AlarmModeBitmap>) {
+  if (this->source_on_.load())
+    run_on_matter_thread([this]() { this->apply_source_(true); });
+  return CHIP_NO_ERROR;
+}
+
 // Matter thread. Returning false would reject the change.
 bool MatterBooleanStateConfigMapping::OnCurrentSensitivityLevelChanged(
     uint8_t new_value) {
@@ -85,6 +120,23 @@ bool MatterBooleanStateConfigMapping::OnCurrentSensitivityLevelChanged(
     global_matter_component->defer_to_main_loop(
         [this, new_value]() { this->publish_to_number_(new_value); });
 #endif
+  return true;
+}
+
+// Matter thread. The cluster passes the alarms that were suppressed by the
+// command (all suppressed alarms are cleared with an empty mask).
+bool MatterBooleanStateConfigMapping::OnAlarmsSuppressedChanged(
+    chip::BitMask<chip::app::Clusters::BooleanStateConfiguration::AlarmModeBitmap>
+        new_value) {
+  using chip::app::Clusters::BooleanStateConfiguration::AlarmModeBitmap;
+  bool visual = new_value.Has(AlarmModeBitmap::kVisual);
+  bool audible = new_value.Has(AlarmModeBitmap::kAudible);
+  if (!this->suppressed_triggers_.empty()) {
+    global_matter_component->defer_to_main_loop([this, visual, audible]() {
+      for (auto *trigger : this->suppressed_triggers_)
+        trigger->trigger(visual, audible);
+    });
+  }
   return true;
 }
 
@@ -116,6 +168,7 @@ void MatterBooleanStateConfigMapping::on_number_(float value) {
     if (cluster == nullptr)
       return;
     // No-op when the number only shows a value that a controller wrote.
+    MatterPushGuard push_guard;
     CHIP_ERROR err = cluster->SetCurrentSensitivityLevel(level);
     if (err != CHIP_NO_ERROR)
       ESP_LOGW(TAG, "Cannot set sensitivity level %u on endpoint %u: %s", level,

@@ -49,8 +49,11 @@
   new(matter_matteralarmsactivetrigger_id) matter::MatterAlarmsActiveTrigger();
   new(automation_id) Automation<bool, bool>(matter_matteralarmsactivetrigger_id);
   matter_bsc_3->add_alarms_active_trigger(matter_matteralarmsactivetrigger_id);
+  new(matter_matteralarmssuppressedtrigger_id) matter::MatterAlarmsSuppressedTrigger();
+  new(automation_id_2) Automation<bool, bool>(matter_matteralarmssuppressedtrigger_id);
+  matter_bsc_3->add_alarms_suppressed_trigger(matter_matteralarmssuppressedtrigger_id);
   matter_mattercomponent_id->register_mapping(matter_bsc_3);
-  matter_mattercomponent_id->register_binary_sensor_attribute(basement_leak, 3, 128, 3, esphome::matter::conversion::boolean_state, esphome::matter::update_alarms_active_attribute);
+  matter_bsc_3->set_alarm_source(basement_leak);
   matter_mattercomponent_id->register_endpoint_parent(3, 0);
   matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::water_leak_detector::config_t device_config_0{};
@@ -92,7 +95,7 @@
   matter_mattercomponent_id->register_binary_sensor_attribute(front_door, 4, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
   new(matter_bsc_4) matter::MatterBooleanStateConfigMapping(4);
   matter_mattercomponent_id->register_mapping(matter_bsc_4);
-  matter_mattercomponent_id->register_binary_sensor_attribute(front_door, 4, 128, 3, esphome::matter::conversion::boolean_state, esphome::matter::update_alarms_active_attribute);
+  matter_bsc_4->set_alarm_source(front_door);
   matter_mattercomponent_id->register_endpoint_parent(4, 0);
   matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::contact_sensor::config_t device_config_0{};
@@ -139,7 +142,7 @@
   matter_mattercomponent_id->register_binary_sensor_attribute(alarm_muted, 6, 92, 4, esphome::matter::conversion::mute_state, esphome::matter::update_device_muted_attribute);
   new(matter_smoke_co_6) matter::MatterSmokeCoAlarmMapping(6, 8000);
   new(matter_mattersmokecoselftesttrigger_id) matter::MatterSmokeCoSelfTestTrigger();
-  new(automation_id_2) Automation<>(matter_mattersmokecoselftesttrigger_id);
+  new(automation_id_3) Automation<>(matter_mattersmokecoselftesttrigger_id);
   matter_smoke_co_6->add_self_test_trigger(matter_mattersmokecoselftesttrigger_id);
   matter_mattercomponent_id->register_mapping(matter_smoke_co_6);
   matter_mattercomponent_id->register_endpoint_parent(6, 0);
@@ -168,7 +171,7 @@
   matter_mattercomponent_id->register_binary_sensor_attribute(hall_testing, 7, 92, 5, esphome::matter::conversion::boolean_state, esphome::matter::update_test_in_progress_attribute);
   new(matter_smoke_co_7) matter::MatterSmokeCoAlarmMapping(7, 0);
   new(matter_mattersmokecoselftesttrigger_id_2) matter::MatterSmokeCoSelfTestTrigger();
-  new(automation_id_3) Automation<>(matter_mattersmokecoselftesttrigger_id_2);
+  new(automation_id_4) Automation<>(matter_mattersmokecoselftesttrigger_id_2);
   matter_smoke_co_7->add_self_test_trigger(matter_mattersmokecoselftesttrigger_id_2);
   matter_mattercomponent_id->register_mapping(matter_smoke_co_7);
   matter_mattercomponent_id->register_endpoint_parent(7, 0);
@@ -213,22 +216,7 @@
     return true;
   });
   matter_mattercomponent_id->register_concentration_sensor(pm_2_5, 9, 1066, 0, esphome::matter::conversion::concentration, 4);
-  new(matter_air_quality_9) matter::MatterSensorAttributeMapping(pm_2_5, 9, 91, 0, [](float v) -> esp_matter_attr_val_t {
-      if (std::isnan(v))
-        return esp_matter_enum8(0);
-      uint8_t level = 1;
-      if (v >= 12.0f)
-        level = 2;
-      if (v >= 35.5f)
-        level = 3;
-      if (v >= 55.5f)
-        level = 4;
-      if (v >= 150.5f)
-        level = 5;
-      if (v >= 250.5f)
-        level = 6;
-      return esp_matter_enum8(level);
-  }, esphome::matter::update_air_quality_attribute);
+  new(matter_air_quality_9) matter::MatterAirQualityMapping(pm_2_5, 9, 91, 0, std::vector<esphome::matter::MatterAirQualityThreshold>{{2, 9.0f}, {3, 35.4f}, {4, 55.4f}, {5, 125.4f}, {6, 225.4f}}, 0.02f);
   matter_mattercomponent_id->register_mapping(matter_air_quality_9);
   matter_mattercomponent_id->register_endpoint_parent(9, 0);
   matter_mattercomponent_id->register_endpoint_tag(9, 7, 2, "");
@@ -253,18 +241,7 @@
       return false;
     return true;
   });
-  new(matter_air_quality_10) matter::MatterSensorAttributeMapping(tvoc_ppb, 10, 91, 0, [](float v) -> esp_matter_attr_val_t {
-      if (std::isnan(v))
-        return esp_matter_enum8(0);
-      uint8_t level = 1;
-      if (v >= 220.0f)
-        level = 2;
-      if (v >= 660.0f)
-        level = 3;
-      if (v >= 2200.0f)
-        level = 4;
-      return esp_matter_enum8(level);
-  }, esphome::matter::update_air_quality_attribute);
+  new(matter_air_quality_10) matter::MatterAirQualityMapping(tvoc_ppb, 10, 91, 0, std::vector<esphome::matter::MatterAirQualityThreshold>{{2, 220.0f}, {3, 660.0f}, {4, 2200.0f}}, 0.02f);
   matter_mattercomponent_id->register_mapping(matter_air_quality_10);
   matter_mattercomponent_id->register_endpoint_parent(10, 0);
   matter_mattercomponent_id->register_endpoint_tag(10, 7, 3, "");
@@ -281,25 +258,37 @@
       return false;
     return true;
   });
-  new(matter_cabinet_mode_11) matter::MatterCabinetModeMapping(11, std::vector<esphome::matter::MatterModeOption>{{"Normal", "Normal", 0, {0}}, {"Rapid cool", "Rapid cool", 1, {16384}}, {"Vacation", "Away", 2, {5, 4}}});
-  matter_cabinet_mode_11->set_select(fridge_mode);
-  matter_mattercomponent_id->register_mapping(matter_cabinet_mode_11);
   new(matter_refrigerator_alarm_11) matter::MatterRefrigeratorAlarmMapping(11, fridge_door);
   matter_mattercomponent_id->register_mapping(matter_refrigerator_alarm_11);
+  new(matter_mattermodemapping_id) matter::MatterModeMapping(11, 82);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id);
+  matter_mattermodemapping_id->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id->add_tag(0, 0, false);
+  matter_mattermodemapping_id->add_mode("Rapid cool", 1, "Rapid cool");
+  matter_mattermodemapping_id->add_tag(16384, 0, false);
+  matter_mattermodemapping_id->add_mode("Vacation", 2, "Away");
+  matter_mattermodemapping_id->add_tag(5, 0, false);
+  matter_mattermodemapping_id->add_tag(4, 0, false);
+  matter_mattermodemapping_id->set_select(fridge_mode);
+  matter_mattermodemapping_id->set_decision(false, 250);
+  matter_mattermodemapping_id->set_accept_when_idle(false);
   matter_mattercomponent_id->register_endpoint_parent(11, 0);
   matter_mattercomponent_id->register_endpoint(11, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::refrigerator::config_t device_config_0{};
     if (esp_matter::endpoint::refrigerator::add(endpoint, &device_config_0) != ESP_OK)
       return false;
-    esp_matter::cluster::refrigerator_and_tcc_mode::config_t cabinet_mode_config{};
-    cabinet_mode_config.current_mode = 0;
-    cabinet_mode_config.delegate = esphome::matter::get_cabinet_mode_delegate(11);
-    if (esp_matter::cluster::refrigerator_and_tcc_mode::create(endpoint, &cabinet_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+    esp_matter::cluster::refrigerator_and_tcc_mode::config_t refrigerator_and_tcc_mode_config{};
+    if (esp_matter::cluster::refrigerator_and_tcc_mode::create(endpoint, &refrigerator_and_tcc_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
       return false;
     esp_matter::cluster::refrigerator_alarm::config_t refrigerator_alarm_config{};
+    refrigerator_alarm_config.mask = 1;
+    refrigerator_alarm_config.supported = 1;
+    refrigerator_alarm_config.state = 0;
     auto *refrigerator_alarm_cluster = esp_matter::cluster::refrigerator_alarm::create(endpoint, &refrigerator_alarm_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (refrigerator_alarm_cluster == nullptr || esp_matter::event::create(refrigerator_alarm_cluster, 0) == nullptr)
       return false;
+    if (!esphome::matter::attach_delegate(endpoint, 0x0052))
+      return false;
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xBC458136);
+  matter_mattercomponent_id->set_structure_hash(0x175C2DA5);

@@ -52,6 +52,10 @@ matter:
             - logger.log:
                 format: "Leak alarm: visual=%d audible=%d"
                 args: [visual, audible]
+          on_suppressed:
+            - logger.log:
+                format: "Leak alarm suppressed: visual=%d audible=%d"
+                args: [visual, audible]
         sensitivity:
           levels: 3
           default: 1
@@ -108,19 +112,21 @@ matter:
             fair: 220
             moderate: 660
             poor: 2200
-    # Refrigerator with a mode list bound to a select and a door alarm.
+    # Refrigerator: the mode list is a delegate layer cluster (docs/delegates.md); `door_open` drives the alarm.
     11:
       refrigerator:
-        modes:
-          - label: Normal
-            tags: [auto]
-          - label: Rapid cool
-            tags: [rapid_cool]
-          - label: Vacation
-            tags: [vacation, low_energy]
-            option: Away
-        mode_select: fridge_mode
         door_open: fridge_door
+      clusters:
+        refrigerator_and_temperature_controlled_cabinet_mode:
+          modes:
+            - label: Normal
+              tags: [auto]
+            - label: Rapid cool
+              tags: [rapid_cool]
+            - label: Vacation
+              tags: [vacation, low_energy]
+              option: Away
+          select: fridge_mode
 
 binary_sensor:
   - platform: template

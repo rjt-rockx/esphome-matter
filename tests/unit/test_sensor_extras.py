@@ -74,6 +74,10 @@ sensor:
     device_class: pm25
     unit_of_measurement: "µg/m³"
   - platform: template
+    id: pm25_ppm
+    device_class: pm25
+    unit_of_measurement: ppm
+  - platform: template
     id: co2
     device_class: carbon_dioxide
     unit_of_measurement: ppm
@@ -183,16 +187,11 @@ def test_hold_time_rejects_inconsistent_limits(config):
         sensor_extras.HOLD_TIME_SCHEMA(config)
 
 
-def test_air_quality_converter_thresholds():
-    code = sensor_extras.air_quality_converter("derived", {"fair": 10.0, "poor": 50.5})
-    assert "v >= 10.0f" in code and "level = 2;" in code
-    assert "v >= 50.5f" in code and "level = 4;" in code
-    assert "moderate" not in code
-    assert "isnan" in code
-    assert (
-        sensor_extras.air_quality_converter("direct", {})
-        == "esphome::matter::conversion::air_quality_index"
-    )
+def test_air_quality_presets_are_strict_upper_bounds():
+    # A level applies strictly above its threshold, the top of the previous category.
+    unit, pm25 = sensor_extras.AIR_QUALITY_PRESETS["pm25"]
+    assert unit == "ug/m3"
+    assert list(pm25.values()) == [9.0, 35.4, 55.4, 125.4, 225.4]
 
 
 def test_air_quality_thresholds_must_increase():
@@ -208,12 +207,6 @@ def test_air_quality_presets_cover_every_level():
         assert list(thresholds) == list(sensor_extras.AIR_QUALITY_LEVELS)
         values = list(thresholds.values())
         assert values == sorted(values)
-
-
-def test_mode_tags():
-    assert sensor_extras._mode_tag("rapid_cool") == 0x4000
-    assert sensor_extras._mode_tag("Auto") == 0
-    assert sensor_extras._mode_tag(0x8001) == 0x8001
 
 
 # --------------------------------------------------------------------------
@@ -636,165 +629,21 @@ def test_air_quality_index_with_unit_warns(run_config):
 # Refrigerator
 # --------------------------------------------------------------------------
 
-FRIDGE_MODES = """
+
+def test_refrigerator_door_and_delegate_modes(run_config):
+    check(
+        run_config,
+        """
         1:
           refrigerator:
-            modes:
-              - label: Normal
-                tags: [auto]
-              - label: Rapid cool
-                tags: [rapid_cool]
-            mode_select: mode
             door_open: fridge_door
-"""
-
-
-def test_refrigerator_modes_and_door(run_config):
-    check(run_config, FRIDGE_MODES)
-
-
-def test_cabinet_modes_without_select(run_config):
-    check(
-        run_config,
-        """
-        1:
-          temperature_controlled_cabinet:
-            with_features: [TemperatureNumber]
-            modes:
-              - {label: Normal, tags: [auto]}
-              - {label: Quiet, tags: [quiet, night]}
-        """,
-    )
-
-
-def test_refrigerator_mode_option_mapping(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Standard, tags: [auto], option: Normal}
-              - {label: Fast, tags: [rapid_cool], option: Rapid cool}
-            mode_select: mode
-        """,
-    )
-
-
-def test_refrigerator_mode_missing_select_option(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal, tags: [auto]}
-              - {label: Holiday, tags: [vacation]}
-            mode_select: mode
-        """,
-        ok=False,
-        message="has no option 'Holiday'",
-    )
-
-
-def test_refrigerator_modes_need_two_entries(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal, tags: [auto]}
-        """,
-        ok=False,
-        message="at least two modes",
-    )
-
-
-def test_refrigerator_modes_need_tags(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal}
-              - {label: Quiet, tags: [quiet]}
-        """,
-        ok=False,
-        message="tags",
-    )
-
-
-def test_refrigerator_unknown_tag(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal, tags: [tropical]}
-              - {label: Quiet, tags: [quiet]}
-        """,
-        ok=False,
-        message="unknown mode tag 'tropical'",
-    )
-
-
-def test_refrigerator_duplicate_mode_value(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal, mode: 1, tags: [auto]}
-              - {label: Quiet, mode: 1, tags: [quiet]}
-        """,
-        ok=False,
-        message="mode value 1 is used twice",
-    )
-
-
-def test_refrigerator_duplicate_mode_label(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            modes:
-              - {label: Normal, tags: [auto]}
-              - {label: Normal, tags: [quiet]}
-        """,
-        ok=False,
-        message="used twice",
-    )
-
-
-def test_mode_select_requires_modes(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator:
-            mode_select: mode
-        """,
-        ok=False,
-        message="'mode_select' requires 'modes'",
-    )
-
-
-def test_cabinet_mode_cluster_without_modes_is_rejected(run_config):
-    check(
-        run_config,
-        """
-        1:
-          refrigerator: {}
           clusters:
             refrigerator_and_temperature_controlled_cabinet_mode:
+              modes:
+                - {label: Normal, tags: [auto]}
+                - {label: Rapid cool, tags: [rapid_cool]}
+              select: mode
         """,
-        ok=False,
-        message="needs its mode list",
     )
 
 
@@ -837,7 +686,8 @@ def test_sensor_extras_codegen(tmp_path):
         "supported_sensitivity_levels = 3;",
         "create_alarms_enabled",
         "create_default_sensitivity_level",
-        "update_alarms_active_attribute",
+        "set_alarm_source(",
+        "add_alarms_suppressed_trigger",
         "create_self_test_request",
         "create_alarm_muted",
         "MatterSmokeCoAlarmMapping(6, 8000)",
@@ -848,12 +698,10 @@ def test_sensor_extras_codegen(tmp_path):
         "update_test_in_progress_attribute",
         "conversion::air_quality_index",
         "update_air_quality_attribute",
-        "if (v >= 12.0f)",
-        "if (v >= 220.0f)",
-        "refrigerator_and_tcc_mode::create(",
-        "get_cabinet_mode_delegate(11)",
-        'MatterModeOption>{{"Normal", "Normal", 0, {0}}',
-        '{"Vacation", "Away", 2, {5, 4}}',
+        "MatterAirQualityThreshold>{{2, 9.0f}, {3, 35.4f}",
+        "MatterAirQualityThreshold>{{2, 220.0f}",
+        "refrigerator_alarm_config.mask = 1;",
+        "refrigerator_alarm_config.supported = 1;",
         "refrigerator_alarm::create(",
         "esp_matter::event::create(refrigerator_alarm_cluster, 0)",
         "MatterRefrigeratorAlarmMapping(11, fridge_door)",
@@ -893,3 +741,39 @@ def test_boolean_state_configuration_with_features_only(tmp_path):
     assert "feature::visual::add(" in code
     assert "visual_config.alarms_supported = 1;" in code
     assert "supported_sensitivity_levels = 2;" in code
+
+
+def test_air_quality_preset_unit_mismatch(run_config):
+    check(
+        run_config,
+        """
+        1:
+          air_quality_sensor:
+            air_quality:
+              sensor: pm25_ppm
+        """,
+        ok=False,
+        message="default thresholds of device_class 'pm25' are in 'ug/m3'",
+    )
+
+
+def test_air_quality_unit_spellings():
+    spellings = sensor_extras._UNIT_SPELLINGS["ug/m3"]
+    assert {"µg/m³", "ug/m3", "μg/m³"} <= spellings
+
+
+def test_alarms_on_suppressed_needs_suppress(run_config):
+    check(
+        run_config,
+        """
+        1:
+          water_leak_detector:
+            boolean_state: leak
+            alarms:
+              audible: true
+              on_suppressed:
+                - logger.log: quiet
+        """,
+        ok=False,
+        message="on_suppressed requires `suppress: true`",
+    )

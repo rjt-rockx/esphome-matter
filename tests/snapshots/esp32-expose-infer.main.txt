@@ -251,12 +251,20 @@
   });
   matter_mattercomponent_id->register_binary_sensor_attribute(smoke_alarm, 36088, 92, 1, esphome::matter::conversion::alarm_state, esphome::matter::update_smoke_state_attribute);
   matter_mattercomponent_id->register_binary_sensor_attribute(co_alarm, 36088, 92, 2, esphome::matter::conversion::alarm_state, esphome::matter::update_co_state_attribute);
+  new(matter_smoke_co_36088) matter::MatterSmokeCoAlarmMapping(36088, 5000);
+  matter_mattercomponent_id->register_mapping(matter_smoke_co_36088);
   matter_mattercomponent_id->register_endpoint_parent(36088, 0);
   matter_mattercomponent_id->register_endpoint(36088, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
     device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id() | esp_matter::cluster::smoke_co_alarm::feature::co_alarm::get_id();
     if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
       return false;
+    {
+      auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
+      if (smoke_co_alarm_cluster == nullptr ||
+          esp_matter::cluster::smoke_co_alarm::command::create_self_test_request(smoke_co_alarm_cluster) == nullptr)
+        return false;
+    }
     return true;
   });
   matter_mattercomponent_id->register_cover(blind, 37846);
@@ -302,5 +310,5 @@
       return false;
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xCAE53D86);
+  matter_mattercomponent_id->set_structure_hash(0x1F30EBC6);
   esphome::matter::set_plan(MATTER_PLAN, sizeof(MATTER_PLAN) / sizeof(MATTER_PLAN[0]));

@@ -131,20 +131,30 @@ add your own `delayed_off` to the same sensor unless you want both delays to add
 
 * Limits: `1 <= min <= default <= max <= 65534` seconds, and `max` must be at least 10 s (a Matter constraint). The
   configuration is rejected otherwise. HoldTime is whole seconds.
-* HoldTime is persisted by the Matter stack. `default` is applied once for every combination of `min`, `max` and
-  `default` (it is remembered in ESPHome's preferences), so changing the configuration applies the new default and a
-  reboot keeps the value that a controller wrote. A stored value is clamped into new limits.
-* `number`: an ESPHome `number` that mirrors HoldTime. A write from Matter sets the number; a change of the number
-  (including its restored state at boot) sets HoldTime, which makes the number the source of truth at boot when it has a
-  state. Use `restore_value: true` on the number, and give it `min_value`/`max_value` that fit the limits (a warning is
-  printed when they do not). It is the way to show or change the value from ESPHome (dashboards, Home Assistant through
-  the ESPHome API).
+* **Persistence and boot rule.** The SDK would lose a HoldTime above 300 s at every reboot (its storage check uses
+  the fixed limits 1/300 s before esphome-matter can raise them), so esphome-matter persists HoldTime itself in the
+  Matter key value store, next to the `min`/`max`/`default` it was stored for. The Matter factory reset erases that
+  store, which also resets HoldTime. At boot the first of these wins:
+  1. the persisted Matter value, if it was stored for the same `min`/`max`/`default` (a reboot keeps what a
+     controller or the number wrote last),
+  2. the state of the `number`, if there is no such record (first boot after flashing, a changed configuration, a
+     factory reset) and the number has a state (for example restored),
+  3. `default`.
+
+  The value is clamped into the limits. Changing `min`, `max` or `default` therefore applies the new setup once.
+* `number`: an ESPHome `number` that mirrors HoldTime in both directions. A write from Matter (HoldTime or a legacy
+  alias) sets the number; a change of the number sets HoldTime, clamped into the limits, and the clamped value is shown
+  in the number again. A stale value from Matter never overwrites a newer number change. The Matter value wins at boot as
+  above, so a restored number only matters when Matter has no value; use `restore_value: true` on it anyway so that it
+  shows something at boot. The number's `min_value`/`max_value` should equal the limits: a narrower range is a warning
+  (some values cannot be set from ESPHome) and a wider one too (values outside are clamped).
 * `legacy_attributes` (default on): also creates the deprecated `PIROccupiedToUnoccupiedDelay`,
   `UltrasonicOccupiedToUnoccupiedDelay` or `PhysicalContactOccupiedToUnoccupiedDelay` attribute that matches the
   sensor-type feature. They are aliases of HoldTime that older controllers read. Sensors of type Radar, Other, ... have no
   such attribute. The `*UnoccupiedToOccupied*` delay and threshold attributes (a delay before reporting occupancy) are
   not supported.
-* Automations: `on_attribute: occupancy_sensing.hold_time` triggers on writes from Matter.
+* Automations: `on_attribute: occupancy_sensing.hold_time` triggers on writes from Matter. The deprecated aliases are
+  accepted for writes and persisted like HoldTime.
 
 ## Water leak, freeze and rain
 
@@ -181,6 +191,8 @@ matter:
           audible: true         # and an audible one (buzzer)
           suppress: true        # AlarmSuppress feature: a controller may silence active alarms
           active: leak_alarm    # optional binary_sensor, default: the sensor of the device type
+          on_suppressed:        # AlarmsSuppressed changed (needs suppress: true): silence the siren
+            - switch.turn_off: buzzer
           on_active:            # AlarmsActive changed; visual and audible are booleans
             - if:
                 condition:
@@ -200,9 +212,12 @@ matter:
   `AlarmsStateChanged` event.
 * **AlarmsEnabled starts empty** and is set by the controller with `EnableDisableAlarm` (persisted by the Matter stack).
   The binary_sensor turning ON makes every *enabled* alarm active (AlarmsActive), turning it OFF clears all alarms. So
-  nothing becomes active until a controller enabled an alarm (an alarm that is enabled while the sensor is already ON
-  becomes active at the next ON). "ON" is the ESPHome state: leak, freeze or rain detected, contact open, occupied.
-  Use `active:` to drive it from another binary_sensor.
+  nothing becomes active until a controller enabled an alarm (the SDK offers no way to preset AlarmsEnabled). When a
+  controller enables alarms while the sensor is already ON they become active right away. "ON" is the ESPHome state:
+  leak, freeze or rain detected, contact open, occupied. Use `active:` to drive it from another binary_sensor.
+* `on_suppressed` (`suppress: true`) runs with `visual`/`audible` when AlarmsSuppressed changes, that is when a
+  controller sends `SuppressAlarm` (the cluster hands over the alarms named in the command; an empty mask means all
+  suppressions were cleared). Use it to silence a siren that `on_active` started.
 * `on_active` runs on the ESPHome main loop whenever AlarmsActive changes, including changes caused by controllers
   (they can disable an active alarm). Use it to drive the buzzer or LED of the device.
 * `sensitivity` creates CurrentSensitivityLevel (writable by controllers, persisted), SupportedSensitivityLevels and,
@@ -250,6 +265,17 @@ ESPHome `gas` and `vibration` have no Matter equivalent and aren't mapped.
 | `end_of_service` | EndOfServiceAlert (and the `EndOfService` event) | the alarm reached its end of life (Expired) |
 | `device_muted` | DeviceMuted, `AlarmMuted`/`MuteEnded` events (optional attribute, created when bound) | the alarm is muted locally. The cluster refuses to mute while an alarm is critical and unmutes automatically on a new critical alarm |
 | `test_in_progress` | TestInProgress (and the `SelfTestComplete` event when it ends) | a self test is running; OFF completes it |
+
+The interplay: a self test does not clear a hardware fault, and the priority order is
+Inoperative > Smoke > interconnect smoke > CO > interconnect CO > HardwareFault > Testing > EndOfService >
+BatteryAlert. ExpressedState shows `HardwareFault` while `hardware_fault` is ON even during a test (the test
+still runs and `SelfTestComplete` is generated), and `SelfTestRequest` is refused with `Busy` while ExpressedState is
+a smoke or CO alarm, `Testing`, or an interconnect alarm (a hardware fault does not block it).
+
+Mute limitation: Matter has no command to mute, the mute button is on the device. The cluster unmutes
+by itself when an alarm turns critical (and when `device_muted` is bound, its binary_sensor stays ON). Turn your own
+mute state OFF from the same triggers (smoke, CO, battery) or publish OFF when the alarm binary_sensors turn ON.
+`device_muted` ON is refused while an alarm is critical (an error is logged).
 
 ExpressedState follows from all of them (`Testing`, `HardwareFault`, `EndOfService`, ...). `hardware_fault` and
 `end_of_service` expect a `problem` class binary_sensor (others only warn).

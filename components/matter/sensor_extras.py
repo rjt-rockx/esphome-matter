@@ -5,8 +5,8 @@
   (the binary_sensor bindings themselves are SensorAttributes, see data_model/attributes.py)
 * Boolean State Configuration: ``alarms`` and ``sensitivity`` on the contact, leak, freeze, rain and occupancy sensors
 * Air Quality: ``air_quality`` (a 0-6 index sensor, or derived from a concentration sensor with thresholds)
-* Refrigerator And Temperature Controlled Cabinet Mode (``modes``, ``mode_select``) and the Refrigerator Alarm
-  (``door_open``) on the refrigerator and temperature_controlled_cabinet device types
+* Refrigerator Alarm (``door_open``) on the refrigerator device type. The cabinet mode cluster is a delegate layer
+  cluster (delegates.py, ``clusters: refrigerator_and_temperature_controlled_cabinet_mode``)
 
 Kept in a separate module so the shared endpoint code only needs a handful of hooks:
 ``extend_schema``/``validate_device_config`` (device type schema), ``validate_endpoint``, ``check_final`` (config time
@@ -21,11 +21,11 @@ from dataclasses import dataclass
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import binary_sensor, number, select, sensor
+from esphome.components import binary_sensor, number, sensor
 from esphome.const import CONF_DEVICE_CLASS, CONF_TRIGGER_ID, CONF_UNIT_OF_MEASUREMENT
 from esphome.core import CORE, ID
 
-from .const import CONF_CLUSTERS, CONF_ENDPOINTS, CONF_WITH_FEATURES
+from .const import CONF_ENDPOINTS, CONF_WITH_FEATURES
 from .data_model.clusters import CLUSTERS_BY_NAME
 from .types import matter_ns
 
@@ -48,14 +48,17 @@ MatterSmokeCoSelfTestTrigger = matter_ns.class_(
 MatterBooleanStateConfigMapping = matter_ns.class_(
     "MatterBooleanStateConfigMapping", MatterEndpointMappingBase
 )
+MatterAlarmsSuppressedTrigger = matter_ns.class_(
+    "MatterAlarmsSuppressedTrigger", automation.Trigger.template(cg.bool_, cg.bool_)
+)
 MatterAlarmsActiveTrigger = matter_ns.class_(
     "MatterAlarmsActiveTrigger", automation.Trigger.template(cg.bool_, cg.bool_)
 )
-MatterCabinetModeMapping = matter_ns.class_(
-    "MatterCabinetModeMapping", MatterEndpointMappingBase
-)
 MatterRefrigeratorAlarmMapping = matter_ns.class_(
     "MatterRefrigeratorAlarmMapping", MatterEndpointMappingBase
+)
+MatterAirQualityMapping = matter_ns.class_(
+    "MatterAirQualityMapping", MatterEndpointMappingBase
 )
 MatterSensorAttributeMapping = matter_ns.class_(
     "MatterSensorAttributeMapping", MatterEndpointMappingBase
@@ -81,19 +84,15 @@ CONF_AUDIBLE = "audible"
 CONF_SUPPRESS = "suppress"
 CONF_ACTIVE = "active"
 CONF_ON_ACTIVE = "on_active"
+CONF_ON_SUPPRESSED = "on_suppressed"
 CONF_SENSITIVITY = "sensitivity"
 CONF_LEVELS = "levels"
 
 CONF_AIR_QUALITY = "air_quality"
 CONF_SENSOR = "sensor"
 CONF_THRESHOLDS = "thresholds"
+CONF_HYSTERESIS = "hysteresis"
 
-CONF_MODES = "modes"
-CONF_MODE_SELECT = "mode_select"
-CONF_LABEL = "label"
-CONF_MODE = "mode"
-CONF_TAGS = "tags"
-CONF_OPTION = "option"
 CONF_DOOR_OPEN = "door_open"
 
 # Matter cluster ids
@@ -104,12 +103,10 @@ CLUSTER_REFRIGERATOR_ALARM = 0x0057
 
 DEVICE_TYPE_OCCUPANCY_SENSOR = "occupancy_sensor"
 DEVICE_TYPE_SMOKE_CO_ALARM = "smoke_co_alarm"
-CABINET_DEVICE_TYPES = ("refrigerator", "temperature_controlled_cabinet")
 REFRIGERATOR = "refrigerator"
 
 CLUSTER_NAME_BSC = "BooleanStateConfiguration"
 CLUSTER_NAME_AIR_QUALITY = "AirQuality"
-CLUSTER_NAME_CABINET_MODE = "RefrigeratorAndTemperatureControlledCabinetMode"
 CLUSTER_NAME_REFRIGERATOR_ALARM = "RefrigeratorAlarm"
 
 # --------------------------------------------------------------------------- #
@@ -217,6 +214,13 @@ def _bsc_alarms_schema():
                         )
                     }
                 ),
+                cv.Optional(CONF_ON_SUPPRESSED): automation.validate_automation(
+                    {
+                        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(
+                            MatterAlarmsSuppressedTrigger
+                        )
+                    }
+                ),
             }
         ),
         _validate_alarms,
@@ -224,6 +228,8 @@ def _bsc_alarms_schema():
 
 
 def _validate_alarms(config: dict) -> dict:
+    if CONF_ON_SUPPRESSED in config and not config[CONF_SUPPRESS]:
+        raise cv.Invalid("on_suppressed requires `suppress: true`")
     if not (config[CONF_VISUAL] or config[CONF_AUDIBLE]):
         raise cv.Invalid(
             "enable at least one of 'visual' or 'audible' (the alarms the device can signal)"
@@ -272,28 +278,34 @@ AIR_QUALITY_LEVEL_FEATURES = {
     "extremely_poor": "ExtremelyPoor",
 }
 
-# Level start values for common concentration sensors, used when `thresholds` is omitted. They are indicative, not
-# a Matter requirement. PM2.5 and PM10 follow the US EPA AQI category breakpoints (ug/m3), CO2 common indoor air
-# guidance (ppm).
+# Thresholds for common concentration sensors, used when `thresholds` is omitted. A level applies to values strictly
+# above its threshold (the upper end of the previous category), so a reading equal to a threshold still belongs to the
+# lower level. They are indicative, not a Matter requirement:
+#   pm25: US EPA AQI breakpoints, 2024 revision (ug/m3, 24 h average): Good 0-9.0, Moderate 9.1-35.4, Unhealthy for
+#         Sensitive Groups 35.5-55.4, Unhealthy 55.5-125.4, Very Unhealthy 125.5-225.4, Hazardous 225.5 and above.
+#   pm10: US EPA AQI breakpoints (ug/m3): Good 0-54, Moderate 55-154, USG 155-254, Unhealthy 255-354, Very Unhealthy
+#         355-424, Hazardous 425 and above.
+#   carbon_dioxide: common indoor air guidance (ppm).
+# Format: device_class -> (unit, {level: threshold}).
 AIR_QUALITY_PRESETS = {
     "pm25": (
         "ug/m3",
         {
-            "fair": 12.0,
-            "moderate": 35.5,
-            "poor": 55.5,
-            "very_poor": 150.5,
-            "extremely_poor": 250.5,
+            "fair": 9.0,
+            "moderate": 35.4,
+            "poor": 55.4,
+            "very_poor": 125.4,
+            "extremely_poor": 225.4,
         },
     ),
     "pm10": (
         "ug/m3",
         {
-            "fair": 55.0,
-            "moderate": 155.0,
-            "poor": 255.0,
-            "very_poor": 355.0,
-            "extremely_poor": 425.0,
+            "fair": 54.0,
+            "moderate": 154.0,
+            "poor": 254.0,
+            "very_poor": 354.0,
+            "extremely_poor": 424.0,
         },
     ),
     "carbon_dioxide": (
@@ -307,6 +319,12 @@ AIR_QUALITY_PRESETS = {
         },
     ),
 }
+# Spellings of a unit that are accepted for a preset.
+_UNIT_SPELLINGS = {
+    "ug/m3": {"µg/m³", "μg/m³", "ug/m3", "µg/m3", "μg/m3", "ug/m³"},
+    "ppm": {"ppm"},
+}
+DEFAULT_AIR_QUALITY_HYSTERESIS = 0.02
 
 
 def _validate_thresholds(thresholds: dict) -> dict:
@@ -337,6 +355,10 @@ def _air_quality_schema():
                 ),
                 _validate_thresholds,
             ),
+            # Fraction of a threshold that the value must fall below it before the level drops again.
+            cv.Optional(
+                CONF_HYSTERESIS, default=DEFAULT_AIR_QUALITY_HYSTERESIS
+            ): cv.All(cv.percentage, cv.Range(min=0.0, max=0.25)),
         }
     )
 
@@ -347,79 +369,6 @@ def _air_quality_schema():
         return {CONF_SENSOR: cv.use_id(sensor.Sensor)(value), "direct": True}
 
     return validate
-
-
-# --------------------------------------------------------------------------- #
-# Refrigerator And Temperature Controlled Cabinet Mode
-# --------------------------------------------------------------------------- #
-
-# ModeTag values of the cluster (the common Mode Base tags and the cluster specific ones).
-MODE_TAGS = {
-    "auto": 0x0000,
-    "quick": 0x0001,
-    "quiet": 0x0002,
-    "low_noise": 0x0003,
-    "low_energy": 0x0004,
-    "vacation": 0x0005,
-    "min": 0x0006,
-    "max": 0x0007,
-    "night": 0x0008,
-    "day": 0x0009,
-    "rapid_cool": 0x4000,
-    "rapid_freeze": 0x4001,
-}
-
-
-def _mode_tag(value):
-    if isinstance(value, str) and value.lower() in MODE_TAGS:
-        return MODE_TAGS[value.lower()]
-    if isinstance(value, int) and not isinstance(value, bool):
-        # Manufacturer specific tags have their own range; accept the full 16 bit range.
-        return cv.int_range(min=0, max=0xFFFF)(value)
-    raise cv.Invalid(
-        f"unknown mode tag '{value}'. Use one of {', '.join(MODE_TAGS)} or a number"
-    )
-
-
-def _validate_modes(modes: list) -> list:
-    if len(modes) < 2:
-        raise cv.Invalid("at least two modes are required")
-    if len(modes) > 255:
-        raise cv.Invalid("at most 255 modes are supported")
-    values: set[int] = set()
-    labels: set[str] = set()
-    resolved = []
-    for index, mode in enumerate(modes):
-        mode = dict(mode)
-        mode.setdefault(CONF_MODE, index)
-        mode.setdefault(CONF_OPTION, mode[CONF_LABEL])
-        if mode[CONF_MODE] in values:
-            raise cv.Invalid(f"mode value {mode[CONF_MODE]} is used twice")
-        if mode[CONF_LABEL] in labels:
-            raise cv.Invalid(f"mode label '{mode[CONF_LABEL]}' is used twice")
-        values.add(mode[CONF_MODE])
-        labels.add(mode[CONF_LABEL])
-        resolved.append(mode)
-    return resolved
-
-
-MODES_SCHEMA = cv.All(
-    cv.ensure_list(
-        cv.Schema(
-            {
-                cv.Required(CONF_LABEL): cv.All(
-                    cv.string_strict, cv.Length(min=1, max=64)
-                ),
-                cv.Optional(CONF_MODE): cv.int_range(min=0, max=254),
-                cv.Required(CONF_TAGS): cv.All(
-                    cv.ensure_list(_mode_tag), cv.Length(min=1, max=8)
-                ),
-                cv.Optional(CONF_OPTION): cv.string_strict,
-            }
-        )
-    ),
-    _validate_modes,
-)
 
 
 # --------------------------------------------------------------------------- #
@@ -451,9 +400,6 @@ def extend_schema(device_type, schema: dict) -> None:
         schema[cv.Optional(CONF_SENSITIVITY)] = _bsc_sensitivity_schema()
     if _has_server_cluster(device_type, CLUSTER_NAME_AIR_QUALITY):
         schema[cv.Optional(CONF_AIR_QUALITY)] = _air_quality_schema()
-    if device_type.name in CABINET_DEVICE_TYPES:
-        schema[cv.Optional(CONF_MODES)] = MODES_SCHEMA
-        schema[cv.Optional(CONF_MODE_SELECT)] = cv.use_id(select.Select)
     if device_type.name == REFRIGERATOR:
         schema[cv.Optional(CONF_DOOR_OPEN)] = cv.use_id(binary_sensor.BinarySensor)
 
@@ -470,9 +416,6 @@ def _add_features(config: dict, *features: str) -> dict:
 
 def validate_device_config(device_type, config: dict) -> dict:
     """Cross-option validation; also enables the cluster features that follow from the options."""
-    if CONF_MODE_SELECT in config and CONF_MODES not in config:
-        raise cv.Invalid(f"'{CONF_MODE_SELECT}' requires '{CONF_MODES}'")
-
     if device_type.name == DEVICE_TYPE_SMOKE_CO_ALARM:
         has_binding = any(
             config.get(key) is not None for key in ("smoke_state", "co_state")
@@ -523,23 +466,6 @@ def validate_device_config(device_type, config: dict) -> dict:
     return config
 
 
-CABINET_CLUSTER_KEY = "refrigerator_and_temperature_controlled_cabinet_mode"
-
-
-def validate_endpoint(config: dict) -> dict:
-    """The cabinet mode cluster needs its modes, which are configured on the device type."""
-    has_modes = any(
-        CONF_MODES in (config.get(name) or {}) for name in CABINET_DEVICE_TYPES
-    )
-    if CABINET_CLUSTER_KEY in config.get(CONF_CLUSTERS, {}) and not has_modes:
-        raise cv.Invalid(
-            f"The '{CABINET_CLUSTER_KEY}' cluster needs its mode list. Configure `modes:` on the "
-            "refrigerator or temperature_controlled_cabinet device type of this endpoint instead of "
-            "listing the cluster under `clusters:`"
-        )
-    return config
-
-
 # --------------------------------------------------------------------------- #
 # Final validation (needs the whole configuration)
 # --------------------------------------------------------------------------- #
@@ -555,7 +481,7 @@ def _entity_config(full_config, entity_id) -> dict:
 
 
 def resolve_air_quality(air_quality: dict, full_config) -> tuple[str, dict[str, float]]:
-    """('direct', {}) or ('derived', {level: start value}) for an `air_quality` option."""
+    """('direct', {}) or ('derived', {level: threshold}) for an `air_quality` option."""
     if air_quality.get("direct"):
         return "direct", {}
     if CONF_THRESHOLDS in air_quality:
@@ -569,7 +495,7 @@ def resolve_air_quality(air_quality: dict, full_config) -> tuple[str, dict[str, 
             f"sensor '{air_quality[CONF_SENSOR]}' has "
             + (f"device_class '{device_class}'" if device_class else "no device_class")
             + f", which has no default air quality thresholds. Set `{CONF_THRESHOLDS}:` "
-            f"(levels {', '.join(AIR_QUALITY_LEVELS)}: the sensor value at which the level starts) "
+            f"(levels {', '.join(AIR_QUALITY_LEVELS)}: the level applies to values above the threshold) "
             f"or use a sensor with device_class {', '.join(AIR_QUALITY_PRESETS)}",
             path=[CONF_AIR_QUALITY],
         )
@@ -589,7 +515,6 @@ def check_final(matter_config: dict, full_config) -> None:
             _check_hold_time(where, device_config, full_config)
             _check_sensitivity(where, device_config, full_config)
             _check_air_quality(endpoint_id, conf_key, where, device_config, full_config)
-            _check_modes(where, device_config, full_config)
 
 
 def _check_number_range(where, option, number_id, minimum, maximum, full_config):
@@ -611,6 +536,18 @@ def _check_number_range(where, option, number_id, minimum, maximum, full_config)
             number_id,
             option,
             high,
+            maximum,
+        )
+    if (low is not None and low < minimum) or (high is not None and high > maximum):
+        _LOGGER.warning(
+            "%s: number '%s' (%s) allows %s to %s, which is wider than the Matter limits %s to %s. "
+            "Values outside the limits are clamped and the clamped value is shown again",
+            where,
+            number_id,
+            option,
+            low,
+            high,
+            minimum,
             maximum,
         )
 
@@ -653,6 +590,17 @@ def _check_air_quality(endpoint_id, conf_key, where, device_config, full_config)
         ) from err
     entity = _entity_config(full_config, air_quality[CONF_SENSOR])
     unit = entity.get(CONF_UNIT_OF_MEASUREMENT)
+    if mode == "derived" and CONF_THRESHOLDS not in air_quality:
+        # The preset thresholds are only valid in the unit they were defined for.
+        expected, _ = AIR_QUALITY_PRESETS[entity.get(CONF_DEVICE_CLASS)]
+        if unit not in _UNIT_SPELLINGS[expected]:
+            raise cv.Invalid(
+                f"sensor '{air_quality[CONF_SENSOR]}' reports "
+                + (f"'{unit}'" if unit else "no unit_of_measurement")
+                + f", but the default thresholds of device_class '{entity.get(CONF_DEVICE_CLASS)}' are in "
+                f"'{expected}'. Set unit_of_measurement on the sensor or give `{CONF_THRESHOLDS}:` in its unit",
+                path=[CONF_ENDPOINTS, endpoint_id, conf_key, CONF_AIR_QUALITY],
+            )
     if mode == "direct" and unit:
         _LOGGER.warning(
             "%s: air_quality sensor '%s' reports '%s'. The short form expects a 0-6 index (0 unknown, 1 good, "
@@ -661,32 +609,6 @@ def _check_air_quality(endpoint_id, conf_key, where, device_config, full_config)
             where,
             air_quality[CONF_SENSOR],
             unit,
-        )
-
-
-def _check_modes(where, device_config, full_config):
-    modes = device_config.get(CONF_MODES)
-    select_id = device_config.get(CONF_MODE_SELECT)
-    if not modes or select_id is None:
-        return
-    options = _entity_config(full_config, select_id).get("options")
-    if not options:
-        return
-    missing = [m[CONF_OPTION] for m in modes if m[CONF_OPTION] not in options]
-    if missing:
-        raise cv.Invalid(
-            f"{where}: select '{select_id}' has no option {', '.join(repr(m) for m in missing)}. Every mode needs "
-            f"a select option with the same name as its label (or the name given with `{CONF_OPTION}:`). "
-            f"Options of the select: {', '.join(repr(o) for o in options)}",
-            path=[CONF_MODE_SELECT],
-        )
-    extra = [o for o in options if o not in {m[CONF_OPTION] for m in modes}]
-    if extra:
-        _LOGGER.warning(
-            "%s: select '%s' has options without a mode (%s). Selecting them is ignored by Matter",
-            where,
-            select_id,
-            ", ".join(repr(o) for o in extra),
         )
 
 
@@ -726,8 +648,8 @@ async def register(endpoint, var, device_type, device_config: dict) -> None:
         )
     if CONF_AIR_QUALITY in device_config:
         await _register_air_quality(endpoint, var, device_config)
-    if device_type.name in CABINET_DEVICE_TYPES:
-        await _register_cabinet(endpoint, var, device_type, device_config)
+    if device_config.get(CONF_DOOR_OPEN) is not None:
+        await _register_refrigerator_alarm(endpoint, var, device_config)
 
 
 def _create_block(cluster, calls: list[str]) -> list[str]:
@@ -965,6 +887,12 @@ async def _register_boolean_state_configuration(
                 trigger, [(cg.bool_, "visual"), (cg.bool_, "audible")], conf
             )
             cg.add(mapping.add_alarms_active_trigger(trigger))
+        for conf in alarms.get(CONF_ON_SUPPRESSED, []):
+            trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+            await automation.build_automation(
+                trigger, [(cg.bool_, "visual"), (cg.bool_, "audible")], conf
+            )
+            cg.add(mapping.add_alarms_suppressed_trigger(trigger))
     cg.add(var.register_mapping(mapping))
 
     # The alarms become active while the sensor is ON (leak, rain, freeze detected, contact open, occupied).
@@ -980,39 +908,10 @@ async def _register_boolean_state_configuration(
                 None,
             )
         if source is not None:
-            alarms_active = cluster.get_attribute("AlarmsActive")
-            cg.add(
-                var.register_binary_sensor_attribute(
-                    await cg.get_variable(source),
-                    endpoint.endpoint_id,
-                    cluster.id,
-                    alarms_active.id,
-                    cg.RawExpression("esphome::matter::conversion::boolean_state"),
-                    cg.RawExpression("esphome::matter::update_alarms_active_attribute"),
-                )
-            )
+            cg.add(mapping.set_alarm_source(await cg.get_variable(source)))
 
 
 # -- Air Quality ------------------------------------------------------------ #
-
-
-def air_quality_converter(mode: str, thresholds: dict[str, float]) -> str:
-    """C++ expression (a captureless lambda or a plain function) converting the sensor value to AirQualityEnum."""
-    if mode == "direct":
-        return "esphome::matter::conversion::air_quality_index"
-    lines = [
-        "[](float v) -> esp_matter_attr_val_t {",
-        "  if (std::isnan(v))",
-        "    return esp_matter_enum8(0);",
-        "  uint8_t level = 1;",
-    ]
-    for name, level in AIR_QUALITY_LEVELS.items():
-        if name in thresholds:
-            lines.append(f"  if (v >= {thresholds[name]!r}f)")
-            lines.append(f"    level = {level};")
-    lines.append("  return esp_matter_enum8(level);")
-    lines.append("}")
-    return "\n".join(lines)
 
 
 async def _register_air_quality(endpoint, var, device_config: dict) -> None:
@@ -1030,83 +929,39 @@ async def _register_air_quality(endpoint, var, device_config: dict) -> None:
     cg.add_define("USE_MATTER_AIR_QUALITY")
     if cluster.chip_include:
         endpoint.global_includes.add(cluster.chip_include)
-    mapping = cg.new_Pvariable(
-        _declare(
-            MatterSensorAttributeMapping, f"matter_air_quality_{endpoint.endpoint_id}"
-        ),
-        await cg.get_variable(air_quality[CONF_SENSOR]),
-        endpoint.endpoint_id,
-        cluster.id,
-        cluster.get_attribute("AirQuality").id,
-        cg.RawExpression(air_quality_converter(mode, thresholds)),
-        cg.RawExpression("esphome::matter::update_air_quality_attribute"),
-    )
-    cg.add(var.register_mapping(mapping))
-
-
-# -- Refrigerator And Temperature Controlled Cabinet Mode / Refrigerator Alarm -- #
-
-
-async def _register_cabinet(endpoint, var, device_type, device_config: dict) -> None:
-    modes = device_config.get(CONF_MODES)
-    if modes:
-        await _register_cabinet_modes(endpoint, var, device_config, modes)
-    if device_config.get(CONF_DOOR_OPEN) is not None:
-        await _register_refrigerator_alarm(endpoint, var, device_config)
-
-
-async def _register_cabinet_modes(
-    endpoint, var, device_config: dict, modes: list
-) -> None:
-    cluster = CLUSTERS_BY_NAME[CLUSTER_NAME_CABINET_MODE]
-    namespace = f"esp_matter::cluster::{cluster.espm_namespace}"
-    endpoint._cluster_configs[cluster.name]
-    endpoint_id = endpoint.endpoint_id
-
-    def lines() -> list[str]:
-        return [
-            f"{namespace}::config_t cabinet_mode_config{{}};",
-            f"cabinet_mode_config.current_mode = {modes[0][CONF_MODE]};",
-            f"cabinet_mode_config.delegate = esphome::matter::get_cabinet_mode_delegate({endpoint_id});",
-            f"if ({namespace}::create(endpoint, &cabinet_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
-            "  return false;",
-        ]
-
-    def elements() -> list[tuple[str, str]]:
-        return [
-            ("attrs", "SupportedModes"),
-            ("attrs", "CurrentMode"),
-            ("cmds", "ChangeToMode"),
-            ("cmds", "ChangeToModeResponse"),
-        ]
-
-    endpoint.extras.append(Extra(cluster.name, lines, elements, creates_cluster=True))
-
-    _include(endpoint, "matter_cabinet_mode.h")
-    cg.add_define("USE_MATTER_CABINET_MODE")
-    options = ", ".join(
-        "{"
-        + ", ".join(
-            [
-                str(cg.safe_exp(mode[CONF_LABEL])),
-                str(cg.safe_exp(mode[CONF_OPTION])),
-                str(mode[CONF_MODE]),
-                "{" + ", ".join(str(tag) for tag in mode[CONF_TAGS]) + "}",
-            ]
+    sensor_var = await cg.get_variable(air_quality[CONF_SENSOR])
+    attribute_id = cluster.get_attribute("AirQuality").id
+    if mode == "direct":
+        mapping = cg.new_Pvariable(
+            _declare(
+                MatterSensorAttributeMapping,
+                f"matter_air_quality_{endpoint.endpoint_id}",
+            ),
+            sensor_var,
+            endpoint.endpoint_id,
+            cluster.id,
+            attribute_id,
+            cg.RawExpression("esphome::matter::conversion::air_quality_index"),
+            cg.RawExpression("esphome::matter::update_air_quality_attribute"),
         )
-        + "}"
-        for mode in modes
-    )
-    mapping = cg.new_Pvariable(
-        _declare(MatterCabinetModeMapping, f"matter_cabinet_mode_{endpoint_id}"),
-        endpoint_id,
-        cg.RawExpression(
-            f"std::vector<esphome::matter::MatterModeOption>{{{options}}}"
-        ),
-    )
-    if device_config.get(CONF_MODE_SELECT) is not None:
-        cg.add(
-            mapping.set_select(await cg.get_variable(device_config[CONF_MODE_SELECT]))
+    else:
+        entries = ", ".join(
+            "{" + f"{level}, {thresholds[name]!r}f" + "}"
+            for name, level in AIR_QUALITY_LEVELS.items()
+            if name in thresholds
+        )
+        mapping = cg.new_Pvariable(
+            _declare(
+                MatterAirQualityMapping, f"matter_air_quality_{endpoint.endpoint_id}"
+            ),
+            sensor_var,
+            endpoint.endpoint_id,
+            cluster.id,
+            attribute_id,
+            cg.RawExpression(
+                f"std::vector<esphome::matter::MatterAirQualityThreshold>{{{entries}}}"
+            ),
+            air_quality[CONF_HYSTERESIS],
         )
     cg.add(var.register_mapping(mapping))
 
@@ -1121,6 +976,9 @@ async def _register_refrigerator_alarm(endpoint, var, device_config: dict) -> No
         # Mask and Supported are DoorOpen (bit 0), State starts cleared.
         return [
             f"{namespace}::config_t refrigerator_alarm_config{{}};",
+            "refrigerator_alarm_config.mask = 1;",
+            "refrigerator_alarm_config.supported = 1;",
+            "refrigerator_alarm_config.state = 0;",
             (
                 f"auto *refrigerator_alarm_cluster = {namespace}::create(endpoint, &refrigerator_alarm_config, "
                 "esp_matter::CLUSTER_FLAG_SERVER);"
@@ -1136,7 +994,7 @@ async def _register_refrigerator_alarm(endpoint, var, device_config: dict) -> No
         Extra(cluster.name, lines, lambda: [("events", "Notify")], creates_cluster=True)
     )
 
-    _include(endpoint, "matter_cabinet_mode.h")
+    _include(endpoint, "matter_refrigerator_alarm.h")
     cg.add_define("USE_MATTER_REFRIGERATOR_ALARM")
     mapping = cg.new_Pvariable(
         _declare(

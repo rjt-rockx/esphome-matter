@@ -7,6 +7,13 @@
 #include "esphome/core/defines.h"
 #ifdef USE_MATTER_AIR_QUALITY
 
+#include "esphome/core/log.h"
+#include "matter_attributes.h"
+#include "matter_endpoints.h"
+#ifdef USE_SENSOR
+#include "esphome/components/sensor/sensor.h"
+#endif
+
 #include <app/clusters/air-quality-server/AirQualityCluster.h>
 #include <clusters/AirQuality/Enums.h>
 #include <data_model_provider/esp_matter_data_model_provider.h>
@@ -15,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 namespace esphome::matter {
 
@@ -48,6 +56,83 @@ inline CHIP_ERROR update_air_quality_attribute(uint16_t endpoint_id,
              ? CHIP_NO_ERROR
              : CHIP_ERROR_INVALID_ARGUMENT;
 }
+
+// A level of the derived air quality and the sensor value above which it applies.
+struct MatterAirQualityThreshold {
+  uint8_t level;
+  float above;
+};
+
+// AirQualityEnum level for a value. `thresholds` ascend, `index` is the number
+// of thresholds the previous value was above (0 = Good), kept by the caller. A
+// level is entered strictly above its threshold and left again once the value
+// is at or below threshold - |threshold| * hysteresis, so a reading that
+// hovers around a threshold does not flip the level. NaN is Unknown (0).
+inline uint8_t air_quality_level(float value,
+                                 const std::vector<MatterAirQualityThreshold> &thresholds,
+                                 float hysteresis, size_t &index) {
+  if (std::isnan(value)) {
+    index = 0;
+    return 0;
+  }
+  while (index < thresholds.size() && value > thresholds[index].above)
+    index++;
+  while (index > 0 &&
+         value <= thresholds[index - 1].above -
+                      std::fabs(thresholds[index - 1].above) * hysteresis)
+    index--;
+  return index == 0 ? 1 : thresholds[index - 1].level;
+}
+
+#ifdef USE_SENSOR
+// Air Quality level derived from a measurement with thresholds.
+class MatterAirQualityMapping : public MatterEndpointMappingBase {
+public:
+  MatterAirQualityMapping(sensor::Sensor *sensor, uint16_t endpoint_id,
+                          uint32_t cluster_id, uint32_t attribute_id,
+                          std::vector<MatterAirQualityThreshold> thresholds,
+                          float hysteresis)
+      : MatterEndpointMappingBase(endpoint_id), sensor_(sensor),
+        cluster_id_(cluster_id), thresholds_(std::move(thresholds)),
+        hysteresis_(hysteresis) {}
+
+  void initialize() override {
+    if (this->sensor_ == nullptr)
+      return;
+    this->sensor_->add_on_state_callback(
+        [this](float value) { this->publish_(value); });
+    if (this->sensor_->has_state())
+      this->publish_(this->sensor_->state);
+  }
+
+protected:
+  // Main loop.
+  void publish_(float value) {
+    uint8_t level =
+        air_quality_level(value, this->thresholds_, this->hysteresis_, this->index_);
+    if (level == this->published_)
+      return;
+    this->published_ = level;
+    uint16_t endpoint_id = this->endpoint_id_;
+    uint32_t cluster_id = this->cluster_id_;
+    run_on_matter_thread([endpoint_id, cluster_id, level]() {
+      CHIP_ERROR err = update_air_quality_attribute(endpoint_id, cluster_id,
+                                                    esp_matter_enum8(level));
+      if (err != CHIP_NO_ERROR)
+        ESP_LOGW("matter.air_quality",
+                 "Cannot set the air quality level %u on endpoint %u: %s",
+                 level, endpoint_id, err.AsString());
+    });
+  }
+
+  sensor::Sensor *sensor_;
+  uint32_t cluster_id_;
+  std::vector<MatterAirQualityThreshold> thresholds_;
+  float hysteresis_;
+  size_t index_{0};
+  int16_t published_{-1};
+};
+#endif // USE_SENSOR
 
 } // namespace esphome::matter
 
