@@ -3,6 +3,7 @@
 
 #include "esphome/core/log.h"
 #include "matter_attributes.h"
+#include "matter_binding.h"
 #include "matter_component.h"
 
 #include <data_model_provider/esp_matter_data_model_provider.h>
@@ -349,6 +350,9 @@ endpoint_attribute_update_cb(esp_matter::attribute::callback_type_t type,
     return ESP_OK;
   // An ESPHome -> Matter push (see MatterPushGuard) is not a controller change.
   if (MatterPushGuard::active())
+    return ESP_OK;
+  // Same for a binding framework PushScope, which is scoped to its endpoint.
+  if (MatterBindingBase::is_echo(endpoint_id))
     return ESP_OK;
 
   const std::string value = format_attribute_value(*val);
