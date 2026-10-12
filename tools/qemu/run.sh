@@ -47,7 +47,7 @@ fetch_qemu() {
   curl -fsSL -o "$base/$f" "https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-$QEMU_TAG/$f"
   tar xf "$base/$f" -C "$base"
   if ldd "$QEMU_DIR/bin/qemu-system-xtensa" | grep -q "not found"; then
-    echo "Missing shared libraries (try: apt-get install libslirp0 libglib2.0-0):" >&2
+    echo "Missing shared libraries (try: apt-get install libslirp0 libglib2.0-0 libsdl2-2.0-0 libpixman-1-0 libsdl2-2.0-0 libpixman-1-0):" >&2
     ldd "$QEMU_DIR/bin/qemu-system-xtensa" | grep "not found" >&2
     exit 1
   fi
