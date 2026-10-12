@@ -77,6 +77,7 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |
+| `binary_sensor`: smoke, carbon monoxide | Smoke CO Alarm | Partial (untested; ON = Critical alarm) | [binary-sensors.md](docs/binary-sensors.md) |
 | `switch` | On/Off Plug-in Unit | Supported (untested on hardware) | [switch.md](docs/switch.md) |
 | `cover` | Window Covering | Supported (untested on hardware) | [cover.md](docs/cover.md) |
 | `fan` | Fan | Supported (untested on hardware) | [fan.md](docs/fan.md) |
