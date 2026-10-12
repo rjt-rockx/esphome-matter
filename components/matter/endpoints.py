@@ -28,7 +28,7 @@ from .data_model.device_types import (
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
-from . import fan_binding
+from . import fan_binding, layout_dump
 from .matter_climate import (
     CLIMATE_INCLUDE,
     CONF_CLIMATE_ID,
@@ -657,11 +657,15 @@ async def register_endpoints(var, config: ConfigType):
         }
     )
 
+    endpoints = []
     for endpoint_id, endpoint_config in config[CONF_ENDPOINTS].items():
         endpoint = Endpoint(endpoint_id, endpoint_config)
+        endpoints.append(endpoint)
         await endpoint.register(var)
         global_includes.update(endpoint.global_includes)
         enabled_sdkconfig_clusters.update(endpoint.enabled_sdkconfig_options)
+
+    layout_dump.dump_layout(endpoints)  # opt-in: MATTER_LAYOUT_JSON
 
     # Set sdkconfig options to compile the correct clusters.
     for cluster in CLUSTERS:
