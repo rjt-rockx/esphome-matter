@@ -89,7 +89,8 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
 - `MatterAttributeTrigger::dispatch`: CHIP to main loop via `defer`, with a
   mutex-guarded coalesced pending value. The echo guard
   (`MatterAttributeDispatchGuard`) is only set and read on the main loop. OK.
-- `MatterLightMapping::color_update_pending_`: only touched on the CHIP task. OK.
+- `MatterLightBinding::color_read_pending_`, `ctl_bits_`: atomics (CHIP and main loop). The light window and
+  echo state is main-loop only.
 - `synchronizing_from_matter_` (light): only set and read on the main loop,
   so there is no data race. The residual issue is logical: an entity that
   publishes its state after `perform()` returned (asynchronously) is seen as a

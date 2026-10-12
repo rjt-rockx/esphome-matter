@@ -111,6 +111,18 @@ inline esp_matter_attr_val_t esp_matter_bool(bool v) {
   r.val.b = v;
   return r;
 }
+inline esp_matter_attr_val_t esp_matter_uint8(uint8_t v) {
+  esp_matter_attr_val_t r;
+  r.type = ESP_MATTER_VAL_TYPE_UINT8;
+  r.val.u8 = v;
+  return r;
+}
+inline esp_matter_attr_val_t esp_matter_uint16(uint16_t v) {
+  esp_matter_attr_val_t r;
+  r.type = ESP_MATTER_VAL_TYPE_UINT16;
+  r.val.u16 = v;
+  return r;
+}
 inline esp_matter_attr_val_t esp_matter_bitmap8(uint8_t v) {
   esp_matter_attr_val_t r;
   r.type = ESP_MATTER_VAL_TYPE_BITMAP8;
