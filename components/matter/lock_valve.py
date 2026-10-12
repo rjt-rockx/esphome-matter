@@ -76,9 +76,7 @@ def device_config_lines(
         valve_config = f"{config_var}.valve_configuration_and_control"
         # esp-matter defaults DefaultOpenDuration to 1 second, which would close the valve one second after every
         # Open command that has no explicit duration. Null means "stay open until closed".
-        lines.append(
-            f"{valve_config}.default_open_duration = ::nullable<uint32_t>();"
-        )
+        lines.append(f"{valve_config}.default_open_duration = ::nullable<uint32_t>();")
         if CONF_VALVE_ID in device_config:
             lines.append(
                 f"{valve_config}.delegate = esphome::matter::get_valve_delegate({endpoint_id});"
