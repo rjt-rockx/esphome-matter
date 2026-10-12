@@ -51,7 +51,8 @@ protected:
   void apply_operation_(MatterLockOperation operation,
                         const MatterLockOperationOrigin &origin);
   void on_lock_state_(lock::LockState state);
-  void push_state_to_matter_(lock::LockState state);
+  // `announce` also emits a LockOperation event (not wanted for the initial state).
+  void push_state_to_matter_(lock::LockState state, bool announce = true);
 
   lock::Lock *lock_;
   bool has_door_state_{false};

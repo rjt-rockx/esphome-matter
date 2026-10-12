@@ -57,9 +57,9 @@ void MatterLockMapping::initialize() {
       [this](lock::LockState state) { this->on_lock_state_(state); });
 
   // Publish the initial state from the main loop to read the lock state
-  // safely.
+  // safely. No LockOperation event: nothing was operated.
   global_matter_component->defer_to_main_loop(
-      [this]() { this->on_lock_state_(this->lock_->state); });
+      [this]() { this->push_state_to_matter_(this->lock_->state, false); });
 }
 
 void MatterLockMapping::handle_operation(
@@ -131,7 +131,8 @@ void MatterLockMapping::on_lock_state_(lock::LockState state) {
 // ESPHome JAMMED   -> LockState NotFullyLocked (+ DoorState DoorJammed when the
 //                     DoorPositionSensor feature is enabled)
 // ESPHome NONE     -> LockState NotFullyLocked
-void MatterLockMapping::push_state_to_matter_(lock::LockState state) {
+void MatterLockMapping::push_state_to_matter_(lock::LockState state,
+                                              bool announce) {
   using chip::app::Clusters::DoorLock::DlLockState;
   DlLockState matter_state = DlLockState::kNotFullyLocked;
   bool jammed = false;
@@ -157,12 +158,14 @@ void MatterLockMapping::push_state_to_matter_(lock::LockState state) {
   this->pending_origin_ = MatterLockOperationOrigin{};
 
   uint16_t eid = this->endpoint_id();
+  // esp-matter creates DoorState as DoorOpen, which would be a false claim.
+  // The initial publish (and any change of the jam state) updates it.
   bool update_door_state =
-      this->has_door_state_ && (jammed || this->door_jammed_);
+      this->has_door_state_ && (jammed || this->door_jammed_ || !announce);
   this->door_jammed_ = jammed;
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
-      [eid, matter_state, jammed, update_door_state, origin]() {
+      [eid, matter_state, jammed, update_door_state, origin, announce]() {
         using namespace chip::app::Clusters;
         auto &server = DoorLockServer::Instance();
         if (origin.valid) {
@@ -174,9 +177,11 @@ void MatterLockMapping::push_state_to_matter_(lock::LockState state) {
                   static_cast<chip::FabricIndex>(origin.fabric_index)),
               chip::app::DataModel::MakeNullable(
                   static_cast<chip::NodeId>(origin.node_id)));
-        } else {
+        } else if (announce) {
           server.SetLockState(eid, matter_state,
                               DoorLock::OperationSourceEnum::kManual);
+        } else {
+          server.SetLockState(eid, matter_state);
         }
         if (update_door_state) {
           if (jammed)
