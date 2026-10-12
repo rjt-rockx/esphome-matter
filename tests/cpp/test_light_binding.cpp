@@ -91,6 +91,7 @@ class TestLight : public MatterLightBinding {
     as_chip([&] { submit_command(c); });
   }
 
+  uint32_t light_retries() const { return retries_[G_LIGHT]; }
   void clear_loop_requested() { color_loop_requested_ = false; }
   void force_push() { request_push(); }
   bool window_light() const { return light_window_active(); }
@@ -1099,6 +1100,174 @@ TEST(light_new_command_cancels_the_wait_for_the_old_one) {
   s.r.p.settle();
   CHECK(s.l.window_light());  // the second command's window (10 s) is still open
   CHECK_EQ(s.l.requests.size(), n);
+}
+
+// ---------------------------------------------------------------------------
+// Waiting for CHIP's transition: one wait per attribute group
+// ---------------------------------------------------------------------------
+
+namespace {
+
+MatterLightCommand color_command(uint16_t x, uint16_t y, uint32_t transition_ms) {
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, x, y};
+  c.transition_ms = transition_ms;
+  c.color_group = true;
+  return c;
+}
+
+// CHIP is in the middle of a long level transition: RemainingTime is not 0.
+void chip_is_busy(FakePlatform &p) {
+  p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(30);
+  p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+}
+
+}  // namespace
+
+TEST(light_step_right_after_the_nominal_time_does_not_leak) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 3000));
+  s.r.p.settle();
+  chip_is_busy(s.r.p);
+  // The step is processed after the nominal time but before the timer that asks CHIP got to run.
+  s.r.p.now += 3501;
+  matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(31));
+  s.r.p.run_main();
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  CHECK(s.l.window_light());
+}
+
+TEST(light_colour_command_does_not_cancel_the_level_wait) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 1000));
+  s.r.p.settle();
+  chip_is_busy(s.r.p);
+  s.r.p.advance(1600);
+  s.r.p.settle();  // the level check ran: busy, windows stay open
+  CHECK(s.l.window_light());
+  // A colour command arrives while the level transition is still waited for.
+  s.l.submit_cmd(color_command(10000, 40000, 500));
+  s.r.p.settle();
+  size_t n = s.l.requests.size();
+  // CHIP's late level steps are still ignored.
+  matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(60));
+  s.r.p.settle();
+  CHECK_EQ(s.l.requests.size(), n);
+  CHECK(s.l.window_light());
+  s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS + 10);
+  matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(64));
+  s.r.p.settle();
+  CHECK_EQ(s.l.requests.size(), n);
+  CHECK(s.l.window_light());
+}
+
+TEST(light_level_stop_leaves_the_colour_wait_alone_and_it_still_settles) {
+  Started s;
+  s.l.requests.clear();
+  MatterLightCommand both = level_command(200, 1000);
+  both.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 10000, 40000};
+  both.color_group = true;
+  s.l.submit_cmd(both);
+  s.r.p.settle();
+  chip_is_busy(s.r.p);
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(20);
+  s.r.p.advance(1600);
+  s.r.p.settle();  // both groups waited for, both busy
+  CHECK(s.l.window_light());
+  CHECK(s.l.window_color());
+
+  // Stop the level transition only.
+  s.r.p.store[{EP, LEVEL_CLUSTER, CURRENT_LEVEL}] = level_val(90);
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(0);
+  MatterLightCommand stop;
+  stop.stop_light = true;
+  s.l.submit_cmd(stop);
+  s.r.p.settle();
+  CHECK(!s.l.window_light());
+  CHECK(s.l.window_color());
+  CHECK_NEAR(s.l.view.brightness, 90 / 254.0, 0.001);
+  // CHIP's late colour steps are still ignored.
+  size_t n = s.l.requests.size();
+  matter_writes(s.r.p, COLOR_CLUSTER, CURRENT_X, u16_val(12000));
+  s.r.p.settle();
+  CHECK_EQ(s.l.requests.size(), n);
+  // The colour transition ends: the colour settles.
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(20000);
+  s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS + 10);
+  s.r.p.settle();
+  CHECK(!s.l.window_color());
+  CHECK_EQ(s.l.requests.size(), n + 1);
+  float r, g, b;
+  CHECK(esphome::matter::conversion::from_matter::color(20000, 21845, r, g, b));
+  CHECK_NEAR(s.l.requests.back().red, r, 0.001);
+}
+
+TEST(light_idle_answer_of_the_light_does_not_close_a_colour_window_opened_since) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 1000));
+  s.r.p.settle();
+  // The nominal end of the level command requests the check; CHIP has not answered when a colour command is
+  // applied (same main loop iteration), and the answer says "not busy".
+  s.r.p.advance(1600);
+  CHECK(!s.r.p.chip_queue.empty());
+  s.l.submit_cmd(color_command(10000, 40000, 3000));
+  s.r.p.run_main();  // the colour command is applied before CHIP's answer arrives
+  CHECK(s.l.window_color());
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(0);
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+  s.r.p.settle();
+  // The level window is over, the colour window is the new command's and stays.
+  CHECK(!s.l.window_light());
+  CHECK(s.l.window_color());
+  // Its own end settles the colour.
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(15000);
+  size_t n = s.l.requests.size();
+  s.r.p.advance(3600);
+  s.r.p.settle();
+  CHECK(!s.l.window_color());
+  CHECK(s.l.requests.size() > n);
+}
+
+TEST(light_local_off_is_not_turned_back_on_by_a_stale_idle_answer) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 1000));
+  s.r.p.settle();
+  s.r.p.advance(1600);  // the check is requested, CHIP has not run it
+  // The user turns the light off. CHIP still has OnOff = true and level 200 in its store.
+  s.l.view.on = false;
+  s.l.entity_changed();
+  CHECK(!s.l.window_light());
+  s.r.p.settle();  // the stop, the (stale) check and the push run
+  CHECK(!s.l.view.on);
+  size_t on_requests = 0;
+  for (auto &r : s.l.requests)
+    if (r.state.has_value() && *r.state)
+      on_requests++;
+  CHECK_EQ(on_requests, (size_t) 0);
+  CHECK(!last_write(s.r.p, ON_OFF_CLUSTER, ON_OFF).val.b);
+}
+
+TEST(light_retries_start_again_after_a_new_command) {
+  Started s;
+  s.l.submit_cmd(level_command(200, 500));
+  s.r.p.settle();
+  chip_is_busy(s.r.p);
+  s.r.p.advance(1100);
+  for (int i = 0; i < 5; i++) {
+    s.r.p.settle();
+    s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS + 10);
+  }
+  s.r.p.settle();
+  CHECK(s.l.light_retries() >= 5);
+  // A dimmer slider: the next command starts a new count.
+  s.l.submit_cmd(level_command(100, 500));
+  s.r.p.settle();
+  CHECK_EQ(s.l.light_retries(), (uint32_t) 0);
 }
 
 TEST(light_push_leaves_the_colour_alone_while_a_colour_command_runs) {
