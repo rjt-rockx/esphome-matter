@@ -45,6 +45,7 @@ RAW = {
         {"platform": "template", "name": "No id", "device_class": "temperature"},
     ],
     "button": [{"platform": "template", "id": "btn", "name": "Btn"}],
+    "number": [{"platform": "template", "id": "num", "name": "Num"}],
 }
 
 
@@ -216,8 +217,8 @@ def test_unknown_id_suggests(raw):
 
 def test_unmappable_explicit_errors_with_reason(raw):
     lowered = None
-    with pytest.raises(cv.Invalid, match="'btn' cannot be exposed: a button has no faithful"):
-        lowered = run(["btn"])
+    with pytest.raises(cv.Invalid, match="'num' cannot be exposed: a number has no faithful"):
+        lowered = run(["num"])
     assert lowered is None
 
 
@@ -323,13 +324,13 @@ def test_registry_is_extensible(raw):
     from components.matter.expose import inference
 
     inv = {e.id: e for e in build_inventory(raw)}
-    saved = dict(inference._RULES)
+    saved = {k: list(v) for k, v in inference._RULES.items()}
     try:
         register_rule(
-            "button",
+            "number",
             lambda e, o: LoweredEndpoint({"on_off_plug_in_unit": {"switch_id": e.id}}, merge_group="g"),
         )
-        assert infer(inv["btn"], Overrides()).merge_group == "g"
+        assert infer(inv["num"], Overrides()).merge_group == "g"
     finally:
         inference._RULES.clear()
         inference._RULES.update(saved)
@@ -417,7 +418,7 @@ def test_expose_all_with_exclude(raw):
 def test_merge_group_and_attach_to(raw):
     from components.matter.expose import inference
 
-    saved = dict(inference._RULES)
+    saved = {k: list(v) for k, v in inference._RULES.items()}
     try:
         register_rule(
             "sensor",
@@ -446,12 +447,10 @@ def test_attach_to_unexposed_target(raw):
         run([{"id": "h", "attach_to": "t"}])
 
 
-def test_label_dropped_when_base_lacks_it(raw, caplog):
-    assert lower._supports_label() is False
-    with caplog.at_level("DEBUG"):
-        cfg = run([{"id": "relay", "label": "Plug"}])
+def test_single_endpoint_gets_no_label_unless_asked(raw):
+    cfg = run(["relay", {"id": "lamp", "label": "Reading"}])
     assert "label" not in cfg["endpoints"][endpoint_for_key("relay")]
-    assert "dropped" in caplog.text
+    assert cfg["endpoints"][endpoint_for_key("lamp")]["label"] == "Reading"
 
 
 def test_wrong_pairing_is_left_to_use_id(raw):

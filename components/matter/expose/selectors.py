@@ -8,7 +8,7 @@ without a mapping; an explicit id may expose them (with a warning) or errors wit
 import difflib
 import fnmatch
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import esphome.config_validation as cv
 
@@ -48,6 +48,8 @@ class Selection:
     selected: list[Selected] = field(default_factory=list)
     # (entity label, reason) for everything a glob or `all` passed over.
     skipped: list[tuple[str, str]] = field(default_factory=list)
+    # Ids of entities a glob or `all` matched but passed over because they have no `name:`.
+    unnamed: list[str] = field(default_factory=list)
 
 
 def is_glob(pattern: str) -> bool:
@@ -73,6 +75,9 @@ def parse_items(expose) -> list[Item]:
                     meters=entry.get("meters"),
                     endpoint=entry.get("endpoint"),
                     was=entry.get("was"),
+                    tags=entry.get("tags"),
+                    parent=entry.get("parent"),
+                    clusters=entry.get("clusters"),
                 ),
             )
         )
@@ -109,7 +114,10 @@ def _merge(level: int, eid: str, candidates: list[Overrides]) -> Overrides:
 
 def _describe(o: Overrides) -> str:
     base = Overrides().key()
-    names = ("as", "features", "label", "options", "attach_to", "meters", "endpoint", "was")
+    names = (
+        "as", "features", "label", "options", "attach_to", "meters", "endpoint", "was",
+        "tags", "parent", "clusters",
+    )  # fmt: skip
     parts = [n for n, v, b in zip(names, o.key(), base, strict=True) if v != b]
     return "{" + ", ".join(parts) + "}"
 
@@ -184,9 +192,12 @@ def select(inventory: list[Entity], items: list[Item], excludes: list[str]) -> S
                 continue
             if reason := entity.skipped_by_glob:
                 skipped.append((eid, reason))
+                if reason.startswith("no name"):
+                    result.unnamed.append(eid)
                 continue
             try:
-                infer(entity, overrides)  # probe only; lowering re-runs it
+                # Probe only; lowering re-runs it with the real selection.
+                infer(entity, replace(overrides, via_glob=True))
             except NoMapping as exc:
                 skipped.append((eid, str(exc)))
                 continue

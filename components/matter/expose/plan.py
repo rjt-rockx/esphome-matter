@@ -44,8 +44,13 @@ class PlannedEndpoint:
     device_types: dict[str, dict] = field(default_factory=dict)
     extra: dict = field(default_factory=dict)
     entities: list[str] = field(default_factory=list)
+    # Label that ends up on the endpoint (FixedLabel), None when the endpoint has no label.
     label: str | None = None
+    # The entity name, used as the label only when the endpoint is in a Duplicate set.
+    default_label: str | None = None
     pin: int | None = None
+    # `parent:` of the item: the key of another planned endpoint, or a hand-written number.
+    parent: str | int | None = None
     # Entities whose clusters were merged in with `attach_to:`.
     attached: list[str] = field(default_factory=list)
     members: list[Member] = field(default_factory=list)

@@ -88,7 +88,7 @@ def test_platform_default_device_class_changes_the_device_type():
 
 def test_device_class_change_to_unmappable_warns():
     raw = raw_entity("sensor", platform="template", id_="s", unit_of_measurement="°C")
-    texts = check_member(member(raw), validated(raw, device_class="power", unit="W"))
+    texts = check_member(member(raw), validated(raw, device_class="duration", unit="s"))
     assert any("inferred as temperature_sensor" in t and "no longer maps" in t for t in texts)
 
 
@@ -319,7 +319,8 @@ def test_expose_all_config_validates_and_prints_the_plan(expose_all_output):
         "skipped hidden_relay: internal: true",
         "skipped nameless_relay: no name (internal)",
         "skipped cfg_relay: entity_category: config",
-        "skipped some_button: a button has no faithful Matter device type",
+        "skipped some_button: a button has no events; list its id in `expose:` to get an unbound "
+        "Generic Switch that `on_press:` drives with matter.send_switch_event",
         "skipped diag_temp: entity_category: diagnostic",
         "skipped chip_temp: entity_category: diagnostic (platform default)",
         "skipped nameless_sensor: no name (internal)",
@@ -398,9 +399,9 @@ def test_plan_table_is_generated_when_the_logger_shows_config(tmp_path):
     main, defines = generate(tmp_path, None)
     assert "#define USE_MATTER_PLAN" in defines
     assert "static constexpr esphome::matter::PlanRow MATTER_PLAN[] = {" in main
-    assert '{33996, "dimmable_light", "lamp", "Lamp"}' in main
-    assert '{38775, "on_off_plug_in_unit", "relay", "Relay"}' in main
-    assert '{61934, "temperature_sensor", "room_temp", "Room Temperature"}' in main
+    assert '{33996, "dimmable_light", "lamp", ""}' in main
+    assert '{38775, "on_off_plug_in_unit", "relay", ""}' in main
+    assert '{61934, "temperature_sensor", "room_temp", ""}' in main
     assert "esphome::matter::set_plan(MATTER_PLAN" in main
 
 

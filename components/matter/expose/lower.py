@@ -7,10 +7,13 @@ unchanged. Lowering in FINAL_VALIDATE would be too late for that.
 """
 
 import logging
+import re
+from dataclasses import replace
 
 import esphome.config_validation as cv
 from esphome.core import CORE
 
+from ..conformance import application_device_type_ids
 from ..const import CONF_ENDPOINTS, CONF_MATTER, CONF_VENDOR_ID
 from .inference import CONF_LABEL, NoMapping, Overrides, infer
 from .inventory import Entity, build_inventory
@@ -23,8 +26,9 @@ from .plan import (
     PlannedEndpoint,
     log_plan,
 )
-from .schema import CONF_EXCLUDE, CONF_EXPOSE
+from .schema import CONF_CLUSTERS, CONF_EXCLUDE, CONF_EXPOSE, CONF_PARENT, CONF_TAGS
 from .selectors import ALL, EXPLICIT, Selection, parse_items, select
+from .tags import assign_duplicate_tags
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +40,7 @@ def bare_matter_error(inventory: list[Entity]) -> str:
         if not entity.exposable or entity.skipped_by_glob:
             continue
         try:
-            infer(entity, Overrides())
+            infer(entity, Overrides(via_glob=True))
         except NoMapping:
             continue
         inferred.append(entity.id)
@@ -59,93 +63,219 @@ def _has_endpoints(config: dict) -> bool:
 def _merge_dicts(into: dict, new: dict, what: str) -> None:
     for key, value in new.items():
         if key in into and into[key] != value:
+            hint = ""
+            if "group:electrical" in what:
+                hint = "; with several loads give each meter `meters: <switch id>`"
             raise cv.Invalid(
                 f"matter.expose: {what}: '{key}' is bound to two entities "
-                f"({into[key]} and {value}); use `endpoints:` or separate endpoints"
+                f"({into[key]} and {value}); use `endpoints:` or separate endpoints{hint}"
             )
         into[key] = value
 
 
-def _supports_label() -> bool:
-    """Whether the base ENDPOINT_SCHEMA has an endpoint `label:` key (M0 adds it)."""
-    from ..endpoints import ENDPOINT_SCHEMA
+# Entities whose endpoint a power or energy sensor can belong to.
+LOAD_DOMAINS = frozenset({"switch", "light", "cover", "fan"})
+_TRAILING_INT = re.compile(r"(\d+)$")
 
-    validators = getattr(ENDPOINT_SCHEMA, "validators", (ENDPOINT_SCHEMA,))
-    return any(
-        str(k) == CONF_LABEL
-        for v in validators
-        for k in getattr(getattr(v, "schema", None), "keys", lambda: ())()
-    )
+
+def _apply_item_keys(ep: PlannedEndpoint, o: Overrides) -> None:
+    """`endpoint:`, `label:`, `tags:`, `clusters:` and `parent:` of an item onto its endpoint."""
+    key = ep.key
+    if o.endpoint is not None:
+        if ep.pin is not None and ep.pin != o.endpoint:
+            raise cv.Invalid(
+                f"matter.expose: conflicting endpoint pins for {key}: {ep.pin} and {o.endpoint}"
+            )
+        ep.pin = o.endpoint
+    if o.label and CONF_LABEL not in ep.extra:
+        ep.extra[CONF_LABEL] = o.label
+    if o.tags is not None:
+        if CONF_TAGS in ep.extra and ep.extra[CONF_TAGS] != o.tags:
+            raise cv.Invalid(f"matter.expose: conflicting `tags:` for {key}")
+        ep.extra[CONF_TAGS] = list(o.tags)
+    if o.clusters is not None:
+        _merge_dicts(ep.extra.setdefault(CONF_CLUSTERS, {}), o.clusters, f"{key} clusters")
+    if o.parent is not None:
+        if ep.parent is not None and ep.parent != o.parent:
+            raise cv.Invalid(
+                f"matter.expose: conflicting `parent:` for {key}: {ep.parent} and {o.parent}"
+            )
+        ep.parent = o.parent
+
+
+def _add_standalone(planned, key_of, entity, o, lowered, explicit) -> None:
+    if lowered.merge_group:
+        if o.was:
+            raise cv.Invalid(
+                f"matter.expose: `was:` on '{entity.id}' cannot be used for a merged "
+                f"endpoint ({group_key(lowered.merge_group)})"
+            )
+        key = group_key(lowered.merge_group)
+    else:
+        key = o.was or entity.id
+        if key in planned:
+            raise cv.Invalid(
+                f"matter.expose: endpoint key '{key}' is used twice (check `was:` against ids)"
+            )
+    ep = planned.setdefault(key, PlannedEndpoint(key))
+    for name, block in lowered.device_types.items():
+        _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{key} {name}")
+    _merge_dicts(ep.extra, lowered.extra, f"{key}")
+    ep.entities.append(entity.id)
+    ep.members.append(Member(entity, o, lowered, explicit))
+    key_of[entity.id] = key
+    _apply_item_keys(ep, o)
+    if not lowered.merge_group and entity.name and not ep.default_label:
+        ep.default_label = entity.name
+
+
+def _attach(planned, key_of, entity, o, lowered, target: str) -> None:
+    for what, value in (
+        ("endpoint", o.endpoint),
+        ("was", o.was),
+        ("tags", o.tags),
+        ("parent", o.parent),
+        ("clusters", o.clusters),
+        ("label", o.label),
+    ):
+        if value is not None:
+            raise cv.Invalid(
+                f"matter.expose: '{entity.id}' is attached to '{target}', so `{what}:` has no "
+                f"meaning on it; put it on the item of '{target}'"
+            )
+    ep = planned[target]
+    if lowered.attach_extra is not None:
+        _merge_dicts(ep.extra, lowered.attach_extra, target)
+    else:
+        for name, block in lowered.device_types.items():
+            _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{target} {name}")
+        _merge_dicts(ep.extra, lowered.extra, target)
+    ep.attached.append(entity.id)
+    ep.members.append(Member(entity, o, lowered, True))
+    key_of[entity.id] = target
+
+
+def _trailing(text: str) -> int | None:
+    match = _TRAILING_INT.search(text or "")
+    return int(match.group(1)) if match else None
+
+
+def _auto_target(entity: Entity, kind: str, planned: dict[str, PlannedEndpoint]) -> str | None:
+    """The endpoint a meter or battery belongs to, or None when that is not unambiguous.
+
+    A single candidate wins. Among several, an id or name that starts with the candidate's
+    (`relay_1_power` for `relay_1`), then the same trailing number (`power_2` for `relay_2`),
+    must pick exactly one.
+    """
+    if kind == "meter":
+        cands = [
+            ep for ep in planned.values() if any(m.entity.domain in LOAD_DOMAINS for m in ep.members)
+        ]
+    else:
+        cands = [ep for ep in planned.values() if application_device_type_ids(ep.device_types)]
+    if len(cands) == 1:
+        return cands[0].key
+    if not cands:
+        return None
+
+    def prefix_score(ep: PlannedEndpoint) -> int:
+        best = 0
+        for m in ep.members:
+            other = m.entity
+            if entity.id and other.id and (
+                entity.id == other.id or entity.id.startswith(other.id + "_")
+            ):
+                best = max(best, len(other.id))
+            if entity.name and other.name and entity.name.lower().startswith(other.name.lower()):
+                best = max(best, len(other.name))
+        return best
+
+    scores = {ep.key: prefix_score(ep) for ep in cands}
+    top = max(scores.values())
+    if top and list(scores.values()).count(top) == 1:
+        return next(k for k, v in scores.items() if v == top)
+    number = _trailing(entity.id)
+    if number is not None:
+        same = [ep.key for ep in cands if _trailing(ep.key) == number]
+        if len(same) == 1:
+            return same[0]
+    return None
 
 
 def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, str]]:
     """Group the selected entities into planned endpoints. Returns (planned, entity -> key)."""
     planned: dict[str, PlannedEndpoint] = {}
     key_of: dict[str, str] = {}
-    attaches = []
-    supports_label = _supports_label()
+    attaches, autos = [], []
 
     for sel in selection.selected:
         entity, o = sel.entity, sel.overrides
+        explicit = sel.level == EXPLICIT
         try:
-            lowered = infer(entity, o)
+            lowered = infer(entity, replace(o, via_glob=not explicit))
         except NoMapping as exc:
+            raise cv.Invalid(f"matter.expose: '{entity.id}' cannot be exposed: {exc}") from None
+        if o.meters and lowered.auto_attach != "meter":
             raise cv.Invalid(
-                f"matter.expose: '{entity.id}' cannot be exposed: {exc}"
-            ) from None
-        if o.attach_to:
-            attaches.append((entity, o, lowered))
-            continue
-        if lowered.merge_group:
-            if o.was:
-                raise cv.Invalid(
-                    f"matter.expose: `was:` on '{entity.id}' cannot be used for a merged "
-                    f"endpoint ({group_key(lowered.merge_group)})"
-                )
-            key = group_key(lowered.merge_group)
-        else:
-            key = o.was or entity.id
-        if key in planned and not lowered.merge_group:
-            raise cv.Invalid(
-                f"matter.expose: endpoint key '{key}' is used twice (check `was:` against ids)"
+                f"matter.expose: `meters:` on '{entity.id}', which is not a power, energy, "
+                "voltage, current, frequency or power factor sensor; use `attach_to:`"
             )
-        ep = planned.setdefault(key, PlannedEndpoint(key))
-        for name, block in lowered.device_types.items():
-            _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{key} {name}")
-        _merge_dicts(ep.extra, lowered.extra, f"{key}")
-        ep.entities.append(entity.id)
-        ep.members.append(Member(entity, o, lowered, sel.level == EXPLICIT))
-        key_of[entity.id] = key
-        if o.endpoint is not None:
-            if ep.pin is not None and ep.pin != o.endpoint:
-                raise cv.Invalid(
-                    f"matter.expose: conflicting endpoint pins for {key}: "
-                    f"{ep.pin} and {o.endpoint}"
-                )
-            ep.pin = o.endpoint
-        label = o.label or (entity.name if not lowered.merge_group else None)
-        if label and not ep.label:
-            ep.label = label
-            if supports_label:
-                ep.extra[CONF_LABEL] = label[:64]
-            else:
-                _LOGGER.debug("matter.expose: endpoint label '%s' dropped (not supported)", label)
+        if o.meters and o.attach_to and o.meters != o.attach_to:
+            raise cv.Invalid(
+                f"matter.expose: '{entity.id}' has `meters: {o.meters}` and "
+                f"`attach_to: {o.attach_to}`; keep one"
+            )
+        target = o.attach_to or o.meters
+        if target:
+            attaches.append((entity, o, lowered, target))
+        elif lowered.auto_attach:
+            autos.append((entity, o, lowered, explicit))
+        else:
+            _add_standalone(planned, key_of, entity, o, lowered, explicit)
 
-    for entity, o, lowered in attaches:
-        target = key_of.get(o.attach_to) or (o.attach_to if o.attach_to in planned else None)
+    def resolve(entity, name):
+        target = key_of.get(name) or (name if name in planned else None)
         if target is None:
             raise cv.Invalid(
-                f"matter.expose: '{entity.id}' has attach_to: '{o.attach_to}', which is not "
-                "an exposed entity or endpoint key"
+                f"matter.expose: '{entity.id}' has attach_to: '{name}', which is not an exposed "
+                "entity or endpoint key"
             )
-        ep = planned[target]
-        for name, block in lowered.device_types.items():
-            _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{target} {name}")
-        _merge_dicts(ep.extra, lowered.extra, target)
-        ep.attached.append(entity.id)
-        ep.members.append(Member(entity, o, lowered, True))
-        key_of[entity.id] = target
+        return target
+
+    for entity, o, lowered, name in attaches:
+        _attach(planned, key_of, entity, o, lowered, resolve(entity, name))
+    # Meters before batteries: a standalone electrical endpoint is no host for a Power Source.
+    for kind in ("meter", "battery"):
+        for entity, o, lowered, explicit in (a for a in autos if a[2].auto_attach == kind):
+            target = _auto_target(entity, kind, planned)
+            if target is not None:
+                _attach(planned, key_of, entity, o, lowered, target)
+            else:
+                _add_standalone(planned, key_of, entity, o, lowered, explicit)
+
+    for ep in planned.values():
+        if isinstance(ep.parent, str):
+            ep.parent = key_of.get(ep.parent) or (ep.parent if ep.parent in planned else None)
+            if ep.parent is None:
+                raise cv.Invalid(
+                    f"matter.expose: `parent:` of '{ep.key}' is not an exposed entity or "
+                    "endpoint key"
+                )
+            if ep.parent == ep.key:
+                raise cv.Invalid(f"matter.expose: '{ep.key}' cannot be its own parent")
     return planned, key_of
+
+
+def unnamed_warning(selection: Selection) -> str | None:
+    if not selection.unnamed:
+        return None
+    ids = ", ".join(selection.unnamed)
+    return (
+        f"matter.expose: {len(selection.unnamed)} entities matched by a glob or `all` were "
+        f"skipped because they have no `name:` (ESPHome makes a nameless entity internal): "
+        f"{ids}. To expose one, give it a `name:`; to expose it as it is, list its id "
+        "explicitly in `expose:`; to silence this, add the id to `exclude:`."
+    )
 
 
 def lower_expose(config: dict) -> dict:
@@ -158,7 +288,10 @@ def lower_expose(config: dict) -> dict:
 
     items = parse_items(config[CONF_EXPOSE])
     selection = select(inventory, items, config.get(CONF_EXCLUDE, []))
+    if warning := unnamed_warning(selection):
+        _LOGGER.warning(warning)
     planned, _ = _plan(selection)
+    assign_duplicate_tags(planned)
 
     from ..endpoints import ENDPOINT_SCHEMA  # avoid an import cycle at module import
 
@@ -173,6 +306,8 @@ def lower_expose(config: dict) -> dict:
         ep.number = numbers[key]
         ep.source = "pin" if ep.pin is not None else "hash"
         value = {**ep.device_types, **ep.extra}
+        if ep.parent is not None:
+            value[CONF_PARENT] = numbers[ep.parent] if isinstance(ep.parent, str) else ep.parent
         try:
             endpoints[ep.number] = ENDPOINT_SCHEMA(value)
         except cv.Invalid as exc:
