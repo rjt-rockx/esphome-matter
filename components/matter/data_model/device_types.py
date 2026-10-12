@@ -8,6 +8,7 @@ from esphome import automation
 from esphome.components import light
 from esphome.const import CONF_LIGHT_ID
 
+from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
@@ -172,6 +173,8 @@ class DeviceType:
             schema[cv.Optional(CONF_FEATURES)] = cv.ensure_list(
                 cv.one_of(*(feature.name for feature in features))
             )
+
+        schema.update(binary_sensor_schema(self))
 
         # TODO: replace with something better
         if self.name.endswith("light"):

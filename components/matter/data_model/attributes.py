@@ -100,7 +100,10 @@ SENSOR_ATTRIBUTES = {
         )
     },
     "OccupancySensing": {  # 0x0406
-        "Occupancy": SensorAttribute("occupancy", "occupancy", BinarySensor)
+        # OccupancySensingCluster is code-driven in esp-matter 1.6 (see update_occupancy_attribute).
+        "Occupancy": SensorAttribute(
+            "occupancy", "occupancy", BinarySensor, code_driven=True
+        )
     },
     "IlluminanceMeasurement": {  # 0x0400
         "MeasuredValue": SensorAttribute(
@@ -213,4 +216,15 @@ SENSOR_ATTRIBUTES = {
             features=("NumericMeasurement",),
         )
     },
+}
+
+# AlarmStateEnum attributes of the code-driven SmokeCoAlarmCluster, bound to binary sensors (ON = Critical alarm).
+# The converter and updater are chosen by binary_sensors.py. Selecting a sensor enables the matching choice feature.
+SENSOR_ATTRIBUTES["SmokeCOAlarm"] = {  # 0x005C
+    "SmokeState": SensorAttribute(
+        "smoke_state", "alarm_state", BinarySensor, features=("SmokeAlarm",), code_driven=True
+    ),
+    "COState": SensorAttribute(
+        "co_state", "alarm_state", BinarySensor, features=("CO Alarm",), code_driven=True
+    ),
 }

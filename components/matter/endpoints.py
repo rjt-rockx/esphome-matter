@@ -11,9 +11,10 @@ from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.components.sensor import Sensor
 from esphome.config import Config
 from esphome.const import CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGER_ID
-from esphome.core import ID
+from esphome.core import CORE, ID
 from esphome.types import ConfigType
 
+from . import binary_sensors
 from .const import *
 from .data_model.attributes import SensorAttribute, attribute_value_type
 from .data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME, Cluster
@@ -221,7 +222,9 @@ class Endpoint:
         # Register sensor attributes
         for sensor_attr in device_type.sensor_attributes:
             if sensor_id := device_config.get(sensor_attr.conf_key):
-                await self._register_sensor_attribute(var, sensor_id, sensor_attr)
+                await self._register_sensor_attribute(
+                    var, sensor_id, sensor_attr, device_type, device_config
+                )
 
         # Register ESPHome entities
         if CONF_LIGHT_ID in device_config:
@@ -294,7 +297,12 @@ class Endpoint:
         return lines
 
     async def _register_sensor_attribute(
-        self, var, sensor_id: ID, sensor_attribute: SensorAttribute
+        self,
+        var,
+        sensor_id: ID,
+        sensor_attribute: SensorAttribute,
+        device_type: DeviceType,
+        device_config: dict,
     ):
         cluster = sensor_attribute.cluster
         attribute = sensor_attribute.attribute
@@ -308,16 +316,29 @@ class Endpoint:
             self._cluster_configs[cluster.name].enabled_features[feature_name] = True
 
         sensor = await cg.get_variable(sensor_id)
-        converter = cg.RawExpression(
-            f"esphome::matter::conversion::{sensor_attribute.converter}"
-        )
+        converter_name = sensor_attribute.converter
+        binding = None
         if sensor_attribute.sensor_type is BinarySensor:
+            # Polarity, occupancy sensor type and alarm levels depend on the device_class (see binary_sensors.py).
+            device_class = binary_sensors.get_device_class(CORE.config, sensor_id)
+            binding = binary_sensors.resolve_binding(
+                device_type, sensor_attribute, device_config, device_class
+            )
+            converter_name = binding.converter
+            if cluster.name == "OccupancySensing" and (
+                feature := binary_sensors.implied_occupancy_feature(
+                    device_config, device_class
+                )
+            ):
+                self._cluster_configs[cluster.name].enabled_features[feature] = True
+        converter = cg.RawExpression(f"esphome::matter::conversion::{converter_name}")
+        if binding is not None:
+            self.global_includes.add(binding.include)
+            if binding.converter != sensor_attribute.converter:
+                self.global_includes.add(binary_sensors.BINARY_SENSORS_INCLUDE)
             args = [sensor, self._endpoint_id, cluster.id, attribute.id, converter]
             if sensor_attribute.code_driven:
-                self.global_includes.add(cluster.chip_include)
-                args.append(
-                    cg.RawExpression("esphome::matter::update_boolean_state_attribute")
-                )
+                args.append(cg.RawExpression(f"esphome::matter::{binding.updater}"))
             cg.add(var.register_binary_sensor_attribute(*args))
         elif sensor_attribute.code_driven:
             self.global_includes.add(cluster.chip_include)
