@@ -21,6 +21,7 @@ from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
 from .actions import register_bound_command_actions
+from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
 from .const import *
 from .endpoints import (
     ENDPOINT_SCHEMA,
@@ -143,7 +144,9 @@ CONFIG_SCHEMA = cv.All(
                 }
             ),
         }
-    ).extend(cv.COMPONENT_SCHEMA),
+    )
+    .extend(COMMISSIONING_SCHEMA)
+    .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
     _require_vfs_select,  # TODO: Only needed when openthread is enabled
@@ -231,6 +234,7 @@ async def to_code(config: ConfigType):
     if CONF_PASSCODE in config:
         cg.add_define("MATTER_PASSCODE", config[CONF_PASSCODE])
     _configure_basic_information(config)
+    await commissioning_to_code(config)
 
     use_openthread = "openthread" in CORE.loaded_integrations
     use_wifi = "wifi" in CORE.loaded_integrations
