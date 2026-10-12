@@ -373,10 +373,13 @@ protected:
                       level_val);
       }
     }
-    if (!s.write_color || s.color.epoch == this->chip_color_epoch_)
+    if (s.color.epoch == this->chip_color_epoch_)
       return;
+    // A colour skipped while a Matter colour command owns the colour is
+    // superseded by that command, not pending: never write it later.
     this->chip_color_epoch_ = s.color.epoch;
-    this->write_color_(s.color);
+    if (s.write_color)
+      this->write_color_(s.color);
   }
 
   // ----------------------------------------------------------------------

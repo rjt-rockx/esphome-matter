@@ -862,6 +862,21 @@ TEST(light_stop_of_a_local_colour_change_does_not_outlive_a_newer_command) {
   CHECK(s.l.window_color());
   // The colour of the light is not reported over the running command.
   CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 0);
+
+  // The skipped local colour is superseded by the command, not pending: once the
+  // command has settled, a brightness-only change must not write it to Matter.
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(20000);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_Y}] = u16_val(20000);
+  for (int i = 0; i < 20 && s.l.window_color(); i++) {
+    s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS);
+    s.r.p.settle();
+  }
+  CHECK(!s.l.window_color());
+  size_t x_writes = writes_to(s.r.p, COLOR_CLUSTER, CURRENT_X);
+  s.l.view.brightness = 0.5f;
+  s.l.entity_changed();
+  s.r.p.settle();
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, CURRENT_X), x_writes);
 }
 
 TEST(light_stop_move_step_settles_on_chips_colour) {
