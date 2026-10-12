@@ -41,6 +41,8 @@ def run(raw, expose, *, endpoints=None, exclude=()):
 
 
 def idof(value):
+    if isinstance(value, dict) and "percent" in value:  # battery: {percent, description, order}
+        value = value["percent"]
     return getattr(value, "id", value)
 
 

@@ -108,6 +108,7 @@ protected:
     uint32_t cluster_id = this->cluster_id_;
     uint32_t attribute_id = this->attribute_id_;
     run_on_matter_thread([endpoint_id, cluster_id, attribute_id, value]() {
+      MatterPushGuard push_guard;  // ESPHome -> Matter push, not a controller write (see MatterPushGuard)
       esp_matter_attr_val_t val = esp_matter_enum8(value);
       esp_err_t err = esp_matter::attribute::update(endpoint_id, cluster_id,
                                                     attribute_id, &val);

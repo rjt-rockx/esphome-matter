@@ -77,3 +77,7 @@ tempCodeRunnerFile.py
 ci_tmp_*.yaml
 /tests/configs/ci_tmp_*.yaml
 tests/configs/secrets.yaml
+/examples/.gitignore
+/examples/secrets.yaml
+/examples/.esphome/
+/examples/ci_tmp_*.yaml

@@ -116,7 +116,7 @@ def ep_of(cfg, eid):
         for block in ep.values():
             if isinstance(block, dict) and eid in [getattr(v, "id", v) for v in block.values()]:
                 return ep
-        if getattr(ep.get("battery"), "id", ep.get("battery")) == eid:
+        if _batt_id(ep.get("battery")) == eid:
             return ep
     raise AssertionError(f"{eid} is not bound in {list(cfg['endpoints'])}")
 
@@ -278,6 +278,13 @@ def test_nested_sub_sensor_hints_map(raw):
     assert kinds == ["air_quality_sensor", "humidity_sensor", "temperature_sensor"]
 
 
+def _batt_id(value):
+    """battery: <sensor> or the normalised {percent: <sensor>, description, order}."""
+    if isinstance(value, dict) and "percent" in value:
+        value = value["percent"]
+    return getattr(value, "id", value)
+
+
 # --- battery -------------------------------------------------------------------------------
 
 
@@ -291,7 +298,7 @@ def test_related_battery_attaches(raw):
     cfg = run(["door", "door_batt"])
     (ep,) = cfg["endpoints"].values()
     assert types_of(ep) == ["contact_sensor"]
-    assert getattr(ep["battery"], "id", ep["battery"]) == "door_batt"
+    assert _batt_id(ep["battery"]) == "door_batt"
 
 
 def test_battery_with_several_endpoints_gets_its_own_endpoint(raw):
@@ -304,7 +311,7 @@ def test_battery_attach_to_picks_the_endpoint(raw):
     cfg = run(["door", "pir", {"id": "batt", "attach_to": "pir"}])
     assert len(cfg["endpoints"]) == 2
     ep = ep_of(cfg, "pir")
-    assert getattr(ep["battery"], "id", None) == "batt"
+    assert _batt_id(ep["battery"]) == "batt"
 
 
 def test_two_batteries_do_not_collide_when_standalone(raw):

@@ -5,6 +5,7 @@
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   matter_mattercomponent_id->register_lock(front_door, 1);
   matter_mattercomponent_id->register_sensor_attribute(lock_battery, 1, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(lock_battery, 1, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
   matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::door_lock::config_t device_config_0{};
@@ -14,6 +15,9 @@
       return false;
     esp_matter::cluster::power_source::config_t power_source_config{};
     power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
     if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
       return false;
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
@@ -39,12 +43,8 @@
       return false;
     {
       auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
-      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}) == nullptr)
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
         return false;
-      auto *status_attr = esp_matter::attribute::get(power_source_cluster, 0x0000);
-      esp_matter_attr_val_t status_val = esp_matter_enum8(1);
-      if (status_attr != nullptr)
-        esp_matter::attribute::set_val(status_attr, &status_val, false);
     }
     return true;
   });
