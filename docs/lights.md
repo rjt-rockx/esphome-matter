@@ -41,7 +41,7 @@ Matter can describe a color in several ways and the active one is stored in the 
 | Hue and saturation | `CurrentHue`, `CurrentSaturation` | RGB |
 | Enhanced hue and saturation | `EnhancedCurrentHue`, `CurrentSaturation` | RGB |
 
-XY and color temperature are always available on an `extended_color_light`. Hue/saturation, enhanced hue and color loop are optional features of the ColorControl cluster. Many controllers (including Home Assistant) use XY, but some only use hue and saturation. Enable them with the `features` option. Because the `Hue And Saturation` name contains spaces, it is written as is:
+XY and color temperature are always available on an `extended_color_light`. Hue/saturation, enhanced hue and color loop are optional features of the ColorControl cluster. Many controllers (including Home Assistant) use XY, but some only use hue and saturation. Enable them with the `with_features` option. The feature can be written as `hue_and_saturation`, `HueAndSaturation` or `Hue And Saturation`:
 
 ```yaml
 matter:
@@ -49,7 +49,7 @@ matter:
     1:
       extended_color_light:
         light_id: some_light
-        features:
+        with_features:
           - Hue And Saturation
           - EnhancedHue
           - ColorLoop

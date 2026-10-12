@@ -34,7 +34,7 @@ matter:
     3:
       # Manual feature selection without a bound climate.
       thermostat:
-        features: [Heating, Cooling, AutoMode]
+        with_features: [Heating, Cooling, AutoMode]
 
 sensor:
   - platform: internal_temperature

@@ -9,6 +9,7 @@ on:
       - "tests/**"
       - "examples/**"
       - "packages/**"
+      - "tools/**"
       - ".github/**"
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - "tests/**"
       - "examples/**"
       - "packages/**"
+      - "tools/**"
       - ".github/**"
   workflow_dispatch:
     inputs:
@@ -176,6 +178,86 @@ jobs:
         run: .venv/bin/python -m pytest tests/unit -m "not slow"
       - name: pytest (slow, code generation)
         run: .venv/bin/python -m pytest tests/unit -m slow
+      - name: Golden codegen snapshots (dev only)
+        if: matrix.esphome-version == 'dev'
+        run: .venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py
+
+  # ---------------------------------------------------------------------------
+  # Matter spec conformance of every test config (tools/conformance)
+  # ---------------------------------------------------------------------------
+  conformance:
+    name: Matter conformance
+    runs-on: ubuntu-24.04
+    env:
+      MATTER_CONFORMANCE_REQUIRE: "1"
+      MATTER_DATA_MODEL: ${{ github.workspace }}/connectedhomeip/data_model
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Fetch the Matter data model (public, not vendored)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/project-chip/connectedhomeip.git
+          git -C connectedhomeip sparse-checkout set data_model/1.6
+      - name: Install ESPHome and pytest
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev" pytest
+      - name: Conformance unit tests
+        run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
+      - name: Check every test config
+        run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-report
+          path: conformance.json
+
+  # ---------------------------------------------------------------------------
+  # Validates the data model JSON against the esp-matter sources
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Validate esp-matter data model
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ESPHome
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome==2026.7.4" pytest
+
+      - name: Read esp-matter version
+        id: esp-matter
+        run: echo "version=$(tools/esp-matter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache esp-matter source
+        id: esp-matter-cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/esp-matter
+          key: esp-matter-${{ runner.os }}-${{ steps.esp-matter.outputs.version }}
+
+      - name: Resolve esp-matter source
+        if: steps.esp-matter-cache.outputs.cache-hit != 'true'
+        run: |
+          # ESPHome 2026.7.4 needs the PlatformIO toolchain (see tests/validate.sh).
+          path=$(python .github/scripts/ci_prepare.py tests/configs/esp32-wifi.yaml --toolchain platformio)
+          .venv/bin/esphome compile "$path"
+          mkdir -p .cache
+          cp -a tests/configs/.esphome/build/matter-ci-wifi/managed_components/davidvtwout__esp_matter .cache/esp-matter
+
+      - name: Run integration tests
+        env:
+          ESP_MATTER_SOURCE: .cache/esp-matter
+        run: .venv/bin/python -m pytest --color=yes tests/integration
 
   # ---------------------------------------------------------------------------
   # Compile matrix (native ESP-IDF toolchain)

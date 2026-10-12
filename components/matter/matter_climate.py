@@ -10,7 +10,7 @@ final traits of every climate platform.
 import esphome.config_validation as cv
 from esphome.components import climate
 
-from .const import CONF_FEATURES
+from .const import CONF_WITH_FEATURES
 
 CONF_CLIMATE_ID = "climate_id"
 
@@ -37,7 +37,7 @@ def climate_schema(device_type_name: str) -> dict:
 def validate_climate_features(config: dict) -> dict:
     if CONF_CLIMATE_ID not in config:
         return config
-    conflicting = [f for f in config.get(CONF_FEATURES, ()) if f in _DERIVED_FEATURES]
+    conflicting = [f for f in config.get(CONF_WITH_FEATURES, ()) if f in _DERIVED_FEATURES]
     if conflicting:
         raise cv.Invalid(
             f"features {', '.join(conflicting)} are derived from the climate "

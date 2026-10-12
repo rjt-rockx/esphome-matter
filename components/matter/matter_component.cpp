@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstdio>
 #include <cstring>
 #include <esp_matter_client.h>
 #include <nvs.h>
@@ -66,15 +67,24 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricRemoved:
     ESP_LOGI(TAG_EVENT, "Fabric removed");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricWillBeRemoved:
     ESP_LOGI(TAG_EVENT, "Fabric will be removed");
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricUpdated:
     ESP_LOGI(TAG_EVENT, "Fabric is updated");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricCommitted:
     ESP_LOGI(TAG_EVENT, "Fabric is committed");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kDnssdRestartNeeded:
     ESP_LOGD(TAG_EVENT, "DNS-SD restart needed");
@@ -154,10 +164,12 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
         ESP_LOGW(TAG_EVENT, "Thread role changed; unable to acquire instance");
       }
     }
-    if (thread_state.NetDataChanged)
+    if (thread_state.NetDataChanged) {
       ESP_LOGV(TAG_EVENT, "Thread network data changed");
-    if (thread_state.ChildNodesChanged)
+    }
+    if (thread_state.ChildNodesChanged) {
       ESP_LOGV(TAG_EVENT, "Thread child nodes changed");
+    }
     if (thread_state.AddressChanged) {
       ESP_LOGD(TAG_EVENT, "Thread address(es) changed");
       auto lock = esphome::openthread::InstanceLock::try_acquire(1000);
@@ -183,9 +195,10 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
       }
     }
     if (!thread_state.RoleChanged && !thread_state.AddressChanged &&
-        !thread_state.NetDataChanged && !thread_state.ChildNodesChanged)
+        !thread_state.NetDataChanged && !thread_state.ChildNodesChanged) {
       ESP_LOGV(TAG_EVENT, "ThreadStateChange: flags=0x%08" PRIx32,
                thread_state.OpenThread.Flags);
+    }
 #endif // USE_OPENTHREAD
     break;
   }
@@ -221,6 +234,9 @@ void MatterComponent::setup() {
       nvs_close(h);
     }
   }
+
+  this->conformance_.init_configuration_version();
+  this->conformance_.install_labels();
 
   esp_matter::node::config_t node_config;
   device_info_fill_root_config(this->device_info_, node_config);
@@ -265,6 +281,9 @@ void MatterComponent::setup() {
   esp_matter::client::binding_manager_init();
   replay_attribute_triggers(this);
   this->initialize_endpoint_mappings_();
+#ifdef USE_TEXT_SENSOR
+  this->publish_fabric_sensors_();
+#endif
 }
 
 void MatterComponent::factory_reset() {

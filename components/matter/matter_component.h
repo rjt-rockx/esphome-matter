@@ -4,10 +4,12 @@
 #ifdef USE_MATTER
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
+#include "matter_text_sensors.h"
 
 #include "matter_attributes.h"
 #include "matter_cover.h"
 #include "matter_climate.h"
+#include "matter_conformance.h"
 #include "matter_device_info.h"
 #include "matter_endpoints.h"
 #include "matter_fan.h"
@@ -20,6 +22,7 @@
 #include "matter_valve.h"
 
 #include <functional>
+#include <string>
 #include <vector>
 
 #include <esp_matter.h>
@@ -42,9 +45,35 @@ public:
 
   // Basic Information overrides (node label, serial number, ...)
   DeviceInfoConfig &get_device_info() { return this->device_info_; }
+#ifdef USE_TEXT_SENSOR
+  void set_fabric_compressed_id_sensor(size_t slot,
+                                       text_sensor::TextSensor *sensor);
+  void set_fabric_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_label_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_node_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_vendor_id_sensor(size_t slot,
+                                   text_sensor::TextSensor *sensor);
+  void schedule_fabric_sensor_update();
+#endif
 
   // Register Matter endpoints
   void register_endpoint(uint16_t endpoint_id, MatterEndpointBuildFn build_fn);
+
+  // Spec conformance of the endpoint composition (matter_conformance.h).
+  // register_endpoint_parent(endpoint, parent): parent 0 is the root node.
+  void register_endpoint_parent(uint16_t endpoint_id, uint16_t parent_id) {
+    this->conformance_.register_parent(endpoint_id, parent_id);
+  }
+  void register_endpoint_label(uint16_t endpoint_id, const char *label) {
+    this->conformance_.register_label(endpoint_id, label);
+  }
+  void register_endpoint_tag(uint16_t endpoint_id, uint8_t namespace_id,
+                             uint8_t tag, const char *label) {
+    this->conformance_.register_tag(endpoint_id, namespace_id, tag, label);
+  }
+  void set_structure_hash(uint32_t hash) {
+    this->conformance_.set_structure_hash(hash);
+  }
 
   // Register attribute update actions
   void register_attribute_trigger(MatterAttributeTriggerBase *trigger) {
@@ -155,6 +184,12 @@ private:
   void initialize_endpoint_mappings_();
 
   DeviceInfoConfig device_info_;
+#ifdef USE_TEXT_SENSOR
+  std::vector<MatterFabricSensorRegistration> fabric_sensors_;
+  MatterFabricSensorRegistration &get_fabric_sensors_(size_t slot);
+  void publish_fabric_sensors_();
+#endif
+  MatterConformance conformance_;
   std::vector<MatterEndpointRegistration> endpoint_registrations_;
   std::vector<MatterEndpointMappingBase *> mappings_;
   std::vector<MatterAttributeCallbackRegistration> attribute_callbacks_;
@@ -167,7 +202,7 @@ template <typename... Ts>
 class MatterFactoryResetAction : public Action<Ts...>,
                                  public Parented<MatterComponent> {
 public:
-  void play(Ts... x) override { this->parent_->factory_reset(); }
+  void play(const Ts &...x) override { this->parent_->factory_reset(); }
 };
 
 } // namespace esphome::matter

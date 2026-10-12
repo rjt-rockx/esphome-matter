@@ -1,13 +1,13 @@
 #include "matter_device_info.h"
 #ifdef USE_MATTER
 
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 
 #include <cstdio>
 #include <cstring>
 #include <string>
 
-#include <esp_mac.h>
 #include <sdkconfig.h>
 
 #include <esp_matter_providers.h>
@@ -41,8 +41,9 @@ class EsphomeDeviceInstanceInfoProvider
     if (!cfg.serial_number.empty()) {
       snprintf(this->serial_, sizeof(this->serial_), "%s", cfg.serial_number.c_str());
     } else {
-      uint8_t mac[6] = {0};
-      esp_read_mac(mac, ESP_MAC_WIFI_STA);
+      // Same MAC the ESPHome native API reports; esp_read_mac(ESP_MAC_WIFI_STA) fails on chips without Wi-Fi (H2).
+      uint8_t mac[MAC_ADDRESS_SIZE] = {0};
+      get_mac_address_raw(mac);
       snprintf(this->serial_, sizeof(this->serial_), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
                mac[5]);
     }

@@ -28,7 +28,7 @@ lock:
 | UnlockDoor | `lock.unlock()` |
 | UnboltDoor (only with the `Unbolt` feature) | `lock.open()` if the lock supports it (`supports_open`), otherwise `unlock()` |
 
-Commands are accepted immediately (the Matter response only says "accepted") and executed on the ESPHome main loop. The resulting state is reported when the ESPHome lock publishes it. No PIN is required: PIN codes are ignored by default. The door lock server only validates a PIN when the `PIN Credential` and `User` features are added with `features:`, which is not needed for normal use.
+Commands are accepted immediately (the Matter response only says "accepted") and executed on the ESPHome main loop. The resulting state is reported when the ESPHome lock publishes it. No PIN is required: PIN codes are ignored by default. The door lock server only validates a PIN when the `PIN Credential` and `User` features are added with `with_features:`, which is not needed for normal use.
 
 A lock that is already in the requested state acknowledges the operation right away.
 
@@ -50,7 +50,7 @@ To report jams to controllers, enable the door position sensor feature:
 ```yaml
       door_lock:
         lock_id: front_door
-        features:
+        with_features:
           - DoorPositionSensor
 ```
 
@@ -118,4 +118,4 @@ Controller support differs a lot between ecosystems and has not been tested by t
 ## Notes
 
 * The Door Lock server callbacks (`emberAfPluginDoorLockOn*Command` and `emberAfDoorLockClusterInitCallback`) are defined once by this component in `matter_lock.cpp` and are compiled only when a `door_lock` endpoint has a `lock_id`. Do not define them yourself in a custom component.
-* To accept UnboltDoor, add `Unbolt` to `features:`. The Aliro features are not supported.
+* To accept UnboltDoor, add `Unbolt` to `with_features:`. The Aliro features are not supported.

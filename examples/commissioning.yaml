@@ -30,16 +30,14 @@ matter:
 
 text_sensor:
   - platform: matter
-    type: commissioning_state
-    name: Matter state
-  - platform: matter
-    type: fabric_count
-    name: Matter fabrics
-  # Only non-empty while a commissioning window is open.
-  - platform: matter
-    type: pairing_code
-    name: Matter pairing code
-    disabled_by_default: false
+    commissioning_state:
+      name: Matter state
+    fabric_count:
+      name: Matter fabrics
+    # Only non-empty while a commissioning window is open.
+    manual_pairing_code:
+      name: Matter pairing code
+      disabled_by_default: false
 
 button:
   - platform: template

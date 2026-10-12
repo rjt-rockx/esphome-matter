@@ -7,7 +7,7 @@ from esphome.components import fan
 from esphome.config import Config
 from esphome.const import CONF_RESTORE_MODE
 
-from .const import CONF_ENDPOINTS, CONF_FEATURES
+from .const import CONF_ENDPOINTS, CONF_WITH_FEATURES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def fan_id_schema():
 def validate_fan_features(config):
     """The trait based features can't be selected for a bound fan."""
     if CONF_FAN_ID in config:
-        trait_features = [f for f in config.get(CONF_FEATURES, ()) if f in TRAIT_FEATURES]
+        trait_features = [f for f in config.get(CONF_WITH_FEATURES, ()) if f in TRAIT_FEATURES]
         if trait_features:
             raise cv.Invalid(
                 f"The features {', '.join(trait_features)} follow the capabilities of "

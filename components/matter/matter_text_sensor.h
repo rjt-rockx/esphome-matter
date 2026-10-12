@@ -2,7 +2,7 @@
 
 #include "esphome/core/defines.h"
 #if defined(USE_MATTER) && defined(USE_TEXT_SENSOR)
-#include "esphome/components/matter/matter_commissioning.h"
+#include "matter_commissioning.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/component.h"
 

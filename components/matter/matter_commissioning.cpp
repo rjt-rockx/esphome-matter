@@ -408,7 +408,7 @@ void MatterCommissioning::on_fabric_removed_() {
     this->refresh_(true);
 }
 
-void MatterCommissioning::handle_event(const ChipDeviceEvent *event) {
+void MatterCommissioning::handle_event(const chip::DeviceLayer::ChipDeviceEvent *event) {
   switch (event->Type) {
   case chip::DeviceLayer::DeviceEventType::kServerReady:
     this->on_server_ready_();

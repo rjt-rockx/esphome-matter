@@ -78,11 +78,6 @@
         "StartUpCurrentLevel": "create_start_up_current_level"
       }
     },
-    "PulseWidthModulation": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
     "Descriptor": {
       "namespace": "descriptor",
       "features": {
@@ -222,13 +217,6 @@
       "attributes": {
         "TemperatureUnit": "create_temperature_unit",
         "SupportedTemperatureUnits": "create_supported_temperature_units"
-      }
-    },
-    "PowerSourceConfiguration": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "Sources": null
       }
     },
     "PowerSource": {
@@ -685,21 +673,6 @@
         "LabelList": "create_label_list"
       }
     },
-    "ProxyConfiguration": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
-    "ProxyDiscovery": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
-    "ProxyValid": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
     "BooleanState": {
       "namespace": "boolean_state",
       "features": {
@@ -745,40 +718,12 @@
         "MaximumCheckInBackOff": "create_maximum_check_in_backoff"
       }
     },
-    "OvenCavityOperationalState": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "PhaseList": null,
-        "CurrentPhase": null,
-        "CountdownTime": null,
-        "OperationalStateList": null,
-        "OperationalState": null,
-        "OperationalError": null
-      }
-    },
-    "OvenMode": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "SupportedModes": null,
-        "CurrentMode": null
-      }
-    },
     "LaundryDryerControls": {
       "namespace": "laundry_dryer_controls",
       "features": {},
       "attributes": {
         "SupportedDrynessLevels": "create_supported_dryness_levels",
         "SelectedDrynessLevel": "create_selected_dryness_level"
-      }
-    },
-    "TemperatureControlledCabinetTopology": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "DisabledCabinets": null,
-        "Topology": null
       }
     },
     "ModeSelect": {
@@ -800,14 +745,6 @@
     },
     "LaundryWasherMode": {
       "namespace": "laundry_washer_mode",
-      "features": {},
-      "attributes": {
-        "SupportedModes": null,
-        "CurrentMode": null
-      }
-    },
-    "RefrigeratorAndTemperatureControlledCabinetMode": {
-      "namespace": null,
       "features": {},
       "attributes": {
         "SupportedModes": null,
@@ -893,14 +830,6 @@
         "Supported": "create_supported"
       }
     },
-    "DishwasherMode": {
-      "namespace": "dish_washer_mode",
-      "features": {},
-      "attributes": {
-        "SupportedModes": null,
-        "CurrentMode": null
-      }
-    },
     "AirQuality": {
       "namespace": "air_quality",
       "features": {
@@ -952,21 +881,6 @@
         "SmokeSensitivityLevel": "create_smoke_sensitivity_level",
         "ExpiryDate": "create_expiry_date",
         "Unmounted": null
-      }
-    },
-    "DishwasherAlarm": {
-      "namespace": "dish_washer_alarm",
-      "features": {
-        "Reset": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Mask": null,
-        "Latch": null,
-        "State": null,
-        "Supported": null
       }
     },
     "MicrowaveOvenMode": {
@@ -1114,31 +1028,6 @@
         "InPlaceIndicator": "create_in_place_indicator",
         "LastChangedTime": "create_last_changed_time",
         "ReplacementProductList": "create_replacement_product_list"
-      }
-    },
-    "WaterTankLevelMonitoring": {
-      "namespace": null,
-      "features": {
-        "Condition": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Warning": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ReplacementProductList": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Condition": null,
-        "DegradationDirection": null,
-        "ChangeIndication": null,
-        "InPlaceIndicator": null,
-        "LastChangedTime": null,
-        "ReplacementProductList": null
       }
     },
     "BooleanStateConfiguration": {
@@ -1321,31 +1210,6 @@
         "PriceForecast": "create_price_forecast"
       }
     },
-    "Messages": {
-      "namespace": null,
-      "features": {
-        "ReceivedConfirmation": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ConfirmationResponse": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ConfirmationReply": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ProtectedMessages": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Messages": null,
-        "ActiveMessageIDs": null
-      }
-    },
     "DeviceEnergyManagement": {
       "namespace": "device_energy_management",
       "features": {
@@ -1428,10 +1292,13 @@
         "MinimumChargeCurrent": "create_minimum_charge_current",
         "MaximumChargeCurrent": "create_maximum_charge_current",
         "MaximumDischargeCurrent": "create_maximum_discharge_current",
+        "USER_MAXIMUM_CHARGE_CURRENT": "create_user_maximum_charge_current",
+        "RANDOMIZATION_DELAY_WINDOW": "create_randomization_delay_window",
         "NextChargeStartTime": "create_next_charge_start_time",
         "NextChargeTargetTime": "create_next_charge_target_time",
         "NextChargeRequiredEnergy": "create_next_charge_required_energy",
         "NextChargeTargetSoC": "create_next_charge_target_soc",
+        "APPROXIMATE_EV_EFFICIENCY": "create_approximate_ev_efficiency",
         "StateOfCharge": "create_state_of_charge",
         "BatteryCapacity": "create_battery_capacity",
         "VehicleID": "create_vehicle_id",
@@ -1542,131 +1409,6 @@
         "LocalGenerationAvailable": "create_local_generation_available",
         "CurrentConditions": "create_current_conditions",
         "ForecastConditions": "create_forecast_conditions"
-      }
-    },
-    "ElectricalAlarm": {
-      "namespace": null,
-      "features": {
-        "Reset": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "AdjustableThresholds": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverVoltage": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "UnderVoltage": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverFrequency": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "UnderFrequency": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverPower": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "UnderPower": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverCurrent": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "UnderCurrent": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PowerImport": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PowerExport": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Mask": null,
-        "Latch": null,
-        "State": null,
-        "Supported": null,
-        "OverVoltageThreshold": null,
-        "UnderVoltageThreshold": null,
-        "OverFrequencyThreshold": null,
-        "UnderFrequencyThreshold": null,
-        "OverPowerThreshold": null,
-        "UnderPowerThreshold": null,
-        "OverCurrentThreshold": null,
-        "UnderCurrentThreshold": null,
-        "PowerImportThreshold": null,
-        "PowerExportThreshold": null
-      }
-    },
-    "ElectricalDistribution": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "MaxContinuousCurrent": null,
-        "MaxVoltage": null,
-        "NumberOfPoles": null,
-        "EndOfLife": null,
-        "ServiceEntranceRated": null
-      }
-    },
-    "ElectricalProtectionAlarm": {
-      "namespace": null,
-      "features": {
-        "ShortCircuit": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverLoad": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OverVoltage": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "SurgeProtection": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ResidualCurrent": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ArcFault": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "SelfTest": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Mask": null,
-        "State": null,
-        "Supported": null,
-        "ArcCause": null,
-        "OverLoadRating": null,
-        "OverVoltageRating": null,
-        "SurgeProtectionRating": null,
-        "ShortCircuitRating": null,
-        "ResidualCurrentRating": null,
-        "ArcFaultRating": null
       }
     },
     "DoorLock": {
@@ -2156,7 +1898,20 @@
           "add_takes_config": true
         }
       },
-      "attributes": {}
+      "attributes": {
+        "FAN_MODE": "create_fan_mode",
+        "FAN_MODE_SEQUENCE": "create_fan_mode_sequence",
+        "PERCENT_SETTING": "create_percent_setting",
+        "PERCENT_CURRENT": "create_percent_current",
+        "SPEED_MAX": "create_speed_max",
+        "SPEED_SETTING": "create_speed_setting",
+        "SPEED_CURRENT": "create_speed_current",
+        "ROCK_SUPPORT": "create_rock_support",
+        "ROCK_SETTING": "create_rock_setting",
+        "WIND_SUPPORT": "create_wind_support",
+        "WIND_SETTING": "create_wind_setting",
+        "AIRFLOW_DIRECTION": "create_airflow_direction"
+      }
     },
     "ThermostatUserInterfaceConfiguration": {
       "namespace": "thermostat_user_interface_configuration",
@@ -2165,60 +1920,6 @@
         "TemperatureDisplayMode": "create_temperature_display_mode",
         "KeypadLockout": "create_keypad_lockout",
         "ScheduleProgrammingVisibility": "create_schedule_programming_visibility"
-      }
-    },
-    "Humidistat": {
-      "namespace": null,
-      "features": {
-        "Humidifier": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Dehumidifier": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Continuous": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Sensor": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Auto": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "FanOnly": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Optimal": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "WarmMist": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ColdMist": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Mode": null,
-        "SystemState": null,
-        "UserSetpoint": null,
-        "MinSetpoint": null,
-        "MaxSetpoint": null,
-        "Step": null,
-        "TargetSetpoint": null,
-        "MistType": null,
-        "Continuous": null,
-        "Sleep": null,
-        "Optimal": null
       }
     },
     "ColorControl": {
@@ -2298,35 +1999,6 @@
         "ColorTempPhysicalMaxMireds": "create_color_temp_physical_max_mireds",
         "CoupleColorTempToLevelMinMireds": "create_couple_color_temp_to_level_min_mireds",
         "StartUpColorTemperatureMireds": "create_start_up_color_temperature_mireds"
-      }
-    },
-    "BallastConfiguration": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "PhysicalMinLevel": null,
-        "PhysicalMaxLevel": null,
-        "BallastStatus": null,
-        "MinLevel": null,
-        "MaxLevel": null,
-        "IntrinsicBallastFactor": null,
-        "BallastFactorAdjustment": null,
-        "LampQuantity": null,
-        "LampType": null,
-        "LampManufacturer": null,
-        "LampRatedHours": null,
-        "LampBurnHours": null,
-        "LampAlarmMode": null,
-        "LampBurnHoursTripPoint": null
-      }
-    },
-    "DynamicLighting": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "AvailableEffects": null,
-        "CurrentEffectID": null,
-        "CurrentSpeed": null
       }
     },
     "IlluminanceMeasurement": {
@@ -2880,140 +2552,6 @@
         "SoilMoistureMeasuredValue": "create_soil_moisture_measured_value"
       }
     },
-    "AmbientContextSensing": {
-      "namespace": null,
-      "features": {
-        "HumanActivity": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ObjectCounting": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ObjectIdentification": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "SoundIdentification": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PredictedActivity": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "SensorFusion": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "HumanActivityDetected": null,
-        "ObjectIdentified": null,
-        "AudioContextDetected": null,
-        "AmbientContextType": null,
-        "AmbientContextTypeSupported": null,
-        "ObjectCountThresholdReached": null,
-        "ObjectCountConfig": null,
-        "ObjectCount": null,
-        "SimultaneousDetectionLimit": null,
-        "HoldTime": null,
-        "HoldTimeLimits": null,
-        "PredictedActivity": null,
-        "SensorFusionSupported": null
-      }
-    },
-    "AmbientSensingUnion": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "UnionName": null,
-        "UnionHealth": null,
-        "UnionContributorList": null
-      }
-    },
-    "ProximityRanging": {
-      "namespace": null,
-      "features": {
-        "Wi-Fi USD Proximity Detection": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "Bluetooth Channel Sounding": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "BLE Beacon RSSI": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "UWB Ranging": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "RangingCapabilities": null,
-        "WiFiDevIK": null,
-        "BLEDeviceID": null,
-        "BLTDevIK": null,
-        "BLTCSSecurityLevel": null,
-        "BLTCSModeCapability": null,
-        "SessionIDList": null
-      }
-    },
-    "SmokeConcentrationMeasurement": {
-      "namespace": null,
-      "features": {
-        "NumericMeasurement": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "LevelIndication": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "MediumLevel": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "CriticalLevel": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PeakMeasurement": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "AverageMeasurement": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "MeasuredValue": null,
-        "MinMeasuredValue": null,
-        "MaxMeasuredValue": null,
-        "PeakMeasuredValue": null,
-        "PeakMeasuredValueWindow": null,
-        "AverageMeasuredValue": null,
-        "AverageMeasuredValueWindow": null,
-        "Uncertainty": null,
-        "MeasurementUnit": null,
-        "MeasurementMedium": null,
-        "LevelValue": null
-      }
-    },
-    "NetworkIdentityManagement": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "ActiveNetworkIdentities": null,
-        "Clients": null,
-        "ClientTableSize": null
-      }
-    },
     "WiFiNetworkManagement": {
       "namespace": "wifi_network_management",
       "features": {},
@@ -3048,104 +2586,6 @@
         "ThreadNetworkTableSize": "create_thread_network_table_size"
       }
     },
-    "WakeonLAN": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "MACAddress": null,
-        "LinkLocalAddress": null
-      }
-    },
-    "Channel": {
-      "namespace": null,
-      "features": {
-        "ChannelList": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "LineupInfo": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ElectronicGuide": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "RecordProgram": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "ChannelList": null,
-        "Lineup": null,
-        "CurrentChannel": null
-      }
-    },
-    "TargetNavigator": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "TargetList": null,
-        "CurrentTarget": null
-      }
-    },
-    "MediaPlayback": {
-      "namespace": null,
-      "features": {
-        "AdvancedSeek": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "VariableSpeed": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "TextTracks": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "AudioTracks": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "AudioAdvance": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "CurrentState": null,
-        "StartTime": null,
-        "Duration": null,
-        "SampledPosition": null,
-        "PlaybackSpeed": null,
-        "SeekRangeEnd": null,
-        "SeekRangeStart": null,
-        "ActiveAudioTrack": null,
-        "AvailableAudioTracks": null,
-        "ActiveTextTrack": null,
-        "AvailableTextTracks": null
-      }
-    },
-    "MediaInput": {
-      "namespace": null,
-      "features": {
-        "NameUpdates": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "InputList": null,
-        "CurrentInput": null
-      }
-    },
-    "LowPower": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
     "KeypadInput": {
       "namespace": "keypad_input",
       "features": {
@@ -3164,40 +2604,6 @@
       },
       "attributes": {}
     },
-    "ContentLauncher": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "AcceptHeader": null,
-        "SupportedStreamingProtocols": null
-      }
-    },
-    "AudioOutput": {
-      "namespace": null,
-      "features": {
-        "NameUpdates": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "OutputList": null,
-        "CurrentOutput": null
-      }
-    },
-    "ApplicationLauncher": {
-      "namespace": null,
-      "features": {
-        "ApplicationPlatform": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "CatalogList": null,
-        "CurrentApp": null
-      }
-    },
     "ApplicationBasic": {
       "namespace": "application_basic",
       "features": {},
@@ -3211,66 +2617,6 @@
         "ApplicationVersion": "create_application_version",
         "AllowedVendorList": "create_allowed_vendor_list"
       }
-    },
-    "AccountLogin": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
-    "ContentControl": {
-      "namespace": null,
-      "features": {
-        "ScreenTime": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PINManagement": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "BlockUnrated": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "OnDemandContentRating": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "ScheduledContentRating": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "BlockChannels": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "BlockApplications": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "BlockContentTimeWindow": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "Enabled": null,
-        "OnDemandRatings": null,
-        "OnDemandRatingThreshold": null,
-        "ScheduledContentRatings": null,
-        "ScheduledContentRatingThreshold": null,
-        "ScreenDailyTime": null,
-        "RemainingScreenTime": null,
-        "BlockUnrated": null,
-        "BlockChannelList": null,
-        "BlockApplicationList": null,
-        "BlockContentTimeWindow": null
-      }
-    },
-    "ContentAppObserver": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
     },
     "ZoneManagement": {
       "namespace": "zone_management",
@@ -3477,31 +2823,6 @@
         "Enabled": "create_enabled"
       }
     },
-    "AVAnalysis": {
-      "namespace": null,
-      "features": {
-        "LocalContextDetection": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "RemoteContextDetection": {
-          "namespace": null,
-          "add_takes_config": false
-        },
-        "PerZoneContextDetection": {
-          "namespace": null,
-          "add_takes_config": false
-        }
-      },
-      "attributes": {
-        "SupportedAmbientContexts": null,
-        "ActiveAmbientContextTriggers": null,
-        "MaxAnalysisStreamCount": null,
-        "CurrentAnalysisStreamCount": null,
-        "AnalysisStreams": null,
-        "TrackingEnabled": null
-      }
-    },
     "CommodityTariff": {
       "namespace": "commodity_tariff",
       "features": {
@@ -3567,33 +2888,6 @@
         "SupportedDeviceCategories": "create_supported_device_categories"
       }
     },
-    "JointFabricDatastore": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "AnchorRootCA": null,
-        "AnchorNodeID": null,
-        "AnchorVendorID": null,
-        "FriendlyName": null,
-        "GroupKeySetList": null,
-        "GroupList": null,
-        "NodeList": null,
-        "AdminList": null,
-        "Status": null,
-        "EndpointGroupIDList": null,
-        "EndpointBindingList": null,
-        "NodeKeySetList": null,
-        "NodeACLList": null,
-        "NodeEndpointList": null
-      }
-    },
-    "JointFabricAdministrator": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "AdministratorFabricIndex": null
-      }
-    },
     "TLSCertificateManagement": {
       "namespace": "tls_certificate_management",
       "features": {},
@@ -3637,23 +2931,6 @@
         "TariffUnit": "create_tariff_unit",
         "MaximumMeteredQuantities": "create_maximum_metered_quantities"
       }
-    },
-    "UnitTesting": {
-      "namespace": null,
-      "features": {},
-      "attributes": {
-        "UnsupportedAttributeRequiringAdminPrivilege": null
-      }
-    },
-    "FaultInjection": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
-    },
-    "SampleMEI": {
-      "namespace": null,
-      "features": {},
-      "attributes": {}
     }
   },
   "device_types": {

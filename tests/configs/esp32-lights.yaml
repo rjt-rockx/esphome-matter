@@ -37,7 +37,7 @@ matter:
     4:
       extended_color_light:
         light_id: rgbww_light
-        features:
+        with_features:
           - Hue And Saturation
           - EnhancedHue
           - ColorLoop

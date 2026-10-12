@@ -29,13 +29,13 @@ matter:
       door_lock:
         lock_id: front_door
         lock_type: DEAD_BOLT
-        features:
+        with_features:
           - DoorPositionSensor
           - Unbolt
     2:
       water_valve:
         valve_id: garden_valve
-        features:
+        with_features:
           - Level
     3:
       water_valve:

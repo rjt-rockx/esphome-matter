@@ -6,6 +6,9 @@ from esphome.components.binary_sensor import BinarySensor
 from esphome.components.sensor import Sensor
 from esphome.cpp_generator import MockObjClass
 
+from ..util import snake_case
+from .conformance import Conformance
+
 if TYPE_CHECKING:
     from .clusters import Cluster
 
@@ -13,21 +16,30 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, slots=True)
 class Attribute:
     id: int
-    name: str | None  # CamelCase
+    name: str  # CamelCase
+    conf_key: str  # snake_case
     type: str
     # max: int | None = None
     # is_nullable: bool = False
     writable: bool = False
     optional: bool = False
+    server: bool = False
+    client: bool = False
+    conformance: Conformance | None = field(default=None, compare=False, hash=False)
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, attribute_id: int, data: dict):
+        name: str = data.get("name", data["define"])
         return cls(
-            id=data["id"],
-            name=data.get("name"),
+            id=attribute_id,
+            name=name,
+            conf_key=snake_case(name),
             type=data["type"],
-            writable=data["writable"],
-            optional=data["optional"],
+            writable=data.get("writable", False),
+            optional=data.get("optional", False),
+            server=data.get("server", False),
+            client=data.get("client", False),
+            conformance=Conformance.from_dict(data.get("conformance")),
         )
 
 
@@ -269,10 +281,6 @@ SENSOR_ATTRIBUTES = {
             "soil_moisture", "percent", family="humidity", kind="soil_moisture"
         )
     },
-    # Not used by any device type?
-    "SmokeConcentrationMeasurement": {  # 0x0434
-        "MeasuredValue": _concentration("smoke_concentration")
-    },
 }
 
 # AlarmStateEnum attributes of the code-driven SmokeCoAlarmCluster, bound to binary sensors (ON = Critical alarm).
@@ -282,6 +290,6 @@ SENSOR_ATTRIBUTES["SmokeCOAlarm"] = {  # 0x005C
         "smoke_state", "alarm_state", BinarySensor, features=("SmokeAlarm",), code_driven=True
     ),
     "COState": SensorAttribute(
-        "co_state", "alarm_state", BinarySensor, features=("CO Alarm",), code_driven=True
+        "co_state", "alarm_state", BinarySensor, features=("COAlarm",), code_driven=True
     ),
 }

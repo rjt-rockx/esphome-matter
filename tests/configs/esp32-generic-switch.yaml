@@ -37,12 +37,12 @@ matter:
     2:
       id: manual_endpoint
       generic_switch:
-        features: [MomentarySwitchRelease, MomentarySwitchLongPress]
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress]
     # Latching switch (e.g. a toggle switch).
     3:
       generic_switch:
         binary_sensor_id: toggle
-        features: [LatchingSwitch]
+        with_features: [LatchingSwitch]
     # Bare config: MomentarySwitch and MomentarySwitchRelease.
     4:
       generic_switch:
@@ -50,14 +50,14 @@ matter:
     5:
       generic_switch:
         binary_sensor_id: action_button
-        features: [ActionSwitch, MomentarySwitchLongPress]
+        with_features: [ActionSwitch, MomentarySwitchLongPress]
         multi_press_max: 4
     # Other device types with a Switch cluster.
     6:
       doorbell:
     7:
       audio_doorbell:
-        features: [Audio]
+        with_features: [Audio]
 
 binary_sensor:
   - id: button

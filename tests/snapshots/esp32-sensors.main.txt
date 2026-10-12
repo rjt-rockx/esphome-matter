@@ -1,0 +1,200 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-sensors");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 1, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::PressureMeasurementCluster, int16_t, &chip::app::Clusters::PressureMeasurementCluster::SetMeasuredValue>(pressure_kpa, 2, 1027, 0, [](float v) { return esphome::matter::conversion::pressure(v * 10.0f); });
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::pressure_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::pressure_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(humidity, 3, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::IlluminanceMeasurementCluster, uint16_t, &chip::app::Clusters::IlluminanceMeasurementCluster::SetMeasuredValue>(illuminance, 4, 1024, 0, esphome::matter::conversion::illuminance);
+  matter_mattercomponent_id->register_sensor_attribute(battery_level, 4, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_endpoint_parent(4, 0);
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::light_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::light_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}) == nullptr)
+        return false;
+      auto *status_attr = esp_matter::attribute::get(power_source_cluster, 0x0000);
+      esp_matter_attr_val_t status_val = esp_matter_enum8(1);
+      if (status_attr != nullptr)
+        esp_matter::attribute::set_val(status_attr, &status_val, false);
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_sensor_attribute(battery_level_2, 5, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_endpoint_parent(5, 0);
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::power_source::config_t device_config_0{};
+    device_config_0.power_source.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    if (esp_matter::endpoint::power_source::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}) == nullptr)
+        return false;
+      auto *status_attr = esp_matter::attribute::get(power_source_cluster, 0x0000);
+      esp_matter_attr_val_t status_val = esp_matter_enum8(1);
+      if (status_attr != nullptr)
+        esp_matter::attribute::set_val(status_attr, &status_val, false);
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 6, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(humidity, 6, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_concentration_sensor(co2, 6, 1037, 0, esphome::matter::conversion::concentration, 0);
+  matter_mattercomponent_id->register_concentration_sensor(pm_2_5, 6, 1066, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(ch2o, 6, 1067, 0, [](float v) { return esphome::matter::conversion::concentration(v * 1000.0f); }, 1);
+  matter_mattercomponent_id->register_concentration_sensor(pm_1_0, 6, 1068, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(pm_10_0, 6, 1069, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(tvoc_ppb, 6, 1070, 0, esphome::matter::conversion::concentration, 1);
+  matter_mattercomponent_id->register_concentration_sensor(radon, 6, 1071, 0, [](float v) { return esphome::matter::conversion::concentration(v * 37.0f); }, 7);
+  matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::temperature_measurement::config_t temperature_measurement_config{};
+    if (esp_matter::cluster::temperature_measurement::create(endpoint, &temperature_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::relative_humidity_measurement::config_t relative_humidity_measurement_config{};
+    if (esp_matter::cluster::relative_humidity_measurement::create(endpoint, &relative_humidity_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::carbon_dioxide_concentration_measurement::config_t carbon_dioxide_concentration_measurement_config{};
+    carbon_dioxide_concentration_measurement_config.feature_flags = esp_matter::cluster::carbon_dioxide_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::carbon_dioxide_concentration_measurement::create(endpoint, &carbon_dioxide_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::pm25_concentration_measurement::config_t pm25_concentration_measurement_config{};
+    pm25_concentration_measurement_config.feature_flags = esp_matter::cluster::pm25_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm25_concentration_measurement::create(endpoint, &pm25_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::formaldehyde_concentration_measurement::config_t formaldehyde_concentration_measurement_config{};
+    formaldehyde_concentration_measurement_config.feature_flags = esp_matter::cluster::formaldehyde_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::formaldehyde_concentration_measurement::create(endpoint, &formaldehyde_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::pm1_concentration_measurement::config_t pm1_concentration_measurement_config{};
+    pm1_concentration_measurement_config.feature_flags = esp_matter::cluster::pm1_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm1_concentration_measurement::create(endpoint, &pm1_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::pm10_concentration_measurement::config_t pm10_concentration_measurement_config{};
+    pm10_concentration_measurement_config.feature_flags = esp_matter::cluster::pm10_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm10_concentration_measurement::create(endpoint, &pm10_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::config_t total_volatile_organic_compounds_concentration_measurement_config{};
+    total_volatile_organic_compounds_concentration_measurement_config.feature_flags = esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::create(endpoint, &total_volatile_organic_compounds_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    esp_matter::cluster::radon_concentration_measurement::config_t radon_concentration_measurement_config{};
+    radon_concentration_measurement_config.feature_flags = esp_matter::cluster::radon_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::radon_concentration_measurement::create(endpoint, &radon_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_voltage, 7, 4, esphome::matter::conversion::volts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_current, 7, 5, esphome::matter::conversion::ampere);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_power, 7, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_apparent_power, 7, 10, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_frequency, 7, 14, esphome::matter::conversion::frequency);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_power_factor, 7, 17, [](float v) { return esphome::matter::conversion::power_factor(v * 0.01f); });
+  matter_mattercomponent_id->register_electrical_energy_sensor(mains_energy, 7, 1, esphome::matter::conversion::kilowatt_hours);
+  matter_mattercomponent_id->register_electrical_energy_sensor(mains_energy_exported, 7, 2, [](float v) { return esphome::matter::conversion::kilowatt_hours(v * 0.001f); });
+  matter_mattercomponent_id->register_endpoint_parent(7, 0);
+  matter_mattercomponent_id->register_endpoint(7, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(7, true);
+    device_config_0.with_electrical_energy_measurement().feature_flags = esp_matter::cluster::electrical_energy_measurement::feature::imported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::exported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_voltage(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_active_current(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_apparent_power(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_frequency(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_power_factor(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_voltage, 8, 4, [](float v) { return esphome::matter::conversion::volts(v * 0.001f); });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_current, 8, 5, [](float v) { return esphome::matter::conversion::ampere(v * 0.001f); });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_power, 8, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(8, 0);
+  matter_mattercomponent_id->register_endpoint(8, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::direct_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(8, false);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_voltage(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_active_current(electrical_power_measurement_cluster, {}) == nullptr)
+        return false;
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 9, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_soil_moisture_sensor(soil_moisture, 9, 1072, 1, esphome::matter::conversion::percent);
+  matter_mattercomponent_id->register_endpoint_parent(9, 0);
+  matter_mattercomponent_id->register_endpoint(9, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::soil_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::soil_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esphome::matter::set_soil_moisture_limits(esp_matter::endpoint::get_id(endpoint));
+    esp_matter::cluster::temperature_measurement::config_t temperature_measurement_config{};
+    if (esp_matter::cluster::temperature_measurement::create(endpoint, &temperature_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x1332F9B5);

@@ -19,6 +19,7 @@ from components.matter import binary_sensors, fan_binding
 from components.matter.data_model import device_types, espmatter_names
 from components.matter.data_model.attributes import SENSOR_ATTRIBUTES
 from components.matter.data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME
+from components.matter.data_model.conformance import ConformanceDisposition
 from components.matter.data_model.device_types import DEVICE_TYPES
 
 TABLE = espmatter_names.TABLE
@@ -42,14 +43,15 @@ def test_table_covers_data_model():
         assert cluster.name in TABLE["clusters"], cluster.name
         entry = TABLE["clusters"][cluster.name]
         for feature in cluster.features:
-            assert feature.name in entry["features"], (cluster.name, feature.name)
-        for attribute in cluster.server_attributes:
-            if attribute.name:
+            assert feature.spec_name in entry["features"], (cluster.name, feature.name)
+        for attribute in cluster.attributes:
+            if attribute.server and attribute.name:
                 assert attribute.name in entry["attributes"], (
                     cluster.name,
                     attribute.name,
                 )
-    assert len(TABLE["clusters"]) == len(clusters)
+    # The data model only contains the clusters that esp-matter supports.
+    assert len(TABLE["clusters"]) >= len(clusters)
     for device_type in DEVICE_TYPES:
         assert device_type.name in TABLE["device_types"], device_type.name
 
@@ -60,7 +62,6 @@ def test_table_covers_data_model():
         ("Switch", "switch_cluster"),
         ("OnOff", "on_off"),
         ("PM25ConcentrationMeasurement", "pm25_concentration_measurement"),
-        ("DishwasherAlarm", "dish_washer_alarm"),
         ("SmokeCOAlarm", "smoke_co_alarm"),
         ("ValveConfigurationandControl", "valve_configuration_and_control"),
     ],
@@ -76,7 +77,7 @@ def test_cluster_namespaces(cluster, namespace):
         ("DoorLock", "Unbolt", "unbolting"),
         ("DoorLock", "WeekDayAccessSchedules", "weekday_access_schedules"),
         ("DoorLock", "CredentialsOverTheAirAccess", "credential_over_the_air_access"),
-        ("ColorControl", "Hue And Saturation", "hue_saturation"),
+        ("ColorControl", "HueAndSaturation", "hue_saturation"),
         ("Thermostat", "MatterScheduleConfiguration", "matter_schedule_configuration"),
         # Shared by all concentration measurement clusters.
         ("PM25ConcentrationMeasurement", "NumericMeasurement", "numeric_measurement"),
@@ -103,7 +104,7 @@ def test_unsupported_feature_rejected_at_config_time(run_config):
           endpoints:
             1:
               window_covering:
-                features: [Lift, AbsolutePosition]
+                with_features: [Lift, AbsolutePosition]
         """
     )
     assert not result.ok
@@ -118,11 +119,13 @@ def test_unsupported_extra_cluster_rejected_at_config_time(run_config):
           endpoints:
             1:
               on_off_light: {}
-              extra_clusters: [Channel]
+              clusters:
+                channel: {}
         """
     )
     assert not result.ok
-    assert "not supported by esp-matter" in result.output
+    # Clusters that esp-matter lacks are not in the data model at all.
+    assert "channel" in result.output
 
 
 def test_every_device_type_has_endpoint_namespace():
@@ -141,7 +144,12 @@ def test_device_type_clusters_and_features_exist():
                 # esp-matter creates its own required clusters; nothing is emitted.
                 continue
             for feature in cluster.features:
-                if feature.enabled and not feature.espm_available:
+                if (
+                    feature.conformance is not None
+                    and feature.conformance.disposition(set())
+                    is ConformanceDisposition.MANDATORY
+                    and not feature.espm_available
+                ):
                     problems.append((device_type.name, cluster.name, feature.name))
     assert not problems
 
@@ -152,7 +160,7 @@ def test_feature_flag_config_members_exist():
         for cluster in device_type.server_clusters:
             if not cluster.required or not cluster.espm_available:
                 continue
-            if not cluster.choice_features and cluster.name != "Switch":
+            if not cluster.choice_groups() and cluster.name != "Switch":
                 continue
             entry = TABLE["device_types"][device_type.name]
             if not entry["config_members"]:

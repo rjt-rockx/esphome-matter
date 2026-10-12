@@ -39,7 +39,7 @@ public:
   bool init(bool persist_passcode);
 
   // CHIP task: called from the Matter device event callback.
-  void handle_event(const ChipDeviceEvent *event);
+  void handle_event(const chip::DeviceLayer::ChipDeviceEvent *event);
 
   // Main loop: logs the QR/manual code (only while a window is open and the
   // code is known) and the window/fabric summary.
@@ -135,7 +135,7 @@ template <typename... Ts>
 class MatterOpenCommissioningWindowAction : public Action<Ts...> {
 public:
   TEMPLATABLE_VALUE(uint32_t, timeout)
-  void play(Ts... x) override {
+  void play(const Ts &...x) override {
     // Matter spec 11.19.7: window length between 3 and 15 minutes.
     uint32_t t = this->timeout_.value(x...);
     t = t < 180 ? 180 : (t > 900 ? 900 : t);
@@ -146,7 +146,7 @@ public:
 template <typename... Ts>
 class MatterResetIdentityAction : public Action<Ts...> {
 public:
-  void play(Ts... x) override {
+  void play(const Ts &...x) override {
     MatterCommissioning::instance().reset_identity();
   }
 };

@@ -70,7 +70,7 @@ Notes:
 
 ## Occupancy sensors
 
-The Occupancy Sensing cluster requires at least one sensor-type feature. If `features:` doesn't contain one, it is chosen
+The Occupancy Sensing cluster requires at least one sensor-type feature. If `with_features:` doesn't contain one, it is chosen
 from the device_class:
 
 | `device_class` | Feature enabled | OccupancySensorType (legacy attribute) |
@@ -84,7 +84,7 @@ OccupancySensorType and OccupancySensorTypeBitmap are derived from the feature m
 feature reports type PIR with an empty bitmap.
 
 `presence` maps to `Radar` because that is what mmWave presence sensors usually are. This is a judgement call, not
-something the specification dictates. Set `features:` explicitly if your sensor is something else.
+something the specification dictates. Set `with_features:` explicitly if your sensor is something else.
 
 ```yaml
 matter:
@@ -92,7 +92,7 @@ matter:
     1:
       occupancy_sensor:
         occupancy: desk_mat
-        features: [PhysicalContact]    # overrides the device_class based choice
+        with_features: [PhysicalContact]    # overrides the device_class based choice
 ```
 
 Valid sensor-type features: `Other`, `PassiveInfrared`, `Ultrasonic`, `PhysicalContact`, `ActiveInfrared`, `Radar`,

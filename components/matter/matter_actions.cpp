@@ -6,6 +6,7 @@
 #include "esphome/core/log.h"
 
 #include <app/DeviceProxy.h>
+#include <app/EventLogging.h>
 #include <app/clusters/bindings/binding-table.h>
 #include <platform/CHIPDeviceLayer.h>
 
@@ -14,11 +15,27 @@
 #include <cstring>
 #include <inttypes.h>
 #include <memory>
+#include <json_to_tlv.h>
 #include <string>
 
 static const char *const TAG = "matter.actions";
 
 namespace esphome::matter {
+
+class JsonEventWriter : public chip::app::EventLoggingDelegate {
+public:
+  explicit JsonEventWriter(const char *data) : data_(data) {}
+
+  CHIP_ERROR WriteEvent(chip::TLV::TLVWriter &writer) override {
+    esp_err_t err = esp_matter::json_to_tlv(
+        this->data_, writer,
+        chip::TLV::ContextTag(chip::app::EventDataIB::Tag::kData));
+    return err == ESP_OK ? CHIP_NO_ERROR : CHIP_ERROR_INVALID_ARGUMENT;
+  }
+
+protected:
+  const char *data_;
+};
 
 // Builds the JSON command payload for outgoing client commands. Called by
 // esp_matter once per matching binding entry for every command sent through
@@ -111,6 +128,19 @@ void send_client_command_on_matter_thread(intptr_t context) {
       reinterpret_cast<ClientCommandRequest *>(context));
   pending_client_commands.fetch_sub(1);
 
+  auto *cluster_ptr =
+      esp_matter::cluster::get(request->endpoint_id, request->cluster);
+  if (cluster_ptr == nullptr ||
+      esp_matter::command::get(cluster_ptr, request->command,
+                               esp_matter::COMMAND_FLAG_ACCEPTED) == nullptr) {
+    ESP_LOGW(
+        TAG,
+        "Cannot send unavailable command: endpoint=%u cluster=%lu command=%lu",
+        request->endpoint_id, static_cast<unsigned long>(request->cluster),
+        static_cast<unsigned long>(request->command));
+    return;
+  }
+
   std::string node_ids;
   for (const auto &entry :
        chip::app::Clusters::Binding::Table::GetInstance()) {
@@ -172,6 +202,39 @@ void send_client_command(uint16_t endpoint_id, chip::ClusterId cluster,
     pending_client_commands.fetch_sub(1);
     delete request;
   }
+}
+
+void send_event(uint16_t endpoint_id, chip::ClusterId cluster,
+                chip::EventId event, uint8_t priority, const char *event_data) {
+  JsonEventWriter writer(event_data != nullptr ? event_data : "{}");
+  chip::app::EventOptions options;
+  options.mPath = chip::app::ConcreteEventPath(endpoint_id, cluster, event);
+  options.mPriority = static_cast<chip::app::PriorityLevel>(priority);
+  chip::EventNumber event_number;
+
+  esp_matter::lock::ScopedChipStackLock scoped_lock(portMAX_DELAY);
+  auto *cluster_ptr = esp_matter::cluster::get(endpoint_id, cluster);
+  if (cluster_ptr == nullptr ||
+      esp_matter::event::get(cluster_ptr, event) == nullptr) {
+    ESP_LOGW(TAG,
+             "Cannot send unavailable event: endpoint=%u cluster=%lu event=%lu",
+             endpoint_id, static_cast<unsigned long>(cluster),
+             static_cast<unsigned long>(event));
+    return;
+  }
+
+  CHIP_ERROR err = chip::app::EventManagement::GetInstance().LogEvent(
+      &writer, options, event_number);
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGW(TAG,
+             "Send event failed: endpoint=%u cluster=%lu event=%lu error=%s",
+             endpoint_id, static_cast<unsigned long>(cluster),
+             static_cast<unsigned long>(event), err.AsString());
+    return;
+  }
+  ESP_LOGD(TAG, "Sent event: endpoint=%u cluster=%lu event=%lu number=%" PRIu64,
+           endpoint_id, static_cast<unsigned long>(cluster),
+           static_cast<unsigned long>(event), event_number);
 }
 
 } // namespace esphome::matter

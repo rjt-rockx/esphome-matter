@@ -5,7 +5,7 @@ This page covers the options that control how a controller (Home Assistant, Appl
 ```yaml
 matter:
   node_label: Living room plug      # default: friendly_name, else the ESPHome name
-  serial_number: "PLUG-0001"        # default: Wi-Fi MAC address as 12 hex digits
+  serial_number: "PLUG-0001"        # default: device MAC address as 12 hex digits
   software_version_string: "1.4.2"  # default: esphome.project.version, else the ESPHome version
   hardware_version_string: "rev-b"  # default: chip variant, e.g. ESP32C6
   unique_id: "living-room-plug"     # default: random, generated once and stored
@@ -20,7 +20,7 @@ matter:
 | Option | Attribute | Default | Limit |
 | --- | --- | --- | --- |
 | `node_label` | NodeLabel | `friendly_name`, else the ESPHome `name` | 32 characters |
-| `serial_number` | SerialNumber | Wi-Fi MAC as uppercase hex (`AABBCCDDEEFF`) | 32 characters |
+| `serial_number` | SerialNumber | ESPHome device MAC as uppercase hex (`AABBCCDDEEFF`), the same address the native API reports, also on chips without Wi-Fi such as the ESP32-H2 | 32 characters |
 | `software_version_string` | SoftwareVersionString | `esphome.project.version`, else the ESPHome version | 31 characters |
 | `hardware_version_string` | HardwareVersionString | the chip variant (`ESP32C6`) | 64 characters |
 | `unique_id` | UniqueID | random, persisted in flash | 32 characters |

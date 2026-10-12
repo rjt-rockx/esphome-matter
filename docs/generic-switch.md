@@ -28,7 +28,7 @@ Controllers show the events differently. Home Assistant creates an `event` entit
 
 ## Features and events
 
-An event is only generated when the matching Switch cluster feature is enabled on the endpoint. Events of disabled features are dropped silently by Matter, so the `features` option must match what is emitted.
+An event is only generated when the matching Switch cluster feature is enabled on the endpoint. Events of disabled features are dropped silently by Matter, so the `with_features` option must match what is emitted.
 
 | Feature                     | Events                                    |
 |-----------------------------|-------------------------------------------|
@@ -39,9 +39,9 @@ An event is only generated when the matching Switch cluster feature is enabled o
 | `LatchingSwitch`            | `switch_latched`                          |
 | `ActionSwitch`              | Replaces `MomentarySwitchRelease`: one `initial_press` per sequence, no `short_release`, no `multi_press_ongoing`, `multi_press_complete` at the end. esp-matter always adds `MomentarySwitchMultiPress` to it. |
 
-The Switch cluster requires exactly one of `MomentarySwitch` and `LatchingSwitch`. esphome-matter selects `MomentarySwitch` automatically if neither is configured. Use `features: [LatchingSwitch]` for a toggle switch. Other features that a selected feature depends on (e.g. `MomentarySwitchRelease` for `MomentarySwitchLongPress`) are enabled automatically.
+The Switch cluster requires exactly one of `MomentarySwitch` and `LatchingSwitch`. esphome-matter selects `MomentarySwitch` automatically if neither is configured. Use `with_features: [LatchingSwitch]` for a toggle switch. Other features that a selected feature depends on (e.g. `MomentarySwitchRelease` for `MomentarySwitchLongPress`) are enabled automatically.
 
-If `features` is not configured, `MomentarySwitchRelease` is enabled. When `binary_sensor_id` is set, `MomentarySwitchRelease`, `MomentarySwitchLongPress` and `MomentarySwitchMultiPress` are enabled.
+If `with_features` is not configured, `MomentarySwitchRelease` is enabled. When `binary_sensor_id` is set, `MomentarySwitchRelease`, `MomentarySwitchLongPress` and `MomentarySwitchMultiPress` are enabled.
 
 ## Binding a binary sensor
 
@@ -102,4 +102,4 @@ Do not combine `binary_sensor_id` with manual events on the same endpoint unless
 
 ## Choosing features for other device types
 
-The Switch cluster feature choice described above is an instance of a more general rule: a cluster that a device type requires may have a mandatory choice between features, and esp-matter refuses to create the cluster when the choice is missing. The choice is resolved when the configuration is validated. For the Switch cluster (`generic_switch`, `doorbell`, `audio_doorbell`) `MomentarySwitch` is the default and at most one of `LatchingSwitch` and `MomentarySwitch` is accepted. Other choices (`Lift`/`Tilt` of `window_covering`, `Heating`/`Cooling` of `thermostat`, the sensor types of `occupancy_sensor`, ...) are not validated here. They are selected with `features:` or derived from the bound `cover_id`, `climate_id` or binary sensor.
+The Switch cluster feature choice described above is an instance of a more general rule: a cluster that a device type requires may have a mandatory choice between features, and esp-matter refuses to create the cluster when the choice is missing. The choice is resolved when the configuration is validated. For the Switch cluster (`generic_switch`, `doorbell`, `audio_doorbell`) `MomentarySwitch` is the default and at most one of `LatchingSwitch` and `MomentarySwitch` is accepted. Other choices (`Lift`/`Tilt` of `window_covering`, `Heating`/`Cooling` of `thermostat`, the sensor types of `occupancy_sensor`, ...) are not validated here. They are selected with `with_features:` or derived from the bound `cover_id`, `climate_id` or binary sensor.

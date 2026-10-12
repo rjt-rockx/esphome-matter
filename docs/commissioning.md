@@ -10,6 +10,48 @@ After flashing the device, a commission code is generated and shown (SetupQRCode
 
 If you missed it, reboot the device while it is not commissioned: it generates and shows a new code.
 
+## Setup codes in Home Assistant
+
+Setup codes are logged while a commissioning window is open (see above). To read them
+ through the [native ESPHome API](https://esphome.io/components/api/), add a
+Matter text sensor:
+
+```yaml
+text_sensor:
+  - platform: matter
+    qr_code: # QR code formatted as MT:xxxxxxxxxxxxxxxxxxx
+      name: "Matter QR-code string"
+    manual_pairing_code: # Pairing code formatted as 0000-000-0000
+      name: "Matter manual pairing code"
+    commissioning_state: # uncommissioned | commissioning | window_open | commissioned
+      name: "Matter commissioning state"
+    fabric_count:
+      name: "Matter fabric count"
+    fabric_1:
+      compressed_fabric_id:
+        name: "Matter fabric 1 compressed ID"
+      fabric_id:
+        name: "Matter fabric 1 ID"
+      label:
+        name: "Matter fabric 1 label"
+      node_id:
+        name: "Matter fabric 1 node ID"
+      vendor_id:
+        name: "Matter fabric 1 vendor ID"
+```
+
+Both accept the standard [text sensor options](https://esphome.io/components/text_sensor/)
+and default to the diagnostic entity category. Values remain available when
+Home Assistant reconnects. A code value does not indicate whether the
+commissioning window is open; see [Persistence](#persistence) below.
+
+Fabric slots `fabric_1` through `fabric_255` can each expose a `compressed_fabric_id`, `fabric_id`,
+`label`, `node_id`, and `vendor_id` text sensor and are very useful for debugging commissioning issues.
+Slots remain unknown while they have never contained a fabric. When an existing fabric is removed, its
+slot is cleared. However, due to a limitation in the `text_sensor`, the values can't be set back to
+unknown and becomes an empty string until after a restart.
+
+
 # Commissioners
 
 ### matterjs-server / Home Assistant
@@ -19,6 +61,10 @@ To accept the dev DAC that esphome-matter uses, matterjs-server should be starte
 `matterjs-server --enable-test-net-dcl=true`
 
 Or the `ENABLE_TEST_NET_DCL` environment variable should be set to `true`.
+
+For the Home Assistant Matter Server app, enable **Enable test-net DCL usage**
+under **Settings → Apps → Matter Server → Configuration**. Save and restart
+the Matter Server app to apply the setting.
 
 When commissioning, use the "Commission existing device" option;
 
@@ -79,16 +125,20 @@ Optionally expose them as diagnostic text sensors (e.g. for the `web_server`, Ho
 ```yaml
 text_sensor:
   - platform: matter
-    type: commissioning_state  # uncommissioned | commissioning | window_open | commissioned
-  - platform: matter
-    type: fabric_count
-  - platform: matter
-    type: pairing_code         # empty unless a window is open
-  - platform: matter
-    type: qr_code              # empty unless a window is open
+    commissioning_state:       # uncommissioned | commissioning | window_open | commissioned
+      name: Matter state
+    fabric_count:
+      name: Matter fabrics
+    manual_pairing_code:       # empty unless a window is open
+      name: Matter pairing code
+    qr_code:                   # empty unless a window is open
+      name: Matter QR code
+    fabric_1:                  # details of the first commissioned fabric
+      label:
+        name: Matter fabric 1 label
 ```
 
-`pairing_code` and `qr_code` are disabled by default (`disabled_by_default: true`) because they expose a secret while a window is open. Be careful with `web_server` (use `auth`) and with Home Assistant's recorder: the value is empty outside of commissioning, but state history keeps whatever was published.
+`manual_pairing_code` and `qr_code` are disabled by default (`disabled_by_default: true`) because they expose a secret while a window is open. Be careful with `web_server` (use `auth`) and with Home Assistant's recorder: the value is empty outside of commissioning, but state history keeps whatever was published.
 
 ## Automations
 

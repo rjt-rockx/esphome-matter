@@ -46,7 +46,7 @@ matter:
     7:
       occupancy_sensor:
         occupancy: desk_pressure_mat
-        features: [PhysicalContact]
+        with_features: [PhysicalContact]
     8:
       occupancy_sensor: living_room_occupancy
     # Leak, freeze and rain.
