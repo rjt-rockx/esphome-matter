@@ -13,6 +13,7 @@ enum class MatterTextSensorType : uint8_t {
   QR_CODE,
   COMMISSIONING_STATE,
   FABRIC_COUNT,
+  CONTROLLERS,
 };
 
 // Publishes commissioning information. The pairing/QR code sensors are empty

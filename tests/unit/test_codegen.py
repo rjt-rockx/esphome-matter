@@ -41,6 +41,19 @@ EXPECTED = {
         "MatterFlagEnumMapping(0, 47, 0, 1, -1, {{mains_present, 2}})",
         "MatterFlagEnumMapping(0, 47, 26, 3, 0,",
     ],
+    "esp32-behaviours": [
+        "set_status_output",
+        "set_status_led_enabled(true, true)",
+        "set_pairing(3000, 10000, 300)",
+        "MatterRemoveFabricAction",
+        "set_fabric_index([]() -> uint8_t {",
+    ],
+    "esp32-behaviours-light": [
+        "set_status_light",
+        "set_status_led_enabled(true, false)",
+        "set_pairing(2000, 0, 300)",
+        "set_fabric_index",
+    ],
     "esp32-power-topology": [
         "tree_topology::get_id()",
         "set_topology::get_id() | esp_matter::cluster::power_topology::feature::dynamic_power_flow",

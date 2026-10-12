@@ -27,6 +27,7 @@ from .binary_sensors import check_binary_sensors
 from .conformance import validate_composition
 from .power_source import validate_power_configuration
 from .power_topology import validate_topologies
+from .behaviours import BEHAVIOURS_SCHEMA, behaviours_to_code
 from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
 from .delegates import validate_delegate_clusters
 from .const import *
@@ -198,6 +199,7 @@ CONFIG_SCHEMA = cv.All(
     )
     .extend(DEVICE_INFO_SCHEMA)  # node_label, serial_number, on_identify, ...
     .extend(COMMISSIONING_SCHEMA)
+    .extend(BEHAVIOURS_SCHEMA)  # status_led, pairing
     .extend(cv.COMPONENT_SCHEMA),
     lower_expose,
     cv.only_on_esp32,
@@ -312,6 +314,7 @@ async def to_code(config: ConfigType):
     await setup_device_info(var, config)
     await setup_identify_triggers(var, config)
     await commissioning_to_code(config)
+    await behaviours_to_code(config)
 
     use_openthread = "openthread" in CORE.loaded_integrations
     use_wifi = "wifi" in CORE.loaded_integrations
