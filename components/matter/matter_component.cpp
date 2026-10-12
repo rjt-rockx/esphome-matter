@@ -231,6 +231,9 @@ void MatterComponent::setup() {
     }
   }
 
+  this->conformance_.init_configuration_version();
+  this->conformance_.install_labels();
+
   esp_matter::node::config_t node_config;
   device_info_fill_root_config(this->device_info_, node_config);
   esp_matter::node_t *node = esp_matter::node::create(
