@@ -23,7 +23,8 @@ class Feature:
     @property
     def namespace(self) -> str:
         """Feature name in esp_matter::cluster::<cluster>::feature::<feature> namespace."""
-        return snake_case(self.name)
+        # Some names contain spaces ("CO Alarm").
+        return snake_case(self.name.replace(" ", ""))
 
 
 @dataclass(frozen=True, slots=True)

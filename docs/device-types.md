@@ -175,6 +175,25 @@ matter:
         soil_moisture: soil_moisture_id
 ```
 
+### Binary sensors
+
+`contact_sensor`, `occupancy_sensor`, `water_leak_detector`, `water_freeze_detector`, `rain_sensor` and `smoke_co_alarm`
+bind ESPHome `binary_sensor` entities. The `device_class` of the binary sensor selects the contact polarity and the
+occupancy sensor type, see [binary-sensors.md](binary-sensors.md).
+
+```yaml
+matter:
+  endpoints:
+    1:
+      contact_sensor: door_sensor_id   # device_class: door is inverted to Matter's "true = closed" automatically
+    2:
+      occupancy_sensor: motion_sensor_id
+    3:
+      water_leak_detector: leak_sensor_id
+    4:
+      rain_sensor: rain_sensor_id
+```
+
 ### air_quality_sensor
 
 The `air_quality_sensor` supports many concentration measurements as well as temperature and humidity. Each measurement gets its own cluster, and a cluster is only created when a sensor id is mapped to it.
