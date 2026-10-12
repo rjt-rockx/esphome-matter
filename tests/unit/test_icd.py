@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import run_esphome, toolchain_line
 import esphome.config_validation as cv
 import pytest
+from conftest import run_esphome, toolchain_line
 
 from components.matter import icd
 
@@ -46,11 +46,15 @@ network:
 """
 
 
-def make_config(body: str, *, thread: str | None = THREAD, base: str | None = None) -> str:
+def make_config(
+    body: str, *, thread: str | None = THREAD, base: str | None = None
+) -> str:
     from conftest import COMPONENTS
 
     loop = "  loop_interval: 1s\n" if icd.core_option_supported("loop_interval") else ""
-    text = (base or BASE).format(toolchain=toolchain_line(), components=COMPONENTS, loop=loop)
+    text = (base or BASE).format(
+        toolchain=toolchain_line(), components=COMPONENTS, loop=loop
+    )
     text += thread or ""
     text += textwrap.dedent(body)
     return text
@@ -150,7 +154,9 @@ def test_lit_sdkconfig_enables_lit_cip_uat_and_dsls():
 
 def test_lit_short_idle_duration_never_exceeds_the_idle_interval():
     # CHIP static_asserts SHORT_IDLE <= IDLE; its Kconfig default is 60 s.
-    options = icd.icd_sdkconfig(validated(**{**LIT_OK, "idle_interval": "30s", "slow_poll_interval": "20s"}))
+    options = icd.icd_sdkconfig(
+        validated(**{**LIT_OK, "idle_interval": "30s", "slow_poll_interval": "20s"})
+    )
     assert options["CONFIG_ICD_SHORT_IDLE_MODE_DURATION_SEC"] == 30
 
 
@@ -171,7 +177,9 @@ def test_light_sleep_sdkconfig_and_opt_out():
 
 
 def test_uat_hint_bitmap():
-    config = validated(**{**LIT_OK, "uat_hint": ["custom_instruction", "device_manual"]})
+    config = validated(
+        **{**LIT_OK, "uat_hint": ["custom_instruction", "device_manual"]}
+    )
     assert icd.uat_hint_value(config) == 0x4 | 0x8
     assert icd.uat_hint_value(validated(mode="sit")) == 0
 
@@ -192,7 +200,14 @@ def test_uat_hint_bitmap():
         ({"active_interval": "200ms", "fast_poll_interval": "100ms"}, "at least 300ms"),
         ({"active_threshold": "200ms"}, "at least 300ms"),
         ({"active_threshold": "70s"}, "at most"),
-        ({"active_interval": "2s", "idle_interval": "1s", "slow_poll_interval": "1s"}, "longer than"),
+        (
+            {
+                "active_interval": "2s",
+                "idle_interval": "1s",
+                "slow_poll_interval": "1s",
+            },
+            "longer than",
+        ),
         ({"clients_per_fabric": 2}, "only available with `mode: lit`"),
         ({"uat_hint": ["power_cycle"]}, "only available with `mode: lit`"),
         ({"uat_instruction": "Press"}, "only available with `mode: lit`"),
@@ -208,8 +223,14 @@ def test_sit_schema_errors(kwargs, message):
     [
         ({"active_threshold": "4s"}, "at least 5s"),
         ({"uat_hint": None}, "`uat_hint` is required"),
-        ({"uat_hint": ["custom_instruction"], "uat_instruction": None}, "`uat_instruction` is required"),
-        ({"uat_hint": ["actuate_sensor_seconds"], "uat_instruction": "ten"}, "decimal number"),
+        (
+            {"uat_hint": ["custom_instruction"], "uat_instruction": None},
+            "`uat_instruction` is required",
+        ),
+        (
+            {"uat_hint": ["actuate_sensor_seconds"], "uat_instruction": "ten"},
+            "decimal number",
+        ),
         ({"uat_instruction": "x" * 129}, "128"),
     ],
 )
@@ -229,7 +250,9 @@ def test_lit_hint_without_instruction_is_fine_for_generic_hints():
 
 
 def test_lit_numeric_instruction_accepted():
-    validated(**{**LIT_OK, "uat_hint": ["actuate_sensor_seconds"], "uat_instruction": "10"})
+    validated(
+        **{**LIT_OK, "uat_hint": ["actuate_sensor_seconds"], "uat_instruction": "10"}
+    )
 
 
 def test_lit_slow_poll_above_15s_allowed():
@@ -294,19 +317,26 @@ def test_rejects_wifi(run_icd):
 
 
 def test_requires_mtd(run_icd):
-    result = run_icd("matter:\n  icd: {}\n", thread=THREAD.replace("MTD", "FTD").replace("  poll_period: 15s\n", ""))
+    result = run_icd(
+        "matter:\n  icd: {}\n",
+        thread=THREAD.replace("MTD", "FTD").replace("  poll_period: 15s\n", ""),
+    )
     assert not result.ok
     assert "device_type: MTD" in result.output
 
 
 def test_default_device_type_is_ftd_and_rejected(run_icd):
-    result = run_icd("matter:\n  icd: {}\n", thread=THREAD.replace("  device_type: MTD\n", ""))
+    result = run_icd(
+        "matter:\n  icd: {}\n", thread=THREAD.replace("  device_type: MTD\n", "")
+    )
     assert not result.ok
     assert "device_type: MTD" in result.output
 
 
 def test_requires_poll_period(run_icd):
-    result = run_icd("matter:\n  icd: {}\n", thread=THREAD.replace("  poll_period: 15s\n", ""))
+    result = run_icd(
+        "matter:\n  icd: {}\n", thread=THREAD.replace("  poll_period: 15s\n", "")
+    )
     assert not result.ok
     assert "poll_period" in result.output
 
@@ -390,8 +420,10 @@ def test_warns_deep_sleep(run_icd):
 
 
 def test_warns_loop_and_watchdog_and_logger(run_icd):
-    base = BASE.replace("{loop}", "").replace("  watchdog_timeout: 60s\n", "").replace(
-        "  baud_rate: 0\n", ""
+    base = (
+        BASE.replace("{loop}", "")
+        .replace("  watchdog_timeout: 60s\n", "")
+        .replace("  baud_rate: 0\n", "")
     )
     result = run_icd("matter:\n  icd: {}\n", base=base)
     assert result.ok, result.output[-2000:]
@@ -402,8 +434,10 @@ def test_warns_loop_and_watchdog_and_logger(run_icd):
 
 
 def test_light_sleep_off_skips_light_sleep_warnings(run_icd):
-    base = BASE.replace("{loop}", "").replace("  watchdog_timeout: 60s\n", "").replace(
-        "  baud_rate: 0\n", ""
+    base = (
+        BASE.replace("{loop}", "")
+        .replace("  watchdog_timeout: 60s\n", "")
+        .replace("  baud_rate: 0\n", "")
     )
     result = run_icd("matter:\n  icd:\n    light_sleep: false\n", base=base)
     assert result.ok, result.output[-2000:]

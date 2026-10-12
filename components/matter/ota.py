@@ -105,7 +105,9 @@ def _ota_key(config: ConfigType) -> str:
 def validate_ota_schema(config: ConfigType) -> ConfigType:
     """Cross-key validation, run after the schema."""
     if config.get(CONF_OTA_REQUESTOR) and config.get(CONF_OTA):
-        raise cv.Invalid(f"Use either `{CONF_OTA}` or `{CONF_OTA_REQUESTOR}`, not both.")
+        raise cv.Invalid(
+            f"Use either `{CONF_OTA}` or `{CONF_OTA_REQUESTOR}`, not both."
+        )
     if ota_config(config) and CONF_SOFTWARE_VERSION not in config:
         raise cv.Invalid(
             f"`{CONF_SOFTWARE_VERSION}` is required when Matter OTA is enabled. It is "

@@ -8,7 +8,12 @@ from esphome.config import Config
 from esphome.const import CONF_DEVICE_CLASS
 from esphome.core import CORE, ID
 
-from .const import CONF_COVER_ID, CONF_END_PRODUCT_TYPE, CONF_ENDPOINTS, CONF_WITH_FEATURES
+from .const import (
+    CONF_COVER_ID,
+    CONF_END_PRODUCT_TYPE,
+    CONF_ENDPOINTS,
+    CONF_WITH_FEATURES,
+)
 
 WINDOW_COVERING = "window_covering"
 
@@ -128,6 +133,8 @@ def config_lines(config_var: str, endpoint_id: int, device_config: dict) -> list
     """C++ lines that attach the cover binding to a window_covering config."""
     device_class, _ = _binding(device_config)
     return [
-        "esphome::matter::configure_window_covering("
-        f'{config_var}.window_covering, {endpoint_id}, "{device_class}");'
+        (
+            "esphome::matter::configure_window_covering("
+            f'{config_var}.window_covering, {endpoint_id}, "{device_class}");'
+        )
     ]

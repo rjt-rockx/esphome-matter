@@ -82,7 +82,9 @@ def test_xy_colour_rate_range():
 
 
 def test_rate_strips_per_second_suffix():
-    assert units.UNIT_VALIDATORS["percentage_rate"](254)("50%/s") == units.percentage(254)("50%")
+    assert units.UNIT_VALIDATORS["percentage_rate"](254)("50%/s") == units.percentage(
+        254
+    )("50%")
     assert units.UNIT_VALIDATORS["hue_rate"](254)("180°/s") == units.hue(254)("180°")
 
 

@@ -19,7 +19,14 @@ MATTER_DIR = COMPONENTS / "matter"
 # Clusters that esp-matter 1.6 serves from the attribute store (classic ember
 # clusters). Everything else is code driven or has its own setter API.
 # `wc` is the namespace alias used in matter_cover.cpp.
-STORE_CLUSTERS = {"OnOff", "LevelControl", "ColorControl", "WindowCovering", "wc", "Thermostat"}
+STORE_CLUSTERS = {
+    "OnOff",
+    "LevelControl",
+    "ColorControl",
+    "WindowCovering",
+    "wc",
+    "Thermostat",
+}
 
 # Sources that legitimately call attribute::report()/update() without a push
 # guard: the user facing set_attribute action (an update that is meant to run
@@ -28,7 +35,9 @@ STORE_CLUSTERS = {"OnOff", "LevelControl", "ColorControl", "WindowCovering", "wc
 # a MatterBindingBase::PushScope.
 UNGUARDED_ALLOWED = {"matter_attributes.cpp", "matter_binding.cpp"}
 
-WRITE_RE = re.compile(r"esp_matter::attribute::(report|update)\(\s*([^,]+),\s*([A-Za-z_:]+)::Id\b")
+WRITE_RE = re.compile(
+    r"esp_matter::attribute::(report|update)\(\s*([^,]+),\s*([A-Za-z_:]+)::Id\b"
+)
 ANY_WRITE_RE = re.compile(r"esp_matter::attribute::(report|update)\(")
 
 
@@ -80,13 +89,17 @@ def test_plain_update_sensor_attributes_are_store_clusters():
 
 def test_identify_time_is_read_from_the_cluster():
     text = (MATTER_DIR / "matter_identify.cpp").read_text()
-    assert "attribute::get_val" not in text, "Identify is code driven, read IdentifyTime from the cluster"
+    assert "attribute::get_val" not in text, (
+        "Identify is code driven, read IdentifyTime from the cluster"
+    )
     assert "GetIdentifyTime" in text
 
 
 def test_no_per_mapping_echo_flags_left():
     for path in _sources():
-        assert "pushing_" not in path.read_text(), f"{path.name}: use MatterBindingBase::PushScope / is_echo()"
+        assert "pushing_" not in path.read_text(), (
+            f"{path.name}: use MatterBindingBase::PushScope / is_echo()"
+        )
 
 
 def test_identify_effect_values_in_docs():
@@ -98,12 +111,16 @@ def test_identify_effect_values_in_docs():
     assert "255 stop effect" in doc
 
 
-GUARD_DECL_RE = re.compile(r"\bMatterPushGuard\s+\w+\s*(?:[;({=]|$)|\bMatterPushGuard\s*[({]")
+GUARD_DECL_RE = re.compile(
+    r"\bMatterPushGuard\s+\w+\s*(?:[;({=]|$)|\bMatterPushGuard\s*[({]"
+)
 
 
 def _strip_comments_and_strings(text: str) -> str:
     text = re.sub(r"//[^\n]*", "", text)
-    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    text = re.sub(
+        r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.DOTALL
+    )
     return re.sub(r'"(?:\\.|[^"\\\n])*"', '""', text)
 
 
@@ -114,8 +131,10 @@ def _unguarded_write_sites(text: str) -> list[int]:
     offenders = []
     for number, line in enumerate(_strip_comments_and_strings(text).splitlines(), 1):
         # Walk the line so a guard declared before a call on the same line counts.
-        position = 0
-        for match in re.finditer(r"[{}]|MatterPushGuard\b[^;{}]*|esp_matter::attribute::(?:report|update)\(", line):
+        for match in re.finditer(
+            r"[{}]|MatterPushGuard\b[^;{}]*|esp_matter::attribute::(?:report|update)\(",
+            line,
+        ):
             token = match.group(0)
             if token == "{":
                 stack.append(False)
@@ -127,7 +146,6 @@ def _unguarded_write_sites(text: str) -> list[int]:
                     stack[-1] = True
             elif not any(stack):
                 offenders.append(number)
-            position = match.end()
     return offenders
 
 
@@ -138,12 +156,25 @@ def test_every_mirrored_write_site_is_preceded_by_a_push_guard():
     for path in _sources():
         if path.name in UNGUARDED_ALLOWED:
             continue
-        offenders += [f"{path.name}:{n}" for n in _unguarded_write_sites(path.read_text())]
-    assert not offenders, f"attribute::report/update without a MatterPushGuard in scope: {offenders}"
+        offenders += [
+            f"{path.name}:{n}" for n in _unguarded_write_sites(path.read_text())
+        ]
+    assert not offenders, (
+        f"attribute::report/update without a MatterPushGuard in scope: {offenders}"
+    )
 
 
 def test_guard_check_rejects_comments_and_other_blocks():
     call = "esp_matter::attribute::report(a, b, c, &v);"
-    assert _unguarded_write_sites(f"void f() {{\n// MatterPushGuard g;\n{call}\n}}") == [3]
-    assert _unguarded_write_sites(f"void f() {{\n{{ MatterPushGuard g; }}\n{call}\n}}") == [3]
-    assert _unguarded_write_sites(f"void f() {{\nMatterPushGuard g;\nif (x) {{\n{call}\n}}\n}}") == []
+    assert _unguarded_write_sites(
+        f"void f() {{\n// MatterPushGuard g;\n{call}\n}}"
+    ) == [3]
+    assert _unguarded_write_sites(
+        f"void f() {{\n{{ MatterPushGuard g; }}\n{call}\n}}"
+    ) == [3]
+    assert (
+        _unguarded_write_sites(
+            f"void f() {{\nMatterPushGuard g;\nif (x) {{\n{call}\n}}\n}}"
+        )
+        == []
+    )

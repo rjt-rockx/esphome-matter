@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import COMPONENTS, HEADER, WIFI, run_esphome, toolchain_line
 import esphome.config_validation as cv
 import pytest
+from conftest import COMPONENTS, HEADER, WIFI, run_esphome, toolchain_line
 
 from components.matter import fan_binding, filter_monitoring
 from components.matter.data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
@@ -90,7 +90,11 @@ ENTITIES = textwrap.dedent(
 
 def endpoint(body: str) -> str:
     """The matter: section for endpoint YAML (`1: ...`)."""
-    return "\nmatter:\n  endpoints:\n" + textwrap.indent(textwrap.dedent(body).strip(), "    ") + "\n"
+    return (
+        "\nmatter:\n  endpoints:\n"
+        + textwrap.indent(textwrap.dedent(body).strip(), "    ")
+        + "\n"
+    )
 
 
 @pytest.fixture
@@ -124,7 +128,10 @@ def test_fan_id_accepted_on_every_device_type_with_fan_control():
 
 
 def test_optional_fan_control_cluster_is_added_for_fan_id():
-    config = {"clusters": {}, "room_air_conditioner": {"fan_id": "f", "with_features": []}}
+    config = {
+        "clusters": {},
+        "room_air_conditioner": {"fan_id": "f", "with_features": []},
+    }
     result = normalize(config)
     assert "fan_control" in result["clusters"]
     assert "fan_control" not in config["clusters"]  # copied, not mutated
@@ -151,7 +158,9 @@ def test_device_level_climate_id_is_not_a_fan_binding():
 
 
 def test_climate_binding_found():
-    config = {"clusters": {"fan_control": {"climate_id": "c", "with_features": ["step"]}}}
+    config = {
+        "clusters": {"fan_control": {"climate_id": "c", "with_features": ["step"]}}
+    }
     binding = fan_binding.find_binding(normalize(config), DEVICE_TYPES_BY_CONF_KEY)
     assert binding.kind == "climate"
     assert binding.step and not binding.wind
@@ -160,20 +169,32 @@ def test_climate_binding_found():
 @pytest.mark.parametrize("feature", ["wind", "step"])
 def test_wind_and_step_need_a_binding(feature):
     with pytest.raises(cv.Invalid, match="need fan_id"):
-        normalize({"clusters": {}, "air_purifier": {"with_features": [feature.capitalize()]}})
+        normalize(
+            {"clusters": {}, "air_purifier": {"with_features": [feature.capitalize()]}}
+        )
     with pytest.raises(cv.Invalid, match="need fan_id"):
         normalize({"clusters": {"fan_control": {"with_features": [feature]}}})
 
 
 def test_wind_presets_without_fan_id_rejected():
     with pytest.raises(cv.Invalid, match="needs fan_id"):
-        normalize({"clusters": {"fan_control": {"wind_presets": {"sleep": "x"}, "with_features": []}}})
+        normalize(
+            {
+                "clusters": {
+                    "fan_control": {"wind_presets": {"sleep": "x"}, "with_features": []}
+                }
+            }
+        )
 
 
 def test_wind_presets_imply_the_wind_feature():
     config = {
         "clusters": {},
-        "air_purifier": {"fan_id": "f", "wind_presets": {"natural": "Breeze"}, "with_features": []},
+        "air_purifier": {
+            "fan_id": "f",
+            "wind_presets": {"natural": "Breeze"},
+            "with_features": [],
+        },
     }
     binding = fan_binding.find_binding(normalize(config), DEVICE_TYPES_BY_CONF_KEY)
     assert binding.wind_natural == "Breeze"
@@ -181,7 +202,10 @@ def test_wind_presets_imply_the_wind_feature():
 
 
 def test_wind_default_preset_names():
-    config = {"clusters": {}, "air_purifier": {"fan_id": "f", "with_features": ["Wind"]}}
+    config = {
+        "clusters": {},
+        "air_purifier": {"fan_id": "f", "with_features": ["Wind"]},
+    }
     binding = fan_binding.find_binding(normalize(config), DEVICE_TYPES_BY_CONF_KEY)
     assert (binding.wind_natural, binding.wind_sleep) == ("natural", "sleep")
 
@@ -189,7 +213,9 @@ def test_wind_default_preset_names():
 def test_climate_derives_fan_features():
     for feature in ("auto", "multi_speed", "rocking", "wind"):
         with pytest.raises(cv.Invalid, match="derived"):
-            fan_binding.validate_cluster_options({"climate_id": "c", "with_features": [feature]})
+            fan_binding.validate_cluster_options(
+                {"climate_id": "c", "with_features": [feature]}
+            )
 
 
 def test_fan_and_climate_exclusive():
@@ -199,7 +225,9 @@ def test_fan_and_climate_exclusive():
 
 def test_trait_features_rejected_with_fan_id_in_cluster_form():
     with pytest.raises(cv.Invalid, match="follow the capabilities"):
-        fan_binding.validate_cluster_options({"fan_id": "f", "with_features": ["multi_speed"]})
+        fan_binding.validate_cluster_options(
+            {"fan_id": "f", "with_features": ["multi_speed"]}
+        )
 
 
 # --------------------------------------------------------------------------
@@ -226,7 +254,9 @@ def test_filter_replace_needed_alone():
     assert config["with_features"] == []
 
 
-@pytest.mark.parametrize("key", ["warning_level", "critical_level", "degradation_direction"])
+@pytest.mark.parametrize(
+    "key", ["warning_level", "critical_level", "degradation_direction"]
+)
 def test_filter_levels_need_condition(key):
     value = "up" if key == "degradation_direction" else 10
     with pytest.raises(cv.Invalid, match="condition"):
@@ -242,8 +272,15 @@ def test_filter_level_order():
     with pytest.raises(cv.Invalid, match="above"):
         filter_conf(condition="s", warning_level=5, critical_level=10)
     with pytest.raises(cv.Invalid, match="below"):
-        filter_conf(condition="s", degradation_direction="up", warning_level=90, critical_level=80)
-    filter_conf(condition="s", degradation_direction="up", warning_level=70, critical_level=80)
+        filter_conf(
+            condition="s",
+            degradation_direction="up",
+            warning_level=90,
+            critical_level=80,
+        )
+    filter_conf(
+        condition="s", degradation_direction="up", warning_level=70, critical_level=80
+    )
 
 
 def test_filter_default_critical_level_orders_against_warning():
@@ -622,7 +659,10 @@ def test_generated_fan_wind_step(generate):
     assert 'FanFeatureOptions{true, "natural", "sleep"}' in code
     assert "matter_filter_1_113->set_condition_sensor(life)" in code
     # the delegate is installed through the cluster config, before Matter starts
-    assert "hepa_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_1_113)" in code
+    assert (
+        "hepa_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_1_113)"
+        in code
+    )
     assert "fan_control.fan_mode_sequence" in code
     assert "hepa_filter_monitoring::feature::condition::add" in code
     assert "hepa_filter_monitoring::feature::warning::add" in code
@@ -645,7 +685,9 @@ def test_generated_climate_fan(generate):
     )
     assert "register_climate_fan(ac, 1)" in code
     assert "climate_fan_mode_sequence(ac)" in code
-    assert "esp_matter::cluster::fan_control::create(endpoint, &fan_control_config" in code
+    assert (
+        "esp_matter::cluster::fan_control::create(endpoint, &fan_control_config" in code
+    )
     assert "add_climate_fan_features(fan_control_cluster, ac, false)" in code
 
 
@@ -674,7 +716,9 @@ def test_generated_heat_pump_and_water_heater(generate):
             thermostat_on_endpoint: true
         """
     )
-    assert "esp_matter::cluster::thermostat::create(endpoint, &thermostat_config" in code
+    assert (
+        "esp_matter::cluster::thermostat::create(endpoint, &thermostat_config" in code
+    )
     assert "configure_climate_thermostat(thermostat_config, heater, false)" in code
     assert "register_climate(heater, 1, false)" in code
     assert "extend_climate_thermostat(endpoint, heater, false)" in code
@@ -691,6 +735,9 @@ def test_generated_water_heater(generate):
         """
     )
     # heating only: the flag tells the climate binding to leave cooling out
-    assert "configure_climate_thermostat(device_config_0.thermostat, ac, false, true)" in code
+    assert (
+        "configure_climate_thermostat(device_config_0.thermostat, ac, false, true)"
+        in code
+    )
     assert "extend_climate_thermostat(endpoint, ac, false, true)" in code
     assert "register_climate(ac, 1, false, true)" in code

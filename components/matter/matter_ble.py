@@ -45,9 +45,7 @@ _CONF_REBOOT_TIMEOUT = "reboot_timeout"
 def has_ip_network(loaded_integrations=None) -> bool:
     """True if ESPHome owns an IP interface that Matter can run on."""
     loaded = (
-        CORE.loaded_integrations
-        if loaded_integrations is None
-        else loaded_integrations
+        CORE.loaded_integrations if loaded_integrations is None else loaded_integrations
     )
     return bool({"wifi", "openthread", "ethernet"} & set(loaded))
 

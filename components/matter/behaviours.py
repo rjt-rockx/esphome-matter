@@ -53,7 +53,9 @@ MIN_STAGE_GAP = cv.TimePeriod(seconds=3)
 def _validate_pairing(config):
     reset = config[CONF_FACTORY_RESET_HOLD]
     if reset != NEVER:
-        gap = reset.total_milliseconds - config[CONF_OPEN_WINDOW_HOLD].total_milliseconds
+        gap = (
+            reset.total_milliseconds - config[CONF_OPEN_WINDOW_HOLD].total_milliseconds
+        )
         if gap < MIN_STAGE_GAP.total_milliseconds:
             raise cv.Invalid(
                 f"{CONF_FACTORY_RESET_HOLD} ({reset}) must be at least "

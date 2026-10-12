@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from conftest import CONFIGS, prepare_config, run_esphome
 import pytest
+from conftest import CONFIGS, prepare_config, run_esphome
 
 from components.matter import conformance as c
 

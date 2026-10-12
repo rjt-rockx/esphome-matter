@@ -38,7 +38,9 @@ EXPOSE_ITEM_SCHEMA = cv.Any(
             ),
             # Id of an exposed entity (or endpoint key) whose endpoint is the parent, or the
             # number of a hand-written endpoint.
-            cv.Optional(CONF_PARENT): cv.Any(cv.int_range(min=0, max=65534), cv.string_strict),
+            cv.Optional(CONF_PARENT): cv.Any(
+                cv.int_range(min=0, max=65534), cv.string_strict
+            ),
             # Same as the endpoint `clusters:`; merged into the lowered endpoint.
             cv.Optional(CONF_CLUSTERS): cv.Schema({cv.string_strict: object}),
         }

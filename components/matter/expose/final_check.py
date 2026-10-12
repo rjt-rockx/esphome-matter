@@ -52,7 +52,11 @@ def check_member(member: Member, validated: Entity) -> list[str]:
     """Warnings for one entity: raw-config assumptions (member.entity) vs the validated entity."""
     raw, o = member.entity, member.overrides
     eid = raw.id
-    drop = f"add `exclude: [{eid}]`" if not member.explicit else f"remove '{eid}' from `expose:`"
+    drop = (
+        f"add `exclude: [{eid}]`"
+        if not member.explicit
+        else f"remove '{eid}' from `expose:`"
+    )
     out = []
 
     if validated.internal and not raw.internal:
@@ -124,7 +128,9 @@ def validated_entity(full_config, member: Member) -> Entity | None:
         return None
     if not isinstance(conf, dict):
         return None
-    return make_entity(raw.domain, conf.get("platform", raw.platform), conf, raw.sub_key, path)
+    return make_entity(
+        raw.domain, conf.get("platform", raw.platform), conf, raw.sub_key, path
+    )
 
 
 def check_expose(config: dict, full_config) -> list[str]:

@@ -28,9 +28,8 @@ from pathlib import Path
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import select, sensor, text_sensor
+from esphome.components import select, sensor
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
-from esphome.core import ID
 
 from .const import CONF_CLUSTER, CONF_ENDPOINT, CONF_ENDPOINTS, CONF_WITH_FEATURES
 from .types import MatterEndpointRef, matter_ns
@@ -205,14 +204,20 @@ def _utf8_label(value):
     if not value:
         raise cv.Invalid("label must not be empty")
     if len(value.encode()) > MAX_LABEL_BYTES:
-        raise cv.Invalid(f"label is {len(value.encode())} bytes, the maximum is {MAX_LABEL_BYTES}")
+        raise cv.Invalid(
+            f"label is {len(value.encode())} bytes, the maximum is {MAX_LABEL_BYTES}"
+        )
     return value
 
 
 # ------------------------------------------------------------------ mode schemas
 def _tag_validator(cluster_name: str):
     """Validates one entry of `tags:`; returns a dict(value, mfg_code | None, named)."""
-    known = {} if cluster_name == MODE_SELECT else DATA["mode_clusters"][cluster_name]["tags"]
+    known = (
+        {}
+        if cluster_name == MODE_SELECT
+        else DATA["mode_clusters"][cluster_name]["tags"]
+    )
     by_value = {value: name for name, value in known.items()}
 
     def validate(value):
@@ -228,7 +233,11 @@ def _tag_validator(cluster_name: str):
                     cv.Required(CONF_VALUE): cv.int_range(min=0, max=0xFFFF),
                 }
             value = cv.Schema(schema)(value)
-            return {"value": value[CONF_VALUE], "mfg_code": value[CONF_MFG_CODE], "named": False}
+            return {
+                "value": value[CONF_VALUE],
+                "mfg_code": value[CONF_MFG_CODE],
+                "named": False,
+            }
         if cluster_name == MODE_SELECT:
             raise cv.Invalid(
                 "Mode Select semantic tags need a manufacturer code and a value: "
@@ -260,7 +269,9 @@ def _tag_validator(cluster_name: str):
 def _mode_entry_schema(cluster_name: str):
     is_select = cluster_name == MODE_SELECT
     max_tags = MAX_SELECT_TAGS if is_select else MAX_MODE_TAGS
-    tags_key = cv.Optional(CONF_TAGS, default=[]) if is_select else cv.Required(CONF_TAGS)
+    tags_key = (
+        cv.Optional(CONF_TAGS, default=[]) if is_select else cv.Required(CONF_TAGS)
+    )
     return cv.Schema(
         {
             cv.Required(CONF_LABEL): _utf8_label,
@@ -365,9 +376,9 @@ def _mode_cluster_schema(cluster_name: str) -> dict:
             "always", "when_idle", lower=True
         )
         schema[cv.Optional(CONF_DECIDE_IN_AUTOMATION, default=False)] = cv.boolean
-        schema[
-            cv.Optional(CONF_DECIDE_TIMEOUT, default=DEFAULT_DECIDE_TIMEOUT)
-        ] = cv.positive_time_period_milliseconds
+        schema[cv.Optional(CONF_DECIDE_TIMEOUT, default=DEFAULT_DECIDE_TIMEOUT)] = (
+            cv.positive_time_period_milliseconds
+        )
     return schema
 
 
@@ -395,7 +406,9 @@ def _error_id(names: dict[str, int]):
             raise cv.Invalid("Expected an error name or number")
         name = _snake(cv.string_strict(value))
         if name not in names:
-            raise cv.Invalid(f"Unknown error '{value}'. Known errors: {', '.join(names)}")
+            raise cv.Invalid(
+                f"Unknown error '{value}'. Known errors: {', '.join(names)}"
+            )
         return names[name]
 
     def by_number(value):
@@ -412,7 +425,9 @@ def _error_id(names: dict[str, int]):
     def validate(value):
         if isinstance(value, int) and not isinstance(value, bool):
             return by_number(value)
-        if isinstance(value, str) and re.fullmatch(r"\s*(0x[0-9a-fA-F]+|\d+)\s*", value):
+        if isinstance(value, str) and re.fullmatch(
+            r"\s*(0x[0-9a-fA-F]+|\d+)\s*", value
+        ):
             return by_number(int(value, 0))
         return by_name(value)
 
@@ -523,9 +538,13 @@ def _validate_operational_state_map(cluster_name: str):
                 )
         for command, wanted in config[CONF_ALLOWED_STATES].items():
             if command == "go_home" and cluster_name != RVC_OPERATIONAL_STATE:
-                raise cv.Invalid("allowed_states: go_home exists only on rvc_operational_state")
+                raise cv.Invalid(
+                    "allowed_states: go_home exists only on rvc_operational_state"
+                )
             if command in ("start", "stop") and cluster_name == RVC_OPERATIONAL_STATE:
-                raise cv.Invalid(f"allowed_states: {command} does not exist on rvc_operational_state")
+                raise cv.Invalid(
+                    f"allowed_states: {command} does not exist on rvc_operational_state"
+                )
             for state in wanted:
                 if _normalize(state) not in available:
                     raise cv.Invalid(
@@ -618,7 +637,9 @@ def _validate_laundry_controls(config):
         raise cv.Invalid("spin_speed needs spin_speeds")
     if CONF_NUMBER_OF_RINSES in config and CONF_RINSES not in config:
         raise cv.Invalid("number_of_rinses needs rinses")
-    if len(set(config.get(CONF_SPIN_SPEEDS, []))) != len(config.get(CONF_SPIN_SPEEDS, [])):
+    if len(set(config.get(CONF_SPIN_SPEEDS, []))) != len(
+        config.get(CONF_SPIN_SPEEDS, [])
+    ):
         raise cv.Invalid("spin_speeds must be unique")
     if len(set(config.get(CONF_RINSES, []))) != len(config.get(CONF_RINSES, [])):
         raise cv.Invalid("rinses must be unique")
@@ -684,7 +705,7 @@ def validate_delegate_clusters(matter_config: dict, full_config) -> None:
                     where, endpoint_refs, cluster, cluster_config, full_config, actions
                 )
         # Delegate clusters created by a device type but not configured are structure only.
-        for key, device_config in endpoint_config.items():
+        for key in endpoint_config:
             device_type = DEVICE_TYPES_BY_CONF_KEY.get(key)
             if device_type is None:
                 continue
@@ -706,7 +727,9 @@ def validate_delegate_clusters(matter_config: dict, full_config) -> None:
                     )
 
 
-def _validate_mode_cluster(where, cluster_name, config, full_config, sibling_state=False):
+def _validate_mode_cluster(
+    where, cluster_name, config, full_config, sibling_state=False
+):
     if cluster_name != MODE_SELECT:
         if config[CONF_ACCEPT] == "when_idle" and not sibling_state:
             raise cv.Invalid(
@@ -736,11 +759,13 @@ def _validate_mode_cluster(where, cluster_name, config, full_config, sibling_sta
                 f"{where}: the SDK answers ChangeToMode of Mode Select itself, matter.mode.reject has no effect"
             )
     if CONF_SELECT in config:
-        platform, entity = _entity_platform(full_config, config[CONF_SELECT])
+        _platform, entity = _entity_platform(full_config, config[CONF_SELECT])
         options = (entity or {}).get("options")
         if options:
             missing = [
-                mode[CONF_OPTION] for mode in config[CONF_MODES] if mode[CONF_OPTION] not in options
+                mode[CONF_OPTION]
+                for mode in config[CONF_MODES]
+                if mode[CONF_OPTION] not in options
             ]
             if missing:
                 raise cv.Invalid(
@@ -757,7 +782,7 @@ def _validate_laundry_selects(where, config, full_config):
     ):
         if key not in config:
             continue
-        platform, entity = _entity_platform(full_config, config[key])
+        _platform, entity = _entity_platform(full_config, config[key])
         options = (entity or {}).get("options")
         if options:
             if key == CONF_SPIN_SPEED:
@@ -771,7 +796,9 @@ def _validate_laundry_selects(where, config, full_config):
                 )
 
 
-def _validate_operational_cluster(where, endpoint_refs, cluster, config, full_config, actions):
+def _validate_operational_cluster(
+    where, endpoint_refs, cluster, config, full_config, actions
+):
     for key in (CONF_STATE, CONF_PHASE):
         if key not in config:
             continue
@@ -789,9 +816,7 @@ def _validate_operational_cluster(where, endpoint_refs, cluster, config, full_co
                 )
                 names = {_normalize(name) for name in available}
                 unknown = [
-                    option
-                    for option in options
-                    if _normalize(option) not in names
+                    option for option in options if _normalize(option) not in names
                 ]
                 if unknown:
                     raise cv.Invalid(
@@ -805,7 +830,8 @@ def _validate_operational_cluster(where, endpoint_refs, cluster, config, full_co
                 unknown = [
                     option
                     for option in options
-                    if _normalize(option) not in {_normalize(p) for p in config[CONF_PHASES]}
+                    if _normalize(option)
+                    not in {_normalize(p) for p in config[CONF_PHASES]}
                     and _normalize(option) not in ("none", "null")
                 ]
                 if unknown:
@@ -863,9 +889,17 @@ async def _register_laundry_controls(var, endpoint_id, config):
     for rinse in config.get(CONF_RINSES, []):
         cg.add(mapping.add_rinse(RINSES[rinse], rinse))
     if CONF_SPIN_SPEED in config:
-        cg.add(mapping.set_spin_speed_select(await cg.get_variable(config[CONF_SPIN_SPEED])))
+        cg.add(
+            mapping.set_spin_speed_select(
+                await cg.get_variable(config[CONF_SPIN_SPEED])
+            )
+        )
     if CONF_NUMBER_OF_RINSES in config:
-        cg.add(mapping.set_rinses_select(await cg.get_variable(config[CONF_NUMBER_OF_RINSES])))
+        cg.add(
+            mapping.set_rinses_select(
+                await cg.get_variable(config[CONF_NUMBER_OF_RINSES])
+            )
+        )
 
 
 async def _register_modes(var, endpoint_id, cluster, config):
@@ -878,11 +912,7 @@ async def _register_modes(var, endpoint_id, cluster, config):
         cg.add(mapping.add_mode(mode[CONF_LABEL], mode[CONF_MODE], mode[CONF_OPTION]))
         for tag in mode[CONF_TAGS]:
             mfg_code = tag["mfg_code"]
-            cg.add(
-                mapping.add_tag(
-                    tag["value"], mfg_code or 0, mfg_code is not None
-                )
-            )
+            cg.add(mapping.add_tag(tag["value"], mfg_code or 0, mfg_code is not None))
     if CONF_SELECT in config:
         select_ = await cg.get_variable(config[CONF_SELECT])
         cg.add(mapping.set_select(select_))
@@ -943,9 +973,15 @@ async def _register_operational_state(var, endpoint_id, cluster, config):
             )
     idle = config.get(CONF_IDLE_STATES)
     if idle is None:
-        idle = ["stopped", "docked", "charging"] if cluster.name == RVC_OPERATIONAL_STATE else ["stopped"]
+        idle = (
+            ["stopped", "docked", "charging"]
+            if cluster.name == RVC_OPERATIONAL_STATE
+            else ["stopped"]
+        )
     for state in idle:
-        cg.add(mapping.add_idle_state(states["names"][_find_name(states["names"], state)]))
+        cg.add(
+            mapping.add_idle_state(states["names"][_find_name(states["names"], state)])
+        )
     for key, attr in (
         (CONF_STATE, "state"),
         (CONF_PHASE, "phase"),
@@ -1023,13 +1059,17 @@ def layout_extras(cluster, config: dict) -> dict:
     if commands:
         commands.append("OperationalCommandResponse")
     return {
-        "attrs": ["CountdownTime"] if config.get(CONF_COUNTDOWN_TIME) is not None else [],
+        "attrs": ["CountdownTime"]
+        if config.get(CONF_COUNTDOWN_TIME) is not None
+        else [],
         "cmds": commands,
         "events": ["OperationalError", "OperationCompletion"],
     }
 
 
-def cluster_config_lines(cluster_name: str, config_member: str, config: dict | None) -> list[str]:
+def cluster_config_lines(
+    cluster_name: str, config_member: str, config: dict | None
+) -> list[str]:
     """Initial values the SDK config of a delegate cluster needs.
 
     Mode Select: the description (a fixed size char array) and the first mode as CurrentMode; the SDK does not pick one.
@@ -1038,13 +1078,17 @@ def cluster_config_lines(cluster_name: str, config_member: str, config: dict | N
     if not config:
         return []
     if cluster_name == MODE_SELECT and CONF_DESCRIPTION in config:
-        text = json.dumps(config[CONF_DESCRIPTION], ensure_ascii=False)  # valid C string literal
+        text = json.dumps(
+            config[CONF_DESCRIPTION], ensure_ascii=False
+        )  # valid C string literal
         return [
             f"strncpy({config_member}.description, {text}, sizeof({config_member}.description) - 1);",
             f"{config_member}.current_mode = {config[CONF_MODES][0][CONF_MODE]};",
         ]
     if cluster_name == LAUNDRY_WASHER_CONTROLS and CONF_RINSES in config:
-        return [f"{config_member}.features.rinse.number_of_rinses = {RINSES[config[CONF_RINSES][0]]};"]
+        return [
+            f"{config_member}.features.rinse.number_of_rinses = {RINSES[config[CONF_RINSES][0]]};"
+        ]
     return []
 
 
@@ -1065,12 +1109,18 @@ def _resolve_endpoint_id(endpoint) -> int:
 def _delegate_cluster_key(allowed: tuple[str, ...], default: str | None = None):
     from .data_model.clusters import CLUSTERS_BY_NAME
 
-    keys = {CLUSTERS_BY_NAME[name].conf_key: CLUSTERS_BY_NAME[name] for name in allowed if name in CLUSTERS_BY_NAME}
+    keys = {
+        CLUSTERS_BY_NAME[name].conf_key: CLUSTERS_BY_NAME[name]
+        for name in allowed
+        if name in CLUSTERS_BY_NAME
+    }
 
     def validate(value):
         value = _snake(cv.string_strict(value))
         if value not in keys:
-            raise cv.Invalid(f"Unknown cluster '{value}'. Use one of: {', '.join(keys)}")
+            raise cv.Invalid(
+                f"Unknown cluster '{value}'. Use one of: {', '.join(keys)}"
+            )
         return value
 
     return validate, keys
@@ -1101,7 +1151,9 @@ def _status_code(value):
         return number
     name = _snake(cv.string_strict(value))
     if name not in names:
-        raise cv.Invalid(f"Unknown status '{value}'. Known: {', '.join(names)}, or a number 0x80-0xBF")
+        raise cv.Invalid(
+            f"Unknown status '{value}'. Known: {', '.join(names)}, or a number 0x80-0xBF"
+        )
     return names[name]
 
 
@@ -1149,14 +1201,18 @@ async def matter_mode_reject_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     cg.add(var.set_status(await cg.templatable(config[CONF_STATUS], args, cg.uint8)))
     if CONF_TEXT in config:
-        cg.add(var.set_text(await cg.templatable(config[CONF_TEXT], args, cg.std_string)))
+        cg.add(
+            var.set_text(await cg.templatable(config[CONF_TEXT], args, cg.std_string))
+        )
     return var
 
 
 def _endpoint_cluster_schema():
     return {
         cv.Required(CONF_ENDPOINT): _endpoint_validator,
-        cv.Optional(CONF_CLUSTER, default="operational_state"): _operational_cluster_validator,
+        cv.Optional(
+            CONF_CLUSTER, default="operational_state"
+        ): _operational_cluster_validator,
     }
 
 
@@ -1184,15 +1240,23 @@ async def matter_operational_state_set_to_code(config, action_id, template_arg, 
     cg.add(var.set_endpoint_id(_resolve_endpoint_id(config[CONF_ENDPOINT])))
     cg.add(var.set_cluster_id(cluster.id))
     if CONF_STATE in config:
-        cg.add(var.set_state(await cg.templatable(config[CONF_STATE], args, cg.std_string)))
+        cg.add(
+            var.set_state(await cg.templatable(config[CONF_STATE], args, cg.std_string))
+        )
     if CONF_PHASE in config:
-        cg.add(var.set_phase(await cg.templatable(config[CONF_PHASE], args, cg.std_string)))
+        cg.add(
+            var.set_phase(await cg.templatable(config[CONF_PHASE], args, cg.std_string))
+        )
     return var
 
 
 def _error_schema(error_default=None):
     # The error names depend on the cluster, validated in _resolve_error below.
-    key = cv.Optional(CONF_ERROR, default=error_default) if error_default else cv.Required(CONF_ERROR)
+    key = (
+        cv.Optional(CONF_ERROR, default=error_default)
+        if error_default
+        else cv.Required(CONF_ERROR)
+    )
     return {
         key: cv.templatable(cv.Any(cv.uint8_t, cv.string_strict)),
         cv.Optional(CONF_LABEL): cv.templatable(_utf8_label),
@@ -1203,7 +1267,11 @@ def _error_schema(error_default=None):
 def _resolve_error_names(names: dict[str, int]):
     def resolve(config):
         error = config.get(CONF_ERROR)
-        if error is None or not isinstance(error, (str, int)) or isinstance(error, bool):
+        if (
+            error is None
+            or not isinstance(error, (str, int))
+            or isinstance(error, bool)
+        ):
             return config
         config[CONF_ERROR] = _error_id(names)(error)
         return config
@@ -1235,9 +1303,15 @@ async def matter_operational_state_error_to_code(config, action_id, template_arg
     cg.add(var.set_cluster_id(cluster.id))
     cg.add(var.set_error(await cg.templatable(config[CONF_ERROR], args, cg.uint8)))
     if CONF_LABEL in config:
-        cg.add(var.set_label(await cg.templatable(config[CONF_LABEL], args, cg.std_string)))
+        cg.add(
+            var.set_label(await cg.templatable(config[CONF_LABEL], args, cg.std_string))
+        )
     if CONF_DETAILS in config:
-        cg.add(var.set_details(await cg.templatable(config[CONF_DETAILS], args, cg.std_string)))
+        cg.add(
+            var.set_details(
+                await cg.templatable(config[CONF_DETAILS], args, cg.std_string)
+            )
+        )
     return var
 
 
@@ -1270,16 +1344,24 @@ OPERATIONAL_STATE_COMPLETED_SCHEMA = cv.All(
     OPERATIONAL_STATE_COMPLETED_SCHEMA,
     synchronous=True,
 )
-async def matter_operational_state_completed_to_code(config, action_id, template_arg, args):
+async def matter_operational_state_completed_to_code(
+    config, action_id, template_arg, args
+):
     cluster = _OPERATIONAL_CLUSTER_KEYS[config[CONF_CLUSTER]]
     var = cg.new_Pvariable(action_id, template_arg)
     cg.add(var.set_endpoint_id(_resolve_endpoint_id(config[CONF_ENDPOINT])))
     cg.add(var.set_cluster_id(cluster.id))
-    cg.add(var.set_error(await cg.templatable(config[CONF_COMPLETION_ERROR], args, cg.uint8)))
+    cg.add(
+        var.set_error(
+            await cg.templatable(config[CONF_COMPLETION_ERROR], args, cg.uint8)
+        )
+    )
     if CONF_TOTAL_OPERATIONAL_TIME in config:
         cg.add(
             var.set_total_operational_time(
-                await cg.templatable(config[CONF_TOTAL_OPERATIONAL_TIME], args, cg.uint32)
+                await cg.templatable(
+                    config[CONF_TOTAL_OPERATIONAL_TIME], args, cg.uint32
+                )
             )
         )
     if CONF_PAUSED_TIME in config:
@@ -1313,11 +1395,19 @@ OPERATIONAL_STATE_REJECT_SCHEMA = automation.maybe_conf(
     OPERATIONAL_STATE_REJECT_SCHEMA,
     synchronous=True,
 )
-async def matter_operational_state_reject_to_code(config, action_id, template_arg, args):
+async def matter_operational_state_reject_to_code(
+    config, action_id, template_arg, args
+):
     var = cg.new_Pvariable(action_id, template_arg)
     cg.add(var.set_error(await cg.templatable(config[CONF_ERROR], args, cg.uint8)))
     if CONF_LABEL in config:
-        cg.add(var.set_label(await cg.templatable(config[CONF_LABEL], args, cg.std_string)))
+        cg.add(
+            var.set_label(await cg.templatable(config[CONF_LABEL], args, cg.std_string))
+        )
     if CONF_DETAILS in config:
-        cg.add(var.set_details(await cg.templatable(config[CONF_DETAILS], args, cg.std_string)))
+        cg.add(
+            var.set_details(
+                await cg.templatable(config[CONF_DETAILS], args, cg.std_string)
+            )
+        )
     return var

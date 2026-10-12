@@ -51,9 +51,14 @@ def _literal(text: str) -> str:
 
 def plan_table_code(rows: list[Row]) -> str:
     body = ",\n    ".join(
-        f"{{{n}, {_literal(d)}, {_literal(e)}, {_literal(label)}}}" for n, d, e, label in rows
+        f"{{{n}, {_literal(d)}, {_literal(e)}, {_literal(label)}}}"
+        for n, d, e, label in rows
     )
-    return "static constexpr esphome::matter::PlanRow MATTER_PLAN[] = {\n    " + body + "};"
+    return (
+        "static constexpr esphome::matter::PlanRow MATTER_PLAN[] = {\n    "
+        + body
+        + "};"
+    )
 
 
 def plan_to_code() -> None:

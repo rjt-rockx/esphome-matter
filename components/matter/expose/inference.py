@@ -58,7 +58,9 @@ class Overrides:
             self.meters,
             self.endpoint,
             self.was,
-            json.dumps(self.tags, sort_keys=True, default=str) if self.tags is not None else None,
+            json.dumps(self.tags, sort_keys=True, default=str)
+            if self.tags is not None
+            else None,
             self.parent,
             json.dumps(self.clusters, sort_keys=True, default=str)
             if self.clusters is not None
@@ -245,12 +247,16 @@ def infer(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
     return apply_overrides(lowered, entity, overrides)
 
 
-def apply_overrides(lowered: LoweredEndpoint, entity: Entity, o: Overrides) -> LoweredEndpoint:
+def apply_overrides(
+    lowered: LoweredEndpoint, entity: Entity, o: Overrides
+) -> LoweredEndpoint:
     """`features:`, `options:` on the primary device type block, `label:` on the endpoint."""
     block = lowered.device_types[lowered.primary]
     if o.features:
         # Names are validated by the device type schema when the block is lowered.
-        block[FEATURES_KEY] = list(dict.fromkeys([*block.get(FEATURES_KEY, ()), *o.features]))
+        block[FEATURES_KEY] = list(
+            dict.fromkeys([*block.get(FEATURES_KEY, ()), *o.features])
+        )
     if o.options:
         clash = sorted(set(o.options) & set(block))
         if clash:
@@ -351,7 +357,9 @@ def _sensor(entity: Entity, overrides: Overrides) -> LoweredEndpoint | None:
         or entity.platform in _TEMPERATURE_PLATFORMS
         or (hint is None and entity.unit in _TEMPERATURE_UNITS)
     ):
-        return LoweredEndpoint({"temperature_sensor": bind("temperature_sensor", entity)})
+        return LoweredEndpoint(
+            {"temperature_sensor": bind("temperature_sensor", entity)}
+        )
     if hint in _SINGLE_SENSOR_TYPES:
         name = _SINGLE_SENSOR_TYPES[hint]
         return LoweredEndpoint({name: bind(name, entity)})
@@ -403,7 +411,11 @@ def _hint(entity: Entity) -> str | None:
 MULTI_ATTRIBUTE_TYPES = {
     "electrical_sensor": {"sensor": _ELECTRICAL_ATTRS},
     "air_quality_sensor": {
-        "sensor": {**_AIR_QUALITY_ATTRS, "temperature": "temperature", "humidity": "relative_humidity"}
+        "sensor": {
+            **_AIR_QUALITY_ATTRS,
+            "temperature": "temperature",
+            "humidity": "relative_humidity",
+        }
     },
     "smoke_co_alarm": {
         "binary_sensor": _SMOKE_CO_KEYS,
@@ -425,7 +437,8 @@ def _binary_sensor(entity: Entity, overrides: Overrides) -> LoweredEndpoint | No
     if hint in _SMOKE_CO_KEYS:
         # A smoke and a CO sensor share one Smoke CO Alarm endpoint.
         return LoweredEndpoint(
-            {"smoke_co_alarm": {_SMOKE_CO_KEYS[hint]: entity.id}}, merge_group="smoke_co_alarm"
+            {"smoke_co_alarm": {_SMOKE_CO_KEYS[hint]: entity.id}},
+            merge_group="smoke_co_alarm",
         )
     return None  # no class, or one without a Matter counterpart: never guessed
 
@@ -437,7 +450,11 @@ def _binary_sensor(entity: Entity, overrides: Overrides) -> LoweredEndpoint | No
 def _event(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
     # The events of the entity drive the Switch cluster (event_binding.py). A doorbell class is
     # the Matter Doorbell device type; every other class is a Generic Switch.
-    name = "doorbell" if (entity.device_class or "").lower() == "doorbell" else "generic_switch"
+    name = (
+        "doorbell"
+        if (entity.device_class or "").lower() == "doorbell"
+        else "generic_switch"
+    )
     return LoweredEndpoint({name: bind(name, entity)})
 
 
@@ -519,13 +536,17 @@ def _valve(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
 
 @rule("climate")
 def _climate(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
-    name = "room_air_conditioner" if entity.platform in _AC_CLIMATE_PLATFORMS else "thermostat"
+    name = (
+        "room_air_conditioner"
+        if entity.platform in _AC_CLIMATE_PLATFORMS
+        else "thermostat"
+    )
     return LoweredEndpoint({name: bind(name, entity)})
 
 
 __all__ = [
-    "FEATURES_KEY",
     "CONF_LABEL",
+    "FEATURES_KEY",
     "LoweredEndpoint",
     "NoMapping",
     "Overrides",

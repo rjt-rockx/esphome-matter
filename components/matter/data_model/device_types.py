@@ -8,25 +8,22 @@ from esphome import automation
 from esphome.components import switch
 from esphome.const import CONF_LIGHT_ID, CONF_NAME
 
-from .. import bridge
+from .. import bridge, sensor_extras
 from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import (
-    CONF_MAX_LEVEL,
-    CONF_MIN_LEVEL,
     CONF_SWITCH_ID,
     CONF_WITH_FEATURES,
 )
 from ..fan_binding import (
-    CONF_FAN_ID,
     FAN_CONTROL,
-    device_options as fan_device_options,
-    fan_id_schema,
     validate_fan_features,
 )
-from ..light_binding import light_schema_options, validate_light_binding
+from ..fan_binding import (
+    device_options as fan_device_options,
+)
 from ..generic_switch import apply_switch_defaults, switch_schema_options
+from ..light_binding import light_schema_options, validate_light_binding
 from ..lock_valve import extend_device_type_schema
-from .. import sensor_extras
 from ..matter_climate import climate_schema, validate_climate_features
 from ..power_topology import apply_topology
 from ..power_topology import schema_options as topology_schema_options
@@ -83,7 +80,6 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
 # features, including per-feature config like MultiPressMax, are set through the
 # feature flags.
 FLAG_DRIVEN_CLUSTERS = frozenset({"Switch", "PowerTopology"})
-
 
 
 def _parse_cluster_include(cluster_id: int, data: dict) -> Cluster:
@@ -197,7 +193,9 @@ class DeviceType:
                 return feature.name
         by_key = {feature.name: feature for feature in features}
         by_key.update({feature.conf_key: feature for feature in features})
-        by_key.update({feature.spec_name: feature for feature in features if feature.spec_name})
+        by_key.update(
+            {feature.spec_name: feature for feature in features if feature.spec_name}
+        )
         cv.one_of(*by_key)(value)
         raise cv.Invalid(f"Unknown feature '{value}'")
 
@@ -208,7 +206,8 @@ class DeviceType:
     def has_fan_control_server(self) -> bool:
         """Whether the Fan Control server cluster can be part of this device type."""
         return any(
-            cluster.name == FAN_CONTROL and (cluster.server or not cluster.server_locked)
+            cluster.name == FAN_CONTROL
+            and (cluster.server or not cluster.server_locked)
             for cluster in self.clusters
         )
 
@@ -247,7 +246,9 @@ class DeviceType:
 
     def _has_feature_binding(self, config: dict) -> bool:
         """True if an entity binding in the config selects feature choices later."""
-        keys = {sensor_attribute.conf_key for sensor_attribute in self.sensor_attributes}
+        keys = {
+            sensor_attribute.conf_key for sensor_attribute in self.sensor_attributes
+        }
         keys.update(("cover_id", "climate_id"))
         return any(config.get(key) is not None for key in keys)
 
@@ -344,7 +345,7 @@ class DeviceType:
         if units_schema := measurement_units_schema(self.sensor_attributes):
             schema[cv.Optional(CONF_MEASUREMENT_UNITS)] = units_schema
 
-        if features := self.get_features():
+        if self.get_features():
             schema[cv.Optional(CONF_WITH_FEATURES)] = cv.ensure_list(
                 self._validate_feature_name
             )
@@ -438,7 +439,8 @@ DEVICE_TYPE_OVERRIDES = {
 
 
 def _load_device_types(
-    device_types_file: Path = Path(__file__).resolve().parent / "device_types.json",
+    device_types_file: Path = Path(__file__).resolve().parent  # noqa: B008 - evaluated once at import
+    / "device_types.json",
 ) -> tuple[DeviceType, ...]:
     device_types: list[DeviceType] = []
 

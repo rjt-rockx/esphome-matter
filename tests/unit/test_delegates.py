@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import textwrap
 
-from conftest import COMPONENTS, CONFIGS, DATA_MODEL_DIR, prepare_config, run_esphome
 import pytest
+from conftest import COMPONENTS, CONFIGS, DATA_MODEL_DIR, prepare_config, run_esphome
 
 DATA = json.loads((DATA_MODEL_DIR / "delegate_data.json").read_text())
 
@@ -50,8 +50,8 @@ def test_delegate_data_matches_cluster_table():
     from esphome.core import CORE
 
     CORE.name = "unit"
-    from components.matter.data_model.clusters import CLUSTERS_BY_NAME
     from components.matter import delegates
+    from components.matter.data_model.clusters import CLUSTERS_BY_NAME
 
     for name, entry in DATA["mode_clusters"].items():
         cluster = CLUSTERS_BY_NAME.get(name)
@@ -110,6 +110,7 @@ def test_manufacturer_range_helpers():
 
     CORE.name = "unit"
     import esphome.config_validation as cv
+
     from components.matter import delegates
 
     validate = delegates._tag_validator("LaundryWasherMode")
@@ -323,7 +324,9 @@ def test_mode_select_requires_description(run_config):
     """
     result = run_config(body)
     assert not result.ok and "'description' is a required option" in result.output
-    ok = run_config(body.replace("modes:", "description: Speed\n                  modes:"))
+    ok = run_config(
+        body.replace("modes:", "description: Speed\n                  modes:")
+    )
     assert ok.ok, ok.output[-2000:]
 
 
@@ -363,7 +366,12 @@ def test_delegate_cluster_without_config_warns(run_config):
 
 
 def washer_state(opstate: str, extra: str = SELECTS) -> str:
-    return washer(WASHER_MODES + "operational_state:\n" + textwrap.indent(textwrap.dedent(opstate), "  "), extra)
+    return washer(
+        WASHER_MODES
+        + "operational_state:\n"
+        + textwrap.indent(textwrap.dedent(opstate), "  "),
+        extra,
+    )
 
 
 def test_operational_state_ok(run_config):
@@ -388,12 +396,18 @@ def test_operational_state_ok(run_config):
     ("opstate", "message"),
     [
         ("on_pause:\n  - logger.log: x\n", "on_pause and on_resume go together"),
-        ("on_go_home:\n  - logger.log: x\n", "on_go_home exists only on rvc_operational_state"),
+        (
+            "on_go_home:\n  - logger.log: x\n",
+            "on_go_home exists only on rvc_operational_state",
+        ),
         ("phase: wash_state\n", "phase needs a list of phases"),
         ("phases: [A, a]\n", "Phase names must be unique"),
         ("states: [warp_speed]\n", "Unknown OperationalState state"),
         ("states: [{id: 5, label: x}]\n", "value must be at least 128"),
-        ("state: wash_state\nstate_map: {x: nonsense}\n", "not a state of this cluster"),
+        (
+            "state: wash_state\nstate_map: {x: nonsense}\n",
+            "not a state of this cluster",
+        ),
     ],
 )
 def test_operational_state_errors(run_config, opstate, message):
@@ -407,7 +421,9 @@ def test_operational_state_select_options_checked(run_config):
     result = run_config(washer_state("state: bad_state\n", extra))
     assert not result.ok
     assert "not operational states" in result.output
-    mapped = run_config(washer_state("state: bad_state\nstate_map: {dancing: running}\n", extra))
+    mapped = run_config(
+        washer_state("state: bad_state\nstate_map: {dancing: running}\n", extra)
+    )
     assert mapped.ok, mapped.output[-2500:]
 
 
@@ -430,7 +446,10 @@ def test_rvc_has_no_start_stop(run_config):
 def test_operational_state_without_source_warns(run_config):
     result = run_config(washer_state("phases: [A]\n"))
     assert result.ok
-    assert "operational state will stay Stopped" in result.output or "stay Stopped" in result.output
+    assert (
+        "operational state will stay Stopped" in result.output
+        or "stay Stopped" in result.output
+    )
 
 
 def test_operational_actions(run_config):
@@ -512,7 +531,10 @@ def test_codegen_modes_tags_and_numbers(generated_main):
     assert 'add_mode("Vacuum then mop", 5, "Vacuum then mop");' in code
     assert 'add_mode("Heavy", 10, "Heavy");' in code
     # Mop has the Mop (0x4002) and Quiet (2) tags
-    assert "add_tag(16386, 0, false);\n  matter_mattermodemapping_id_2->add_tag(2, 0, false);" in code
+    assert (
+        "add_tag(16386, 0, false);\n  matter_mattermodemapping_id_2->add_tag(2, 0, false);"
+        in code
+    )
     # Manufacturer specific semantic tag of the Mode Select cluster
     assert "add_tag(1, 65521, true);" in code
     assert "set_select(vacuum_run_mode)" in code
@@ -524,9 +546,9 @@ def test_codegen_operational_state(generated_main):
     code, _ = generated_main
     assert "MatterOperationalStateMapping(1, 97)" in code
     assert "MatterOperationalStateMapping(2, 96)" in code
-    assert "add_state(128, \"Soaking\");" in code  # manufacturer specific state
-    assert "add_state_name(\"Washing\", 1);" in code  # state_map alias
-    assert "add_phase(\"Pre-wash\");" in code
+    assert 'add_state(128, "Soaking");' in code  # manufacturer specific state
+    assert 'add_state_name("Washing", 1);' in code  # state_map alias
+    assert 'add_phase("Pre-wash");' in code
     assert "set_state_select(washer_state)" in code
     assert "set_phase_text_sensor(vacuum_phase)" in code
     assert "set_countdown_sensor(washer_remaining)" in code
@@ -536,7 +558,9 @@ def test_codegen_operational_state(generated_main):
     # actions
     assert "MatterOperationalStateRejectAction" in code
     assert "MatterModeRejectAction<uint8_t>" in code
-    assert "set_status([](uint8_t mode) -> uint8_t {\n      return 67;" in code  # dust_bin_full
+    assert (
+        "set_status([](uint8_t mode) -> uint8_t {\n      return 67;" in code
+    )  # dust_bin_full
     # the blocking mode is opt-in per cluster, with its timeout in ms
     assert "mattermodemapping_id->set_decision(true, 250);" in code
     assert "mattermodemapping_id_2->set_decision(false, 250);" in code
@@ -565,7 +589,9 @@ select:
 
 def controls(body: str) -> str:
     return washer(
-        WASHER_MODES + "laundry_washer_controls:\n" + textwrap.indent(textwrap.dedent(body), "  "),
+        WASHER_MODES
+        + "laundry_washer_controls:\n"
+        + textwrap.indent(textwrap.dedent(body), "  "),
         CONTROLS_SELECTS,
     )
 
@@ -617,15 +643,22 @@ def test_codegen_laundry_controls(generated_main):
     assert "set_rinses_select(washer_rinses)" in code
     # NumberOfRinses must start with a supported value; both features are enabled by the lists
     assert "laundry_washer_controls_config.features.rinse.number_of_rinses = 0;" in code
-    assert "feature::spin::get_id() | esp_matter::cluster::laundry_washer_controls::feature::rinse::get_id()" in code
+    assert (
+        "feature::spin::get_id() | esp_matter::cluster::laundry_washer_controls::feature::rinse::get_id()"
+        in code
+    )
     assert "esphome::matter::attach_delegate(endpoint, 0x0053)" in code
 
 
 @pytest.mark.slow
 def test_codegen_dishwasher_and_fridge_modes(generated_main):
     code, _ = generated_main
-    assert "esphome::matter::attach_delegate(endpoint, 0x0059)" in code  # Dishwasher Mode
-    assert "esphome::matter::attach_delegate(endpoint, 0x0052)" in code  # Refrigerator mode
+    assert (
+        "esphome::matter::attach_delegate(endpoint, 0x0059)" in code
+    )  # Dishwasher Mode
+    assert (
+        "esphome::matter::attach_delegate(endpoint, 0x0052)" in code
+    )  # Refrigerator mode
     assert "esp_matter::cluster::dish_washer_mode::create(" in code
     assert "esp_matter::cluster::refrigerator_and_tcc_mode::create(" in code
 
@@ -641,11 +674,17 @@ def test_conformance_checker_clean(tmp_path):
     import sys
 
     result = subprocess.run(
-        [sys.executable, "-m", "tools.conformance", str(CONFIGS / "esp32-delegates.yaml")],
+        [
+            sys.executable,
+            "-m",
+            "tools.conformance",
+            str(CONFIGS / "esp32-delegates.yaml"),
+        ],
         capture_output=True,
         text=True,
         cwd=COMPONENTS.parent,
         timeout=600,
+        check=False,
     )
     assert "0 error(s)" in result.stdout, result.stdout[-3000:] + result.stderr[-1000:]
 
@@ -685,7 +724,9 @@ def test_conformance_checker_flags_missing_delegate():
     messages = [f.message for f in without.findings if f.code.startswith("CL-")]
     assert any("ChangeToMode" in m for m in messages), messages
     with_delegate = check_node(from_layout(layout(True), spec), spec)
-    assert not [f for f in with_delegate.findings if f.code.startswith("CL-")], with_delegate.findings
+    assert not [f for f in with_delegate.findings if f.code.startswith("CL-")], (
+        with_delegate.findings
+    )
 
 
 # --------------------------------------------------------------------------
@@ -703,8 +744,17 @@ def test_reject_needs_decide_in_automation(run_config):
         - {label: Delicate, tags: [delicate]}
     """
     result = run_config(washer(clusters))
-    assert not result.ok and "only works with `decide_in_automation: true`" in result.output
-    assert run_config(washer(clusters.replace("      modes:", "      decide_in_automation: true\n      modes:", 1))).ok
+    assert (
+        not result.ok
+        and "only works with `decide_in_automation: true`" in result.output
+    )
+    assert run_config(
+        washer(
+            clusters.replace(
+                "      modes:", "      decide_in_automation: true\n      modes:", 1
+            )
+        )
+    ).ok
 
 
 def test_reject_in_operational_state_needs_decide(run_config):
@@ -713,7 +763,10 @@ def test_reject_in_operational_state_needs_decide(run_config):
             "state: wash_state\non_start:\n  - matter.operational_state.reject: unable_to_start_or_resume\n"
         )
     )
-    assert not result.ok and "only works with `decide_in_automation: true`" in result.output
+    assert (
+        not result.ok
+        and "only works with `decide_in_automation: true`" in result.output
+    )
 
 
 def test_accept_when_idle_needs_operational_state(run_config):
@@ -725,7 +778,9 @@ def test_accept_when_idle_needs_operational_state(run_config):
         - {label: Delicate, tags: [delicate]}
     """
     result = run_config(washer(clusters))
-    assert not result.ok and "operational_state or rvc_operational_state" in result.output
+    assert (
+        not result.ok and "operational_state or rvc_operational_state" in result.output
+    )
     with_state = textwrap.dedent(clusters) + "operational_state:\n  state: wash_state\n"
     assert run_config(washer(with_state)).ok
 
@@ -747,7 +802,10 @@ def test_decide_timeout_is_configurable(run_config):
 @pytest.mark.parametrize(
     ("opstate", "message"),
     [
-        ("allowed_states: {go_home: [stopped]}\n", "go_home exists only on rvc_operational_state"),
+        (
+            "allowed_states: {go_home: [stopped]}\n",
+            "go_home exists only on rvc_operational_state",
+        ),
         ("allowed_states: {start: [warp]}\n", "'warp' is not a state of this cluster"),
         ("idle_states: [warp]\n", "idle_states: 'warp'"),
     ],
@@ -787,7 +845,9 @@ def test_mode_select_accepts_one_mode_and_byte_limited_description(run_config):
 
 def test_mode_cluster_still_needs_two_modes(run_config):
     result = run_config(
-        washer("laundry_washer_mode:\n  modes:\n    - {label: Normal, tags: [normal]}\n")
+        washer(
+            "laundry_washer_mode:\n  modes:\n    - {label: Normal, tags: [normal]}\n"
+        )
     )
     assert not result.ok and "at least 2" in result.output
 
@@ -796,6 +856,7 @@ def test_utf8_prefix_length_is_in_the_header():
     """The C++ helper that truncates StatusText / labels on a character boundary."""
     text = (COMPONENTS / "matter" / "matter_delegates.h").read_text()
     assert "utf8_prefix_length" in text and "& 0xC0) == 0x80" in text
+
     # the same algorithm in Python, to document the expected results
     def prefix(value: bytes, limit: int) -> int:
         if len(value) <= limit:
@@ -837,14 +898,22 @@ def test_layout_extras_match_attach_code():
         delegates.CONF_COUNTDOWN_TIME: "sensor_id",
     }
     extras = delegates.layout_extras(CLUSTERS_BY_NAME["OperationalState"], config)
-    assert set(extras["cmds"]) == {"Pause", "Resume", "Start", "Stop", "OperationalCommandResponse"}
+    assert set(extras["cmds"]) == {
+        "Pause",
+        "Resume",
+        "Start",
+        "Stop",
+        "OperationalCommandResponse",
+    }
     assert extras["attrs"] == ["CountdownTime"]
     for name in extras["cmds"]:
         assert f"create_{snake_case(name)}(cluster)" in ops, name
     for name in extras["events"]:
         assert f"create_{snake_case(name)}(cluster)" in ops, name
     assert "create_countdown_time(" in ops
-    rvc = delegates.layout_extras(CLUSTERS_BY_NAME["RVCOperationalState"], {delegates.CONF_ON_GO_HOME: [1]})
+    rvc = delegates.layout_extras(
+        CLUSTERS_BY_NAME["RVCOperationalState"], {delegates.CONF_ON_GO_HOME: [1]}
+    )
     assert rvc["cmds"] == ["GoHome", "OperationalCommandResponse"]
     assert "GoHome::Id" in ops
 

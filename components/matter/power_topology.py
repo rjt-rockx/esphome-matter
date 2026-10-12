@@ -93,7 +93,11 @@ def apply_topology(config: dict) -> dict:
         raise cv.Invalid(
             "Power Topology features are no longer selected with with_features. Use the "
             f"'{CONF_TOPOLOGY}' option instead"
-            + (f" ({hints})" if hints else " ('topology: set' plus 'active_endpoints' enables DynamicPowerFlow)"),
+            + (
+                f" ({hints})"
+                if hints
+                else " ('topology: set' plus 'active_endpoints' enables DynamicPowerFlow)"
+            ),
             path=[CONF_WITH_FEATURES],
         )
     if topology == "set":
@@ -125,9 +129,7 @@ def apply_topology(config: dict) -> dict:
     else:
         for key in (CONF_AVAILABLE_ENDPOINTS, CONF_ACTIVE_ENDPOINTS):
             if key in config:
-                raise cv.Invalid(
-                    f"'{key}' requires '{CONF_TOPOLOGY}: set'", path=[key]
-                )
+                raise cv.Invalid(f"'{key}' requires '{CONF_TOPOLOGY}: set'", path=[key])
     config = dict(config)
     config[CONF_WITH_FEATURES] = [
         *config.get(CONF_WITH_FEATURES, ()),
@@ -157,8 +159,10 @@ def delegate_lines(config_var: str, member: str, device_config: dict) -> list[st
     available = device_config[CONF_AVAILABLE_ENDPOINTS]
     active = device_config.get(CONF_ACTIVE_ENDPOINTS, available)
     return [
-        f"{config_var}.{member}.delegate = esphome::matter::power_topology_delegate("
-        f"{{{', '.join(map(str, available))}}}, {{{', '.join(map(str, active))}}});"
+        (
+            f"{config_var}.{member}.delegate = esphome::matter::power_topology_delegate("
+            f"{{{', '.join(map(str, available))}}}, {{{', '.join(map(str, active))}}});"
+        )
     ]
 
 

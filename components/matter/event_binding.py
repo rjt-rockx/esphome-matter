@@ -72,7 +72,8 @@ DEFAULT_EVENT_NAMES: dict[str, int | str] = {
 def _gesture(value):
     if isinstance(value, bool):
         raise cv.Invalid(
-            "expected a number of presses (1-255) or one of " + ", ".join(NAMED_GESTURES)
+            "expected a number of presses (1-255) or one of "
+            + ", ".join(NAMED_GESTURES)
         )
     if isinstance(value, int) or (isinstance(value, str) and value.strip().isdigit()):
         return cv.int_range(min=1, max=255)(int(value))
@@ -189,7 +190,9 @@ def gesture_args(event_map: dict[str, int | str]) -> list[tuple[str, str, int, b
     return out
 
 
-def validate_event_bindings(matter_config: dict, full_config, device_types_by_key: dict) -> None:
+def validate_event_bindings(
+    matter_config: dict, full_config, device_types_by_key: dict
+) -> None:
     """FINAL_VALIDATE: resolve and check the event maps and keep them for the code generation."""
     from .generic_switch import CONF_MULTI_PRESS_MAX, DEFAULT_MULTI_PRESS_MAX
 
@@ -210,10 +213,14 @@ def validate_event_bindings(matter_config: dict, full_config, device_types_by_ke
                     device_config.get(CONF_MULTI_PRESS_MAX, DEFAULT_MULTI_PRESS_MAX),
                 )
             elif CONF_EVENT_MAP in device_config:
-                raise cv.Invalid(f"{where}: event_map requires event_id", path=[CONF_EVENT_MAP])
+                raise cv.Invalid(
+                    f"{where}: event_map requires event_id", path=[CONF_EVENT_MAP]
+                )
 
 
-async def register_event_binding(var, endpoint_id: int, conf_key: str, device_config: dict, make):
+async def register_event_binding(
+    var, endpoint_id: int, conf_key: str, device_config: dict, make
+):
     """Create the event -> Switch events mapping of an endpoint (`make(event)` builds the object)."""
     event = await cg.get_variable(device_config[CONF_EVENT_ID])
     event_map = CORE.data[CONF_MATTER][KEY_EVENT_MAPS][endpoint_id][conf_key]

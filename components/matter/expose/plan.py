@@ -123,7 +123,10 @@ def format_plan(
     for number in sorted(pinned_by_hand or ()):
         rows.append((str(number), "", "(endpoints:)", "", "", "pin"))
     widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
-    lines = ["  ".join(c.ljust(w) for c, w in zip(r, widths, strict=True)).rstrip() for r in rows]
+    lines = [
+        "  ".join(c.ljust(w) for c, w in zip(r, widths, strict=True)).rstrip()
+        for r in rows
+    ]
     lines.extend(f"skipped {name}: {reason}" for name, reason in skipped)
     if plan is not None:
         lines.extend(f"ecosystem: {text}" for text in ecosystem_warnings(plan))

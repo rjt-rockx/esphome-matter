@@ -5,24 +5,35 @@ from dataclasses import dataclass, field
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import light
 from esphome.components.binary_sensor import BinarySensor
 from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.config import Config
-from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGER_ID
+from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_TRIGGER_ID
 from esphome.core import CORE, ID, HexInt
 from esphome.types import ConfigType
 
-from . import binary_sensors, bridge, cluster_options
-from . import conformance
-from . import sensor_extras
-from . import delegates
+from . import (
+    binary_sensors,
+    bridge,
+    closure,
+    cluster_options,
+    conformance,
+    delegates,
+    fan_binding,
+    filter_monitoring,
+    layout_dump,
+    light_binding,
+    power_source,
+    power_topology,
+    sensor_extras,
+)
+from . import matter_climate as climate_binding
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
-from . import closure
 from .covers import WINDOW_COVERING
 from .covers import config_init as cover_config_init
 from .covers import config_lines as cover_config_lines
+from .data_model import espmatter_names
 from .data_model.attributes import Attribute, SensorAttribute, attribute_value_type
 from .data_model.clusters import (
     CLUSTERS,
@@ -43,20 +54,24 @@ from .data_model.device_types import (
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
-from . import fan_binding, filter_monitoring, layout_dump
-from . import matter_climate as climate_binding
+from .data_model.events import Event
+from .data_model.units import MEASUREMENT_UNITS
+from .generic_switch import multi_press_max_line, register_switch_binding
+from .icd import ICD_MANAGEMENT_SDKCONFIG
+from .lock_valve import device_config_lines, register_entity
 from .matter_climate import (
     CLIMATE_INCLUDE,
     CONF_CLIMATE_ID,
+)
+from .matter_climate import (
     config_lines as climate_config_lines,
+)
+from .matter_climate import (
     post_create_lines as climate_post_create_lines,
+)
+from .matter_climate import (
     prefer_cooling as climate_prefer_cooling,
 )
-from .icd import ICD_MANAGEMENT_SDKCONFIG
-from .lock_valve import device_config_lines, register_entity
-from .generic_switch import multi_press_max_line, register_switch_binding
-from .data_model.units import MEASUREMENT_UNITS
-from . import power_source, power_topology
 from .sensor_mapping import (
     CONF_MEASUREMENT_UNITS,
     configure_electrical_sensor,
@@ -67,9 +82,6 @@ from .sensor_mapping import (
     sensor_unit_info,
     validate_battery_binding,
 )
-from .data_model import espmatter_names
-from .data_model.events import Event
-from . import light_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import iter_matter_actions, maybe_empty, restore_warning, snake_case
 
@@ -325,11 +337,7 @@ class Endpoint:
         return cluster_present, enabled_codes, disallowed_codes
 
     def _device_type_names(self) -> list[str]:
-        return [
-            key
-            for key in self._config
-            if key in DEVICE_TYPES_BY_CONF_KEY
-        ]
+        return [key for key in self._config if key in DEVICE_TYPES_BY_CONF_KEY]
 
     def resolve(self) -> None:
         self._validate_light_options()
@@ -372,9 +380,7 @@ class Endpoint:
                     reason = f"required by: {usage_names}"
                 else:
                     features = ", ".join(
-                        f.conf_key
-                        for f in cluster.features
-                        if f.code in enabled_codes
+                        f.conf_key for f in cluster.features if f.code in enabled_codes
                     )
                     reason = f"needed by the selected with_features: {features}"
                 raise cv.Invalid(
@@ -544,7 +550,9 @@ class Endpoint:
         self._fan_binding = binding
         self._fan_variable = await cg.get_variable(binding.entity_id)
         if binding.kind == "fan":
-            self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_fan.h"'
+            )
             args = [self._fan_variable, self._endpoint_id]
             if binding.wind:
                 args += [
@@ -627,7 +635,9 @@ class Endpoint:
         )
         if bridged_node := self._config.get(bridge.DEVICE_TYPE_BRIDGED_NODE):
             # The BDBI attributes a controller reads (NodeLabel, VendorName, ...) are part of the structure.
-            device_types += "|b" + ",".join(sorted(bridge.attribute_names(bridged_node)))
+            device_types += "|b" + ",".join(
+                sorted(bridge.attribute_names(bridged_node))
+            )
         cluster_text = ",".join(
             f"{cid}[{'+'.join(sorted(features))}]"
             for cid, features in sorted(clusters.items())
@@ -731,11 +741,11 @@ class Endpoint:
         if CONF_SWITCH_ID in device_config:
             switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
             cg.add(var.register_switch(switch_, self._endpoint_id))
-        await register_entity(
+        await register_entity(var, self._endpoint_id, device_type.name, device_config)
+
+        await closure.register_entity(
             var, self._endpoint_id, device_type.name, device_config
         )
-
-        await closure.register_entity(var, self._endpoint_id, device_type.name, device_config)
         if CONF_COVER_ID in device_config and device_type.name == WINDOW_COVERING:
             cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
             cg.add(var.register_cover(cover_, self._endpoint_id))
@@ -830,10 +840,14 @@ class Endpoint:
                 lines.extend(
                     (
                         f"auto {traits_var} = {light}->get_traits();",
-                        f"{config_var}.color_control_color_temperature.color_temp_physical_min_mireds = "
-                        f"{traits_var}.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_min_mireds()) : {light_binding.DEFAULT_MIN_MIREDS};",
-                        f"{config_var}.color_control_color_temperature.color_temp_physical_max_mireds = "
-                        f"{traits_var}.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds()) : {light_binding.DEFAULT_MAX_MIREDS};",
+                        (
+                            f"{config_var}.color_control_color_temperature.color_temp_physical_min_mireds = "
+                            f"{traits_var}.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_min_mireds()) : {light_binding.DEFAULT_MIN_MIREDS};"
+                        ),
+                        (
+                            f"{config_var}.color_control_color_temperature.color_temp_physical_max_mireds = "
+                            f"{traits_var}.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds()) : {light_binding.DEFAULT_MAX_MIREDS};"
+                        ),
                     )
                 )
 
@@ -1162,7 +1176,9 @@ class Endpoint:
         ):
             # The config has no feature_flags: the features are added to the
             # created cluster (in bit order, enhanced features need the base one).
-            lines.extend(self._standalone_cluster_config_lines(cluster, config_var, features))
+            lines.extend(
+                self._standalone_cluster_config_lines(cluster, config_var, features)
+            )
             lines.extend(
                 (
                     f"auto *{cluster_var} = {cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER);",
@@ -1200,7 +1216,7 @@ class Endpoint:
 
     def _expand_feature_dependencies(self) -> None:
         """Enable the features that enabled features need (all configuration paths)."""
-        for cluster_name, cluster_config in self._cluster_configs.items():
+        for cluster_config in self._cluster_configs.values():
             enabled = cluster_config.enabled_features
             changed = True
             while changed:
@@ -1228,15 +1244,17 @@ class Endpoint:
             )
         lines.extend(
             (
-                "if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, "
-                "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
+                (
+                    "if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, "
+                    "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)"
+                ),
                 "  return false;",
             )
         )
         return lines
 
     def _make_build_callback(self) -> str:
-        """ """
+        """Build the endpoint build-callback C++ lambda."""
         self._expand_feature_dependencies()
         lines = ["[](esp_matter::endpoint_t *endpoint) -> bool {"]
 
@@ -1279,9 +1297,7 @@ class Endpoint:
                 key=lambda feature: feature.bit,
             )
             # Features of a bound fan or climate come from its traits instead.
-            bound_fan = (
-                self._fan_binding if cluster.name == "FanControl" else None
-            )
+            bound_fan = self._fan_binding if cluster.name == "FanControl" else None
             if bound_fan is not None:
                 # Wind and Step are added together with the binding.
                 direct_features = [
@@ -1301,7 +1317,9 @@ class Endpoint:
             )
             if bound_fan is not None:
                 lines.extend(
-                    fan_binding.feature_lines(cluster_var, bound_fan, self._fan_variable)
+                    fan_binding.feature_lines(
+                        cluster_var, bound_fan, self._fan_variable
+                    )
                 )
             for feature in direct_features:
                 lines.extend(
@@ -1438,7 +1456,9 @@ async def register_endpoints(var, config: ConfigType):
         # FixedLabel needs a DeviceInfoProvider; matter_conformance.cpp installs one.
         add_idf_sdkconfig_option("CONFIG_CUSTOM_DEVICE_INFO_PROVIDER", True)
 
-    layout_dump.dump_layout(CORE.data[CONF_MATTER][CONF_ENDPOINTS])  # opt-in: MATTER_LAYOUT_JSON
+    layout_dump.dump_layout(
+        CORE.data[CONF_MATTER][CONF_ENDPOINTS]
+    )  # opt-in: MATTER_LAYOUT_JSON
 
     # Set sdkconfig options to compile the correct clusters.
     for cluster in CLUSTERS:

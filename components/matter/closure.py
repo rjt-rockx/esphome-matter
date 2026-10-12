@@ -22,7 +22,15 @@ CLOSURE = "closure"
 BOUND_FEATURES = ("Positioning",)
 
 # device_class values that are window coverings and must not be bound to a closure.
-WINDOW_COVERING_CLASSES = ("blind", "shade", "curtain", "awning", "shutter", "window", "damper")
+WINDOW_COVERING_CLASSES = (
+    "blind",
+    "shade",
+    "curtain",
+    "awning",
+    "shutter",
+    "window",
+    "damper",
+)
 
 
 def schema_options() -> dict:
@@ -34,7 +42,9 @@ def schema_options() -> dict:
 def validate_closure_features(config: dict) -> dict:
     """Only the Positioning feature is supported by the cover binding; it is always enabled."""
     unsupported = [
-        name for name in config.get(CONF_WITH_FEATURES, ()) if name not in BOUND_FEATURES
+        name
+        for name in config.get(CONF_WITH_FEATURES, ())
+        if name not in BOUND_FEATURES
     ]
     if unsupported:
         raise cv.Invalid(
@@ -78,7 +88,10 @@ def validate_unique_cover_bindings(matter_config: dict) -> None:
     for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
         for key in (WINDOW_COVERING, CLOSURE):
             device_config = endpoint_config.get(key)
-            if not isinstance(device_config, dict) or CONF_COVER_ID not in device_config:
+            if (
+                not isinstance(device_config, dict)
+                or CONF_COVER_ID not in device_config
+            ):
                 continue
             cover_id = str(device_config[CONF_COVER_ID])
             place = f"endpoint {endpoint_id} ({key})"
@@ -106,7 +119,9 @@ def device_config_lines(
 ) -> list[str]:
     if device_type_name == CLOSURE:
         return [
-            f"{config_var}.closure_control.delegate = "
-            f"esphome::matter::get_closure_delegate({endpoint_id});"
+            (
+                f"{config_var}.closure_control.delegate = "
+                f"esphome::matter::get_closure_delegate({endpoint_id});"
+            )
         ]
     return []

@@ -25,7 +25,9 @@ def test_commission(device, matter):
     node_id = matter.commission()
     assert node_id >= 1
     print(f"commissioned as node {node_id} in {matter.commission_seconds:.0f} s")
-    assert device.wait_log(r"Commissioning complete", timeout=10), "device did not log 'Commissioning complete'"
+    assert device.wait_log(r"Commissioning complete", timeout=10), (
+        "device did not log 'Commissioning complete'"
+    )
 
 
 def test_light_toggle_and_read(device, matter):

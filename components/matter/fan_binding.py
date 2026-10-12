@@ -23,7 +23,6 @@ from esphome.config import Config
 from esphome.const import CONF_RESTORE_MODE
 
 from .const import CONF_CLUSTERS, CONF_ENDPOINTS, CONF_WITH_FEATURES
-from .util import restore_warning
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -154,7 +153,9 @@ def normalize_endpoint(config: dict, device_types_by_key: dict) -> dict:
         holders.append(cluster_conf)
         for key in (CONF_FAN_ID, CONF_CLIMATE_ID):
             if key in cluster_conf:
-                bindings.append(("clusters: fan_control", key, cluster_conf[key], cluster_conf))
+                bindings.append(
+                    ("clusters: fan_control", key, cluster_conf[key], cluster_conf)
+                )
     optional_cluster_needed = False
     for conf_key, device_config in config.items():
         device_type = device_types_by_key.get(conf_key)
@@ -164,9 +165,12 @@ def normalize_endpoint(config: dict, device_types_by_key: dict) -> dict:
             continue
         holders.append(device_config)
         if CONF_FAN_ID in device_config:
-            bindings.append((conf_key, CONF_FAN_ID, device_config[CONF_FAN_ID], device_config))
+            bindings.append(
+                (conf_key, CONF_FAN_ID, device_config[CONF_FAN_ID], device_config)
+            )
             if not any(
-                c.name == FAN_CONTROL and c.required for c in device_type.server_clusters
+                c.name == FAN_CONTROL and c.required
+                for c in device_type.server_clusters
             ):
                 optional_cluster_needed = True
     for holder in holders:
@@ -248,17 +252,23 @@ def find_binding(config: dict, device_types_by_key: dict) -> FanBinding | None:
     return None
 
 
-def config_lines(config_var: str, binding: FanBinding, var, enabled_features: dict[str, bool]):
+def config_lines(
+    config_var: str, binding: FanBinding, var, enabled_features: dict[str, bool]
+):
     """Lines for the Fan Control member of a device type config in the build callback."""
     if binding.kind == "climate":
         return [
-            f"{config_var}.fan_control.fan_mode_sequence = "
-            f"esphome::matter::climate_fan_mode_sequence({var});"
+            (
+                f"{config_var}.fan_control.fan_mode_sequence = "
+                f"esphome::matter::climate_fan_mode_sequence({var});"
+            )
         ]
     with_auto = "true" if enabled_features.get("Auto") else "false"
     return [
-        f"{config_var}.fan_control.fan_mode_sequence = "
-        f"esphome::matter::fan_mode_sequence({var}->get_traits(), {with_auto});"
+        (
+            f"{config_var}.fan_control.fan_mode_sequence = "
+            f"esphome::matter::fan_mode_sequence({var}->get_traits(), {with_auto});"
+        )
     ]
 
 
@@ -268,7 +278,9 @@ def cluster_config_lines(binding: FanBinding, var, enabled_features: dict[str, b
         sequence = f"esphome::matter::climate_fan_mode_sequence({var})"
     else:
         with_auto = "true" if enabled_features.get("Auto") else "false"
-        sequence = f"esphome::matter::fan_mode_sequence({var}->get_traits(), {with_auto})"
+        sequence = (
+            f"esphome::matter::fan_mode_sequence({var}->get_traits(), {with_auto})"
+        )
     return [f"fan_control_config.fan_mode_sequence = {sequence};"]
 
 
@@ -283,8 +295,10 @@ def feature_lines(cluster_var: str, binding: FanBinding, var):
     """Lines that add the bound features to the created Fan Control cluster."""
     if binding.kind == "climate":
         return [
-            f"if (esphome::matter::add_climate_fan_features({cluster_var}, {var}, "
-            f"{str(binding.step).lower()}) != ESP_OK)",
+            (
+                f"if (esphome::matter::add_climate_fan_features({cluster_var}, {var}, "
+                f"{str(binding.step).lower()}) != ESP_OK)"
+            ),
             "  return false;",
         ]
     options = ""
@@ -347,7 +361,11 @@ def final_validate(matter_config: dict, full_config: Config, device_types_by_key
             raise cv.Invalid(
                 f"{prefix}: the Step feature needs a fan with speed control, fan "
                 f"'{fan_id}' ({fan_config.get('platform')}) has none"
-                + (" (set speed_count)" if fan_config.get("platform") == "template" else "")
+                + (
+                    " (set speed_count)"
+                    if fan_config.get("platform") == "template"
+                    else ""
+                )
             )
         if binding.wind:
             presets = {}

@@ -20,10 +20,10 @@ See docs/dev/runtime-tests.md. Environment variables:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shlex
 import shutil
@@ -33,7 +33,9 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -46,12 +48,18 @@ MATTER_PORT = int(os.environ.get("MATTER_PORT", "5540"))
 API_PORT = int(os.environ.get("API_PORT", "6053"))
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
-ARTIFACTS = Path(os.environ.get("RUNTIME_ARTIFACTS", REPO / "test-artifacts" / "runtime"))
+ARTIFACTS = Path(
+    os.environ.get("RUNTIME_ARTIFACTS", REPO / "test-artifacts" / "runtime")
+)
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "smoke: boot, commission, toggle a light (every PR)")
-    config.addinivalue_line("markers", "golden: golden behavioural tests (nightly / label `runtime`)")
+    config.addinivalue_line(
+        "markers", "smoke: boot, commission, toggle a light (every PR)"
+    )
+    config.addinivalue_line(
+        "markers", "golden: golden behavioural tests (nightly / label `runtime`)"
+    )
 
 
 def pytest_collection_modifyitems(items):
@@ -85,7 +93,11 @@ def ensure_image(yaml: Path) -> Path:
     prebuilt = os.environ.get("RUNTIME_IMAGE")
     if prebuilt:
         return Path(prebuilt)
-    cache = Path(os.environ.get("RUNTIME_CACHE", Path.home() / ".cache" / "esphome-matter-runtime"))
+    cache = Path(
+        os.environ.get(
+            "RUNTIME_CACHE", Path.home() / ".cache" / "esphome-matter-runtime"
+        )
+    )
     key = content_hash(yaml)
     cached = cache / f"{yaml.stem}-{key}" / "flash.bin"
     if cached.exists():
@@ -96,10 +108,19 @@ def ensure_image(yaml: Path) -> Path:
     env.update(BUILD_DIR=build_dir, WORK_NAME=work_name)
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     with open(ARTIFACTS / "build.log", "w") as log:
-        r = subprocess.run([str(RUN_SH), "build", str(yaml)], env=env, stdout=log, stderr=subprocess.STDOUT)
+        r = subprocess.run(
+            [str(RUN_SH), "build", str(yaml)],
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     if r.returncode != 0:
         tail = (ARTIFACTS / "build.log").read_text(errors="replace")[-3000:]
-        pytest.fail(f"run.sh build failed ({r.returncode}); tail of build.log:\n{tail}", pytrace=False)
+        pytest.fail(
+            f"run.sh build failed ({r.returncode}); tail of build.log:\n{tail}",
+            pytrace=False,
+        )
     cached.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(Path(build_dir) / work_name / "flash.bin", cached)
     return cached
@@ -112,7 +133,9 @@ class QemuDevice:
         self.yaml = yaml
         self.image = image
         self.run_dir = Path(tempfile.mkdtemp(prefix="qemu-run-"))
-        self.run_image = self.run_dir / "flash.run.bin"  # QEMU writes NVS into this copy
+        self.run_image = (
+            self.run_dir / "flash.run.bin"
+        )  # QEMU writes NVS into this copy
         shutil.copy(image, self.run_image)
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         self.log_path = ARTIFACTS / "uart.log"
@@ -123,23 +146,37 @@ class QemuDevice:
         timeout = timeout or float(os.environ.get("BOOT_TIMEOUT", "300"))
         env = _env()
         env["FLASH_IMAGE"] = str(self.run_image)
-        out = subprocess.run([str(RUN_SH), "cmd", str(self.yaml)], env=env, capture_output=True, text=True)
+        out = subprocess.run(
+            [str(RUN_SH), "cmd", str(self.yaml)],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         if out.returncode != 0:
             pytest.fail(f"run.sh cmd failed: {out.stderr}", pytrace=False)
         # Only the last line is the command; run.sh may print progress before it.
         lines = [line for line in out.stdout.splitlines() if line.strip()]
         cmd = shlex.split(lines[-1]) if lines else []
-        self._log = open(self.log_path, "wb")
+        self._log = open(self.log_path, "wb")  # noqa: SIM115 - closed in stop()
         t0 = time.monotonic()
-        self.proc = subprocess.Popen(cmd, stdout=self._log, stderr=subprocess.STDOUT, start_new_session=True)
+        self.proc = subprocess.Popen(
+            cmd, stdout=self._log, stderr=subprocess.STDOUT, start_new_session=True
+        )
         while time.monotonic() - t0 < timeout:
             if "Server ready!" in self.log_text():
                 self.boot_seconds = time.monotonic() - t0
                 return
             if self.proc.poll() is not None:
-                pytest.fail(f"QEMU exited with {self.proc.returncode} before 'Server ready!':\n{self.log_text()[-3000:]}", pytrace=False)
+                pytest.fail(
+                    f"QEMU exited with {self.proc.returncode} before 'Server ready!':\n{self.log_text()[-3000:]}",
+                    pytrace=False,
+                )
             time.sleep(1)
-        pytest.fail(f"'Server ready!' not seen within {timeout:.0f} s:\n{self.log_text()[-3000:]}", pytrace=False)
+        pytest.fail(
+            f"'Server ready!' not seen within {timeout:.0f} s:\n{self.log_text()[-3000:]}",
+            pytrace=False,
+        )
 
     def stop(self) -> None:
         if self.proc and self.proc.poll() is None:
@@ -201,7 +238,15 @@ class Matter:
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
     def _cli(self, *args: str) -> list[str]:
-        return ["node", str(HARNESS_CLI), *args, "--state", str(self.state_dir), "--operational-ip", "127.0.0.1"]
+        return [
+            "node",
+            str(HARNESS_CLI),
+            *args,
+            "--state",
+            str(self.state_dir),
+            "--operational-ip",
+            "127.0.0.1",
+        ]
 
     # -- lifecycle ---------------------------------------------------------------------------------------------
     def commission(self, timeout: float = 300) -> int:
@@ -210,14 +255,27 @@ class Matter:
         t0 = time.monotonic()
         with open(ARTIFACTS / "harness-commission.log", "wb") as err:
             r = subprocess.run(
-                self._cli("commission", "--code", MANUAL_CODE, "--ip", "127.0.0.1", "--port", str(MATTER_PORT), "--timeout", str(int(timeout))),
+                self._cli(
+                    "commission",
+                    "--code",
+                    MANUAL_CODE,
+                    "--ip",
+                    "127.0.0.1",
+                    "--port",
+                    str(MATTER_PORT),
+                    "--timeout",
+                    str(int(timeout)),
+                ),
                 stdout=subprocess.PIPE,
                 stderr=err,
                 text=True,
                 timeout=timeout + 60,
+                check=False,
             )
         if r.returncode != 0:
-            tail = (ARTIFACTS / "harness-commission.log").read_text(errors="replace")[-2000:]
+            tail = (ARTIFACTS / "harness-commission.log").read_text(errors="replace")[
+                -2000:
+            ]
             raise MatterError(f"commission failed ({r.returncode}): {tail}")
         self.node_id = int(json.loads(r.stdout)["nodeId"])
         self.commission_seconds = time.monotonic() - t0
@@ -227,11 +285,24 @@ class Matter:
         """Start the serve process (after commissioning)."""
         if self.proc:
             return
-        self._stderr = open(ARTIFACTS / "harness.log", "wb")
-        env = dict(os.environ, HARNESS_OPERATIONAL_IP="127.0.0.1", HARNESS_OPERATIONAL_PORT=str(MATTER_PORT))
-        verbose = os.environ.get("RUNTIME_HARNESS_VERBOSE", "info" if os.environ.get("CI") else "")
+        self._stderr = open(ARTIFACTS / "harness.log", "wb")  # noqa: SIM115 - closed in stop()
+        env = dict(
+            os.environ,
+            HARNESS_OPERATIONAL_IP="127.0.0.1",
+            HARNESS_OPERATIONAL_PORT=str(MATTER_PORT),
+        )
+        verbose = os.environ.get(
+            "RUNTIME_HARNESS_VERBOSE", "info" if os.environ.get("CI") else ""
+        )
         self.proc = subprocess.Popen(
-            self._cli("serve", "--node", str(self.node_id), *(["--verbose", verbose] if verbose else []), "--operational-port", str(MATTER_PORT)),
+            self._cli(
+                "serve",
+                "--node",
+                str(self.node_id),
+                *(["--verbose", verbose] if verbose else []),
+                "--operational-port",
+                str(MATTER_PORT),
+            ),
             env=env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -250,7 +321,7 @@ class Matter:
 
     def _read_loop(self) -> None:
         assert self.proc and self.proc.stdout
-        sub_log = open(ARTIFACTS / "subscription.jsonl", "w")
+        sub_log = open(ARTIFACTS / "subscription.jsonl", "w")  # noqa: SIM115 - open for the lifetime of the reader thread
         for line in self.proc.stdout:
             try:
                 msg = json.loads(line)
@@ -282,7 +353,7 @@ class Matter:
                 assert self.proc.stdin
                 self.proc.stdin.close()
                 self.proc.wait(15)
-            except Exception:
+            except Exception:  # noqa: BLE001 - any failure while stopping: kill
                 self.proc.kill()
         if self._stderr:
             self._stderr.close()
@@ -292,7 +363,9 @@ class Matter:
         assert self.proc and self.proc.stdin, "call start() first"
         if not self._warm and op != "ping":
             # The first operation sets up the CASE session, which can take minutes on a slow runner.
-            timeout = max(timeout, float(os.environ.get("RUNTIME_FIRST_REQUEST_TIMEOUT", "300")))
+            timeout = max(
+                timeout, float(os.environ.get("RUNTIME_FIRST_REQUEST_TIMEOUT", "300"))
+            )
             self._warm = True
         with self._cond:
             rid = self._next_id
@@ -311,13 +384,19 @@ class Matter:
         return slot["result"]
 
     def read(self, ep: int, cluster: str, attribute: str) -> Any:
-        return self.request("read", ep=ep, cluster=cluster, attribute=attribute)["value"]
+        return self.request("read", ep=ep, cluster=cluster, attribute=attribute)[
+            "value"
+        ]
 
     def write(self, ep: int, cluster: str, attribute: str, value: Any) -> None:
         self.request("write", ep=ep, cluster=cluster, attribute=attribute, value=value)
 
-    def invoke(self, ep: int, cluster: str, command: str, args: dict | None = None) -> Any:
-        return self.request("invoke", ep=ep, cluster=cluster, command=command, args=args or {})
+    def invoke(
+        self, ep: int, cluster: str, command: str, args: dict | None = None
+    ) -> Any:
+        return self.request(
+            "invoke", ep=ep, cluster=cluster, command=command, args=args or {}
+        )
 
     def subscribe(self) -> None:
         self.request("subscribe", timeout=300, min=0, max=60)
@@ -332,20 +411,57 @@ class Matter:
         with self._cond:
             return list(self._records[since:])
 
-    def reports(self, ep: int, cluster: str, attribute: str, since: int = 0) -> list[Any]:
+    def reports(
+        self, ep: int, cluster: str, attribute: str, since: int = 0
+    ) -> list[Any]:
         """Values of the attribute reports seen since `since`, oldest first."""
-        return [r["value"] for r in self.records(since) if r["kind"] == "attribute" and r["endpoint"] == ep and r["cluster"] == cluster and r["attribute"] == attribute]
+        return [
+            r["value"]
+            for r in self.records(since)
+            if r["kind"] == "attribute"
+            and r["endpoint"] == ep
+            and r["cluster"] == cluster
+            and r["attribute"] == attribute
+        ]
 
     def events(self, ep: int, cluster: str, event: str, since: int = 0) -> list[Any]:
-        return [r["data"] for r in self.records(since) if r["kind"] == "event" and r["endpoint"] == ep and r["cluster"] == cluster and r["event"] == event]
+        return [
+            r["data"]
+            for r in self.records(since)
+            if r["kind"] == "event"
+            and r["endpoint"] == ep
+            and r["cluster"] == cluster
+            and r["event"] == event
+        ]
 
-    def wait_report(self, ep: int, cluster: str, attribute: str, expect: Any | Callable[[Any], bool], since: int = 0, timeout: float = 5) -> bool:
+    def wait_report(
+        self,
+        ep: int,
+        cluster: str,
+        attribute: str,
+        expect: Any | Callable[[Any], bool],
+        since: int = 0,
+        timeout: float = 5,
+    ) -> bool:
         """Wait until a report whose value equals `expect` (or satisfies the predicate) has been seen since `since`."""
         pred = expect if callable(expect) else (lambda v: v == expect)
         with self._cond:
-            return self._cond.wait_for(lambda: any(pred(v) for v in self.reports(ep, cluster, attribute, since)), timeout=timeout)
+            return self._cond.wait_for(
+                lambda: any(
+                    pred(v) for v in self.reports(ep, cluster, attribute, since)
+                ),
+                timeout=timeout,
+            )
 
-    def wait_event(self, ep: int, cluster: str, event: str, since: int = 0, timeout: float = 5, pred: Callable[[Any], bool] = lambda d: True) -> Any | None:
+    def wait_event(
+        self,
+        ep: int,
+        cluster: str,
+        event: str,
+        since: int = 0,
+        timeout: float = 5,
+        pred: Callable[[Any], bool] = lambda d: True,
+    ) -> Any | None:
         found: list = []
 
         def check() -> bool:
@@ -379,7 +495,9 @@ class Api:
 
     async def _make_client(self):
         # aioesphomeapi needs a running loop at construction time.
-        return self._lib.APIClient(self._host, self._port, None, client_info="matter-runtime-tests")
+        return self._lib.APIClient(
+            self._host, self._port, None, client_info="matter-runtime-tests"
+        )
 
     def _run(self, coro, timeout: float = 60):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
@@ -398,7 +516,9 @@ class Api:
             except Exception as e:  # noqa: BLE001 - the API server may not be up yet
                 last = e
                 time.sleep(3)
-        raise RuntimeError(f"could not connect to the ESPHome API on port {API_PORT}: {last!r}")
+        raise RuntimeError(
+            f"could not connect to the ESPHome API on port {API_PORT}: {last!r}"
+        )
 
     async def _subscribe(self) -> None:
         def on_state(state) -> None:
@@ -409,10 +529,8 @@ class Api:
         self._cli.subscribe_states(on_state)
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self._run(self._cli.disconnect(), 10)
-        except Exception:  # noqa: BLE001
-            pass
         self._loop.call_soon_threadsafe(self._loop.stop)
 
     # -- state -------------------------------------------------------------------------------------------------
@@ -420,10 +538,14 @@ class Api:
         """Latest state of an entity (an aioesphomeapi EntityState), or None if none was received yet."""
         return self._states.get(self.entities[object_id].key)
 
-    def wait_state(self, object_id: str, pred: Callable[[Any], bool], timeout: float = 5) -> Any | None:
+    def wait_state(
+        self, object_id: str, pred: Callable[[Any], bool], timeout: float = 5
+    ) -> Any | None:
         key = self.entities[object_id].key
         with self._cond:
-            self._cond.wait_for(lambda: key in self._states and pred(self._states[key]), timeout=timeout)
+            self._cond.wait_for(
+                lambda: key in self._states and pred(self._states[key]), timeout=timeout
+            )
             st = self._states.get(key)
             return st if st is not None and pred(st) else None
 
@@ -464,7 +586,9 @@ class Api:
 
         async def run() -> float:
             t0 = time.monotonic()
-            await asyncio.gather(*(self._cli.execute_service(self.services[name], c) for c in calls))
+            await asyncio.gather(
+                *(self._cli.execute_service(self.services[name], c) for c in calls)
+            )
             return time.monotonic() - t0
 
         return self._run(run(), 120)
@@ -533,8 +657,17 @@ def node(matter, api, device):
         while time.monotonic() < deadline:
             i += 1
             api.action("set_temp", value=10.0 + (i % 5))
-            if matter.wait_report(4, "TemperatureMeasurement", "MeasuredValue", lambda v: v is not None, since=mark, timeout=15):
+            if matter.wait_report(
+                4,
+                "TemperatureMeasurement",
+                "MeasuredValue",
+                lambda v: v is not None,
+                since=mark,
+                timeout=15,
+            ):
                 break
         else:
-            pytest.fail("subscription never delivered a report within 300 s", pytrace=False)
+            pytest.fail(
+                "subscription never delivered a report within 300 s", pytrace=False
+            )
     return matter

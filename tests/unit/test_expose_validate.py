@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 
+import pytest
 from conftest import CONFIGS, prepare_config, run_esphome
 from esphome.core import CORE
-import pytest
 
 from components.matter.expose.final_check import check_expose, check_member
 from components.matter.expose.inference import LoweredEndpoint, Overrides, infer
@@ -51,7 +51,9 @@ def temp_sensor(**node):
 
 
 def test_clean_entity_has_no_warnings():
-    raw = raw_entity("sensor", id_="t", device_class="temperature", unit_of_measurement="°C")
+    raw = raw_entity(
+        "sensor", id_="t", device_class="temperature", unit_of_measurement="°C"
+    )
     assert check_member(member(raw), validated(raw)) == []
 
 
@@ -82,18 +84,25 @@ def test_platform_default_device_class_changes_the_device_type():
     mem = member(raw)
     assert mem.lowered.primary == "temperature_sensor"  # inferred from the unit
     (text,) = check_member(mem, validated(raw, device_class="humidity"))
-    assert "inferred as temperature_sensor" in text and "would now infer humidity_sensor" in text
+    assert (
+        "inferred as temperature_sensor" in text
+        and "would now infer humidity_sensor" in text
+    )
     assert "Add `as: temperature_sensor` to keep it" in text
 
 
 def test_device_class_change_to_unmappable_warns():
     raw = raw_entity("sensor", platform="template", id_="s", unit_of_measurement="°C")
     texts = check_member(member(raw), validated(raw, device_class="duration", unit="s"))
-    assert any("inferred as temperature_sensor" in t and "no longer maps" in t for t in texts)
+    assert any(
+        "inferred as temperature_sensor" in t and "no longer maps" in t for t in texts
+    )
 
 
 def test_explicit_as_is_never_second_guessed():
-    raw = raw_entity("sensor", id_="s", device_class="temperature", unit_of_measurement="°C")
+    raw = raw_entity(
+        "sensor", id_="s", device_class="temperature", unit_of_measurement="°C"
+    )
     mem = member(raw, Overrides(as_="temperature_sensor"))
     assert check_member(mem, validated(raw, device_class="humidity")) == []
 
@@ -145,9 +154,17 @@ def test_check_expose_is_read_only_and_logs(caplog):
             return self.conf
 
     raw = temp_sensor(unit_of_measurement="°C")
-    plan = ExposePlan([PlannedEndpoint("t", {"temperature_sensor": {}}, members=[member(raw)])], [])
-    conf = {"platform": "template", "id": "t", "name": "T", "device_class": "temperature",
-            "unit_of_measurement": "°C", "entity_category": "diagnostic"}
+    plan = ExposePlan(
+        [PlannedEndpoint("t", {"temperature_sensor": {}}, members=[member(raw)])], []
+    )
+    conf = {
+        "platform": "template",
+        "id": "t",
+        "name": "T",
+        "device_class": "temperature",
+        "unit_of_measurement": "°C",
+        "entity_category": "diagnostic",
+    }
     before = dict(conf)
     CORE.data["matter"] = {"expose_plan": plan}
     try:
@@ -192,8 +209,13 @@ def test_all_skips_nameless_internal_diagnostic_and_platform_default_diagnostic(
         ],
         "sensor": [
             {"platform": "internal_temperature", "id": "chip", "name": "Chip"},
-            {"platform": "template", "id": "diag", "name": "D", "device_class": "temperature",
-             "entity_category": "diagnostic"},
+            {
+                "platform": "template",
+                "id": "diag",
+                "name": "D",
+                "device_class": "temperature",
+                "entity_category": "diagnostic",
+            },
         ],
         "button": [{"platform": "template", "id": "b", "name": "B"}],
     }
@@ -242,7 +264,9 @@ def planned(key, device_type, number, **kw):
 
 def test_ecosystem_warnings_for_valve_soil_and_test_vendor():
     plan = ExposePlan(
-        [planned("tap", "water_valve", 5), planned("soil", "soil_sensor", 6)], [], test_vendor=True
+        [planned("tap", "water_valve", 5), planned("soil", "soil_sensor", 6)],
+        [],
+        test_vendor=True,
     )
     found = ecosystem_warnings(plan)
     assert "tap: Apple Home does not show water valves" in found
@@ -268,7 +292,11 @@ def test_plan_table_rows_and_code():
         [
             planned("b", "on_off_light", 20, label='Say "hi"'),
             PlannedEndpoint(
-                "a", {"temperature_sensor": {}}, entities=["a"], attached=["bat"], number=10
+                "a",
+                {"temperature_sensor": {}},
+                entities=["a"],
+                attached=["bat"],
+                number=10,
             ),
         ],
         [],
@@ -279,7 +307,9 @@ def test_plan_table_rows_and_code():
         (20, "on_off_light", "b", 'Say "hi"'),
     ]
     code = plan_table_code(rows)
-    assert code.startswith("static constexpr esphome::matter::PlanRow MATTER_PLAN[] = {")
+    assert code.startswith(
+        "static constexpr esphome::matter::PlanRow MATTER_PLAN[] = {"
+    )
     assert '{20, "on_off_light", "b", "Say \\"hi\\""}' in code
     assert flash_estimate([]) == 0
     assert flash_estimate(rows) > flash_estimate(rows[:1]) > 0
@@ -298,7 +328,9 @@ def expose_all_output(tmp_path_factory):
 
 
 def plan_lines(output: str) -> list[str]:
-    text = output.split("matter.expose plan:\n")[1].split("INFO Configuration is valid")[0]
+    text = output.split("matter.expose plan:\n")[1].split(
+        "INFO Configuration is valid"
+    )[0]
     return text.strip().splitlines()
 
 
@@ -319,14 +351,20 @@ def test_expose_all_config_validates_and_prints_the_plan(expose_all_output):
         "skipped hidden_relay: internal: true",
         "skipped nameless_relay: no name (internal)",
         "skipped cfg_relay: entity_category: config",
-        "skipped some_button: a button has no events; list its id in `expose:` to get an unbound "
-        "Generic Switch that `on_press:` drives with matter.send_switch_event",
+        (
+            "skipped some_button: a button has no events; list its id in `expose:` to get an unbound "
+            "Generic Switch that `on_press:` drives with matter.send_switch_event"
+        ),
         "skipped diag_temp: entity_category: diagnostic",
         "skipped chip_temp: entity_category: diagnostic (platform default)",
         "skipped nameless_sensor: no name (internal)",
     ]
-    assert lines[-2].startswith("ecosystem: Google Home needs a Google Developer Console project")
-    assert lines[-1] == "heap: about 1.3 KB for 3 endpoints (rough estimate, unmeasured)"
+    assert lines[-2].startswith(
+        "ecosystem: Google Home needs a Google Developer Console project"
+    )
+    assert (
+        lines[-1] == "heap: about 1.3 KB for 3 endpoints (rough estimate, unmeasured)"
+    )
 
 
 def test_expose_all_has_no_final_validate_warnings(expose_all_output):
@@ -385,7 +423,9 @@ def generate(tmp_path, logger_level: str | None):
     config = prepare_config(CONFIGS / "esp32-expose-all.yaml", tmp_path)
     if logger_level:
         config.write_text(
-            config.read_text().replace("logger:\n", f"logger:\n  level: {logger_level}\n", 1)
+            config.read_text().replace(
+                "logger:\n", f"logger:\n  level: {logger_level}\n", 1
+            )
         )
     result = run_esphome("compile", "--only-generate", str(config), cwd=tmp_path)
     assert result.ok, result.output[-3000:]

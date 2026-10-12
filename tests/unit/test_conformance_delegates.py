@@ -19,10 +19,18 @@ needs_spec = pytest.mark.skipif(
 
 def test_scanner_sees_base_cluster_calls():
     """The mode clusters call `mode_base::...::create_x`, RVC calls `operational_state::attribute::create_x`."""
-    assert espm._ATTR_RE.search("        mode_base::attribute::create_supported_modes(cluster, NULL, 0, 0);")
-    assert espm._ATTR_RE.search("    operational_state::attribute::create_phase_list(cluster, NULL, 0, 0);")
-    assert espm._CMD_RE.search("    mode_base::command::create_change_to_mode(cluster);")
-    match = espm._ATTR_RE.search("        global::attribute::create_feature_map(cluster, 0);")
+    assert espm._ATTR_RE.search(
+        "        mode_base::attribute::create_supported_modes(cluster, NULL, 0, 0);"
+    )
+    assert espm._ATTR_RE.search(
+        "    operational_state::attribute::create_phase_list(cluster, NULL, 0, 0);"
+    )
+    assert espm._CMD_RE.search(
+        "    mode_base::command::create_change_to_mode(cluster);"
+    )
+    match = espm._ATTR_RE.search(
+        "        global::attribute::create_feature_map(cluster, 0);"
+    )
     assert match and match.group(1) and match.group(2) == "feature_map"
     assert espm._EVENT_RE.search("    event::create_operational_error(cluster);")
 
@@ -78,4 +86,6 @@ def test_delegate_layout_adds_commands():
     assert not {1, 2} & set(state.accepted)
     assert state.generated, "OperationalCommandResponse"
     # the dishwasher device type is mapped to the esp-matter namespace `dish_washer`
-    assert not any("not known to the esp-matter profile" in note for note in model.notes)
+    assert not any(
+        "not known to the esp-matter profile" in note for note in model.notes
+    )

@@ -120,7 +120,9 @@ def _apply_item_keys(ep: PlannedEndpoint, o: Overrides) -> None:
             )
         ep.extra[CONF_TAGS] = list(o.tags)
     if o.clusters is not None:
-        _merge_dicts(ep.extra.setdefault(CONF_CLUSTERS, {}), o.clusters, f"{key} clusters")
+        _merge_dicts(
+            ep.extra.setdefault(CONF_CLUSTERS, {}), o.clusters, f"{key} clusters"
+        )
     if o.parent is not None:
         if ep.parent is not None and ep.parent != o.parent:
             raise cv.Invalid(
@@ -198,7 +200,9 @@ def _attach(planned, key_of, entity, o, lowered, target: str) -> None:
         _merge_dicts(ep.extra, lowered.attach_extra, target)
     else:
         for name, block in lowered.device_types.items():
-            _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{target} {name}")
+            _merge_dicts(
+                ep.device_types.setdefault(name, {}), block, f"{target} {name}"
+            )
         _merge_dicts(ep.extra, lowered.extra, target)
     ep.attached.append(entity.id)
     ep.members.append(Member(entity, o, lowered, True))
@@ -248,13 +252,16 @@ def _auto_target(
     """
     if kind == "meter":
         cands = [
-            ep for ep in planned.values() if any(m.entity.domain in LOAD_DOMAINS for m in ep.members)
+            ep
+            for ep in planned.values()
+            if any(m.entity.domain in LOAD_DOMAINS for m in ep.members)
         ]
     else:
         cands = [
             ep
             for ep in planned.values()
-            if application_device_type_ids(ep.device_types) and "battery" not in ep.extra
+            if application_device_type_ids(ep.device_types)
+            and "battery" not in ep.extra
         ]
     family = cands
     if kind == "meter":
@@ -270,7 +277,8 @@ def _auto_target(
             hits = [
                 len(getattr(m.entity, attr))
                 for m in ep.members
-                if getattr(m.entity, attr) and _word_prefix(getattr(entity, attr), getattr(m.entity, attr))
+                if getattr(m.entity, attr)
+                and _word_prefix(getattr(entity, attr), getattr(m.entity, attr))
             ]
             scores[ep.key] = max(hits, default=0)
         return _unique_best(scores)
@@ -309,7 +317,9 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
         try:
             lowered = infer(entity, replace(o, via_glob=not explicit))
         except NoMapping as exc:
-            raise cv.Invalid(f"matter.expose: '{entity.id}' cannot be exposed: {exc}") from None
+            raise cv.Invalid(
+                f"matter.expose: '{entity.id}' cannot be exposed: {exc}"
+            ) from None
         if o.meters and lowered.auto_attach != "meter":
             raise cv.Invalid(
                 f"matter.expose: `meters:` on '{entity.id}', which is not a power, energy, "
@@ -341,7 +351,9 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
         _attach(planned, key_of, entity, o, lowered, resolve(entity, name))
     # Meters before batteries: a standalone electrical endpoint is no host for a Power Source.
     for kind in ("meter", "battery"):
-        for entity, o, lowered, explicit in (a for a in autos if a[2].auto_attach == kind):
+        for entity, o, lowered, explicit in (
+            a for a in autos if a[2].auto_attach == kind
+        ):
             target = _auto_target(entity, kind, planned, lowered, explicit)
             if target is not None:
                 _attach(planned, key_of, entity, o, lowered, target)
@@ -350,7 +362,9 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
 
     for ep in planned.values():
         if isinstance(ep.parent, str):
-            ep.parent = key_of.get(ep.parent) or (ep.parent if ep.parent in planned else None)
+            ep.parent = key_of.get(ep.parent) or (
+                ep.parent if ep.parent in planned else None
+            )
             if ep.parent is None:
                 raise cv.Invalid(
                     f"matter.expose: `parent:` of '{ep.key}' is not an exposed entity or "
@@ -375,7 +389,9 @@ def unnamed_warning(selection: Selection) -> str | None:
 
 def lower_expose(config: dict) -> dict:
     inventory = build_inventory(CORE.raw_config)
-    CORE.data.get(CONF_MATTER, {}).pop(KEY_EXPOSE_PLAN, None)  # no stale plan across validations
+    CORE.data.get(CONF_MATTER, {}).pop(
+        KEY_EXPOSE_PLAN, None
+    )  # no stale plan across validations
     if CONF_EXPOSE not in config:
         # A bare `matter:` (or one with only `endpoints:`) stays valid: a root node, or the
         # hand-written endpoints. The hint shows what `expose:` would add.
@@ -411,12 +427,16 @@ def lower_expose(config: dict) -> dict:
         ep.source = "pin" if ep.pin is not None else "hash"
         value = {**ep.device_types, **ep.extra}
         if ep.parent is not None:
-            value[CONF_PARENT] = numbers[ep.parent] if isinstance(ep.parent, str) else ep.parent
+            value[CONF_PARENT] = (
+                numbers[ep.parent] if isinstance(ep.parent, str) else ep.parent
+            )
         try:
             endpoints[ep.number] = ENDPOINT_SCHEMA(value)
         except cv.Invalid as exc:
             where = ".".join(str(p) for p in exc.path)
-            what = exc.msg.replace("extra keys not allowed", "is not an option of this device type")
+            what = exc.msg.replace(
+                "extra keys not allowed", "is not an option of this device type"
+            )
             raise cv.Invalid(
                 f"matter.expose: '{key}' ({', '.join([*ep.entities, *ep.attached])}) lowered to "
                 f"endpoint {ep.number}, which failed validation"
@@ -439,4 +459,4 @@ def lower_expose(config: dict) -> dict:
 
 bare_matter_error = bare_matter_hint  # old name
 
-__all__ = ["ALL", "bare_matter_hint", "bare_matter_error", "lower_expose"]
+__all__ = ["ALL", "bare_matter_error", "bare_matter_hint", "lower_expose"]

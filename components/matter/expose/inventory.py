@@ -94,7 +94,10 @@ class Entity:
             return "internal: true" if self.name else "no name (internal)"
         if self.entity_category in ("config", "diagnostic"):
             return f"entity_category: {self.entity_category}"
-        if self.entity_category is None and self.platform in DIAGNOSTIC_DEFAULT_PLATFORMS:
+        if (
+            self.entity_category is None
+            and self.platform in DIAGNOSTIC_DEFAULT_PLATFORMS
+        ):
             return "entity_category: diagnostic (platform default)"
         return None
 
@@ -121,7 +124,9 @@ def make_entity(domain, platform, node: dict, sub_key, path) -> Entity:
         device_class=_text(node.get(CONF_DEVICE_CLASS)),
         unit=_text(node.get(CONF_UNIT)),
         sub_key=sub_key,
-        traits=frozenset(k for k in node if isinstance(k, str) and k not in NON_TRAIT_KEYS),
+        traits=frozenset(
+            k for k in node if isinstance(k, str) and k not in NON_TRAIT_KEYS
+        ),
         path=tuple(path),
         raw={k: v for k, v in node.items() if isinstance(v, (str, int, float, bool))},
     )
@@ -135,7 +140,11 @@ def _visit(domain, platform, node, sub_key, path, depth, out: list[Entity]) -> N
     if domain not in NESTED_DOMAINS or depth >= MAX_NESTING:
         return
     for key, value in node.items():
-        if isinstance(value, dict) and isinstance(key, str) and not key.startswith("on_"):
+        if (
+            isinstance(value, dict)
+            and isinstance(key, str)
+            and not key.startswith("on_")
+        ):
             _visit(domain, platform, value, key, [*path, key], depth + 1, out)
 
 
@@ -148,7 +157,9 @@ def build_inventory(raw: dict | None) -> list[Entity]:
             items = [items]
         for index, item in enumerate(items or []):
             if isinstance(item, dict):
-                _visit(domain, item.get(CONF_PLATFORM), item, None, [domain, index], 0, out)
+                _visit(
+                    domain, item.get(CONF_PLATFORM), item, None, [domain, index], 0, out
+                )
     return out
 
 

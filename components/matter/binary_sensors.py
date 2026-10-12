@@ -87,7 +87,9 @@ def is_binary_attribute(sensor_attribute) -> bool:
 
 def inverted_key(device_type, sensor_attribute) -> str:
     """Config key of the polarity override. `inverted` unless the device type binds several binary sensors."""
-    binary_attributes = [a for a in device_type.sensor_attributes if is_binary_attribute(a)]
+    binary_attributes = [
+        a for a in device_type.sensor_attributes if is_binary_attribute(a)
+    ]
     if len(binary_attributes) <= 1:
         return CONF_INVERTED
     return f"{sensor_attribute.conf_key}_{CONF_INVERTED}"
@@ -112,7 +114,9 @@ def get_device_class(full_config: Config, sensor_id) -> str | None:
     return sensor_config.get(CONF_DEVICE_CLASS) or None
 
 
-def resolve_inverted(device_type, sensor_attribute, device_config: dict, device_class) -> bool:
+def resolve_inverted(
+    device_type, sensor_attribute, device_config: dict, device_class
+) -> bool:
     """Whether the binary_sensor state must be inverted before it is written to the Matter attribute.
 
     An explicit `inverted:` option always wins. Otherwise only contact_sensor is inverted automatically, and only
@@ -121,7 +125,9 @@ def resolve_inverted(device_type, sensor_attribute, device_config: dict, device_
     explicit = device_config.get(inverted_key(device_type, sensor_attribute))
     if explicit is not None:
         return explicit
-    return device_type.name == "contact_sensor" and device_class in OPENING_DEVICE_CLASSES
+    return (
+        device_type.name == "contact_sensor" and device_class in OPENING_DEVICE_CLASSES
+    )
 
 
 # Smoke CO Alarm attribute (conf key) -> (converter in matter_binary_sensors.h, updater in matter_binary_sensors.h)
@@ -138,13 +144,19 @@ _SMOKE_CO_BINDINGS = {
 @dataclass(frozen=True)
 class BinaryBinding:
     converter: str  # esphome::matter::conversion::<converter>
-    updater: str | None  # esphome::matter::<updater> or None for a plain esp_matter attribute update
+    updater: (
+        str | None
+    )  # esphome::matter::<updater> or None for a plain esp_matter attribute update
     include: str  # C++ include needed by the generated code
     inverted: bool
 
 
-def resolve_binding(device_type, sensor_attribute, device_config: dict, device_class) -> BinaryBinding:
-    inverted = resolve_inverted(device_type, sensor_attribute, device_config, device_class)
+def resolve_binding(
+    device_type, sensor_attribute, device_config: dict, device_class
+) -> BinaryBinding:
+    inverted = resolve_inverted(
+        device_type, sensor_attribute, device_config, device_class
+    )
     suffix = "_inverted" if inverted else ""
     cluster_name = sensor_attribute.cluster.name
     if cluster_name == "BooleanState":
@@ -163,7 +175,9 @@ def resolve_binding(device_type, sensor_attribute, device_config: dict, device_c
         )
     if cluster_name == "SmokeCOAlarm":
         converter, updater = _SMOKE_CO_BINDINGS[sensor_attribute.conf_key]
-        return BinaryBinding(f"{converter}{suffix}", updater, BINARY_SENSORS_INCLUDE, inverted)
+        return BinaryBinding(
+            f"{converter}{suffix}", updater, BINARY_SENSORS_INCLUDE, inverted
+        )
     raise cv.Invalid(
         f"Binary sensors cannot be bound to the {cluster_name} cluster ({sensor_attribute.conf_key})"
     )
@@ -171,12 +185,18 @@ def resolve_binding(device_type, sensor_attribute, device_config: dict, device_c
 
 def implied_occupancy_feature(device_config: dict, device_class) -> str | None:
     """Occupancy Sensing sensor-type feature to enable, or None if `features:` already contains one."""
-    if OCCUPANCY_CHOICE_FEATURES.intersection(device_config.get(CONF_WITH_FEATURES, ())):
+    if OCCUPANCY_CHOICE_FEATURES.intersection(
+        device_config.get(CONF_WITH_FEATURES, ())
+    ):
         return None
-    return OCCUPANCY_FEATURE_BY_DEVICE_CLASS.get(device_class, DEFAULT_OCCUPANCY_FEATURE)
+    return OCCUPANCY_FEATURE_BY_DEVICE_CLASS.get(
+        device_class, DEFAULT_OCCUPANCY_FEATURE
+    )
 
 
-def check_binary_sensors(matter_config: dict, full_config: Config, device_types_by_key: dict):
+def check_binary_sensors(
+    matter_config: dict, full_config: Config, device_types_by_key: dict
+):
     """Config time warnings for device_class mismatches and ambiguous contact sensor polarity."""
     for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
         for conf_key, device_config in endpoint_config.items():
@@ -197,14 +217,24 @@ def check_binary_sensors(matter_config: dict, full_config: Config, device_types_
                 )
 
 
-def _check_binding(endpoint_id, device_type, attribute, device_config, sensor_id, device_class):
+def _check_binding(
+    endpoint_id, device_type, attribute, device_config, sensor_id, device_class
+):
     where = f"Matter endpoint {endpoint_id} {device_type.name}.{attribute.conf_key}"
     accepted = _ACCEPTED_DEVICE_CLASSES.get((device_type.name, attribute.conf_key))
     explicit_inversion = device_config.get(inverted_key(device_type, attribute))
 
-    if device_class is not None and accepted is not None and device_class not in accepted:
+    if (
+        device_class is not None
+        and accepted is not None
+        and device_class not in accepted
+    ):
         suggestion = _SUGGESTED_DEVICE_TYPES.get(device_class)
-        hint = f" A '{device_class}' binary_sensor fits {suggestion}." if suggestion else ""
+        hint = (
+            f" A '{device_class}' binary_sensor fits {suggestion}."
+            if suggestion
+            else ""
+        )
         _LOGGER.warning(
             "%s: binary_sensor '%s' has device_class '%s' which doesn't fit a %s. Expected one of: %s.%s",
             where,
@@ -215,7 +245,11 @@ def _check_binding(endpoint_id, device_type, attribute, device_config, sensor_id
             hint,
         )
 
-    if device_type.name == "contact_sensor" and explicit_inversion is None and device_class is None:
+    if (
+        device_type.name == "contact_sensor"
+        and explicit_inversion is None
+        and device_class is None
+    ):
         _LOGGER.warning(
             "%s: binary_sensor '%s' has no device_class. Matter reports contact closed as TRUE, so ON is reported as "
             "'closed'. If ON means open (door, window, ...), set device_class (door, window, opening or "

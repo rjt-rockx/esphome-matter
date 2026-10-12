@@ -5,10 +5,10 @@ Kept separate from __init__.py so the main schema only needs a small, additive h
 
 import logging
 
-from esphome import automation
 import esphome.codegen as cg
-from esphome.components.esp32 import add_idf_sdkconfig_option, get_esp32_variant
 import esphome.config_validation as cv
+from esphome import automation
+from esphome.components.esp32 import add_idf_sdkconfig_option, get_esp32_variant
 from esphome.const import (
     CONF_ESPHOME,
     CONF_PROJECT,
@@ -70,7 +70,9 @@ DEVICE_INFO_SCHEMA = {
 
 def _truncate(value: str, length: int, what: str) -> str:
     if len(value) > length:
-        _LOGGER.warning("Matter %s '%s' truncated to %d characters", what, value, length)
+        _LOGGER.warning(
+            "Matter %s '%s' truncated to %d characters", what, value, length
+        )
         return value[:length]
     return value
 
@@ -104,8 +106,14 @@ async def setup_device_info(var, config) -> None:
         cg.add(info.set_unique_id(config[CONF_UNIQUE_ID]))
 
     # Hardware version string: the existing `hardware_version_string` option is validated in __init__.
-    hw_string = config.get("hardware_version_string") or default_hardware_version_string()
-    cg.add(info.set_hardware_version_string(_truncate(hw_string, 64, "hardware_version_string")))
+    hw_string = (
+        config.get("hardware_version_string") or default_hardware_version_string()
+    )
+    cg.add(
+        info.set_hardware_version_string(
+            _truncate(hw_string, 64, "hardware_version_string")
+        )
+    )
 
     # This is the only place that sets CONFIG_APP_PROJECT_VER(_FROM_CONFIG); the numeric
     # `software_version` (ota.py) only adds CONFIG_DEVICE_SOFTWARE_VERSION_NUMBER.

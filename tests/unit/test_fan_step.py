@@ -6,12 +6,12 @@ C++ compiler. Skipped when no compiler is available.
 
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
-from conftest import COMPONENTS
 import pytest
+from conftest import COMPONENTS
 
 CXX = shutil.which("g++") or shutil.which("clang++") or shutil.which("c++")
 
@@ -49,17 +49,29 @@ def test_fan_step_target(tmp_path: Path):
     lines = ['#include "matter_fan_step.h"', "#include <cstdio>", "int main() {"]
     for current, top, increase, wrap, lowest_off, _ in CASES:
         lines.append(
-            "  std::printf(\"%d\\n\", esphome::matter::fan_step_target("
+            '  std::printf("%d\\n", esphome::matter::fan_step_target('
             f"{current}, {top}, {str(increase).lower()}, {str(wrap).lower()}, {str(lowest_off).lower()}));"
         )
     lines += ["  return 0;", "}"]
     source.write_text("\n".join(lines))
     exe = tmp_path / "step"
     build = subprocess.run(
-        [CXX, "-std=c++17", "-Wall", "-Werror", f"-I{COMPONENTS / 'matter'}", str(source), "-o", str(exe)],
+        [
+            CXX,
+            "-std=c++17",
+            "-Wall",
+            "-Werror",
+            f"-I{COMPONENTS / 'matter'}",
+            str(source),
+            "-o",
+            str(exe),
+        ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert build.returncode == 0, build.stderr
-    out = subprocess.run([str(exe)], capture_output=True, text=True, check=True).stdout.split()
+    out = subprocess.run(
+        [str(exe)], capture_output=True, text=True, check=True
+    ).stdout.split()
     assert [int(v) for v in out] == [case[-1] for case in CASES]

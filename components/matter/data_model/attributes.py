@@ -65,29 +65,24 @@ def attribute_value_type(attribute: Attribute):
         "voltage_mv",
     ):
         return cg.int64
-    if (
-        type_name
-        in (
-            "int8u",
-            "int16u",
-            "int24u",
-            "int32u",
-            "int64u",
-            "enum8",
-            "enum16",
-            "bitmap16",
-            "elapsed_s",
-            "epoch_s",
-            "epoch_us",
-            "fabric_idx",
-            "node_id",
-            "percent",
-            "percent100ths",
-            "vendor_id",
-        )
-        or type_name.endswith("Enum")
-        or type_name.endswith("Bitmap")
-    ):
+    if type_name in (
+        "int8u",
+        "int16u",
+        "int24u",
+        "int32u",
+        "int64u",
+        "enum8",
+        "enum16",
+        "bitmap16",
+        "elapsed_s",
+        "epoch_s",
+        "epoch_us",
+        "fabric_idx",
+        "node_id",
+        "percent",
+        "percent100ths",
+        "vendor_id",
+    ) or type_name.endswith(("Enum", "Bitmap")):
         return cg.uint64
     return None
 
@@ -287,7 +282,11 @@ SENSOR_ATTRIBUTES = {
 # The converter and updater are chosen by binary_sensors.py. Selecting a sensor enables the matching choice feature.
 SENSOR_ATTRIBUTES["SmokeCOAlarm"] = {  # 0x005C
     "SmokeState": SensorAttribute(
-        "smoke_state", "alarm_state", BinarySensor, features=("SmokeAlarm",), code_driven=True
+        "smoke_state",
+        "alarm_state",
+        BinarySensor,
+        features=("SmokeAlarm",),
+        code_driven=True,
     ),
     "COState": SensorAttribute(
         "co_state", "alarm_state", BinarySensor, features=("COAlarm",), code_driven=True

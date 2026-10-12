@@ -40,7 +40,9 @@ CONF_MULTI_PRESS_MAX = "multi_press_max"
 CONF_EVENT = "event"
 
 MatterSwitchEvent = matter_ns.enum("MatterSwitchEvent", is_class=True)
-MatterGenericSwitchMapping = matter_ns.class_("MatterGenericSwitchMapping", cg.Component)
+MatterGenericSwitchMapping = matter_ns.class_(
+    "MatterGenericSwitchMapping", cg.Component
+)
 MatterGenericSwitchEventMapping = matter_ns.class_(
     "MatterGenericSwitchEventMapping", cg.Component
 )
@@ -124,7 +126,11 @@ def apply_switch_defaults(config: dict) -> dict:
             )
     if latching and any(
         conf in config
-        for conf in (CONF_LONG_PRESS_TIME, CONF_MULTI_PRESS_WINDOW, CONF_MULTI_PRESS_MAX)
+        for conf in (
+            CONF_LONG_PRESS_TIME,
+            CONF_MULTI_PRESS_WINDOW,
+            CONF_MULTI_PRESS_MAX,
+        )
     ):
         raise cv.Invalid(
             "long_press_time, multi_press_window and multi_press_max only apply to "
@@ -164,7 +170,8 @@ def multi_press_max_line(config_var: str, device_config: dict) -> str | None:
 
 async def _new_mapping(cls, endpoint_id: int, device_config: dict, source):
     long_press_time = device_config.get(
-        CONF_LONG_PRESS_TIME, cv.positive_time_period_milliseconds(DEFAULT_LONG_PRESS_TIME)
+        CONF_LONG_PRESS_TIME,
+        cv.positive_time_period_milliseconds(DEFAULT_LONG_PRESS_TIME),
     )
     window = device_config.get(
         CONF_MULTI_PRESS_WINDOW,
@@ -234,6 +241,8 @@ async def matter_send_switch_event_to_code(
     var = cg.new_Pvariable(action_id, template_arg)
     cg.add(var.set_endpoint_id(_resolve_endpoint_id(config[CONF_ENDPOINT])))
     cg.add(var.set_event(config[CONF_EVENT]))
-    cg.add(var.set_position(await cg.templatable(config[CONF_POSITION], args, cg.uint8)))
+    cg.add(
+        var.set_position(await cg.templatable(config[CONF_POSITION], args, cg.uint8))
+    )
     cg.add(var.set_count(await cg.templatable(config[CONF_COUNT], args, cg.uint8)))
     return var

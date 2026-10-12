@@ -61,7 +61,9 @@ def climate_schema(device_type_name: str) -> dict:
 def validate_climate_features(config: dict) -> dict:
     if CONF_CLIMATE_ID not in config:
         return config
-    conflicting = [f for f in config.get(CONF_WITH_FEATURES, ()) if f in _DERIVED_FEATURES]
+    conflicting = [
+        f for f in config.get(CONF_WITH_FEATURES, ()) if f in _DERIVED_FEATURES
+    ]
     if conflicting:
         raise cv.Invalid(
             f"features {', '.join(conflicting)} are derived from the climate "
@@ -93,10 +95,14 @@ def separate_thermostat_lines(climate_var, device_type_name: str) -> list[str]:
     return [
         "{",
         "  esp_matter::cluster::thermostat::config_t thermostat_config{};",
-        "  esphome::matter::configure_climate_thermostat(thermostat_config, "
-        f"{climate_var}, {_flags(device_type_name)});",
-        "  if (esp_matter::cluster::thermostat::create(endpoint, &thermostat_config, "
-        "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
+        (
+            "  esphome::matter::configure_climate_thermostat(thermostat_config, "
+            f"{climate_var}, {_flags(device_type_name)});"
+        ),
+        (
+            "  if (esp_matter::cluster::thermostat::create(endpoint, &thermostat_config, "
+            "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)"
+        ),
         "    return false;",
         "}",
     ]
@@ -120,15 +126,19 @@ def _flags(device_type_name: str) -> str:
 def config_lines(config_var: str, climate_var, device_type_name: str) -> list[str]:
     """Lines run before esp_matter::endpoint::<type>::add()."""
     return [
-        f"esphome::matter::configure_climate_thermostat({config_var}.thermostat, "
-        f"{climate_var}, {_flags(device_type_name)});"
+        (
+            f"esphome::matter::configure_climate_thermostat({config_var}.thermostat, "
+            f"{climate_var}, {_flags(device_type_name)});"
+        )
     ]
 
 
 def post_create_lines(climate_var, device_type_name: str) -> list[str]:
     """Lines run after the device type has been added to the endpoint."""
     return [
-        f"if (!esphome::matter::extend_climate_thermostat(endpoint, {climate_var}, "
-        f"{_flags(device_type_name)}))",
+        (
+            f"if (!esphome::matter::extend_climate_thermostat(endpoint, {climate_var}, "
+            f"{_flags(device_type_name)}))"
+        ),
         "  return false;",
     ]

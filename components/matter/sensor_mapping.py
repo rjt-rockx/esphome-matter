@@ -16,7 +16,9 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_DEVICE_CLASS, CONF_UNIT_OF_MEASUREMENT
 
+from . import power_topology
 from .const import CONF_ENDPOINTS
+from .data_model import espmatter_names
 from .data_model.attributes import SensorAttribute
 from .data_model.clusters import CLUSTERS_BY_NAME
 from .data_model.units import (
@@ -26,8 +28,6 @@ from .data_model.units import (
     concentration_default_unit,
     concentration_scale,
 )
-from .data_model import espmatter_names
-from . import power_topology
 
 _LOGGER = logging.getLogger(__name__)
 

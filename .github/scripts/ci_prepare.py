@@ -169,7 +169,9 @@ def ensure_secrets(directory: Path, text: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
-    ap.add_argument("--toolchain", choices=("keep", "esp-idf", "platformio"), default="keep")
+    ap.add_argument(
+        "--toolchain", choices=("keep", "esp-idf", "platformio"), default="keep"
+    )
     ap.add_argument("--no-local-components", action="store_true")
     args = ap.parse_args()
 
