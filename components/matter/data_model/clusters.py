@@ -261,7 +261,7 @@ class Cluster:
     def schema(self):
         schema = {}
         if self.features:
-                    schema[cv.Optional(CONF_WITH_FEATURES, default=list)] = cv.ensure_list(
+            schema[cv.Optional(CONF_WITH_FEATURES, default=list)] = cv.ensure_list(
                 self._validate_feature_name
             )
         return schema

@@ -149,6 +149,7 @@ protected:
   void finish_command_windows_();
   bool light_group_suppressed_(uint32_t now) const;
   bool color_group_suppressed_(uint32_t now) const;
+  bool color_window_open_(uint32_t now) const;
   void remember_applied_values_();
   bool add_color_to_call_(light::LightCall &call,
                           const MatterLightColorUpdate &color, bool force);
@@ -167,6 +168,8 @@ protected:
   // Written on the CHIP task when the command is decoded.
   std::atomic<bool> color_loop_requested_{false};
   uint32_t settle_retries_{0};
+  // Counts the opened colour windows, so a delayed close only closes its own.
+  uint32_t color_window_generation_{0};
 
   // Main loop only.
   MatterLightPendingUpdate pending_;

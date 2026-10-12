@@ -12,7 +12,8 @@ from esphome.components import light
 from esphome.config import Config
 from esphome.const import CONF_LIGHT_ID, CONF_NAME, CONF_RESTORE_MODE
 
-from .const import CONF_ENDPOINTS, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_WITH_FEATURES
+from .const import CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_WITH_FEATURES
+from .util import iter_bound_entities, restore_warning
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,6 +85,10 @@ def _warn_transition_rounding(value):
     return value
 
 
+# Range of a color_temperature_light whose light has none (6500 K to 2000 K).
+DEFAULT_MIN_MIREDS = 153
+DEFAULT_MAX_MIREDS = 500
+
 # Light platforms that have a color temperature range.
 COLOR_TEMPERATURE_PLATFORMS = ("rgbct", "rgbww", "cwww")
 
@@ -99,25 +104,42 @@ def light_has_color_temperature(light_config) -> bool:
 
 
 def warn_missing_color_temperature(matter_config: dict, full_config: Config) -> None:
-    """Say that an RGB only light isn't a conformant Extended Color Light."""
-    for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
-        device_config = endpoint_config.get("extended_color_light")
-        if not isinstance(device_config, dict):
+    """Warn about a light without a color temperature range on a CT device type.
+
+    An extended_color_light then doesn't advertise ColorTemperature (not
+    conformant to the device type). A color_temperature_light can't without it
+    and gets a default range (153 to 500 mireds) that the light can't follow.
+    """
+    for endpoint_id, device_type, _, light_id, light_config in iter_bound_entities(
+        matter_config, full_config, CONF_LIGHT_ID
+    ):
+        if device_type not in ("extended_color_light", "color_temperature_light"):
             continue
-        light_id = device_config.get(CONF_LIGHT_ID)
-        light_config = _light_config(full_config, light_id) if light_id else None
-        if light_config is None or light_has_color_temperature(light_config):
+        if light_has_color_temperature(light_config):
             continue
-        _LOGGER.warning(
-            "Light '%s' has no color temperature range, so Matter endpoint %s "
-            "(extended_color_light) doesn't advertise the ColorTemperature feature. "
-            "The Matter specification requires ColorTemperature for this device "
-            "type, so controllers and certification tools may consider the endpoint "
-            "non-conformant. Controllers that follow the features show no color "
-            "temperature control for it.",
-            light_id,
-            endpoint_id,
-        )
+        if device_type == "extended_color_light":
+            _LOGGER.warning(
+                "Light '%s' has no color temperature range, so Matter endpoint %s "
+                "(extended_color_light) doesn't advertise the ColorTemperature "
+                "feature. The Matter specification requires ColorTemperature for "
+                "this device type, so controllers and certification tools may "
+                "consider the endpoint non-conformant. Controllers that follow the "
+                "features show no color temperature control for it.",
+                light_id,
+                endpoint_id,
+            )
+        else:
+            _LOGGER.warning(
+                "Light '%s' has no color temperature range but Matter endpoint %s "
+                "is a color_temperature_light: it advertises a default range of "
+                "%d to %d mireds that the light can't follow. Use a light with "
+                "cold_white_color_temperature and warm_white_color_temperature, "
+                "or a dimmable_light (or extended_color_light for RGB).",
+                light_id,
+                endpoint_id,
+                DEFAULT_MIN_MIREDS,
+                DEFAULT_MAX_MIREDS,
+            )
 
 
 def light_schema_options(device_type) -> dict:
@@ -152,6 +174,16 @@ def validate_light_binding(device_type):
 
     def validator(config):
         light_bound = CONF_LIGHT_ID in config
+        if (
+            CONF_MIN_LEVEL in config
+            and CONF_MAX_LEVEL in config
+            and config[CONF_MIN_LEVEL] > config[CONF_MAX_LEVEL]
+        ):
+            raise cv.Invalid(
+                f"{CONF_MIN_LEVEL} ({config[CONF_MIN_LEVEL]}) is higher than "
+                f"{CONF_MAX_LEVEL} ({config[CONF_MAX_LEVEL]})",
+                path=[CONF_MIN_LEVEL],
+            )
         if not light_bound:
             for key in (CONF_ON_OFF_TRANSITION_TIME, CONF_COLOR_LOOP_EFFECT):
                 if key in config:
@@ -190,37 +222,22 @@ def light_effect_names(light_config) -> list[str]:
     return names
 
 
-def _light_config(full_config: Config, light_id):
-    try:
-        path = full_config.get_path_for_id(light_id)[:-1]
-        return full_config.get_config_for_path(path)
-    except KeyError:
-        return None
-
-
 def validate_light_effects(matter_config: dict, full_config: Config) -> None:
     """The color loop effect has to exist on the bound light."""
-    for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
-        for device_config in endpoint_config.values():
-            if not isinstance(device_config, dict):
-                continue
-            effect = device_config.get(CONF_COLOR_LOOP_EFFECT)
-            light_id = device_config.get(CONF_LIGHT_ID)
-            if effect is None or light_id is None:
-                continue
-            light_config = _light_config(full_config, light_id)
-            if light_config is None:
-                continue
-            names = light_effect_names(light_config)
-            if effect.lower() not in (name.lower() for name in names):
-                available = (
-                    f"it has: {', '.join(names)}" if names else "it has no effects"
-                )
-                raise cv.Invalid(
-                    f"Matter endpoint {endpoint_id}: {CONF_COLOR_LOOP_EFFECT} "
-                    f"'{effect}' is not an effect of light '{light_id}' ({available}). "
-                    "ColorLoopSet runs this effect on the light"
-                )
+    for endpoint_id, _, device_config, light_id, light_config in iter_bound_entities(
+        matter_config, full_config, CONF_LIGHT_ID
+    ):
+        effect = device_config.get(CONF_COLOR_LOOP_EFFECT)
+        if effect is None:
+            continue
+        names = light_effect_names(light_config)
+        if effect.lower() not in (name.lower() for name in names):
+            available = f"it has: {', '.join(names)}" if names else "it has no effects"
+            raise cv.Invalid(
+                f"Matter endpoint {endpoint_id}: {CONF_COLOR_LOOP_EFFECT} "
+                f"'{effect}' is not an effect of light '{light_id}' ({available}). "
+                "ColorLoopSet runs this effect on the light"
+            )
 
 
 def _restore_description(light_config) -> str | None:
@@ -240,25 +257,14 @@ def light_restore_warning(matter_config: dict, full_config: Config) -> None:
     A light that also restores its own state turns on or off at boot before
     Matter has applied its power-on behaviour, and the two can disagree.
     """
-    for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
-        for device_config in endpoint_config.values():
-            if not isinstance(device_config, dict):
-                continue
-            light_id = device_config.get(CONF_LIGHT_ID)
-            if light_id is None:
-                continue
-            light_config = _light_config(full_config, light_id)
-            if light_config is None:
-                continue
-            restore = _restore_description(light_config)
-            if restore is not None:
-                _LOGGER.warning(
-                    "Light '%s' is exposed through Matter with %s and should use "
-                    "restore_mode: ALWAYS_OFF so Matter can restore its power-on state "
-                    "(StartUpOnOff and StartUpCurrentLevel)",
-                    light_id,
-                    restore,
-                )
+    restore_warning(
+        matter_config,
+        full_config,
+        CONF_LIGHT_ID,
+        "Light",
+        _restore_description,
+        " (StartUpOnOff and StartUpCurrentLevel)",
+    )
 
 
 def level_attribute_names(oo_enabled: bool) -> tuple[str, ...]:
@@ -277,7 +283,7 @@ def initial_value_lines(attribute_name: str, device_config: dict) -> list[str]:
         return [
             "  {",
             f"    esp_matter_attr_val_t transition_val = esp_matter_uint16({deciseconds});",
-            f"    if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)",
+            "    if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)",
             "      return false;",
             "  }",
         ]
