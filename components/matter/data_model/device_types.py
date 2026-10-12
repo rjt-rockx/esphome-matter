@@ -247,6 +247,12 @@ class DeviceType:
             and "cover_id" not in config
         ):
             raise cv.Invalid("end_product_type requires cover_id")
+        if (
+            self.name == "window_covering"
+            and config.get("closure_compat")
+            and "cover_id" not in config
+        ):
+            raise cv.Invalid("closure_compat requires cover_id")
         if self.name == "closure":
             from ..closure import validate_closure_features
 

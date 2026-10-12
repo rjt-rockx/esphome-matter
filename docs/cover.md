@@ -129,7 +129,14 @@ This creates a Closure device type with the Closure Control cluster (Positioning
 | `position` | `OverallCurrentState.Position` FullyClosed, FullyOpened, PartiallyOpened (null while unknown) |
 | direction of travel | `OverallTargetState.Position` MoveToFullyOpen / MoveToFullyClosed while moving, otherwise null |
 | `MoveTo` command | cover open or close (other target positions are rejected with ConstraintError) |
-| `Stop` command | cover stop (rejected with Failure when the cover has no stop action) |
+| `Stop` command | cover stop (Success, but a no-op, when the cover has no stop action) |
+
+`cover_id` is required: without a cover there is no delegate and the Closure Control cluster would not exist. A cover can
+be bound to one `window_covering` or `closure` endpoint only. `Stop` on a cover without a stop action returns
+Success and does nothing; the cluster state is then re-synchronised from the cover, which keeps reporting Moving until
+it stops by itself. `MovementCompleted` is only emitted when a movement ends at its target end, not after an
+interrupted stop or a `MoveTo` toward the end the cover is already at. FullyClosed and FullyOpened are only reported
+when the cover is idle at an end (within 1%); while moving the position is PartiallyOpened.
 
 Limitations: only the Positioning feature is served (no latching, speed, ventilation, pedestrian, calibration), so
 `with_features` may only contain `Positioning`. `SecureState` is reported as unknown. No Closure Panel child endpoint

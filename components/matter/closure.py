@@ -26,21 +26,20 @@ WINDOW_COVERING_CLASSES = ("blind", "shade", "curtain", "awning", "shutter", "wi
 
 
 def schema_options() -> dict:
-    return {cv.Optional(CONF_COVER_ID): cv.use_id(cover.Cover)}
+    # Without a cover there is no delegate, the SDK never registers the Closure
+    # Control server and the cluster would not exist on the node.
+    return {cv.Required(CONF_COVER_ID): cv.use_id(cover.Cover)}
 
 
 def validate_closure_features(config: dict) -> dict:
-    """With a bound cover only the Positioning feature is supported; it is always enabled."""
-    if CONF_COVER_ID not in config:
-        return config
+    """Only the Positioning feature is supported by the cover binding; it is always enabled."""
     unsupported = [
         name for name in config.get(CONF_WITH_FEATURES, ()) if name not in BOUND_FEATURES
     ]
     if unsupported:
         raise cv.Invalid(
             "closure: the cover binding only supports the Positioning feature. Remove "
-            f"{', '.join(unsupported)} from with_features, or remove cover_id and drive "
-            "the cluster with matter.set_attribute",
+            f"{', '.join(unsupported)} from with_features",
             path=[CONF_WITH_FEATURES],
         )
     config = dict(config)
@@ -53,7 +52,7 @@ def validate_closure_bindings(matter_config: dict, full_config: Config) -> None:
 
     for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
         device_config = endpoint_config.get(CLOSURE)
-        if not isinstance(device_config, dict) or CONF_COVER_ID not in device_config:
+        if not isinstance(device_config, dict):
             continue
         _LOGGER.warning(
             "Endpoint uses the experimental Matter 1.5 `closure` device type: no "
@@ -71,10 +70,31 @@ def validate_closure_bindings(matter_config: dict, full_config: Config) -> None:
             )
 
 
+def validate_unique_cover_bindings(matter_config: dict) -> None:
+    """A cover can be bound to one window_covering or closure endpoint only."""
+    from .covers import WINDOW_COVERING
+
+    seen: dict[str, str] = {}
+    for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
+        for key in (WINDOW_COVERING, CLOSURE):
+            device_config = endpoint_config.get(key)
+            if not isinstance(device_config, dict) or CONF_COVER_ID not in device_config:
+                continue
+            cover_id = str(device_config[CONF_COVER_ID])
+            place = f"endpoint {endpoint_id} ({key})"
+            if cover_id in seen:
+                raise cv.Invalid(
+                    f"Cover '{cover_id}' is bound to {seen[cover_id]} and {place}. A cover "
+                    "can be exposed through one Window Covering or Closure endpoint only; "
+                    "use a second template cover that forwards to it if you need both"
+                )
+            seen[cover_id] = place
+
+
 async def register_entity(
     var, endpoint_id: int, device_type_name: str, device_config: dict
 ) -> None:
-    if device_type_name == CLOSURE and CONF_COVER_ID in device_config:
+    if device_type_name == CLOSURE:
         cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
         # Compiles matter_closure.cpp (it needs the Closure Control cluster of esp-matter).
         cg.add_define("USE_MATTER_CLOSURE")
@@ -84,7 +104,7 @@ async def register_entity(
 def device_config_lines(
     device_type_name: str, config_var: str, endpoint_id: int, device_config: dict
 ) -> list[str]:
-    if device_type_name == CLOSURE and CONF_COVER_ID in device_config:
+    if device_type_name == CLOSURE:
         return [
             f"{config_var}.closure_control.delegate = "
             f"esphome::matter::get_closure_delegate({endpoint_id});"

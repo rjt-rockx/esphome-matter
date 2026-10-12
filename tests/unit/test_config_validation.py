@@ -579,3 +579,71 @@ def test_unbound_choice_feature_device_types_rejected(run_config, device_type):
     )
     assert not result.ok
     assert "features" in result.output.lower()
+
+
+def test_closure_requires_cover_id(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                with_features: [Positioning]
+        """
+    )
+    assert not result.ok
+    assert "cover_id" in result.output
+    assert "set_attribute" not in result.output
+
+
+def test_closure_compat_requires_cover_id(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                closure_compat: true
+        """
+    )
+    assert not result.ok
+    assert "closure_compat requires cover_id" in result.output
+
+
+def test_cover_bound_to_two_endpoints_rejected(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+            2:
+              closure:
+                cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "bound to" in result.output
+
+
+def test_cover_bound_to_two_window_coverings_rejected(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+            2:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "bound to" in result.output

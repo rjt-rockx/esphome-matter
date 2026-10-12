@@ -75,6 +75,8 @@ def validate_cover_bindings(matter_config: dict, full_config: Config) -> None:
         if cover_id is None:
             if CONF_END_PRODUCT_TYPE in device_config:
                 raise cv.Invalid("end_product_type requires cover_id")
+            if device_config.get(CONF_CLOSURE_COMPAT):
+                raise cv.Invalid("closure_compat requires cover_id")
             continue
         if device_config.get(CONF_WITH_FEATURES):
             raise cv.Invalid(
