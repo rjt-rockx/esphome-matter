@@ -96,7 +96,7 @@ Only `ESP32` targets built with the **ESP-IDF** framework are supported. The Ard
 
 - **Matter-over-Wi-Fi**: configure `wifi`. The device announces itself over mDNS and is commissioned on the network.
 - **Matter-over-Thread**: configure `openthread`. Needs ESPHome **2026.6.0** or newer and a Thread border router.
-- **Matter-over-Ethernet**: not supported yet.
+- **Matter-over-Ethernet**: experimental. If `ethernet` is configured, Matter uses the ESPHome Ethernet interface, see [docs/ethernet.md](docs/ethernet.md). Based on work by [romanstanek](https://github.com/romanstanek/esphome-matter). Untested on hardware.
 - **BLE commissioning**: automatic when no `wifi`, `openthread` or `ethernet` component is configured (Matter then owns the radio; ESPHome `api`/`ota` are unreachable). Untested on hardware. See [docs/ble-commissioning.md](docs/ble-commissioning.md).
 
 `ESP32-C3`, `ESP32-C5`, `ESP32-C6`, `ESP32-S3` and `ESP32-H2` have been reported to work. Classic `ESP32` is Wi-Fi only and not validated. Flash is tight on 4 MB boards, see [troubleshooting](docs/troubleshooting.md#flash-size-especially-on-4-mb-boards).

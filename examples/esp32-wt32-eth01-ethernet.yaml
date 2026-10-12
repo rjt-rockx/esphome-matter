@@ -1,0 +1,40 @@
+esphome:
+  name: matter-ethernet
+
+# WT32-ETH01: ESP32 with an onboard LAN8720 PHY. Matter runs over Ethernet only, so no wifi,
+# BLE or Thread is needed. See docs/ethernet.md.
+esp32:
+  variant: ESP32
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://DavidvtWout/esphome-matter@main
+
+logger:
+
+api:
+  reboot_timeout: 0s # Matter operation does not require an ESPHome API client.
+
+network:
+  enable_ipv6: true # required by Matter
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk:
+    pin: GPIO0
+    mode: CLK_OUT
+  phy_addr: 1
+  power_pin: GPIO16
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor:
+        temperature: internal_temp
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp
