@@ -39,6 +39,7 @@ esphome-matter is an experimental ESPHome external component that exposes ESPHom
 - [ecosystems.md](ecosystems.md): pairing guide for Apple, Google, Alexa, SmartThings, Home Assistant and IKEA.
 - [ble-commissioning.md](ble-commissioning.md): commissioning over Bluetooth LE.
 - [ethernet.md](ethernet.md): Matter over Ethernet (experimental).
+- [icd.md](icd.md): battery powered Thread devices, Matter ICD and light sleep (experimental, unverified).
 - [device-info.md](device-info.md): device info, Identify and the fabric limit.
 - [matter-ota.md](matter-ota.md): Matter OTA and the `.ota` image tool.
 - [troubleshooting.md](troubleshooting.md): IPv6/mDNS, build size, Thread.

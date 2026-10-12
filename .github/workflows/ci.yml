@@ -298,6 +298,8 @@ jobs:
           - c6-wifi
           - c6-thread
           - h2-thread
+          - h2-icd
+          - c6-icd
           - s3-wifi
           - c3-wifi
           - c6-closure
@@ -308,6 +310,8 @@ jobs:
           - { slug: c6-wifi, name: C6 wifi, variant: ESP32C6, config: tests/configs/esp32-wifi.yaml }
           - { slug: c6-thread, name: C6 thread, variant: ESP32C6, config: tests/configs/esp32-thread.yaml }
           - { slug: h2-thread, name: H2 thread, variant: ESP32H2, config: tests/configs/esp32-thread.yaml }
+          - { slug: h2-icd, name: H2 thread ICD (SIT), variant: ESP32H2, config: tests/configs/esp32-h2-icd.yaml }
+          - { slug: c6-icd, name: C6 thread ICD (LIT), variant: ESP32C6, config: tests/configs/esp32-c6-icd.yaml }
           - { slug: s3-wifi, name: S3 wifi, variant: ESP32S3, config: tests/configs/esp32-wifi.yaml }
           - { slug: c6-power-source, name: C6 power source, variant: ESP32C6, config: tests/configs/esp32-power-source.yaml }
           - { slug: c6-light-bindings, name: C6 light bindings, variant: ESP32C6, config: tests/configs/esp32-light-bindings.yaml }

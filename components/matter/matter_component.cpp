@@ -9,6 +9,7 @@
 #include "esphome/core/log.h"
 #include "matter_commissioning.h"
 #include "matter_component.h"
+#include "matter_icd.h"
 #include "matter_identify.h"
 #include "matter_network.h"
 #include "matter_plan.h"
@@ -19,6 +20,9 @@
 #include <cstring>
 #include <esp_matter_client.h>
 #include <nvs.h>
+#ifdef USE_MATTER_ICD_LIGHT_SLEEP
+#include <esp_pm.h>
+#endif
 #include <string>
 
 #include <app/server/Server.h>
@@ -235,6 +239,14 @@ void MatterComponent::setup() {
 
   esp_matter::node::config_t node_config;
   device_info_fill_root_config(this->device_info_, node_config);
+#ifdef USE_MATTER_ICD_LIT
+  // User Active Mode Trigger (mandatory with LIT): how the user can wake the device. The ICD Management cluster
+  // reads both when the server starts, so they must be in the attribute store before esp_matter::start().
+  node_config.root_node.icd_user_active_mode_trigger.user_active_mode_trigger_hint = MATTER_ICD_UAT_HINT;
+  snprintf(node_config.root_node.icd_user_active_mode_trigger.user_active_mode_trigger_instruction,
+           sizeof(node_config.root_node.icd_user_active_mode_trigger.user_active_mode_trigger_instruction), "%s",
+           MATTER_ICD_UAT_INSTRUCTION);
+#endif
   esp_matter::node_t *node = esp_matter::node::create(
       &node_config, endpoint_attribute_update_cb, matter_identification_cb);
   if (node == nullptr) {
@@ -261,6 +273,27 @@ void MatterComponent::setup() {
   }
 #endif // USE_OPENTHREAD
 
+#ifdef USE_MATTER_ICD_LIGHT_SLEEP
+  // Automatic light sleep: the CPU sleeps whenever FreeRTOS is idle (tickless idle), and the 802.15.4 driver holds a PM
+  // lock while the radio is awake. Nobody else calls esp_pm_configure() in an ESPHome firmware.
+#if CONFIG_PM_ENABLE && CONFIG_FREERTOS_USE_TICKLESS_IDLE
+  {
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+        .min_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+        .light_sleep_enable = true,
+    };
+    esp_err_t pm_err = esp_pm_configure(&pm_config);
+    if (pm_err != ESP_OK)
+      ESP_LOGE(TAG, "esp_pm_configure (light sleep) failed: %s", esp_err_to_name(pm_err));
+    else
+      ESP_LOGI(TAG, "ICD light sleep enabled");
+  }
+#else
+  ESP_LOGE(TAG, "matter: icd: light_sleep is on but CONFIG_PM_ENABLE / CONFIG_FREERTOS_USE_TICKLESS_IDLE are not set");
+#endif
+#endif // USE_MATTER_ICD_LIGHT_SLEEP
+
   /* Matter start */
   device_info_install_provider(this->device_info_);
   esp_err_t err = esp_matter::start(event_callback);
@@ -273,6 +306,9 @@ void MatterComponent::setup() {
   }
 
   device_info_apply_post_start(this->device_info_);
+#ifdef USE_MATTER_ICD
+  MatterIcd::instance().start();
+#endif
   esp_matter::client::binding_manager_init();
   replay_attribute_triggers(this);
   this->initialize_endpoint_mappings_();

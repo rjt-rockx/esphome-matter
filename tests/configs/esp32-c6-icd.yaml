@@ -1,0 +1,65 @@
+# EXPERIMENTAL, not verified on hardware: battery powered Thread sensor, Long Idle Time ICD (docs/icd.md).
+esphome:
+  name: matter-ci-c6-icd
+  suspend_loop: true
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  toolchain: platformio
+  variant: ${esp32_variant}
+  watchdog_timeout: 60s
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+  baud_rate: 0
+
+network:
+  enable_ipv6: true
+
+openthread:
+  device_type: MTD
+  poll_period: 15s
+  network_key: 0xdfd34f0f05cad978ec4e32b0413038ff
+  network_name: matter-ci-icd
+  pan_id: 0x1234
+  channel: 15
+
+matter:
+  icd:
+    mode: lit
+    slow_poll_interval: 20s
+    idle_interval: 600s
+    active_threshold: 5s
+    clients_per_fabric: 2
+    uat_hint: [custom_instruction]
+    uat_instruction: Press the button
+    on_active:
+      - component.update: internal_temp
+    on_idle:
+      - logger.log: ICD idle
+  endpoints:
+    1:
+      temperature_sensor: internal_temp
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp
+    update_interval: never
+
+binary_sensor:
+  - platform: gpio
+    id: wake_button
+    pin:
+      number: GPIO2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    on_press:
+      - matter.icd.trigger_active

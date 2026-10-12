@@ -71,7 +71,7 @@ Matter-over-Thread requires the `openthread` component, ESPHome 2026.6.0 or newe
 - **Border router and fabrics.** Apple border routers can block mDNS traffic needed for Thread OTA; this does not matter if you update through ESPHome OTA, but it does for controller-driven [Matter OTA](matter-ota.md).
 - **Known issue.** Because ESPHome initializes the OpenThread stack, the Matter network name can show up wrong (garbage) in some controllers. The real fix needs support in connectedhomeip for an externally managed OpenThread stack.
 - **Debugging.** See [dev/thread-debugging.md](dev/thread-debugging.md) for `ot-ctl` and mDNS commands.
-- **Sleepy end devices.** Not supported in ESPHome's OpenThread component at the time of writing. Do not assume battery-friendly Thread behaviour.
+- **Sleepy end devices.** Without `matter: icd:` the device is a normal (always listening) Thread device, and ESPHome's main loop and `api:` keep it awake: do not assume battery-friendly behaviour. `matter: icd:` adds an experimental, hardware-unverified sleepy end device mode, see [icd.md](icd.md).
 - Wi-Fi/Thread/BLE coexistence is not implemented.
 
 ## Setup code and reset

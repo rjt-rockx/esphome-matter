@@ -17,6 +17,7 @@ The [examples/](../examples/) directory holds complete ESPHome configs. They are
 | [door-and-motion.yaml](../examples/door-and-motion.yaml) | Contact and occupancy sensors | [binary-sensors.md](binary-sensors.md) |
 | [all-sensors.yaml](../examples/all-sensors.yaml) | Environmental, air quality and electrical sensors with a battery | [sensors.md](sensors.md) |
 | [wireless-button.yaml](../examples/wireless-button.yaml) | Stateless button (generic switch) | [generic-switch.md](generic-switch.md) |
+| [battery-thread-sensor.yaml](../examples/battery-thread-sensor.yaml) | Battery powered Thread sensor (ICD, light sleep; experimental) | [icd.md](icd.md) |
 | [esp32-dimmer-button.yaml](../examples/esp32-dimmer-button.yaml) | A dimmer switch (over Thread) that controls another Matter light through a binding | [binding.md](binding.md) |
 | [commissioning.yaml](../examples/commissioning.yaml) | Pairing text sensors and commissioning triggers | [commissioning.md](commissioning.md) |
 | [identify-status-led.yaml](../examples/identify-status-led.yaml) | Identify action driving a status LED | [device-info.md](device-info.md) |

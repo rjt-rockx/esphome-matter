@@ -6,7 +6,7 @@ repository. All of them can be reproduced locally.
 | Check | What it runs | Inputs |
 |---|---|---|
 | Config validation | `esphome config` | every `tests/configs/*.yaml` and `examples/*.yaml` (glob, new files are picked up automatically) |
-| Compile matrix | `esphome compile` | `esp32-wifi.yaml` on C6 / S3 / C3, `esp32-thread.yaml` on C6 / H2 |
+| Compile matrix | `esphome compile` | `esp32-wifi.yaml` on C6 / S3 / C3, `esp32-thread.yaml` on C6 / H2, `esp32-h2-icd.yaml` (ICD SIT) on H2, `esp32-c6-icd.yaml` (ICD LIT) on C6 |
 | Lint (non-blocking) | `ruff`, `clang-format` | `components/`, `.github/`, `tests/` |
 
 To add a test config, drop a YAML file into `tests/configs/`. Use
@@ -61,7 +61,7 @@ rm "$cfg"
 ```
 
 Variants used in CI: `esp32-wifi.yaml` with `ESP32C6`, `ESP32S3`, `ESP32C3`;
-`esp32-thread.yaml` with `ESP32C6`, `ESP32H2`. The variant is passed with
+`esp32-thread.yaml` with `ESP32C6`, `ESP32H2`; `esp32-h2-icd.yaml` with `ESP32H2`; `esp32-c6-icd.yaml` with `ESP32C6`. The variant is passed with
 `-s esp32_variant <VARIANT>` (the configs read it as a substitution).
 
 Speed-ups, all used by CI:
