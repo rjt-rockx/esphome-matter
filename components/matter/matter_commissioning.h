@@ -27,6 +27,12 @@ struct CommissioningState {
   // currently known to the device (see docs/commissioning.md).
   std::string qr_code;
   std::string manual_code;
+  // A commissioning window could not be opened or the passcode could not be
+  // generated. Cleared by the next window opening or commissioning.
+  bool error{false};
+  // "<fabric index>: <label> (vendor 0xNNNN)" per fabric, "; " separated.
+  // Empty without fabrics. The index is what matter.remove_fabric takes.
+  std::string controllers;
 };
 
 // persist_passcode: false / true / until_commissioned.
@@ -58,13 +64,17 @@ public:
   // is re-opened instead (with a fresh passcode if the current one is unknown).
   void open_window(uint32_t timeout_s);
 
-  // Main loop. Removes all fabrics plus esp-matter and CHIP persistent data,
-  // then reboots. The commissioning identity (salt, verifier, discriminator) is
-  // kept; without a known passcode the next boot derives a fresh one.
+  // Any thread. Removes all fabrics plus esp-matter and CHIP persistent data,
+  // then reboots. The work runs on the CHIP task (which owns the stack lock).
+  // The commissioning identity (salt, verifier, discriminator) is kept; without
+  // a known passcode the next boot derives a fresh one.
   void factory_reset();
   // Like factory_reset() but also erases the commissioning identity, so a new
   // passcode and discriminator are generated on the next boot.
   void reset_identity();
+  // Any thread. Removes one fabric (CHIP task). Removing the last fabric makes
+  // the device commissionable again, like the RemoveFabric command.
+  void remove_fabric(uint8_t fabric_index);
 
   const CommissioningState &state() const { return this->state_; }
   void add_state_callback(std::function<void()> &&cb) {
@@ -105,6 +115,10 @@ protected:
   void erase_identity_keys_();
   void erase_passcode_key_();
   bool regenerate_identity_();
+  void factory_reset_on_chip_task_(bool erase_identity);
+  void set_error_(bool error);
+
+  std::atomic<bool> error_{false};
 
   Identity identity_;
   PersistPasscode persist_passcode_{PersistPasscode::NEVER};
@@ -150,6 +164,16 @@ public:
     uint32_t t = this->timeout_.value(x...);
     t = t < 180 ? 180 : (t > 900 ? 900 : t);
     MatterCommissioning::instance().open_window(t);
+  }
+};
+
+template <typename... Ts>
+class MatterRemoveFabricAction : public Action<Ts...> {
+public:
+  TEMPLATABLE_VALUE(uint8_t, fabric_index)
+  void play(const Ts &...x) override {
+    MatterCommissioning::instance().remove_fabric(
+        this->fabric_index_.value(x...));
   }
 };
 

@@ -126,7 +126,7 @@ The value is a raw matter value, usually some kind of integer. More complicated 
 
 - `matter.send_event` emits a Matter event from a local cluster (`path: endpoint.cluster.event`, or `endpoint`/`cluster`/`event`, plus `fields`). For switch events see [generic-switch.md](generic-switch.md), which has the dedicated `matter.send_switch_event`. The available events are listed in [generated/events](generated/events.md).
 - `matter.factory_reset` wipes the fabrics and reopens commissioning. See [troubleshooting.md](troubleshooting.md).
-- `matter.open_commissioning_window` and `matter.reset_identity` are described in [commissioning.md](commissioning.md).
+- `matter.open_commissioning_window`, `matter.remove_fabric` and `matter.reset_identity` are described in [commissioning.md](commissioning.md).
 - `matter._send_command` is an unstable escape hatch for commands that the data model does not know about (`endpoint_id`, `cluster_id`, `command_id` and a raw esp-matter JSON `data` string). The older per-command actions named `matter.<cluster>.<command>` still exist but are deprecated and log a warning; use `matter.send_command` instead.
 
 # Cluster commands

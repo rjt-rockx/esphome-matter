@@ -4,6 +4,7 @@
 #include "matter_commissioning.h"
 
 #include "esphome/core/log.h"
+#include "matter_attributes.h"
 #include "matter_component.h"
 
 #include <sdkconfig.h>
@@ -337,6 +338,20 @@ void MatterCommissioning::refresh_(bool log_codes, bool publish) {
   s.valid = true;
   s.window_open = wm.IsCommissioningWindowOpen();
   s.fabric_count = server.GetFabricTable().FabricCount();
+  s.error = this->error_.load();
+  for (const auto &fabric : server.GetFabricTable()) {
+    char head[16];
+    snprintf(head, sizeof(head), "%u: ", (unsigned) fabric.GetFabricIndex());
+    char tail[24];
+    snprintf(tail, sizeof(tail), " (vendor 0x%04X)",
+             (unsigned) static_cast<uint16_t>(fabric.GetVendorId()));
+    const chip::CharSpan label = fabric.GetFabricLabel();
+    if (!s.controllers.empty())
+      s.controllers += "; ";
+    s.controllers += head;
+    s.controllers.append(label.data(), label.size());
+    s.controllers += tail;
+  }
   if (s.window_open) {
     using chip::app::Clusters::AdministratorCommissioning::
         CommissioningWindowStatusEnum;
@@ -435,6 +450,7 @@ void MatterCommissioning::handle_event(const chip::DeviceLayer::ChipDeviceEvent 
     this->on_server_ready_();
     break;
   case chip::DeviceLayer::DeviceEventType::kCommissioningWindowOpened:
+    this->error_ = false;
     this->refresh_(true);
     break;
   case chip::DeviceLayer::DeviceEventType::kCommissioningWindowClosed:
@@ -447,6 +463,7 @@ void MatterCommissioning::handle_event(const chip::DeviceLayer::ChipDeviceEvent 
     this->refresh_(false);
     break;
   case chip::DeviceLayer::DeviceEventType::kCommissioningComplete:
+    this->error_ = false;
     if (this->persist_passcode_ != PersistPasscode::ALWAYS &&
         !this->fixed_passcode_) {
       // Forget the passcode: from now on only the verifier exists. This also
@@ -467,6 +484,7 @@ void MatterCommissioning::handle_event(const chip::DeviceLayer::ChipDeviceEvent 
   case chip::DeviceLayer::DeviceEventType::kFabricRemoved:
     this->on_fabric_removed_();
     break;
+  case chip::DeviceLayer::DeviceEventType::kFabricUpdated: // label changed
   case chip::DeviceLayer::DeviceEventType::kFabricCommitted:
     this->refresh_(false);
     break;
@@ -498,11 +516,15 @@ void MatterCommissioning::open_window(uint32_t timeout_s) {
     const auto timeout = chip::System::Clock::Seconds32(timeout_s);
 
     if (server.GetFabricTable().FabricCount() == 0) {
-      if (!this->identity_.passcode_known && !this->regenerate_identity_())
+      if (!this->identity_.passcode_known && !this->regenerate_identity_()) {
+        this->set_error_(true);
         return;
+      }
       wm.CloseCommissioningWindow();
-      if (wm.OpenBasicCommissioningWindow(timeout) != CHIP_NO_ERROR)
+      if (wm.OpenBasicCommissioningWindow(timeout) != CHIP_NO_ERROR) {
         ESP_LOGW(TAG, "Failed to open the commissioning window");
+        this->set_error_(true);
+      }
       return;
     }
 
@@ -537,6 +559,7 @@ void MatterCommissioning::open_window(uint32_t timeout_s) {
                err.Format());
       this->ephemeral_active_ = false;
       this->ephemeral_passcode_ = 0;
+      this->set_error_(true);
     }
   });
 }
@@ -584,24 +607,54 @@ void MatterCommissioning::erase_identity_keys_() {
   nvs_close(h);
 }
 
+void MatterCommissioning::set_error_(bool error) {
+  this->error_ = error;
+  this->refresh_(false);
+}
+
+// Safe from any thread: all work happens on the CHIP task, which owns the
+// stack lock (esp_matter::factory_reset() touches the fabric table and ends in
+// ConfigurationMgr().InitiateFactoryReset()).
 void MatterCommissioning::factory_reset() {
   ESP_LOGW(TAG, "Matter factory reset: removing all fabrics and rebooting");
   this->resetting_ = true;
-  // Erases esp-matter's own KVS namespace, then asks the CHIP task to delete
-  // all fabrics, clear chip-config, chip-counters and the CHIP KVS (fabrics,
-  // ACLs, groups, sessions, subscriptions), restore the Wi-Fi settings and
-  // restart. Only the esp-matter step can report an error, and the CHIP part
-  // is scheduled regardless.
-  if (esp_matter::factory_reset() != ESP_OK)
-    ESP_LOGE(TAG, "Failed to erase the esp-matter data; the CHIP reset still runs");
+  run_on_matter_thread([this]() { this->factory_reset_on_chip_task_(false); });
 }
 
 void MatterCommissioning::reset_identity() {
   ESP_LOGW(TAG, "Matter identity reset: removing all fabrics and creating a "
                 "new passcode and discriminator on the next boot");
   this->resetting_ = true;
-  this->erase_identity_keys_();
-  this->factory_reset();
+  run_on_matter_thread([this]() { this->factory_reset_on_chip_task_(true); });
+}
+
+// CHIP task. Erases esp-matter's own KVS namespace, then asks the CHIP task
+// (this one) to delete all fabrics, clear chip-config, chip-counters and the
+// CHIP KVS (fabrics, ACLs, groups, sessions, subscriptions), restore the
+// Wi-Fi settings and restart. Only the esp-matter step can report an error,
+// and the CHIP part is scheduled regardless.
+void MatterCommissioning::factory_reset_on_chip_task_(bool erase_identity) {
+  if (erase_identity)
+    this->erase_identity_keys_();
+  if (esp_matter::factory_reset() != ESP_OK)
+    ESP_LOGE(TAG, "Failed to erase the esp-matter data; the CHIP reset still runs");
+}
+
+void MatterCommissioning::remove_fabric(uint8_t fabric_index) {
+  run_on_matter_thread([fabric_index]() {
+    auto &table = chip::Server::GetInstance().GetFabricTable();
+    if (table.FindFabricWithIndex(fabric_index) == nullptr) {
+      ESP_LOGW(TAG, "matter.remove_fabric: no fabric with index %u",
+               (unsigned) fabric_index);
+      return;
+    }
+    CHIP_ERROR err = table.Delete(fabric_index);
+    if (err != CHIP_NO_ERROR)
+      ESP_LOGW(TAG, "Failed to remove fabric %u: %" CHIP_ERROR_FORMAT,
+               (unsigned) fabric_index, err.Format());
+    else
+      ESP_LOGI(TAG, "Removed fabric %u", (unsigned) fabric_index);
+  });
 }
 
 } // namespace esphome::matter

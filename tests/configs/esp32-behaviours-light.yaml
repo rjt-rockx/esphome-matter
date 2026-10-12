@@ -1,0 +1,62 @@
+esphome:
+  name: matter-ci-behaviours-light
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+output:
+  - platform: ledc
+    id: led_pwm
+    pin: GPIO10
+
+light:
+  - platform: monochromatic
+    id: status_light
+    output: led_pwm
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    id: pair_button
+    pin:
+      number: GPIO11
+      mode: INPUT_PULLUP
+      inverted: true
+
+matter:
+  expose: []
+  status_led:
+    light: status_light
+    commissioned: false
+  pairing:
+    binary_sensor: pair_button
+    open_window_hold: 2s
+    factory_reset_hold: never
+  endpoints:
+    1:
+      on_off_light:
+
+interval:
+  - interval: 60s
+    then:
+      - matter.remove_fabric:
+          fabric_index: !lambda "return 2;"

@@ -32,6 +32,9 @@ void MatterTextSensor::update_() {
   case MatterTextSensorType::FABRIC_COUNT:
     value = std::to_string(s.fabric_count);
     break;
+  case MatterTextSensorType::CONTROLLERS:
+    value = s.controllers;
+    break;
   case MatterTextSensorType::COMMISSIONING_STATE:
     if (s.window_open)
       value = s.fabric_count == 0 ? "commissioning" : "window_open";

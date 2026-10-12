@@ -6,6 +6,8 @@ One `text_sensor` platform with optional sub-sensors:
   Empty unless a commissioning window is open and the passcode is known.
 * `commissioning_state`: uncommissioned | commissioning | window_open | commissioned
 * `fabric_count`: number of commissioned fabrics
+* `controllers`: `<fabric index>: <label> (vendor 0xNNNN)` per fabric, `; ` separated (the index is
+  what `matter.remove_fabric` takes)
 * `fabric_1` ... `fabric_N`: details of a commissioned fabric (compressed_fabric_id,
   fabric_id, label, node_id, vendor_id)
 """
@@ -36,6 +38,7 @@ FABRIC_KEYS = tuple(f"fabric_{index}" for index in range(1, 256))
 
 CONF_COMMISSIONING_STATE = "commissioning_state"
 CONF_FABRIC_COUNT = "fabric_count"
+CONF_CONTROLLERS = "controllers"
 
 MatterTextSensor = matter_ns.class_(
     "MatterTextSensor", text_sensor.TextSensor, cg.Component
@@ -52,6 +55,11 @@ COMMISSIONING_SENSORS = {
         False,
     ),
     CONF_FABRIC_COUNT: (MatterTextSensorType.FABRIC_COUNT, "mdi:counter", False),
+    CONF_CONTROLLERS: (
+        MatterTextSensorType.CONTROLLERS,
+        "mdi:account-network",
+        False,
+    ),
 }
 
 

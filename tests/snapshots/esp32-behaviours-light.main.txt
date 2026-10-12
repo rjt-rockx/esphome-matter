@@ -1,0 +1,24 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-behaviours-light");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  new(matter_matterbehaviours_id) matter::MatterBehaviours();
+  App.register_component_(matter_matterbehaviours_id, 4);
+  matter_matterbehaviours_id->set_status_light(status_light);
+  matter_matterbehaviours_id->set_status_led_enabled(true, false);
+  matter_matterbehaviours_id->set_pairing_sensor(pair_button);
+  matter_matterbehaviours_id->set_pairing(2000, 0, 300);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x3CFC84FE);
+  new(matter_matterremovefabricaction_id) matter::MatterRemoveFabricAction<>();
+  matter_matterremovefabricaction_id->set_fabric_index([]() -> uint8_t {
+      return 2;
+  });
+  automation_id->add_action(matter_matterremovefabricaction_id);

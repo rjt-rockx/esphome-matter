@@ -1,0 +1,42 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-behaviours");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  new(matter_matterdecommissionedtrigger_id) matter::MatterDecommissionedTrigger();
+  new(automation_id) Automation<>(matter_matterdecommissionedtrigger_id);
+  new(matter_matterbehaviours_id) matter::MatterBehaviours();
+  App.register_component_(matter_matterbehaviours_id, 4);
+  matter_matterbehaviours_id->set_status_output(status_led_out);
+  matter_matterbehaviours_id->set_status_led_enabled(true, true);
+  matter_matterbehaviours_id->set_pairing_sensor(pair_button);
+  matter_matterbehaviours_id->set_pairing(3000, 10000, 300);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x3CFC84FE);
+  new(matter_mattertextsensor_id_3) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_3, "Matter pairing code", 3176657465UL, 167837696);  // disabled_by_default, category:diagnostic, icon:mdi:key
+  App.register_component_(matter_mattertextsensor_id_3, 11);
+  matter_mattertextsensor_id_3->set_type(matter::MatterTextSensorType::PAIRING_CODE);
+  new(matter_mattertextsensor_id_4) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_4, "Matter QR code", 1535156712, 167903232);  // disabled_by_default, category:diagnostic, icon:mdi:qrcode
+  App.register_component_(matter_mattertextsensor_id_4, 11);
+  matter_mattertextsensor_id_4->set_type(matter::MatterTextSensorType::QR_CODE);
+  new(matter_mattertextsensor_id) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id, "Matter state", 3615238436UL, 134414336);  // category:diagnostic, icon:mdi:state-machine
+  App.register_component_(matter_mattertextsensor_id, 11);
+  matter_mattertextsensor_id->set_type(matter::MatterTextSensorType::COMMISSIONING_STATE);
+  new(matter_mattertextsensor_id_2) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_2, "Matter controllers", 866795476, 134479872);  // category:diagnostic, icon:mdi:account-network
+  App.register_component_(matter_mattertextsensor_id_2, 11);
+  matter_mattertextsensor_id_2->set_type(matter::MatterTextSensorType::CONTROLLERS);
+  new(matter_matterremovefabricaction_id) matter::MatterRemoveFabricAction<>();
+  matter_matterremovefabricaction_id->set_fabric_index([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_2->add_action(matter_matterremovefabricaction_id);

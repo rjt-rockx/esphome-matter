@@ -27,6 +27,8 @@ text_sensor:
       name: "Matter commissioning state"
     fabric_count:
       name: "Matter fabric count"
+    controllers: # 1: Home Assistant (vendor 0x4362); 2: Apple Home (vendor 0x1349)
+      name: "Matter controllers"
     fabric_1:
       compressed_fabric_id:
         name: "Matter fabric 1 compressed ID"
@@ -183,7 +185,99 @@ button:
 - `matter.factory_reset` removes all fabrics: it clears the esp-matter data and the CHIP configuration, counters and key-value store (fabrics, ACLs, groups, ...) via the CHIP task and reboots. The discriminator is kept and after the reboot the device is commissionable again. Unless `persist_passcode: true` or a `passcode:` in the YAML is set, a commissioned device no longer knows its passcode, so a fresh passcode is generated on that boot and shown in the log.
 - `matter.reset_identity` does the same and additionally erases the commissioning identity: a new passcode and discriminator are generated on the next boot. Previously printed codes become invalid. If `passcode:` or `discriminator:` are set in the YAML, those values are used again.
 
-Neither action asks for confirmation. Put them behind something deliberate (a long button press, a config-category button).
+- `matter.remove_fabric` removes one fabric (one controller/ecosystem) by its fabric index, like the `RemoveFabric` command. The device stays paired with the other controllers; removing the last fabric makes it commissionable again (and fires `on_decommissioned`). The fabric indexes are listed by the `controllers` text sensor (`fabric_index` is 1 to 254 and may be a lambda). An unknown index only logs a warning.
+
+```yaml
+button:
+  - platform: template
+    name: "Matter: forget controller 1"
+    entity_category: config
+    on_press:
+      - matter.remove_fabric:
+          fabric_index: 1
+```
+
+`matter.factory_reset` and `matter.reset_identity` run on the CHIP task (the work is queued from the main loop, nothing takes the CHIP lock on the main loop), so they are safe to call from any automation.
+
+None of these actions asks for confirmation. Put them behind something deliberate (a long button press, a config-category button, or the `pairing:` option below).
+
+## Status LED and pairing button
+
+Two optional `matter:` options give a device without a display a physical commissioning UX.
+
+```yaml
+output:
+  - platform: gpio
+    id: status_led_out
+    pin: GPIO10
+
+binary_sensor:
+  - platform: gpio
+    id: pair_button
+    pin:
+      number: GPIO11
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 30ms
+
+matter:
+  status_led:
+    output: status_led_out   # or `light: <light id>` (set `internal: true` on that light)
+    commissioned: on         # LED state once commissioned (on | off), default on
+  pairing:
+    binary_sensor: pair_button
+    open_window_hold: 3s     # default 3s (1s to 30s)
+    factory_reset_hold: 10s  # default 10s (5s to 60s), or `never` to disable
+    timeout: 5min            # how long the window stays open (3min to 15min)
+```
+
+`status_led` patterns:
+
+| State | LED |
+| --- | --- |
+| Not commissioned, no window open | slow blink (1 Hz) |
+| Commissioning window open | fast blink (4 Hz) |
+| Commissioned | steady `commissioned:` (on by default) |
+| Error: the commissioning window could not be opened | two short flashes, pause |
+| Before the first state is known (a second or two after boot) | off |
+
+`pairing` uses a `binary_sensor` (a `button:` entity has no press duration). The action happens when the button is **released**, while the LED confirms which stage is armed:
+
+| Held for | LED while held | On release |
+| --- | --- | --- |
+| less than `open_window_hold` | unchanged | nothing |
+| `open_window_hold` up to `factory_reset_hold` | medium blink (2 Hz) | opens the commissioning window (same as `matter.open_commissioning_window`); the LED flashes three times |
+| `factory_reset_hold` or longer | strobe (10 Hz) | `matter.factory_reset`; the LED strobes until the reboot |
+
+Safety properties: nothing happens while the button is down, a button that is already pressed at boot (or stuck, or a floating pin) is ignored until it was released once, a button held 15 s past the last threshold is treated as stuck and does nothing on release, and `factory_reset_hold` must be at least 3 s longer than `open_window_hold` so the first stage is seen before the second arms. Without `status_led` there is no confirmation, so keep `factory_reset_hold: never` if the button is easy to hold by accident.
+
+## Showing the pairing code on a display
+
+The manual pairing code and the QR payload (`MT:...`) are published by the `manual_pairing_code` and `qr_code` text sensors above, only while a window is open and the device knows the passcode. ESPHome's `web_server` lists text sensors like any other entity, so both codes appear there (protect it with `auth`); the `web_server` has no hook for a custom QR page, so the QR image itself is shown on a display with ESPHome's `qr_code` component:
+
+```yaml
+qr_code:
+  - id: matter_qr
+    value: "MT:"
+
+text_sensor:
+  - platform: matter
+    qr_code:
+      name: "Matter QR code"
+      on_value:
+        - lambda: |-
+            id(matter_qr).set_value(x);
+
+display:
+  - platform: ssd1306_i2c
+    # ...
+    lambda: |-
+      if (!id(matter_state).state.empty() && id(matter_state).state != "commissioned")
+        it.qr_code(0, 0, id(matter_qr), Color::WHITE, 2);
+```
+
+(`matter_state` is a `commissioning_state` text sensor with `internal: true` and `id: matter_state`.) Without a display, open the logged QR URL, or paste the payload into a QR generator.
 
 # Multiple fabrics
 

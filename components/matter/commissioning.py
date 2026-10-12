@@ -20,6 +20,7 @@ CONF_PERSIST_PASSCODE = "persist_passcode"
 PERSIST_UNTIL_COMMISSIONED = "until_commissioned"
 CONF_ON_COMMISSIONED = "on_commissioned"
 CONF_ON_DECOMMISSIONED = "on_decommissioned"
+CONF_FABRIC_INDEX = "fabric_index"
 
 MatterCommissionedTrigger = matter_ns.class_(
     "MatterCommissionedTrigger", automation.Trigger.template()
@@ -29,6 +30,9 @@ MatterDecommissionedTrigger = matter_ns.class_(
 )
 MatterOpenCommissioningWindowAction = matter_ns.class_(
     "MatterOpenCommissioningWindowAction", automation.Action
+)
+MatterRemoveFabricAction = matter_ns.class_(
+    "MatterRemoveFabricAction", automation.Action
 )
 MatterResetIdentityAction = matter_ns.class_(
     "MatterResetIdentityAction", automation.Action
@@ -129,3 +133,25 @@ async def matter_open_commissioning_window_to_code(
 )
 async def matter_reset_identity_to_code(config, action_id, template_arg, args):
     return cg.new_Pvariable(action_id, template_arg)
+
+
+@automation.register_action(
+    "matter.remove_fabric",
+    MatterRemoveFabricAction,
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.use_id(MatterComponent),
+            # FabricIndex is 1..254; the `controllers` text sensor lists them.
+            cv.Required(CONF_FABRIC_INDEX): cv.templatable(cv.int_range(1, 254)),
+        }
+    ),
+    synchronous=True,
+)
+async def matter_remove_fabric_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    cg.add(
+        var.set_fabric_index(
+            await cg.templatable(config[CONF_FABRIC_INDEX], args, cg.uint8)
+        )
+    )
+    return var
