@@ -740,6 +740,12 @@ matter:
     130:
       microwave_oven:
         with_features: [PowerAsNumber]
+      clusters:
+        # Without a delegate esp-matter creates no ChangeToMode commands (the validator warns).
+        microwave_oven_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Defrost, tags: [defrost]}
 
     # ---------------------------------------------------------------------------------------------
     # Electrical Sensor topologies

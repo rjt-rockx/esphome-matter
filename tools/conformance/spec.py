@@ -178,8 +178,19 @@ class Spec:
                     for f in base.features.values():
                         spec.features.setdefault(f.code, f)
                     for coll in ("attributes", "commands", "events"):
+                        mine = getattr(spec, coll)
+                        # A derived cluster can restate a base command without its direction
+                        # (Mode_MicrowaveOven.xml disallows ChangeToModeResponse that way): such
+                        # a stub overrides the base command with the same id.
+                        stubs = {
+                            k & 0xFFFF
+                            for k, v in mine.items()
+                            if coll == "commands" and v.direction is None
+                        }
                         for k, v in getattr(base, coll).items():
-                            getattr(spec, coll).setdefault(k, v)
+                            if coll == "commands" and k & 0xFFFF in stubs:
+                                continue
+                            mine.setdefault(k, v)
                 self.clusters[spec.id] = spec
 
     @staticmethod
