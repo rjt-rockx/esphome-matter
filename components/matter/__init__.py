@@ -30,6 +30,7 @@ from .endpoints import (
     register_endpoints,
     switch_restore_warning,
 )
+from .fan_binding import fan_restore_warning
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -170,6 +171,7 @@ def _final_validate(config: dict):
     light_restore_warning(config, full_config)
     switch_restore_warning(config, full_config)
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
+    fan_restore_warning(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate

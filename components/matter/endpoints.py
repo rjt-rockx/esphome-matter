@@ -24,6 +24,7 @@ from .data_model.device_types import (
     DEVICE_TYPES_BY_ID,
     DeviceType,
 )
+from . import fan_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -154,6 +155,7 @@ class Endpoint:
         )
         self._device_types: list[DeviceType] = []
         self._light_variables = {}
+        self._fan_variable = None
 
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
@@ -258,6 +260,12 @@ class Endpoint:
         if CONF_SWITCH_ID in device_config:
             switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
             cg.add(var.register_switch(switch_, self._endpoint_id))
+        if fan_binding.CONF_FAN_ID in device_config:
+            self._fan_variable = await cg.get_variable(
+                device_config[fan_binding.CONF_FAN_ID]
+            )
+            cg.add(var.register_fan(self._fan_variable, self._endpoint_id))
+            self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
@@ -294,6 +302,15 @@ class Endpoint:
                         f"esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds());",
                     )
                 )
+
+        if device_type.name == "fan" and self._fan_variable is not None:
+            lines.extend(
+                fan_binding.config_lines(
+                    config_var,
+                    self._fan_variable,
+                    self._cluster_configs["FanControl"].enabled_features,
+                )
+            )
 
         # Configure cluster features
         for cluster in device_type.server_clusters:
@@ -450,7 +467,15 @@ class Endpoint:
                 and feature_name in features_by_name
                 and not cluster.is_choice_feature(features_by_name[feature_name])
             ]
-            if not direct_features:
+            # Features of a bound fan come from its traits instead.
+            bound_fan = self._fan_variable if cluster.name == "FanControl" else None
+            if bound_fan is not None:
+                direct_features = [
+                    f
+                    for f in direct_features
+                    if f.name not in fan_binding.TRAIT_FEATURES
+                ]
+            if not direct_features and bound_fan is None:
                 continue
             cluster_var = f"{cluster.espm_namespace}_cluster"
             lines.extend(
@@ -460,6 +485,8 @@ class Endpoint:
                     "  return false;",
                 )
             )
+            if bound_fan is not None:
+                lines.extend(fan_binding.feature_lines(cluster_var, bound_fan))
             for feature in direct_features:
                 lines.extend(
                     (

@@ -10,6 +10,7 @@ from esphome.const import CONF_LIGHT_ID
 
 from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_ID
+from ..fan_binding import CONF_FAN_ID, fan_id_schema
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
@@ -185,6 +186,8 @@ class DeviceType:
 
         if self.name in SWITCH_DEVICE_TYPES:
             schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
+        if self.name == "fan":
+            schema[cv.Optional(CONF_FAN_ID)] = fan_id_schema()
 
         if self.name.endswith("light") and any(
             cluster.name == "LevelControl" and cluster.required
