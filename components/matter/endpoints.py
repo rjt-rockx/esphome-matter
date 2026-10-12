@@ -15,6 +15,8 @@ from esphome.types import ConfigType
 
 from . import binary_sensors, cluster_options
 from . import conformance
+from . import sensor_extras
+from . import delegates
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
 from . import closure
@@ -168,7 +170,9 @@ ENDPOINT_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(MatterEndpointRef),
             cv.Optional(CONF_CLUSTERS, default=dict): {
                 cluster.schema_key: maybe_empty(
-                    cluster.schema(), cluster_options.validate(cluster.conf_key)
+                    cluster.schema(),
+                    cluster_options.validate(cluster.conf_key),
+                    *delegates.cluster_validators(cluster.name),
                 )
                 for cluster in CLUSTERS
             },
@@ -231,6 +235,10 @@ class Endpoint:
         # Extra lines that set the initial value of a created optional attribute.
         self._initial_values: dict[tuple[int, int], list[str]] = {}
         self._electrical_power_features: list[str] = []
+        # Extra C++ for clusters configured by sensor_extras.py (evaluated lazily, see sensor_extras.Extra).
+        self.extras: list[sensor_extras.Extra] = []
+        # Cluster ids whose delegate is installed at the end of the build callback (delegates.py).
+        self._delegate_cluster_ids: list[int] = []
 
     @property
     def endpoint_id(self) -> int:
@@ -284,6 +292,11 @@ class Endpoint:
                 feature = cluster.get_feature(feature_name)
                 if feature is not None:
                     enabled_codes.add(feature.code)
+                    # The `alarms`/`sensitivity` options create the optional
+                    # Boolean State Configuration cluster (sensor_extras.py).
+                    cluster_present |= sensor_extras.creates_cluster(
+                        cluster.name, device_config
+                    )
 
         # A mandatory feature can make another conditional feature mandatory, so
         # evaluate the composed cluster/device-type conformance to a fixed point.
@@ -486,6 +499,13 @@ class Endpoint:
             for configured_feature in config.get(CONF_WITH_FEATURES, ()):
                 if feature := cluster.get_feature(configured_feature):
                     cluster_config.enabled_features[feature.name] = True
+            if delegates.is_delegate_cluster(
+                cluster.name
+            ) and await delegates.register_cluster(
+                var, self._endpoint_id, cluster, config
+            ):
+                self._delegate_cluster_ids.append(cluster.id)
+                self.global_includes.add(delegates.DELEGATES_INCLUDE)
 
         await self._register_filter_monitoring(var)
 
@@ -584,7 +604,18 @@ class Endpoint:
             f"{cid}[{'+'.join(sorted(features))}]"
             for cid, features in sorted(clusters.items())
         )
-        return f"d{device_types}|c{cluster_text}"
+        signature = f"d{device_types}|c{cluster_text}"
+        # Attributes, commands and events created for the sensor and alarm clusters (hold time, ...).
+        extra_text = ",".join(
+            sorted(
+                f"{extra.cluster}.{kind}.{name}"
+                for extra in self.extras
+                for kind, name in extra.elements()
+            )
+        )
+        if extra_text:
+            signature += f"|e{extra_text}"
+        return signature
 
     async def _register_attribute_automations(self, var):
         configured_clusters = self._config.get(CONF_ON_ATTRIBUTE, {})
@@ -703,6 +734,9 @@ class Endpoint:
                     cluster_config = self._cluster_configs[cluster.name]
                     cluster_config.enabled_features[feature.name] = True
 
+        # Optional cluster features of the sensor and alarm clusters (hold time, alarms, air quality, ...)
+        await sensor_extras.register(self, var, device_type, device_config)
+
     def _register_light_level_attributes(
         self, device_type: DeviceType, device_config: dict
     ) -> None:
@@ -794,6 +828,14 @@ class Endpoint:
                 device_config,
             )
         )
+        if device_type.name == "mode_select":
+            lines.extend(
+                delegates.cluster_config_lines(
+                    "ModeSelect",
+                    f"{config_var}.mode_select",
+                    self._config[CONF_CLUSTERS].get("mode_select"),
+                )
+            )
         closure_lines = closure.device_config_lines(
             device_type.name, config_var, self._endpoint_id, device_config
         )
@@ -1041,6 +1083,10 @@ class Endpoint:
                 self._config[CONF_CLUSTERS][cluster.conf_key],
                 self._endpoint_id,
             )
+        for extra in self.extras:
+            if extra.creates_cluster and extra.cluster == cluster.name:
+                # Clusters whose creation needs more than the generic create call (see sensor_extras.py).
+                return extra.lines()
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
         config_var = f"{cluster.espm_namespace}_config"
@@ -1088,6 +1134,13 @@ class Endpoint:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
         if cluster.name == power_source.POWER_SOURCE_CLUSTER:
             lines.extend(power_source.config_lines(config_var, self._config))
+        lines.extend(
+            delegates.cluster_config_lines(
+                cluster.name,
+                config_var,
+                self._config[CONF_CLUSTERS].get(cluster.conf_key),
+            )
+        )
         lines.extend(
             (
                 f"if ({cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
@@ -1225,6 +1278,12 @@ class Endpoint:
         lines.extend(
             optional_attribute_lines(self._optional_attributes, self._initial_values)
         )
+
+        for extra in self.extras:
+            if not extra.creates_cluster:
+                lines.extend(extra.lines())
+        # Delegates are installed once all clusters of the endpoint exist.
+        lines.extend(delegates.build_attach_lines(self._delegate_cluster_ids))
 
         lines.extend(("return true;", "}"))
         return "\n".join(lines)

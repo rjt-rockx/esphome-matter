@@ -268,6 +268,11 @@ class Cluster:
         from .. import cluster_options
 
         schema.update(cluster_options.extra_schema(self.conf_key))
+
+        # Delegate driven clusters (modes, operational state) take more options.
+        from ..delegates import extend_cluster_schema
+
+        extend_cluster_schema(self.name, schema)
         return schema
 
 

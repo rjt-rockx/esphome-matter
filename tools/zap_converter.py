@@ -49,7 +49,6 @@ EXCLUDED_CLUSTERS = {
     "content_control",
     "content_launcher",
     "dishwasher_alarm",
-    "dishwasher_mode",
     "dynamic_lighting",
     "fault_injection",
     "joint_fabric_administrator",
@@ -59,13 +58,11 @@ EXCLUDED_CLUSTERS = {
     "media_playback",
     "messages",
     "oven_cavity_operational_state",
-    "oven_mode",
     "power_source_configuration",
     "proxy_configuration",
     "proxy_discovery",
     "proxy_valid",
     "pulse_width_modulation",
-    "refrigerator_and_temperature_controlled_cabinet_mode",
     "sample_mei",
     "target_navigator",
     "temperature_controlled_cabinet_topology",
@@ -979,7 +976,22 @@ def post_process_device_types(
 
 def fixup(device_types):
     # TODO: doorbell revision is missing
-    ...
+    # The ZAP XML predates Matter 1.4 revision 2 of the Contact Sensor and
+    # revision 4 of the Occupancy Sensor, which added the Boolean State
+    # Configuration cluster as an optional server cluster.
+    for device_type in device_types.values():
+        if device_type["name"] not in ("contact_sensor", "occupancy_sensor"):
+            continue
+        clusters = device_type["clusters"]
+        if "128" not in clusters:
+            clusters["128"] = {
+                "name": "Boolean State Configuration",
+                "server": True,
+                "client_locked": True,
+            }
+            device_type["clusters"] = dict(
+                sorted(clusters.items(), key=lambda item: int(item[0]))
+            )
 
 
 def sanitize_description(description: str) -> str:

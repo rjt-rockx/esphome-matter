@@ -751,6 +751,15 @@
         "MaximumCheckInBackOff": "create_maximum_check_in_backoff"
       }
     },
+    "OvenMode": {
+      "namespace": null,
+      "feature_flags": false,
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
+      }
+    },
     "LaundryDryerControls": {
       "namespace": "laundry_dryer_controls",
       "feature_flags": false,
@@ -780,6 +789,15 @@
     },
     "LaundryWasherMode": {
       "namespace": "laundry_washer_mode",
+      "feature_flags": false,
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
+      }
+    },
+    "RefrigeratorAndTemperatureControlledCabinetMode": {
+      "namespace": "refrigerator_and_tcc_mode",
       "feature_flags": false,
       "features": {},
       "attributes": {
@@ -869,6 +887,15 @@
         "Mask": "create_mask",
         "State": "create_state",
         "Supported": "create_supported"
+      }
+    },
+    "DishwasherMode": {
+      "namespace": "dish_washer_mode",
+      "feature_flags": false,
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
       }
     },
     "AirQuality": {

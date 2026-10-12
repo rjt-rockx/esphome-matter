@@ -25,6 +25,7 @@ from ..fan_binding import (
 from ..light_binding import light_schema_options, validate_light_binding
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
+from .. import sensor_extras
 from ..matter_climate import climate_schema, validate_climate_features
 from ..power_topology import apply_topology
 from ..power_topology import schema_options as topology_schema_options
@@ -368,6 +369,7 @@ class DeviceType:
         schema.update(climate_schema(self.name))
 
         extend_device_type_schema(self.name, schema)
+        sensor_extras.extend_schema(self, schema)
         if self.name == "power_source":
             from ..power_source import device_type_schema_options
 
@@ -395,6 +397,7 @@ class DeviceType:
         # TODO: only maybe_empty if there are no clusters or features for which a mandatory choice must be made.
         return cv.All(
             maybe_empty(self._schema()),
+            lambda config: sensor_extras.validate_device_config(self, config),
             self._validate_features,
             self._validate_entity_ids,
             validate_fan_features,

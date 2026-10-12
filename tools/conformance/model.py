@@ -144,6 +144,33 @@ def _feature_codes(
 # ----------------------------------------------------------------------------
 # layout (static) mode
 # ----------------------------------------------------------------------------
+_ESPM_NAMES = (
+    Path(__file__).resolve().parents[2]
+    / "components"
+    / "matter"
+    / "data_model"
+    / "espmatter_names.json"
+)
+
+
+def _espm_device_type_namespaces() -> dict[str, str]:
+    """Spec/component device type name -> esp-matter endpoint namespace (``evse`` -> ``energy_evse``)."""
+    global _DT_NAMESPACES
+    if _DT_NAMESPACES is None:
+        try:
+            table = json.loads(_ESPM_NAMES.read_text()).get("device_types", {})
+        except OSError:
+            table = {}
+        _DT_NAMESPACES = {
+            name: entry["namespace"]
+            for name, entry in table.items()
+            if entry.get("namespace")
+        }
+    return _DT_NAMESPACES
+
+
+_DT_NAMESPACES: dict[str, str] | None = None
+
 def _predict_cluster(
     spec: Spec,
     profile: Profile,
@@ -256,7 +283,9 @@ def from_layout(
             )
         )
         for name in dt_names:
-            info = dts.get(DEVICE_TYPE_ALIASES.get(name, name))
+            info = dts.get(DEVICE_TYPE_ALIASES.get(name, name)) or dts.get(
+                _espm_device_type_namespaces().get(name, "")
+            )
             if info is None:
                 notes.append(
                     f"device type '{name}' is not known to the esp-matter profile"
@@ -314,6 +343,24 @@ def from_layout(
         for (cid, side), cur in sdk_clusters.items():
             cspec = cur["cspec"]
             lname, lc = layout_by_id.get(cid, (None, {}))
+            layout_extra = lc.get("extra") if side == "server" else None
+            if layout_extra:
+                # attributes, commands and events that the component creates itself (sensor_extras.py)
+                cur = {
+                    **cur,
+                    **{
+                        k: list(cur.get(k, [])) + list(layout_extra.get(k, []))
+                        for k in ("attrs", "cmds", "events")
+                    },
+                }
+            if side == "server" and lc.get("delegate"):
+                # Delegate layer (components/matter/delegates.py): attributes, commands and events that
+                # attach_delegate() creates or the installed delegate serves.
+                cur = dict(cur)
+                for k in ("attrs", "cmds", "events"):
+                    cur[k] = cur[k] + [
+                        x for x in lc["delegate"].get(k, []) if x not in cur[k]
+                    ]
             inst = _predict_cluster(
                 spec,
                 profile,

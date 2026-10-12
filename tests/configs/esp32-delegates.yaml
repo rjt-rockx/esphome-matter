@@ -1,0 +1,234 @@
+# Delegate-driven clusters: Mode Base derived clusters, Mode Select, Operational State, RVC Operational State.
+# See docs/delegates.md.
+esphome:
+  name: matter-ci-delegates
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Robot vacuum: run/clean mode, RVC operational state
+    1:
+      robotic_vacuum_cleaner: {}
+      clusters:
+        rvc_run_mode:
+          modes:
+            - {label: Idle, mode: 0, tags: [idle]}
+            - {label: Cleaning, mode: 1, tags: [cleaning]}
+            - {label: Mapping, mode: 2, tags: [mapping]}
+          select: vacuum_run_mode
+          # The automation decides (matter.mode.reject); the CHIP task waits at most 250 ms for it
+          decide_in_automation: true
+          on_change_to_mode:
+            - if:
+                condition:
+                  lambda: 'return mode == 1 && id(vacuum_bin_full).state;'
+                then:
+                  - matter.mode.reject:
+                      status: dust_bin_full
+                      text: Empty the dust bin first
+        rvc_clean_mode:
+          modes:
+            - {label: Vacuum, tags: [vacuum]}
+            - {label: Mop, tags: [mop, quiet]}
+            - {label: Vacuum then mop, mode: 5, tags: [vacuum_then_mop]}
+          on_change_to_mode:
+            - logger.log:
+                format: "clean mode %d"
+                args: [mode]
+        rvc_operational_state:
+          phases: [Cleaning, Returning]
+          state: vacuum_state
+          decide_in_automation: true
+          decide_timeout: 300ms
+          phase: vacuum_phase
+          countdown_time: vacuum_eta
+          on_pause:
+            - logger.log: pause requested
+          on_resume:
+            - logger.log: resume requested
+          on_go_home:
+            - matter.operational_state.reject:
+                error: command_invalid_in_state
+    # Washing machine
+    2:
+      laundry_washer: {}
+      clusters:
+        laundry_washer_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Delicate, tags: [delicate, quiet]}
+            - {label: Heavy, mode: 10, tags: [heavy, max]}
+          select: washer_program
+          accept: when_idle                # refused while the washer runs
+        laundry_washer_controls:
+          spin_speeds: ["Off", "400", "800", "1200"]
+          spin_speed: washer_spin
+          rinses: [none, normal, extra]
+          number_of_rinses: washer_rinses
+        operational_state:
+          phases: [Pre-wash, Wash, Rinse, Spin]
+          states:
+            - {id: 0x80, label: Soaking}
+          state: washer_state
+          idle_states: [stopped, paused]
+          allowed_states:                  # decided on the CHIP task
+            start: [stopped]
+            stop: [running, paused]
+          state_map:
+            Idle: stopped
+            Washing: running
+          countdown_time: washer_remaining
+          on_start:
+            - switch.turn_on: washer_start
+          on_stop:
+            - switch.turn_off: washer_start
+          on_pause:
+            - logger.log: pause
+          on_resume:
+            - logger.log: resume
+    # Mode Select
+    3:
+      mode_select: {}
+      clusters:
+        mode_select:
+          description: Fan speed preset
+          modes:
+            - {label: Low, tags: [{mfg_code: 0xFFF1, value: 1}]}
+            - {label: High}
+          select: fan_preset
+          on_change_to_mode:
+            - logger.log:
+                format: "preset %d"
+                args: [mode]
+    # Water heater mode (mandatory manual + off tags)
+    4:
+      water_heater:
+        with_features: [heating]
+      clusters:
+        water_heater_mode:
+          modes:
+            - {label: "Off", tags: [off]}
+            - {label: Manual, tags: [manual]}
+            - {label: Timed, tags: [timed, vacation]}
+
+    # Dishwasher
+    5:
+      dishwasher: {}
+      clusters:
+        dishwasher_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Heavy, tags: [heavy]}
+            - {label: Light, tags: [light, quick]}
+        operational_state:
+          state: dishwasher_state
+    # Refrigerator
+    6:
+      refrigerator: {}
+      clusters:
+        refrigerator_and_temperature_controlled_cabinet_mode:
+          modes:
+            - {label: Normal, tags: [auto]}
+            - {label: Rapid cool, tags: [rapid_cool]}
+            - {label: Rapid freeze, tags: [rapid_freeze]}
+
+binary_sensor:
+  - platform: template
+    id: vacuum_bin_full
+    lambda: return false;
+
+sensor:
+  - platform: template
+    id: vacuum_eta
+    unit_of_measurement: s
+    lambda: return 120;
+  - platform: template
+    id: washer_remaining
+    unit_of_measurement: s
+    lambda: return 600;
+
+switch:
+  - platform: template
+    id: washer_start
+    optimistic: true
+
+select:
+  - platform: template
+    id: vacuum_run_mode
+    optimistic: true
+    options: [Idle, Cleaning, Mapping]
+  - platform: template
+    id: vacuum_state
+    optimistic: true
+    options: [stopped, running, paused, error, seeking_charger, charging, docked]
+    initial_option: docked
+  - platform: template
+    id: washer_program
+    optimistic: true
+    options: [Normal, Delicate, Heavy]
+  - platform: template
+    id: washer_state
+    optimistic: true
+    options: [Idle, Washing, paused, Soaking]
+  - platform: template
+    id: washer_spin
+    optimistic: true
+    options: ["Off", "400", "800", "1200"]
+  - platform: template
+    id: washer_rinses
+    optimistic: true
+    options: [none, normal, extra]
+  - platform: template
+    id: dishwasher_state
+    optimistic: true
+    options: [stopped, running, paused]
+  - platform: template
+    id: fan_preset
+    optimistic: true
+    options: [Low, High]
+
+text_sensor:
+  - platform: template
+    id: vacuum_phase
+    lambda: return std::string("Cleaning");
+
+interval:
+  - interval: 10min
+    then:
+      - matter.operational_state.set:
+          endpoint: 2
+          state: running
+          phase: Wash
+      - matter.operational_state.error:
+          endpoint: 1
+          cluster: rvc_operational_state
+          error: stuck
+          label: Wheels stuck
+      - matter.operational_state.completed:
+          endpoint: 2
+          total_operational_time: 3600
+      - matter.mode.set:
+          endpoint: 2
+          cluster: laundry_washer_mode
+          mode: 10

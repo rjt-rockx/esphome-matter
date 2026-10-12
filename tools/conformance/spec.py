@@ -158,6 +158,13 @@ class Spec:
                 first = root.find("clusterIds/clusterId")
                 if first is not None and first.get("id") is None:
                     bases[first.get("name")] = root
+        # A base cluster can also be a real cluster with its own id (Operational State is the base of RVC
+        # Operational State and Oven Cavity Operational State, which inherit its events).
+        for root in parsed:
+            cls = root.find("classification")
+            if cls is not None and cls.get("hierarchy") == "base":
+                for cid in root.findall("clusterIds/clusterId"):
+                    bases.setdefault(cid.get("name"), root)
         for root in parsed:
             cls = root.find("classification")
             base_name = cls.get("baseCluster") if cls is not None else None

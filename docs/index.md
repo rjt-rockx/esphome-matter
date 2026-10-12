@@ -24,6 +24,7 @@ esphome-matter is an experimental ESPHome external component that exposes ESPHom
 - [lights.md](lights.md)
 - [switch.md](switch.md)
 - [sensors.md](sensors.md)
+- [delegates.md](delegates.md) (appliance modes and operational state)
 - [binary-sensors.md](binary-sensors.md) (contact, occupancy, leak, smoke/CO)
 - [generic-switch.md](generic-switch.md) (buttons and events)
 - [fan.md](fan.md)
