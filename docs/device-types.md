@@ -223,13 +223,16 @@ Known gap: the concentration measurement unit is not set per attribute, so Matte
 
 This device type exposes power and energy measurement clusters. It currently can't be created successfully in esphome-matter. Electrical power and energy is among the most requested sensor features (see [ROADMAP.md](ROADMAP.md)).
 
+# generic_switch
+
+The `generic_switch` is a stateless programmable button that emits Matter events (press, long press, multi press). See [generic-switch.md](./generic-switch.md).
+
 # Untested / unsupported
 
 The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Several of them (`on_off_plug_in_unit`, `window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`) are being given entity bindings; see the placeholder sections above and [ROADMAP.md](ROADMAP.md). Treat everything in this list as untested.
 
 - door_lock
 - aggregator
-- generic_switch
 - power_source
 - ota_requestor
 - bridged_node

@@ -14,6 +14,7 @@ from ..fan_binding import CONF_FAN_ID, fan_id_schema
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
 from ..matter_climate import climate_schema, validate_climate_features
 from ..lock_valve import extend_device_type_schema
+from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
@@ -23,6 +24,44 @@ _LOGGER = logging.getLogger(__name__)
 
 # Device types that can be bound to an ESPHome switch through switch_id.
 SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_control")
+
+
+# Default for mandatory feature choices of required clusters when the user does
+# not select one. Keys are "<device_type>"/"<Cluster>" tuples or a cluster name.
+DEFAULT_CHOICE_FEATURES: dict[str | tuple[str, str], str] = {
+    "Switch": "MomentarySwitch",
+}
+
+# Features that need other features to be enabled; esp-matter rejects them
+# otherwise. Each entry is a list of alternatives of which at least one must be
+# enabled. The first alternative is added when none is.
+FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "MomentarySwitchRelease": (("MomentarySwitch",),),
+    "MomentarySwitchLongPress": (
+        ("MomentarySwitch",),
+        ("MomentarySwitchRelease", "ActionSwitch"),
+    ),
+    "MomentarySwitchMultiPress": (
+        ("MomentarySwitch",),
+        ("MomentarySwitchRelease", "ActionSwitch"),
+    ),
+    "ActionSwitch": (("MomentarySwitch",),),
+}
+
+# Clusters whose esp-matter create() function evaluates every feature in
+# config_t::feature_flags (instead of only the choice features), so all of their
+# features, including per-feature config like MultiPressMax, are set through the
+# feature flags.
+# Clusters whose features are set by an entity binding when the given option is
+# configured; the mandatory choice check does not apply to them.
+BINDING_MANAGED_CLUSTERS = {
+    "WindowCovering": ("cover_id",),
+    "Thermostat": ("climate_id",),
+    # The sensor type follows the device_class of the bound binary_sensor.
+    "OccupancySensing": ("occupancy",),
+}
+
+FLAG_DRIVEN_CLUSTERS = frozenset({"Switch"})
 
 
 def _parse_cluster_include(data: dict) -> Cluster:
@@ -100,6 +139,9 @@ class DeviceType:
     def conf_key(self) -> str:
         return self.name
 
+    def has_required_cluster(self, name: str) -> bool:
+        return any(c.name == name and c.required for c in self.server_clusters)
+
     def get_features(self) -> set[Feature]:
         """Get all features that the clusters of this device type supports."""
         features = set()
@@ -134,34 +176,67 @@ class DeviceType:
     #     return features
 
     def _validate_features(self, config: dict) -> dict:
-        # enabled_features = list(config.get(CONF_FEATURES, ()))
-        # for feature in sorted(self.implicit_features(config)):
-        #     if feature not in enabled_features:
-        #         enabled_features.append(feature)
-        #
-        # enabled_feature_set = frozenset(enabled_features)
-        # for cluster in self.configured_server_clusters(config):
-        #     for item in cluster.features:
-        #         if not isinstance(item, FeatureChoice):
-        #             continue
-        #         selected = enabled_feature_set.intersection(
-        #             feature.name for feature in item.features
-        #         )
-        #         if len(selected) < item.min:
-        #             choices = ", ".join(feature.name for feature in item.features)
-        #             raise cv.Invalid(
-        #                 f"Cluster {cluster.name} requires at least {item.min} of "
-        #                 f"these features: {choices}"
-        #             )
-        #         if item.max is not None and len(selected) > item.max:
-        #             choices = ", ".join(feature.name for feature in item.features)
-        #             raise cv.Invalid(
-        #                 f"Cluster {cluster.name} allows at most {item.max} of "
-        #                 f"these features: {choices}"
-        #             )
+        """Resolve mandatory feature choices and feature dependencies.
 
-        # if enabled_features:
-        #     config[CONF_FEATURES] = enabled_features
+        Clusters that a device type requires may define a choice between
+        features of which a minimum number must be enabled (e.g. the Switch
+        cluster requires exactly one of LatchingSwitch/MomentarySwitch).
+        esp-matter silently refuses to create such a cluster when the choice
+        is missing, so it is resolved here: a default from
+        DEFAULT_CHOICE_FEATURES is applied when the user made no selection,
+        and an error is raised when there is no sensible default.
+        """
+        if self.has_required_cluster("Switch"):
+            config = apply_switch_defaults(config)
+        enabled = list(config.get(CONF_FEATURES, ()))
+        for sensor_attribute in self.sensor_attributes:
+            if config.get(sensor_attribute.conf_key) is not None:
+                enabled.extend(sensor_attribute.features)
+
+        # Add the features that other enabled features depend on.
+        for name in list(enabled):
+            for alternatives in FEATURE_DEPENDENCIES.get(name, ()):
+                if not any(alternative in enabled for alternative in alternatives):
+                    enabled.append(alternatives[0])
+
+        for cluster in self.server_clusters:
+            if not cluster.required:
+                continue
+            if any(
+                config.get(key) is not None
+                for key in BINDING_MANAGED_CLUSTERS.get(cluster.name, ())
+            ):
+                # The feature set of this cluster is derived from the bound
+                # ESPHome entity (cover/climate/binary_sensor) at code generation
+                # time or in final validation.
+                continue
+            for choice in cluster.choice_features:
+                names = [feature.name for feature in choice.features]
+                selected = [name for name in enabled if name in names]
+                if choice.max is not None and len(set(selected)) > choice.max:
+                    raise cv.Invalid(
+                        f"{self.name}: cluster {cluster.name} allows at most "
+                        f"{choice.max} of these features: {', '.join(names)} "
+                        f"(got {', '.join(sorted(set(selected)))})",
+                        path=[CONF_FEATURES],
+                    )
+                if len(set(selected)) >= choice.min:
+                    continue
+                default = DEFAULT_CHOICE_FEATURES.get((self.name, cluster.name))
+                default = default or DEFAULT_CHOICE_FEATURES.get(cluster.name)
+                if default not in names:
+                    raise cv.Invalid(
+                        f"{self.name}: cluster {cluster.name} requires "
+                        f"{'exactly' if choice.max == choice.min else 'at least'} "
+                        f"{choice.min} of these features to be enabled: "
+                        f"{', '.join(names)}. Select one with `features: [...]`.",
+                        path=[CONF_FEATURES],
+                    )
+                enabled.append(default)
+
+        if enabled:
+            config = dict(config)
+            config[CONF_FEATURES] = list(dict.fromkeys(enabled))
         return config
 
     @property
@@ -182,6 +257,8 @@ class DeviceType:
             )
 
         schema.update(binary_sensor_schema(self))
+        if self.has_required_cluster("Switch"):
+            schema.update(switch_schema_options())
 
         # TODO: replace with something better
         if self.name.endswith("light"):

@@ -11,6 +11,7 @@
 #include "matter_device_info.h"
 #include "matter_endpoints.h"
 #include "matter_fan.h"
+#include "matter_generic_switch.h"
 #include "matter_lights.h"
 #include "matter_lock.h"
 #include "matter_sensors.h"
@@ -112,6 +113,11 @@ public:
                                    BinarySensorValueConverter converter,
                                    SensorAttributeUpdater updater = nullptr);
 #endif // USE_BINARY_SENSOR
+
+  // Register an ESPHome entity mapping created by codegen.
+  void register_mapping(MatterEndpointMappingBase *mapping) {
+    this->mappings_.push_back(mapping);
+  }
 
   // Public wrapper around the protected Component scheduler; used by the
   // Matter-thread callbacks to hop onto the main loop (defer is thread-safe).

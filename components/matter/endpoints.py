@@ -24,6 +24,7 @@ from .data_model.device_types import (
     DEVICE_TYPES,
     DEVICE_TYPES_BY_CONF_KEY,
     DEVICE_TYPES_BY_ID,
+    FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
 from . import fan_binding
@@ -34,6 +35,7 @@ from .matter_climate import (
     post_create_lines as climate_post_create_lines,
 )
 from .lock_valve import device_config_lines, register_entity
+from .generic_switch import multi_press_max_line, register_switch_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -289,11 +291,16 @@ class Endpoint:
             prefer_cooling = device_type.name == "room_air_conditioner"
             cg.add(var.register_climate(climate_, self._endpoint_id, prefer_cooling))
 
+        # Register Switch cluster event bindings
+        await register_switch_binding(var, self._endpoint_id, device_config)
+
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
             for cluster in device_type.server_clusters:
-                cluster_config = self._cluster_configs[cluster.name]
+                # Only touch clusters that have the feature. Looking up the config
+                # of every cluster would mark all optional clusters as to be created.
                 if enabled_feature in (f.name for f in cluster.features):
+                    cluster_config = self._cluster_configs[cluster.name]
                     cluster_config.enabled_features[enabled_feature] = True
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
@@ -364,10 +371,17 @@ class Endpoint:
                 if not enabled:
                     continue
                 feature = features_by_name[feature_name]
-                if cluster.is_choice_feature(feature):
+                if (
+                    cluster.is_choice_feature(feature)
+                    or cluster.name in FLAG_DRIVEN_CLUSTERS
+                ):
                     feature_flags.append(
                         f"esp_matter::cluster::{cluster.espm_namespace}::feature::{feature.namespace}::get_id()"
                     )
+            if cluster.name == "Switch" and (
+                line := multi_press_max_line(config_var, device_config)
+            ):
+                lines.append(line)
             if feature_flags:
                 lines.append(
                     f"{config_var}.{cluster.espm_namespace}.feature_flags = {' | '.join(feature_flags)};"
@@ -507,6 +521,8 @@ class Endpoint:
             if not cluster_config.created:
                 continue
             cluster = CLUSTERS_BY_NAME[cluster_name]
+            if cluster_name in FLAG_DRIVEN_CLUSTERS:
+                continue  # All features are already set through feature_flags.
             features_by_name = {feature.name: feature for feature in cluster.features}
             direct_features = [
                 features_by_name[feature_name]
