@@ -1,0 +1,54 @@
+# mirrors: mock-mounted-dimmable-load-control-fixture
+# Mirrors: HA fixture "mock_mounted_dimmable_load_control_fixture" (evidence=dump) and the sdk-chef
+#   "mounted-dimmable-load-control" sample (a hardwired dimmable load: in-wall dimmer module, fixed fitting).
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/mock_mounted_dimmable_load_control_fixture.json
+# Hardware an ESPHome user would build: in-wall dimmer module (ac_dimmer output + monochromatic light).
+# Representation (b): explicit `endpoints:` with the mounted_dimmable_load_control device type and `light_id`.
+# BLOCKED today: `light_id` (and therefore `expose: as: mounted_dimmable_load_control` for a light) is only accepted by the four
+#   light device types; esphome config fails with "[light_id] is an invalid option for [mounted_dimmable_load_control]".
+#   See mounted-dimmable-load-control-custom.yaml for the workable on_attribute/set_attribute form.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-mounted-dimmer
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ac_dimmer
+    id: dimmer_out
+    gate_pin: GPIO10
+    zero_cross_pin:
+      number: GPIO11
+      mode: {input: true}
+      inverted: true
+
+light:
+  - platform: monochromatic
+    id: load
+    name: "Load"
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      mounted_dimmable_load_control:
+        light_id: load

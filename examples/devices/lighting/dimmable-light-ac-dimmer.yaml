@@ -1,0 +1,50 @@
+# mirrors: mock-dimmable-light
+# Mirrors: HA fixture "mock_dimmable_light" (dimmable_light, evidence=dump) with a different ESPHome source: a mains
+#   phase-cut dimmer (`ac_dimmer` output + `monochromatic` light), as in a wall dimmer module.
+# Representation (c): `expose:` map form with a glob, an `as:` override, a pinned endpoint and `options:` (min_level).
+# Matches: dimmable_light with OnOff[LT] and LevelControl[OO,LT]; same result as dimmable-light-endpoints.yaml.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-ac-dimmer
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ac_dimmer
+    id: dimmer_out
+    gate_pin: GPIO10
+    zero_cross_pin:
+      number: GPIO11
+      mode: {input: true}
+      inverted: true
+    init_with_half_cycle: true
+    min_power: 15%
+
+light:
+  - platform: monochromatic
+    id: ac_lamp
+    name: "AC Lamp"
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose:
+    - {id: "ac_*", as: dimmable_light, endpoint: 1, options: {min_level: 10%}}

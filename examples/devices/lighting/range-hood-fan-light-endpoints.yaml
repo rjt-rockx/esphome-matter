@@ -1,0 +1,65 @@
+# mirrors: silabs-range-hood
+# Mirrors: HA fixture "silabs_range_hood" (Silabs SL-RangeHood reference app, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/silabs_range_hood.json
+# Real layout: endpoint 1 extractor_hood (Fan Control only, no OnOff), endpoint 2 on_off_light, both direct children of
+#   the root. No link between fan and light except naming.
+# Hardware an ESPHome user would build: kitchen hood with a speed fan (relay-selected speeds) and a switched lamp.
+# Representation (b): explicit `endpoints:`: the fan on a `fan` device type and the lamp on `on_off_light` / `light_id`.
+#   `extractor_hood` has no fan_id binding, so the Extractor Hood device type is only reachable bare.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-range-hood
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: fan_out
+    pin: GPIO10
+  - platform: gpio
+    id: lamp_out
+    pin: GPIO11
+
+fan:
+  - platform: speed
+    id: hood_fan
+    name: "Hood Fan"
+    output: fan_out
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: binary
+    id: hood_light
+    name: "Hood Light"
+    output: lamp_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      label: Fan
+      fan:
+        fan_id: hood_fan
+    2:
+      label: Light
+      on_off_light:
+        light_id: hood_light

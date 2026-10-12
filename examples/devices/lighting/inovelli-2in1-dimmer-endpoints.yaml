@@ -1,0 +1,109 @@
+# mirrors: inovelli-vtm31
+# Mirrors: HA fixture "inovelli_vtm31" (Inovelli VTM31-SN White Series 2-1 dimmer switch, Thread, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/inovelli_vtm31.json
+# Real layout (all endpoints are direct children of the root, flat PartsList):
+#   1 dimmable_light (load)        2 dimmer_switch (client OnOff+LevelControl, Binding)
+#   3/4/5 generic_switch Up/Down/Config (Switch[MS,MSR,MSL,MSM], 2 positions, MultiPressMax 5)
+#   6 extended_color_light (LED bar, ColorControl[HS,XY,CT]), FixedLabel on every endpoint used for naming.
+# Hardware an ESPHome user would build: ac_dimmer + monochromatic load, three tactile buttons (GPIO), a 7-LED
+#   WS2812 bar (esp32_rmt_led_strip).
+# Representation (b): explicit `endpoints:` with the real endpoint numbers 1..6 and `label:` for the names.
+# Matches: the six application endpoints and their device types, Switch features/MultiPressMax, dimmer_switch client
+#   clusters, FixedLabel names.
+# Differs: tags (we auto-add Common Number tags to the three generic switches, the real device has none and relies on
+#   FixedLabel), no ModeSelect / manufacturer cluster 0x122FFC31, no Scenes on the real device, ColorControl on the LED
+#   bar is CT-capable only if the light has color temperature (an RGB strip has no CT).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-inovelli-2in1
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ac_dimmer
+    id: dimmer_out
+    gate_pin: GPIO10
+    zero_cross_pin:
+      number: GPIO11
+      mode: {input: true}
+      inverted: true
+
+light:
+  - platform: monochromatic
+    id: load
+    name: "Load"
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+  - platform: esp32_rmt_led_strip
+    id: led_bar
+    name: "LED Bar"
+    pin: GPIO18
+    num_leds: 7
+    chipset: WS2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    pin: {number: GPIO0, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+    on_click:
+      matter.send_command: remote.on_off.toggle
+  - platform: gpio
+    id: btn_down
+    pin: {number: GPIO1, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+  - platform: gpio
+    id: btn_config
+    pin: {number: GPIO2, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+
+matter:
+  endpoints:
+    1:
+      label: Load
+      dimmable_light:
+        light_id: load
+    2:
+      id: remote
+      label: Remote
+      dimmer_switch:
+    3:
+      label: Up
+      generic_switch:
+        binary_sensor_id: btn_up
+        multi_press_max: 5
+    4:
+      label: Down
+      generic_switch:
+        binary_sensor_id: btn_down
+        multi_press_max: 5
+    5:
+      label: Config
+      generic_switch:
+        binary_sensor_id: btn_config
+        multi_press_max: 5
+    6:
+      label: LED Bar
+      extended_color_light:
+        light_id: led_bar
+        with_features: [Hue And Saturation]

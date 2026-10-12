@@ -1,0 +1,49 @@
+# mirrors: mock-dimmable-plugin-unit
+# Mirrors: HA fixture "mock_dimmable_plugin_unit" (Matter Dimmable Plugin Unit, Leviton VID 0x109B, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/mock_dimmable_plugin_unit.json
+# Hardware an ESPHome user would build: a plug-in lamp dimmer (mains phase-cut dimmer on a socket).
+# Representation (a)+(c): `expose:` with `as: dimmable_plug_in_unit` for a monochromatic light. The inference table
+#   maps monochromatic to dimmable_light, so the override is needed; whether light_id is accepted by
+#   dimmable_plug_in_unit is the interesting part of this example.
+# BLOCKED today: `light_id` (and therefore `expose: as: dimmable_plug_in_unit` for a light) is only accepted by the four
+#   light device types; esphome config fails with "[light_id] is an invalid option for [dimmable_plug_in_unit]".
+#   See dimmable-plug-in-unit-custom.yaml for the workable on_attribute/set_attribute form.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-dimmable-plug
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: dim_out
+    pin: GPIO10
+
+light:
+  - platform: monochromatic
+    id: plug_dimmer
+    name: "Plug Dimmer"
+    output: dim_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose:
+    - {id: plug_dimmer, as: dimmable_plug_in_unit, endpoint: 1}

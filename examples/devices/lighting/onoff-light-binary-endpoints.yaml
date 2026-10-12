@@ -1,0 +1,47 @@
+# mirrors: mock-onoff-light
+# Mirrors: HA fixture "mock_onoff_light" (Nabu Casa Mock Light, evidence=dump)
+# Representation (b): a `light: platform: binary` with a gpio `output`, explicit `endpoints:` with `light_id`.
+#   (Contrast with onoff-light-relay-expose.yaml where the lamp is a plain `switch`.)
+# Matches: on_off_light, OnOff[LT]; ESPHome gets a light entity (not a switch) so HA shows a light card.
+# Differs: ScenesManagement; no root-node Switch cluster (SDK example leftover).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-binary-light
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: gpio
+    id: relay_out
+    pin: GPIO10
+
+light:
+  - platform: binary
+    id: lamp
+    name: "Lamp"
+    output: relay_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: lamp

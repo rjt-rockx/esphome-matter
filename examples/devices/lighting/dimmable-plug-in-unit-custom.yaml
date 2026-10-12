@@ -1,0 +1,71 @@
+# mirrors: mock-dimmable-plugin-unit
+# Mirrors: HA fixture "mock_dimmable_plugin_unit" (Matter Dimmable Plugin Unit, Leviton VID 0x109B, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/mock_dimmable_plugin_unit.json
+# Hardware an ESPHome user would build: a plug-in lamp dimmer (mains phase-cut dimmer on a socket).
+# Representation (c): `dimmable_plug_in_unit` has no `light_id` binding yet, so the endpoint is created bare and wired to the
+#   ESPHome light by hand with `on_attribute` and `matter.set_attribute` (same pattern as packages/dimmable-light.yaml).
+#   Loses: transitions, MinLevel/OnLevel handling, restore of the level at boot (restore_mode: ALWAYS_OFF is used).
+# Matches: dimmable_plug_in_unit (0x010B), OnOff[LT], LevelControl[OO,LT], Identify, Groups, Descriptor.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-dimmable-plug
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: dim_out
+    pin: GPIO10
+
+light:
+  - platform: monochromatic
+    id: plug_dimmer
+    name: "Plug Dimmer"
+    output: dim_out
+    restore_mode: ALWAYS_OFF
+    on_state:
+      then:
+        - matter.set_attribute:
+            path: 1.on_off.on_off
+            value: !lambda return id(plug_dimmer).remote_values.is_on();
+        - matter.set_attribute:
+            path: 1.level_control.current_level
+            value: !lambda |-
+              return std::max<uint64_t>(
+                  static_cast<uint64_t>(std::lroundf(id(plug_dimmer).remote_values.get_brightness() * 254.0f)), 1);
+
+matter:
+  endpoints:
+    1:
+      dimmable_plug_in_unit:
+      on_attribute:
+        on_off.on_off:
+          then:
+            - light.control:
+                id: plug_dimmer
+                state: !lambda return value;
+                transition_length: 0s
+        level_control.current_level:
+          then:
+            - light.control:
+                id: plug_dimmer
+                brightness: !lambda return value / 254.0f;
+                transition_length: 0s

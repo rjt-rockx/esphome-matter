@@ -1,0 +1,53 @@
+# mirrors: silabs-light-switch
+# Mirrors: HA fixture "silabs_light_switch" (Silabs light switch reference app, Thread + ICD, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/silabs_light_switch.json
+# Real layout: endpoint 1 on_off_light_switch (client OnOff, ScenesManagement, ColorControl; server Binding),
+#   endpoint 2 generic_switch (Switch[MS,MSR], 2 positions).
+# Hardware an ESPHome user would build: a battery wall button that toggles a bound light and also reports presses as
+#   Matter events.
+# Representation (b): explicit `endpoints:`; the controller endpoint has no entity, so it is driven by
+#   matter.send_command, the generic_switch is bound to the same binary_sensor.
+# Differs: the real device is an ICD (ICDManagement on the root), Thread-only; no ICD support here. The client clusters
+#   ScenesManagement/ColorControl on the real endpoint are optional client clusters we do not create.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-light-switch
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      id: light_switch
+      on_off_light_switch:
+    2:
+      generic_switch:
+        binary_sensor_id: button
+        with_features: [MomentarySwitch, MomentarySwitchRelease]
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: "Button"
+    pin: {number: GPIO0, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 20ms]
+    on_press:
+      matter.send_command: light_switch.on_off.toggle

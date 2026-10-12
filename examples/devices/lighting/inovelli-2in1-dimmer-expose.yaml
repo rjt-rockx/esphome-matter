@@ -1,0 +1,88 @@
+# mirrors: inovelli-vtm31
+# Mirrors: HA fixture "inovelli_vtm31" (Inovelli VTM31-SN 2-1 dimmer switch, evidence=dump); see
+#   inovelli-2in1-dimmer-endpoints.yaml for the endpoint-by-endpoint description.
+# Representation (a)+(b) mixed: `expose:` for everything that is an ESPHome entity (load, LED bar, three buttons) and an
+#   `endpoints:` block only for the dimmer_switch client, which has no entity to expose (it is just a Binding
+#   endpoint driven by matter.send_command). Pins keep the real endpoint numbers 1, 3-6; the `endpoints:` number 2 is
+#   a pin for expose's numbering.
+# Matches/Differs: same as the explicit variant. Tests: `as: generic_switch` on a binary_sensor, `as:` for an addressable
+#   light platform, `label:` as an expose override, `features:` for hue/saturation.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-inovelli-2in1-expose
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ac_dimmer
+    id: dimmer_out
+    gate_pin: GPIO10
+    zero_cross_pin:
+      number: GPIO11
+      mode: {input: true}
+      inverted: true
+
+light:
+  - platform: monochromatic
+    id: load
+    name: "Load"
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+  - platform: esp32_rmt_led_strip
+    id: led_bar
+    name: "LED Bar"
+    pin: GPIO18
+    num_leds: 7
+    chipset: WS2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    name: "Up"
+    pin: {number: GPIO0, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+    on_click:
+      matter.send_command: remote.on_off.toggle
+  - platform: gpio
+    id: btn_down
+    name: "Down"
+    pin: {number: GPIO1, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+  - platform: gpio
+    id: btn_config
+    name: "Config"
+    pin: {number: GPIO2, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 10ms]
+
+matter:
+  expose:
+    - {id: load, endpoint: 1}
+    - {id: btn_up, as: generic_switch, endpoint: 3, options: {multi_press_max: 5}}
+    - {id: btn_down, as: generic_switch, endpoint: 4, options: {multi_press_max: 5}}
+    - {id: btn_config, as: generic_switch, endpoint: 5, options: {multi_press_max: 5}}
+    - {id: led_bar, as: extended_color_light, endpoint: 6, features: [Hue And Saturation]}
+  endpoints:
+    2:
+      id: remote
+      label: Remote
+      dimmer_switch:

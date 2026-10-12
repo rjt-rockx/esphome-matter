@@ -1,0 +1,52 @@
+# mirrors: sdk-chef-dimmable-light-occupancy-binding
+# Mirrors: CSA chef sample "Dimmable Light with occupancy client" (evidence=dump): dimmable_light with server
+#   Identify/Groups/OnOff/LevelControl and CLIENT clusters Binding + OccupancySensing, so the light can be bound
+#   directly to an occupancy sensor.
+# Hardware an ESPHome user would build: a normal dimmable light; the binding is a Matter-side automation.
+# GAP: (1) `clusters: binding:` is the documented way to add the Binding server cluster but hits base bug B1
+#   (KeyError in endpoints.py). (2) There is no way to declare the OccupancySensing CLIENT cluster
+#   ("Client clusters aren't supported by esphome-matter yet"), and no handling of an incoming occupancy report that
+#   would switch the light. This file shows the intended YAML.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-light-occupancy-bound
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: led_out
+    pin: GPIO19
+
+light:
+  - platform: monochromatic
+    id: lamp
+    name: "Light"
+    output: led_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      dimmable_light:
+        light_id: lamp
+      clusters:
+        binding:

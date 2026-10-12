@@ -1,0 +1,56 @@
+# mirrors: extended-color-light
+# Mirrors: HA fixture "extended_color_light" (Signify Mock Extended Color Light, VID 0x100B, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/extended_color_light.json
+# Hardware an ESPHome user would build: a 5-channel RGBCCT bulb/strip (R, G, B, cold white, warm white on PWM).
+# Representation (a): `expose:` shorthand. One light entity, nothing else. The component infers
+#   extended_color_light from `platform: rgbww`; the only override needed is the Hue/Saturation feature,
+#   because the real device advertises ColorCapabilities 25 (HS | XY | CT).
+# Matches: one endpoint, extended_color_light (0x010D), OnOff[LT], LevelControl[OO,LT], ColorControl[HS,XY,CT].
+# Differs: no ModeSelect (no binding), no BridgedDeviceBasicInformation (the real mock is a bridged test node).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-extended-color-light
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - {platform: ledc, id: out_r, pin: GPIO3}
+  - {platform: ledc, id: out_g, pin: GPIO10}
+  - {platform: ledc, id: out_b, pin: GPIO11}
+  - {platform: ledc, id: out_cw, pin: GPIO6}
+  - {platform: ledc, id: out_ww, pin: GPIO7}
+
+light:
+  - platform: rgbww
+    id: bulb
+    name: "Bulb"
+    red: out_r
+    green: out_g
+    blue: out_b
+    cold_white: out_cw
+    warm_white: out_ww
+    cold_white_color_temperature: 6500 K   # ColorTempPhysicalMinMireds = 153
+    warm_white_color_temperature: 2000 K   # ColorTempPhysicalMaxMireds = 500
+    restore_mode: ALWAYS_OFF               # Matter restores the power-on state (StartUpOnOff)
+
+matter:
+  expose:
+    - {id: bulb, endpoint: 1, features: [Hue And Saturation]}
