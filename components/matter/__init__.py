@@ -54,7 +54,7 @@ from .fan_binding import fan_restore_warning
 from .fan_binding import final_validate as fan_final_validate
 from .icd import CONF_ICD, final_validate_icd, icd_to_code, validate_icd_schema
 from .incomplete import SCHEMA_OPTIONS as INCOMPLETE_SCHEMA_OPTIONS
-from .incomplete import validate_incomplete_device_types
+from .incomplete import validate_incomplete_device_types, validate_openthread_clusters
 from .light_binding import (
     light_restore_warning,
     validate_light_effects,
@@ -237,6 +237,7 @@ def _final_validate(config: dict):
     validate_composition(config.get(CONF_ENDPOINTS, {}))
     validate_delegate_clusters(config, full_config)
     validate_incomplete_device_types(config)
+    validate_openthread_clusters(config, full_config)
     validate_power_configuration(config)
     validate_topologies(config)
 

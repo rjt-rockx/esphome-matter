@@ -84,3 +84,22 @@ def test_ota_requestor_device_type_with_matter_ota(run_config):
         "matter:\n  software_version: 2\n  ota: true\n  endpoints:\n    1:\n      ota_requestor: {}\n"
     )
     assert result.ok, result.output[-2000:]
+
+
+def test_thread_border_router_needs_openthread(run_config):
+    result = run_config(
+        "matter:\n  endpoints:\n    1:\n      thread_border_router: {}\n"
+    )
+    assert not result.ok
+    assert "openthread:" in result.output
+    assert "ThreadBorderRouterManagement" in result.output
+
+
+def test_openthread_only_clusters_match_esp_matter_kconfig():
+    """The three clusters esp-matter's Kconfig gates on OPENTHREAD_ENABLED, by name."""
+    from components.matter.data_model.clusters import CLUSTERS_BY_NAME
+    from components.matter.incomplete import OPENTHREAD_ONLY_CLUSTERS
+
+    for name in OPENTHREAD_ONLY_CLUSTERS:
+        assert name in CLUSTERS_BY_NAME
+        assert "THREAD" in CLUSTERS_BY_NAME[name].sdkconfig_option

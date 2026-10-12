@@ -2,9 +2,10 @@
 # ESP32-C6 firmware (Wi-Fi). It is compiled on every CI run and nightly so that a
 # break in any generated code path shows up even when no other test config exercises it.
 #
-# Not covered, because they exclude each other or need another radio setup: Thread / ICD
-# (esp32-thread.yaml, esp32-*-icd.yaml), BLE only commissioning (esp32-ble-commissioning.yaml),
-# Ethernet (esp32-ethernet.yaml).
+# Not covered, because they exclude each other or need another radio setup: Thread / ICD and
+# the thread_border_router device type, whose Thread clusters need `openthread:` which excludes
+# `wifi:` (esp32-thread.yaml, esp32-*-icd.yaml), BLE only commissioning
+# (esp32-ble-commissioning.yaml), Ethernet (esp32-ethernet.yaml).
 esphome:
   name: matter-ci-compile-all
   friendly_name: Compile All
@@ -868,8 +869,6 @@ matter:
       solar_power: {}
     172:
       battery_storage: {}
-    173:
-      thread_border_router: {}
     174:
       ota_provider: {}
     175:

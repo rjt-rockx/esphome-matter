@@ -12,7 +12,9 @@ import logging
 
 import esphome.config_validation as cv
 
-from .const import CONF_ENDPOINTS
+from .const import CONF_CLUSTERS, CONF_ENDPOINTS
+from .data_model import espmatter_names
+from .data_model.clusters import CLUSTERS_BY_CONF_KEY
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .ota import ota_config
 
@@ -92,3 +94,45 @@ def validate_incomplete_device_types(matter_config: dict) -> None:
                 key,
                 reason,
             )
+
+
+# esp-matter's cluster_select Kconfig declares these `depends on OPENTHREAD_ENABLED`, so without `openthread:` the
+# option comes out =n and the cluster server sources are not built, while esp-matter's integration/delegate code that
+# references them is still compiled: the link fails with undefined references to the cluster constructors.
+OPENTHREAD_ONLY_CLUSTERS = frozenset(
+    {
+        "ThreadBorderRouterManagement",
+        "ThreadNetworkDiagnostics",
+        "ThreadNetworkDirectory",
+    }
+)
+
+
+def validate_openthread_clusters(matter_config: dict, full_config: dict) -> None:
+    """Final validation: reject Thread-only clusters on a firmware without `openthread:`."""
+    if "openthread" in full_config:
+        return
+    for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
+        for key in endpoint_config:
+            if (device_type := DEVICE_TYPES_BY_CONF_KEY.get(key)) is not None:
+                names = {cluster.name for cluster in device_type.server_clusters}
+                names.update(
+                    espmatter_names.device_type_implied_clusters(device_type.name)
+                )
+                found = names & OPENTHREAD_ONLY_CLUSTERS
+                what = f"the {key} device type"
+            elif key == CONF_CLUSTERS:
+                found = {
+                    cluster.name
+                    for cluster_key in endpoint_config[key]
+                    if (cluster := CLUSTERS_BY_CONF_KEY.get(cluster_key)) is not None
+                } & OPENTHREAD_ONLY_CLUSTERS
+                what = "a `clusters:` entry"
+            else:
+                continue
+            if found:
+                raise cv.Invalid(
+                    f"Matter endpoint {endpoint_id}: {what} uses the {', '.join(sorted(found))} cluster, which "
+                    "needs a Thread network. Add an `openthread:` block (it cannot be combined with `wifi:`), or "
+                    "remove it from this firmware, otherwise the build fails to link"
+                )

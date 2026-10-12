@@ -57,4 +57,11 @@
       return MATTER_BUILD_FAIL("endpoint 2: device type temperature_sensor");
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0x66D79EB4);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thread_border_router::config_t device_config_0{};
+    if (esp_matter::endpoint::thread_border_router::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: device type thread_border_router");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0xEBB213D7);
