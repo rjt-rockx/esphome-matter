@@ -75,3 +75,5 @@ tempCodeRunnerFile.py
 
 # Temporary copies written by .github/scripts/ci_prepare.py
 ci_tmp_*.yaml
+/tests/configs/ci_tmp_*.yaml
+tests/configs/secrets.yaml

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import COMPONENTS, CONFIGS, prepare_config, run_esphome
+from conftest import COMPONENTS, config_files, prepare_config, run_esphome
 import pytest
 
 SWITCH = """
@@ -45,7 +45,7 @@ def bound_code(*names: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("config", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("config", config_files(), ids=lambda p: p.stem)
 def test_shipped_configs_validate(config, tmp_path):
     prepared = prepare_config(config, tmp_path)
     result = run_esphome("config", str(prepared), cwd=tmp_path)

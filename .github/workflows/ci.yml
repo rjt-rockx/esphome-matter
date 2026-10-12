@@ -217,6 +217,26 @@ jobs:
           path: conformance.json
 
   # ---------------------------------------------------------------------------
+  # Node test harness self-test against the simulator (non-blocking)
+  # ---------------------------------------------------------------------------
+  harness:
+    name: Test harness selftest (non-blocking)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Selftest (simulated transport)
+        working-directory: tools/harness
+        run: |
+          npm ci
+          node src/cli.mjs selftest --transport sim
+
+  # ---------------------------------------------------------------------------
   # Validates the data model JSON against the esp-matter sources
   # ---------------------------------------------------------------------------
   integration:

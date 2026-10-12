@@ -1,6 +1,8 @@
 # Roadmap
 
 This is a synthesis of what the community asks for, the direction of the upstream maintainer (DavidvtWout), the precedent for getting a protocol component into ESPHome, and the engineering gaps found in the code. It is a plan, not a promise: dates are deliberately absent. Facts below come from the project trackers and forums as of October 2026, mostly via summaries; check the linked threads before relying on exact counts or quotes.
+Design direction and principles: [design/DIRECTION.md](design/DIRECTION.md).
+
 
 ## 1. What the community wants
 

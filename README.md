@@ -256,6 +256,7 @@ More information about endpoints and a full list of supported device types can b
 - Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
+- [docs/design/DIRECTION.md](docs/design/DIRECTION.md): design direction and principles
 - [docs/faq.md](docs/faq.md): frequently asked questions
 - [docs/ROADMAP.md](docs/ROADMAP.md): community demand, maintainer direction, upstreaming, priorities
 - [docs/dev/thread-debugging.md](docs/dev/thread-debugging.md): debugging Thread

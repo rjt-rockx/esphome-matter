@@ -134,3 +134,12 @@ def run_esphome(*args: str, cwd: Path) -> Result:
     return Result(
         subprocess.run([*ESPHOME, *args], capture_output=True, text=True, cwd=cwd, timeout=900)
     )
+
+
+def config_files() -> list:
+    """tests/configs/*.yaml without validate.sh's temporary files (ci_tmp_*, secrets.yaml)."""
+    return sorted(
+        p
+        for p in CONFIGS.glob("*.yaml")
+        if not p.name.startswith("ci_tmp_") and p.name != "secrets.yaml"
+    )

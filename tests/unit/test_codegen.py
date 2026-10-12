@@ -6,7 +6,7 @@ checks for the expected Matter registration calls.
 
 from __future__ import annotations
 
-from conftest import CONFIGS, prepare_config, run_esphome
+from conftest import config_files, prepare_config, run_esphome
 import pytest
 
 pytestmark = pytest.mark.slow
@@ -23,7 +23,7 @@ EXPECTED = {
 }
 
 
-@pytest.mark.parametrize("config", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("config", config_files(), ids=lambda p: p.stem)
 def test_generate(config, tmp_path):
     prepared = prepare_config(config, tmp_path)
     result = run_esphome("compile", "--only-generate", str(prepared), cwd=tmp_path)
@@ -37,5 +37,5 @@ def test_generate(config, tmp_path):
 
 
 def test_all_expected_configs_exist():
-    stems = {p.stem for p in CONFIGS.glob("*.yaml")}
+    stems = {p.stem for p in config_files()}
     assert set(EXPECTED) <= stems
