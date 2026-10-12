@@ -3078,13 +3078,18 @@
         "descriptor": "cluster::descriptor",
         "door_lock": "cluster::door_lock",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "DoorLock",
+        "Identify"
+      ]
     },
     "aggregator": {
       "namespace": "aggregator",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": []
     },
     "generic_switch": {
       "namespace": "generic_switch",
@@ -3092,35 +3097,52 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "switch_cluster": "cluster::switch_cluster"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "Switch"
+      ]
     },
     "power_source": {
       "namespace": "power_source",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "power_source": "cluster::power_source"
-      }
+      },
+      "implied_clusters": [
+        "PowerSource"
+      ]
     },
     "ota_requestor": {
       "namespace": "ota_requestor",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "ota_software_update_requestor": "cluster::ota_software_update_requestor"
-      }
+      },
+      "implied_clusters": [
+        "OTASoftwareUpdateRequestor"
+      ]
     },
     "bridged_node": {
       "namespace": "bridged_node",
       "config_members": {
         "bridged_device_basic_information": "cluster::bridged_device_basic_information",
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "BridgedDeviceBasicInformation",
+        "Descriptor"
+      ]
     },
     "ota_provider": {
       "namespace": "ota_provider",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "ota_software_update_provider": "cluster::ota_software_update_provider"
-      }
+      },
+      "implied_clusters": [
+        "OTASoftwareUpdateProvider"
+      ]
     },
     "contact_sensor": {
       "namespace": "contact_sensor",
@@ -3128,7 +3150,11 @@
         "boolean_state": "cluster::boolean_state",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "BooleanState",
+        "Identify"
+      ]
     },
     "root_node": {
       "namespace": "root_node",
@@ -3144,33 +3170,67 @@
         "icd_user_active_mode_trigger": "cluster::icd_management::feature::user_active_mode_trigger",
         "network_commissioning": "cluster::network_commissioning",
         "operational_credentials": "cluster::operational_credentials"
-      }
+      },
+      "implied_clusters": [
+        "AccessControl",
+        "AdministratorCommissioning",
+        "BasicInformation",
+        "GeneralCommissioning",
+        "GeneralDiagnostics",
+        "GroupKeyManagement",
+        "Groupcast",
+        "ICDManagement",
+        "NetworkCommissioning",
+        "OperationalCredentials",
+        "ThreadNetworkDiagnostics",
+        "WiFiNetworkDiagnostics"
+      ]
     },
     "solar_power": {
       "namespace": "solar_power",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "ElectricalEnergyMeasurement",
+        "ElectricalPowerMeasurement",
+        "PowerSource",
+        "PowerTopology"
+      ]
     },
     "battery_storage": {
       "namespace": "battery_storage",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "DeviceEnergyManagement",
+        "DeviceEnergyManagementMode",
+        "ElectricalEnergyMeasurement",
+        "ElectricalPowerMeasurement",
+        "PowerSource",
+        "PowerTopology"
+      ]
     },
     "secondary_network_interface": {
       "namespace": "secondary_network_interface",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "network_commissioning": "cluster::network_commissioning"
-      }
+      },
+      "implied_clusters": [
+        "NetworkCommissioning"
+      ]
     },
     "mode_select": {
       "namespace": "mode_select",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "mode_select": "cluster::mode_select"
-      }
+      },
+      "implied_clusters": [
+        "ModeSelect"
+      ]
     },
     "fan": {
       "namespace": "fan",
@@ -3179,7 +3239,12 @@
         "fan_control": "cluster::fan_control",
         "groups": "cluster::groups",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "FanControl",
+        "Groups",
+        "Identify"
+      ]
     },
     "air_quality_sensor": {
       "namespace": "air_quality_sensor",
@@ -3187,7 +3252,11 @@
         "air_quality": "cluster::air_quality",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "AirQuality",
+        "Identify"
+      ]
     },
     "air_purifier": {
       "namespace": "air_purifier",
@@ -3195,7 +3264,11 @@
         "descriptor": "cluster::descriptor",
         "fan_control": "cluster::fan_control",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "FanControl",
+        "Identify"
+      ]
     },
     "water_freeze_detector": {
       "namespace": "water_freeze_detector",
@@ -3203,7 +3276,11 @@
         "boolean_state": "cluster::boolean_state",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "BooleanState",
+        "Identify"
+      ]
     },
     "water_valve": {
       "namespace": "water_valve",
@@ -3211,7 +3288,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "valve_configuration_and_control": "cluster::valve_configuration_and_control"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "ValveConfigurationandControl"
+      ]
     },
     "water_leak_detector": {
       "namespace": "water_leak_detector",
@@ -3219,7 +3300,11 @@
         "boolean_state": "cluster::boolean_state",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "BooleanState",
+        "Identify"
+      ]
     },
     "rain_sensor": {
       "namespace": "rain_sensor",
@@ -3227,7 +3312,11 @@
         "boolean_state": "cluster::boolean_state",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "BooleanState",
+        "Identify"
+      ]
     },
     "soil_sensor": {
       "namespace": "soil_sensor",
@@ -3235,20 +3324,28 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "soil_measurement": "cluster::soil_measurement"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "SoilMeasurement"
+      ]
     },
     "refrigerator": {
       "namespace": "refrigerator",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": []
     },
     "temperature_controlled_cabinet": {
       "namespace": "temperature_controlled_cabinet",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "temperature_control": "cluster::temperature_control"
-      }
+      },
+      "implied_clusters": [
+        "TemperatureControl"
+      ]
     },
     "room_air_conditioner": {
       "namespace": "room_air_conditioner",
@@ -3257,14 +3354,22 @@
         "identify": "cluster::identify",
         "on_off": "cluster::on_off",
         "thermostat": "cluster::thermostat"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "OnOff",
+        "Thermostat"
+      ]
     },
     "laundry_washer": {
       "namespace": "laundry_washer",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "operational_state": "cluster::operational_state"
-      }
+      },
+      "implied_clusters": [
+        "OperationalState"
+      ]
     },
     "robotic_vacuum_cleaner": {
       "namespace": "robotic_vacuum_cleaner",
@@ -3273,14 +3378,22 @@
         "identify": "cluster::identify",
         "rvc_operational_state": "cluster::rvc_operational_state",
         "rvc_run_mode": "cluster::rvc_run_mode"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "RVCOperationalState",
+        "RVCRunMode"
+      ]
     },
     "dishwasher": {
       "namespace": "dish_washer",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "operational_state": "cluster::operational_state"
-      }
+      },
+      "implied_clusters": [
+        "OperationalState"
+      ]
     },
     "smoke_co_alarm": {
       "namespace": "smoke_co_alarm",
@@ -3288,7 +3401,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "smoke_co_alarm": "cluster::smoke_co_alarm"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "SmokeCOAlarm"
+      ]
     },
     "cook_surface": {
       "namespace": "cook_surface",
@@ -3296,14 +3413,21 @@
         "descriptor": "cluster::descriptor",
         "temperature_control": "cluster::temperature_control",
         "temperature_measurement": "cluster::temperature_measurement"
-      }
+      },
+      "implied_clusters": [
+        "TemperatureControl",
+        "TemperatureMeasurement"
+      ]
     },
     "cooktop": {
       "namespace": "cooktop",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "on_off": "cluster::on_off"
-      }
+      },
+      "implied_clusters": [
+        "OnOff"
+      ]
     },
     "microwave_oven": {
       "namespace": "microwave_oven",
@@ -3312,27 +3436,39 @@
         "microwave_oven_control": "cluster::microwave_oven_control",
         "microwave_oven_mode": "cluster::microwave_oven_mode",
         "operational_state": "cluster::operational_state"
-      }
+      },
+      "implied_clusters": [
+        "MicrowaveOvenControl",
+        "MicrowaveOvenMode",
+        "OperationalState"
+      ]
     },
     "extractor_hood": {
       "namespace": "extractor_hood",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "fan_control": "cluster::fan_control"
-      }
+      },
+      "implied_clusters": [
+        "FanControl"
+      ]
     },
     "oven": {
       "namespace": "oven",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": []
     },
     "laundry_dryer": {
       "namespace": "laundry_dryer",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "operational_state": "cluster::operational_state"
-      }
+      },
+      "implied_clusters": [
+        "OperationalState"
+      ]
     },
     "thread_border_router": {
       "namespace": "thread_border_router",
@@ -3340,7 +3476,11 @@
         "descriptor": "cluster::descriptor",
         "thread_border_router_management": "cluster::thread_border_router_management",
         "thread_network_diagnostics": "cluster::thread_network_diagnostics"
-      }
+      },
+      "implied_clusters": [
+        "ThreadBorderRouterManagement",
+        "ThreadNetworkDiagnostics"
+      ]
     },
     "on_off_light": {
       "namespace": "on_off_light",
@@ -3351,7 +3491,13 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "dimmable_light": {
       "namespace": "dimmable_light",
@@ -3364,7 +3510,14 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "LevelControl",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "on_off_light_switch": {
       "namespace": "on_off_light_switch",
@@ -3372,7 +3525,11 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding",
+        "Identify"
+      ]
     },
     "dimmer_switch": {
       "namespace": "dimmer_switch",
@@ -3380,7 +3537,11 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding",
+        "Identify"
+      ]
     },
     "color_dimmer_switch": {
       "namespace": "color_dimmer_switch",
@@ -3388,7 +3549,11 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding",
+        "Identify"
+      ]
     },
     "light_sensor": {
       "namespace": "light_sensor",
@@ -3396,7 +3561,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "illuminance_measurement": "cluster::illuminance_measurement"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "IlluminanceMeasurement"
+      ]
     },
     "occupancy_sensor": {
       "namespace": "occupancy_sensor",
@@ -3404,7 +3573,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "occupancy_sensing": "cluster::occupancy_sensing"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "OccupancySensing"
+      ]
     },
     "on_off_plug_in_unit": {
       "namespace": "on_off_plug_in_unit",
@@ -3415,7 +3588,13 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "dimmable_plug_in_unit": {
       "namespace": "dimmable_plug_in_unit",
@@ -3428,7 +3607,14 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "LevelControl",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "color_temperature_light": {
       "namespace": "color_temperature_light",
@@ -3443,7 +3629,15 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "ColorControl",
+        "Groups",
+        "Identify",
+        "LevelControl",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "extended_color_light": {
       "namespace": "extended_color_light",
@@ -3459,7 +3653,15 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "ColorControl",
+        "Groups",
+        "Identify",
+        "LevelControl",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "mounted_on_off_control": {
       "namespace": "mounted_on_off_control",
@@ -3470,7 +3672,13 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "mounted_dimmable_load_control": {
       "namespace": "mounted_dimmable_load_control",
@@ -3483,7 +3691,14 @@
         "on_off": "cluster::on_off",
         "on_off_lighting": "cluster::on_off::feature::lighting",
         "scenes_management": "cluster::scenes_management"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "LevelControl",
+        "OnOff",
+        "ScenesManagement"
+      ]
     },
     "audio_doorbell": {
       "namespace": "audio_doorbell",
@@ -3493,7 +3708,13 @@
         "identify": "cluster::identify",
         "switch_cluster": "cluster::switch_cluster",
         "webrtc_transport_provider": "cluster::webrtc_transport_provider"
-      }
+      },
+      "implied_clusters": [
+        "CameraAVStreamManagement",
+        "Identify",
+        "Switch",
+        "WebRTCTransportProvider"
+      ]
     },
     "camera": {
       "namespace": "camera",
@@ -3502,20 +3723,28 @@
         "descriptor": "cluster::descriptor",
         "webrtc_transport_provider": "cluster::webrtc_transport_provider",
         "webrtc_transport_requestor": "cluster::webrtc_transport_requestor"
-      }
+      },
+      "implied_clusters": [
+        "CameraAVStreamManagement",
+        "WebRTCTransportProvider"
+      ]
     },
     "video_doorbell": {
       "namespace": "video_doorbell",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": []
     },
     "chime": {
       "namespace": "chime",
       "config_members": {
         "chime": "cluster::chime",
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "Chime"
+      ]
     },
     "doorbell": {
       "namespace": "doorbell",
@@ -3523,7 +3752,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "switch_cluster": "cluster::switch_cluster"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "Switch"
+      ]
     },
     "window_covering": {
       "namespace": "window_covering",
@@ -3532,7 +3765,12 @@
         "groups": "cluster::groups",
         "identify": "cluster::identify",
         "window_covering": "cluster::window_covering"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "WindowCovering"
+      ]
     },
     "closure": {
       "namespace": "closure",
@@ -3540,14 +3778,21 @@
         "closure_control": "cluster::closure_control",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "ClosureControl",
+        "Identify"
+      ]
     },
     "closure_panel": {
       "namespace": "closure_panel",
       "config_members": {
         "closure_dimension": "cluster::closure_dimension",
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "ClosureDimension"
+      ]
     },
     "closure_controller": {
       "namespace": "closure_controller",
@@ -3555,7 +3800,10 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding"
+      ]
     },
     "thermostat": {
       "namespace": "thermostat",
@@ -3565,7 +3813,12 @@
         "identify": "cluster::identify",
         "scenes_management": "cluster::scenes_management",
         "thermostat": "cluster::thermostat"
-      }
+      },
+      "implied_clusters": [
+        "Groups",
+        "Identify",
+        "Thermostat"
+      ]
     },
     "temperature_sensor": {
       "namespace": "temperature_sensor",
@@ -3573,7 +3826,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "temperature_measurement": "cluster::temperature_measurement"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "TemperatureMeasurement"
+      ]
     },
     "pump": {
       "namespace": "pump",
@@ -3582,7 +3839,12 @@
         "identify": "cluster::identify",
         "on_off": "cluster::on_off",
         "pump_configuration_and_control": "cluster::pump_configuration_and_control"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "OnOff",
+        "PumpConfigurationandControl"
+      ]
     },
     "pump_controller": {
       "namespace": "pump_controller",
@@ -3590,7 +3852,11 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding",
+        "Identify"
+      ]
     },
     "pressure_sensor": {
       "namespace": "pressure_sensor",
@@ -3598,7 +3864,11 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "pressure_measurement": "cluster::pressure_measurement"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "PressureMeasurement"
+      ]
     },
     "flow_sensor": {
       "namespace": "flow_sensor",
@@ -3606,7 +3876,11 @@
         "descriptor": "cluster::descriptor",
         "flow_measurement": "cluster::flow_measurement",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "FlowMeasurement",
+        "Identify"
+      ]
     },
     "humidity_sensor": {
       "namespace": "humidity_sensor",
@@ -3614,13 +3888,25 @@
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify",
         "relative_humidity_measurement": "cluster::relative_humidity_measurement"
-      }
+      },
+      "implied_clusters": [
+        "Identify",
+        "RelativeHumidityMeasurement"
+      ]
     },
     "heat_pump": {
       "namespace": "heat_pump",
       "config_members": {
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "DeviceEnergyManagement",
+        "DeviceEnergyManagementMode",
+        "ElectricalEnergyMeasurement",
+        "ElectricalPowerMeasurement",
+        "PowerSource",
+        "PowerTopology"
+      ]
     },
     "thermostat_controller": {
       "namespace": "thermostat_controller",
@@ -3628,7 +3914,10 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding"
+      ]
     },
     "evse": {
       "namespace": "energy_evse",
@@ -3637,7 +3926,12 @@
         "device_energy_management": "cluster::device_energy_management",
         "energy_evse": "cluster::energy_evse",
         "energy_evse_mode": "cluster::energy_evse_mode"
-      }
+      },
+      "implied_clusters": [
+        "DeviceEnergyManagement",
+        "EnergyEVSE",
+        "EnergyEVSEMode"
+      ]
     },
     "device_energy_management": {
       "namespace": "device_energy_management",
@@ -3645,7 +3939,11 @@
         "descriptor": "cluster::descriptor",
         "device_energy_management": "cluster::device_energy_management",
         "device_energy_management_mode": "cluster::device_energy_management_mode"
-      }
+      },
+      "implied_clusters": [
+        "DeviceEnergyManagement",
+        "DeviceEnergyManagementMode"
+      ]
     },
     "water_heater": {
       "namespace": "water_heater",
@@ -3654,7 +3952,12 @@
         "thermostat": "cluster::thermostat",
         "water_heater_management": "cluster::water_heater_management",
         "water_heater_mode": "cluster::water_heater_mode"
-      }
+      },
+      "implied_clusters": [
+        "Thermostat",
+        "WaterHeaterManagement",
+        "WaterHeaterMode"
+      ]
     },
     "electrical_sensor": {
       "namespace": "electrical_sensor",
@@ -3663,14 +3966,22 @@
         "electrical_energy_measurement": "cluster::electrical_energy_measurement",
         "electrical_power_measurement": "cluster::electrical_power_measurement",
         "power_topology": "cluster::power_topology"
-      }
+      },
+      "implied_clusters": [
+        "ElectricalEnergyMeasurement",
+        "ElectricalPowerMeasurement",
+        "PowerTopology"
+      ]
     },
     "electrical_utility_meter": {
       "namespace": "electrical_utility_meter",
       "config_members": {
         "descriptor": "cluster::descriptor",
         "meter_identification": "cluster::meter_identification"
-      }
+      },
+      "implied_clusters": [
+        "MeterIdentification"
+      ]
     },
     "electrical_energy_tariff": {
       "namespace": "electrical_energy_tariff",
@@ -3678,7 +3989,11 @@
         "commodity_price": "cluster::commodity_price",
         "commodity_tariff": "cluster::commodity_tariff",
         "descriptor": "cluster::descriptor"
-      }
+      },
+      "implied_clusters": [
+        "CommodityPrice",
+        "CommodityTariff"
+      ]
     },
     "electrical_meter": {
       "namespace": "electrical_meter",
@@ -3686,7 +4001,11 @@
         "descriptor": "cluster::descriptor",
         "electrical_energy_measurement": "cluster::electrical_energy_measurement",
         "electrical_power_measurement": "cluster::electrical_power_measurement"
-      }
+      },
+      "implied_clusters": [
+        "ElectricalEnergyMeasurement",
+        "ElectricalPowerMeasurement"
+      ]
     },
     "control_bridge": {
       "namespace": "control_bridge",
@@ -3694,7 +4013,11 @@
         "binding": "cluster::binding",
         "descriptor": "cluster::descriptor",
         "identify": "cluster::identify"
-      }
+      },
+      "implied_clusters": [
+        "Binding",
+        "Identify"
+      ]
     }
   }
 }

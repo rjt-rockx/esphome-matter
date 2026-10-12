@@ -275,3 +275,65 @@ def test_table_is_up_to_date():
         text=True,
     )
     assert proc.returncode == 0, proc.stderr
+
+
+# Composite device types: esp-matter's add() creates these clusters (directly or through
+# nested endpoint::<x>::add()) no matter what we configure, so they must be compiled in.
+IMPLIED_CLUSTERS = {
+    "heat_pump": {
+        "PowerSource",
+        "PowerTopology",
+        "ElectricalPowerMeasurement",
+        "ElectricalEnergyMeasurement",
+        "DeviceEnergyManagement",
+        "DeviceEnergyManagementMode",
+    },
+    "solar_power": {
+        "PowerSource",
+        "PowerTopology",
+        "ElectricalPowerMeasurement",
+        "ElectricalEnergyMeasurement",
+    },
+    "battery_storage": {
+        "PowerSource",
+        "PowerTopology",
+        "ElectricalPowerMeasurement",
+        "ElectricalEnergyMeasurement",
+        "DeviceEnergyManagement",
+        "DeviceEnergyManagementMode",
+    },
+    "evse": {"EnergyEVSE", "EnergyEVSEMode", "DeviceEnergyManagement"},
+    "water_heater": {"Thermostat", "WaterHeaterManagement", "WaterHeaterMode"},
+    "room_air_conditioner": {"Thermostat", "OnOff"},
+}
+
+
+@pytest.mark.parametrize("device_type", sorted(IMPLIED_CLUSTERS))
+def test_implied_clusters_of_composite_device_types(device_type):
+    implied = set(espmatter_names.device_type_implied_clusters(device_type))
+    assert IMPLIED_CLUSTERS[device_type] <= implied, device_type
+
+
+def test_implied_clusters_are_known_clusters():
+    for name, entry in TABLE["device_types"].items():
+        assert "implied_clusters" in entry, name
+        for cluster in entry["implied_clusters"]:
+            assert cluster in CLUSTERS_BY_NAME, (name, cluster)
+            assert CLUSTERS_BY_NAME[cluster].sdkconfig_option
+
+
+def test_implied_clusters_follow_nested_device_types():
+    """heat_pump creates no electrical clusters itself, it calls electrical_sensor::add()."""
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    try:
+        import gen_espmatter_names as gen
+    finally:
+        sys.path.pop(0)
+    headers = object.__new__(gen.Headers)
+    headers.implied = {
+        "outer": ({"identify"}, {"middle"}),
+        "middle": (set(), {"inner", "outer"}),  # cycles must terminate
+        "inner": ({"power_topology"}, set()),
+    }
+    assert headers.implied_clusters("outer") == {"identify", "power_topology"}
+    assert headers.implied_clusters("missing") == set()
