@@ -156,6 +156,9 @@ void MatterLightMapping::initialize() {
         this->endpoint_id(), LevelControl::Id,
         LevelControl::Attributes::CurrentLevel::Id,
         [this](const esp_matter_attr_val_t &value) {
+          // CurrentLevel is nullable.
+          if (value.is_null())
+            return;
           MatterLightPendingUpdate update;
           update.level = value.val.u8;
           global_matter_component->defer_to_main_loop(
@@ -549,6 +552,11 @@ bool MatterLightMapping::add_color_to_call_(
       nearly_equal(values.get_blue(), blue))
     return false;
   call.set_rgb(red, green, blue);
+  // The counterpart of the color temperature case: don't leave the white
+  // channels of an RGBWW light on, which would wash out the color.
+  call.set_white_if_supported(0.0f);
+  call.set_cold_white_if_supported(0.0f);
+  call.set_warm_white_if_supported(0.0f);
   return true;
 }
 
@@ -591,7 +599,8 @@ void MatterLightMapping::apply_pending_() {
   }
   this->last_apply_ms_ = now;
   this->last_apply_valid_ = true;
-  call.set_transition_length(transition_ms);
+  // Lights without brightness control (on/off) can't transition at all.
+  call.set_transition_length_if_supported(transition_ms);
 
   this->synchronizing_from_matter_ = true;
   call.perform();
