@@ -324,6 +324,10 @@ void MatterLightMapping::register_commands_() {
     hook(OnOff::Id, OnOff::Commands::On::Id);
     hook(OnOff::Id, OnOff::Commands::Off::Id);
     hook(OnOff::Id, OnOff::Commands::Toggle::Id);
+    hook(LevelControl::Id, LevelControl::Commands::Move::Id);
+    hook(LevelControl::Id, LevelControl::Commands::Step::Id);
+    hook(LevelControl::Id, LevelControl::Commands::MoveWithOnOff::Id);
+    hook(LevelControl::Id, LevelControl::Commands::StepWithOnOff::Id);
     hook(LevelControl::Id, LevelControl::Commands::MoveToLevel::Id);
     hook(LevelControl::Id, LevelControl::Commands::MoveToLevelWithOnOff::Id);
     hook(LevelControl::Id, LevelControl::Commands::Stop::Id);
@@ -389,6 +393,15 @@ bool MatterLightMapping::decode_level_command_(uint32_t command_id,
   if (command_id == LevelControl::Commands::Stop::Id ||
       command_id == LevelControl::Commands::StopWithOnOff::Id) {
     command.stop_light = true;
+    return true;
+  }
+
+  // Move and Step run at a rate: CHIP writes every step, the light follows.
+  if (command_id == LevelControl::Commands::Move::Id ||
+      command_id == LevelControl::Commands::MoveWithOnOff::Id ||
+      command_id == LevelControl::Commands::Step::Id ||
+      command_id == LevelControl::Commands::StepWithOnOff::Id) {
+    command.rate_light = true;
     return true;
   }
 
@@ -520,6 +533,21 @@ bool MatterLightMapping::decode_color_command_(uint32_t command_id,
 
   if (command_id == ColorControl::Commands::StopMoveStep::Id) {
     command.stop_color = true;
+    return true;
+  }
+
+  // Move and Step run at a rate: CHIP writes every step, the light follows.
+  if (command_id == ColorControl::Commands::MoveHue::Id ||
+      command_id == ColorControl::Commands::StepHue::Id ||
+      command_id == ColorControl::Commands::MoveSaturation::Id ||
+      command_id == ColorControl::Commands::StepSaturation::Id ||
+      command_id == ColorControl::Commands::MoveColor::Id ||
+      command_id == ColorControl::Commands::StepColor::Id ||
+      command_id == ColorControl::Commands::EnhancedMoveHue::Id ||
+      command_id == ColorControl::Commands::EnhancedStepHue::Id ||
+      command_id == ColorControl::Commands::MoveColorTemperature::Id ||
+      command_id == ColorControl::Commands::StepColorTemperature::Id) {
+    command.rate_color = true;
     return true;
   }
 

@@ -91,6 +91,11 @@ struct MatterLightCommand {
   // Stop commands: CHIP stops where it is, so the light does as well.
   bool stop_light{false};
   bool stop_color{false};
+  // Rate based commands (Move, Step): no target and no transition time. They end
+  // the window of an earlier command of their group, so the light follows CHIP's
+  // steps (as a stream of updates) instead of waiting for CHIP to be idle.
+  bool rate_light{false};
+  bool rate_color{false};
 };
 
 // What the light is showing. The capability bits of the ESPHome color mode only
@@ -760,7 +765,8 @@ protected:
     // the window that asked.
     uint32_t epoch_light = this->req_epoch_[G_LIGHT].load();
     uint32_t epoch_color = this->req_epoch_[G_COLOR].load();
-    binding_platform()->defer_main([this, light, busy_light, epoch_light, color, busy_color, epoch_color]() {
+    binding_platform()->defer_main([this, light, busy_light, epoch_light,
+                                    color, busy_color, epoch_color]() {
       this->window_end_checked_(light, busy_light, epoch_light, color,
                                 busy_color, epoch_color);
     });
@@ -991,6 +997,24 @@ protected:
       this->request_state_read_(true, command.stop_light, command.stop_color);
       return;
     }
+    if (command.rate_light || command.rate_color) {
+      // Move and Step: CHIP walks at a rate and writes every step. The window of
+      // an earlier command of the group (which CHIP's RemainingTime would keep
+      // open, 0xFFFF for a hue move) must not swallow them.
+      if (command.rate_light) {
+        this->cancel_group_(G_LIGHT);
+        this->light_window_active_ = false;
+      }
+      if (command.rate_color) {
+        this->cancel_group_(G_COLOR);
+        this->color_window_active_ = false;
+      }
+      this->last_apply_valid_ = false;
+      // The end of a color loop: CHIP restores the hue from before the loop.
+      if (command.color_loop == MatterLightCommand::ColorLoop::STOP)
+        this->request_state_read_(true, false, true);
+      return;
+    }
     if (command.color_loop == MatterLightCommand::ColorLoop::START) {
       // ColorLoopSet: run the effect. CHIP's own steps are ignored until the
       // loop ends, but only if the effect really started (it doesn't on a light
@@ -1015,7 +1039,9 @@ protected:
         !command.color.has_value() && !command.on.has_value() &&
         !command.level.has_value()) {
       // Nothing else in this command. CHIP restores the hue from before the
-      // loop; follow that.
+      // loop; follow that. A window of an earlier colour command would drop it.
+      this->cancel_group_(G_COLOR);
+      this->color_window_active_ = false;
       this->request_state_read_(true, false, true);
       return;
     }

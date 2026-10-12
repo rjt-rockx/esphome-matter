@@ -1270,6 +1270,120 @@ TEST(light_retries_start_again_after_a_new_command) {
   CHECK_EQ(s.l.light_retries(), (uint32_t) 0);
 }
 
+// ---------------------------------------------------------------------------
+// Rate based commands (Move, Step) inside a held window
+// ---------------------------------------------------------------------------
+
+TEST(light_level_move_after_a_level_command_follows_chips_steps) {
+  Started s;
+  s.l.requests.clear();
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(0);
+  // "Tap on, then hold to dim": a level command, then a Move 0.2 s after its nominal end.
+  s.l.submit_cmd(level_command(100, 1000));
+  s.r.p.settle();
+  size_t n = s.l.requests.size();
+  s.r.p.advance(1200);
+  s.r.p.settle();
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(50);  // Move: finite, CHIP is not idle
+  MatterLightCommand move;
+  move.rate_light = true;
+  s.l.submit_cmd(move);
+  s.r.p.settle();
+  CHECK(!s.l.window_light());
+  uint8_t lv = 100;
+  for (int i = 0; i < 16; i++) {  // 4 s of steps
+    lv += 5;
+    matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(lv));
+    s.r.p.advance(250);
+    s.r.p.settle();
+  }
+  CHECK(s.l.requests.size() >= n + 14);  // the light follows
+  CHECK_NEAR(s.l.view.brightness, lv / 254.0, 0.02);
+}
+
+TEST(light_move_hue_after_a_colour_command_follows_chips_steps) {
+  Started s;
+  s.l.requests.clear();
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+  s.l.submit_cmd(color_command(10000, 40000, 1000));
+  s.r.p.settle();
+  size_t n = s.l.requests.size();
+  s.r.p.advance(1200);
+  s.r.p.settle();
+  // MoveHue: CHIP keeps RemainingTime at 0xFFFF for as long as it moves.
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0xFFFF);
+  MatterLightCommand move;
+  move.rate_color = true;
+  s.l.submit_cmd(move);
+  s.r.p.settle();
+  CHECK(!s.l.window_color());
+  uint16_t x = 10000;
+  for (int i = 0; i < 40; i++) {  // 10 s of steps
+    x += 500;
+    matter_writes(s.r.p, COLOR_CLUSTER, CURRENT_X, u16_val(x));
+    s.r.p.advance(250);
+    s.r.p.settle();
+  }
+  CHECK(s.l.requests.size() >= n + 35);
+  // And it keeps following, minutes later.
+  size_t m = s.l.requests.size();
+  for (int i = 0; i < 40; i++) {
+    x += 400;
+    matter_writes(s.r.p, COLOR_CLUSTER, CURRENT_X, u16_val(x));
+    s.r.p.advance(250);
+    s.r.p.settle();
+  }
+  CHECK(s.l.requests.size() >= m + 35);
+}
+
+TEST(light_stop_after_a_rate_command_settles_as_before) {
+  Started s;
+  s.l.requests.clear();
+  MatterLightCommand move;
+  move.rate_light = true;
+  s.l.submit_cmd(move);
+  s.r.p.settle();
+  matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(60));
+  s.r.p.settle();
+  s.r.p.store[{EP, LEVEL_CLUSTER, CURRENT_LEVEL}] = level_val(70);
+  MatterLightCommand stop;
+  stop.stop_light = true;
+  s.l.submit_cmd(stop);
+  s.r.p.settle();
+  CHECK_NEAR(s.l.view.brightness, 70 / 254.0, 0.001);
+  CHECK_EQ(s.l.requests.back().transition_ms, (uint32_t) 0);
+}
+
+TEST(light_color_loop_deactivate_settles_at_once_inside_a_held_colour_window) {
+  Started s;
+  s.l.requests.clear();
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+  s.l.submit_cmd(color_command(10000, 40000, 1000));
+  s.r.p.settle();
+  MatterLightCommand start;
+  start.color_loop = MatterLightCommand::ColorLoop::START;
+  s.l.submit_cmd(start);
+  s.r.p.settle();
+  CHECK(s.l.color_loop_active());
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0xFFFF);
+  s.r.p.advance(3000);
+  s.r.p.settle();
+  CHECK(s.l.window_color());  // held: CHIP's loop is never idle
+  // ColorLoopSet(deactivate): CHIP restores the hue it had.
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_REMAINING_TIME}] = u16_val(0);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(22222);
+  s.l.clear_loop_requested();
+  MatterLightCommand stop;
+  stop.color_loop = MatterLightCommand::ColorLoop::STOP;
+  s.l.submit_cmd(stop);
+  s.r.p.settle();  // no timer needed: the settle is not dropped by the held window
+  CHECK(!s.l.window_color());
+  float r, g, b;
+  CHECK(esphome::matter::conversion::from_matter::color(22222, 21845, r, g, b));
+  CHECK(s.l.requests.back().color == LightRequest::Color::RGB);
+  CHECK_NEAR(s.l.requests.back().red, r, 0.001);
+}
+
 TEST(light_push_leaves_the_colour_alone_while_a_colour_command_runs) {
   Started s;
   MatterLightCommand c;
