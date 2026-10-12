@@ -26,6 +26,7 @@ from .endpoints import (
     ENDPOINT_SCHEMA,
     light_restore_warning,
     register_endpoints,
+    switch_restore_warning,
 )
 from .types import MatterComponent
 
@@ -165,6 +166,7 @@ def _final_validate(config: dict):
         )
 
     light_restore_warning(config, full_config)
+    switch_restore_warning(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate

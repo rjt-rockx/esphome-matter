@@ -1,0 +1,74 @@
+# A smart plug: a relay controlled over Matter, a status LED that mirrors the relay and a button that
+# factory resets the Matter commissioning data when held for 10 seconds.
+# Change the GPIO pins to match your board. This example uses a pre-configured openthread network.
+
+esphome:
+  name: matter-smart-plug
+  friendly_name: Matter Smart Plug
+
+esp32:
+  variant: # Set to your variant
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      on_off_plug_in_unit:
+        switch_id: relay
+
+switch:
+  # The relay is exposed through Matter. Matter restores the on/off state after a power cycle (see the
+  # StartUpOnOff attribute), so the ESPHome restore mode should be ALWAYS_OFF.
+  - platform: gpio
+    id: relay
+    name: Relay
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+    # The status LED follows the relay.
+    on_turn_on:
+      - light.turn_on: status_led
+    on_turn_off:
+      - light.turn_off: status_led
+
+output:
+  - platform: gpio
+    id: status_led_output
+    pin: GPIO5
+
+light:
+  - platform: binary
+    id: status_led
+    name: Status LED
+    output: status_led_output
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    id: reset_button
+    name: Factory reset button
+    pin:
+      number: GPIO9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    on_click:
+      # Hold the button for 10 seconds to factory reset.
+      min_length: 10s
+      max_length: 60s
+      then:
+        - matter.factory_reset:

@@ -25,6 +25,18 @@ matter:
         light_id: light_id
 ```
 
+# Plugs and relays
+
+The `on_off_plug_in_unit` and `mounted_on_off_control` device types (and `on_off_light`) can be mapped to an esphome `switch` using `switch_id`. State is synchronized both ways. See [switch.md](switch.md).
+
+```yaml
+matter:
+  endpoints:
+    1:
+      on_off_plug_in_unit:
+        switch_id: relay
+```
+
 # Switches
 
 The Matter switch device types are `on_off_light_switch`, `dimmer_switch` and `color_dimmer_switch`. Instead of mapping an esphome entity to the switch device type, esphome actions are mapped to the endpoint on which the switch is created.
@@ -165,9 +177,7 @@ The following device types are untested. Many of them can still successfully be 
 - oven
 - laundry_dryer
 - thread_border_router
-- on_off_plug_in_unit
 - dimmable_plug_in_unit
-- mounted_on_off_control
 - mounted_dimmable_load_control
 - audio_doorbell
 - camera

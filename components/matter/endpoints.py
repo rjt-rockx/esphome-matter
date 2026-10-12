@@ -52,6 +52,29 @@ def light_restore_warning(matter_config: dict, full_config: Config):
                 )
 
 
+def switch_restore_warning(matter_config: dict, full_config: Config):
+    for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
+        for device_config in endpoint_config.values():
+            if not isinstance(device_config, dict):
+                continue
+            switch_id = device_config.get(CONF_SWITCH_ID)
+            if switch_id is None:
+                continue
+            try:
+                switch_path = full_config.get_path_for_id(switch_id)[:-1]
+                switch_config = full_config.get_config_for_path(switch_path)
+            except KeyError:
+                continue
+            restore_mode = switch_config.get(CONF_RESTORE_MODE)
+            if restore_mode is not None and restore_mode != "ALWAYS_OFF":
+                _LOGGER.warning(
+                    "Switch '%s' is exposed through Matter with restore mode %s and should use "
+                    "restore_mode: ALWAYS_OFF so Matter can restore its power-on state",
+                    switch_id,
+                    restore_mode,
+                )
+
+
 def _on_attribute_schema():
     options = {}
     for cluster in CLUSTERS:
@@ -228,6 +251,10 @@ class Endpoint:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
             cg.add(var.register_light(light_, self._endpoint_id))
+
+        if CONF_SWITCH_ID in device_config:
+            switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
+            cg.add(var.register_switch(switch_, self._endpoint_id))
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
