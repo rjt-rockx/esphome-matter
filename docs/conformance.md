@@ -48,6 +48,9 @@ node model + Matter data model XML --> rules --> report (text / JSON / exit code
    feature implications, cluster revision; per device type: id, revision and the
    cluster/feature/element creation sequence of its `add()`). Regenerate with
    `python -m tools.conformance.espm --esp-matter <checkout>` when bumping esp-matter.
+   A profile feature key can name several features (`cumulative_energy+imported_energy`):
+   the element exists only when all of them are enabled, which is how esp-matter creates
+   `CumulativeEnergyImported` (not `...Exported`) for an import-only meter.
    This is what makes the static mode meaningful at attribute level.
    Clusters that esp-matter registers as *code-driven* connectedhomeip ServerClusters are
    corrected by `_apply_code_driven_overlay` in `espm.py`, because for them the wire
