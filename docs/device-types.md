@@ -108,25 +108,7 @@ See [lock-valve.md](lock-valve.md).
 
 # Binary sensors
 
-> **Placeholder.** The full binary sensor mapping (including `device_class` guidance) is documented in [binary-sensors.md](binary-sensors.md). The summary below reflects the current code.
-
-`contact_sensor`, `rain_sensor`, `water_leak_detector` and `water_freeze_detector` expose the Boolean State cluster (key `boolean_state`). `occupancy_sensor` instead exposes the Occupancy Sensing cluster (key `occupancy`).
-
-```yaml
-matter:
-  endpoints:
-    1:
-      contact_sensor:
-        boolean_state: binary_sensor_id
-    2:
-      rain_sensor:
-        boolean_state: binary_sensor_id
-    3:
-      occupancy_sensor:
-        occupancy: binary_sensor_id
-```
-
-Mapping is explicit: the `device_class` of the ESPHome entity is not read. The water leak and water freeze detectors can be created, but their binding is untested. Which polarity a controller shows for a contact sensor (open vs closed) is unverified. `soil_sensor` is **not** a Boolean State device; see Sensors below.
+> **Placeholder.** ESPHome `binary_sensor:` to Matter Contact, Occupancy, Water Leak/Freeze, Rain and Smoke/CO sensors is documented in [binary-sensors.md](binary-sensors.md).
 
 See [binary-sensors.md](binary-sensors.md).
 

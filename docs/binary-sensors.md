@@ -96,7 +96,8 @@ matter:
 ```
 
 Valid sensor-type features: `Other`, `PassiveInfrared`, `Ultrasonic`, `PhysicalContact`, `ActiveInfrared`, `Radar`,
-`RFSensing`, `Vision`. Non-sensor-type features (`Prediction`, `OccupancyEvent`) can be listed next to them.
+`RFSensing`, `Vision`. Other features (`Prediction`, `OccupancyEvent`) are not applied: esp-matter doesn't implement
+`Prediction`, and connectedhomeip generates the OccupancyChanged event regardless.
 
 ## Water leak, freeze and rain
 
