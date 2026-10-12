@@ -400,8 +400,9 @@ def _button(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
 
 # --- cover, fan, lock, valve, climate ------------------------------------------------------
 
-# Cover classes that are not blinds. A garage door as Window Covering is a workaround that
-# controllers present oddly; the user picks it explicitly with `as: window_covering`.
+# Cover classes that are not blinds. They are exposed as Window Covering with `closure_compat`
+# (wave-closure), which acknowledges that controllers show them as a shutter. The native Closure
+# device type is never inferred; it stays opt-in through `as:`.
 _NON_BLIND_COVERS = {"garage", "gate", "door"}
 # climate_ir and similar platforms are air conditioners; everything else is a thermostat.
 _AC_CLIMATE_PLATFORMS = frozenset(
@@ -416,12 +417,10 @@ _AC_CLIMATE_PLATFORMS = frozenset(
 
 @rule("cover")
 def _cover(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
+    block = bind("window_covering", entity)
     if entity.device_class in _NON_BLIND_COVERS:
-        raise NoMapping(
-            f"a cover with device_class '{entity.device_class}' is not a blind; use "
-            "`as: window_covering` to expose it as a Window Covering anyway"
-        )
-    return LoweredEndpoint({"window_covering": bind("window_covering", entity)})
+        block["closure_compat"] = True
+    return LoweredEndpoint({"window_covering": block})
 
 
 @rule("fan")

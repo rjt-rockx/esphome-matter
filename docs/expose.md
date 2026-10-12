@@ -43,10 +43,13 @@ Map keys:
 | `endpoint` | Pin the endpoint number (1..65534). |
 | `features` | Extra features of the device type (same names as `features:` in `endpoints:`). |
 | `options` | Merged into the device type block (e.g. `min_level`, `inverted`). |
-| `label` | Endpoint label. Dropped (debug log) while the base has no endpoint `label:` key. |
+| `label` | Endpoint label (FixedLabel, at most 16 UTF-8 bytes; longer is an error). Without it, the entity name is the label only on endpoints in a Duplicate set (see Tags and labels). |
 | `attach_to` | Add this entity's clusters to another exposed entity's (or group's) endpoint. No number of its own. |
 | `was` | The previous id of a renamed entity; keeps its endpoint number. |
-| `meters` | Reserved for the Electrical Sensor mapping. |
+| `meters` | On a power, energy, voltage, current, frequency or power factor sensor: the load (switch, light, cover, fan id) whose endpoint carries the Electrical Sensor. Same effect as `attach_to`. |
+| `tags` | Descriptor semantic tags (same entries as the endpoint `tags:`, 1 to 3). Replaces the automatic Common Number tag. |
+| `parent` | Id of an exposed entity (or endpoint key) whose endpoint becomes this endpoint's parent, or the number of a hand-written endpoint. |
+| `clusters` | Extra clusters, same as the endpoint `clusters:`. Merged into the lowered endpoint. |
 
 `exclude:` takes ids or globs at the top level of `matter:`.
 
@@ -59,20 +62,84 @@ Map keys:
   `entity_category: config|diagnostic`, and entities that have no mapping. The reason of every skip is
   printed in the plan. An explicit id may expose an internal or diagnostic entity (with a warning).
 - A glob that matches nothing, an unknown id (with "did you mean" suggestions) and an entity whose domain
-  has no Matter device type (button, number, select, text, text_sensor, ...) are errors with the reason.
+  has no Matter device type (number, select, text, text_sensor, ...) are errors with the reason.
 
 ## What is inferred
+
+Every row can be overridden with `as:`. Nothing is guessed from a missing `device_class`.
 
 | Entity | Device type |
 |---|---|
 | `switch` | `on_off_plug_in_unit` (`as: on_off_light` for a lamp) |
 | `light` | by platform: `binary` on_off_light, `monochromatic` dimmable_light, `cwww`/`color_temperature` color_temperature_light, `rgb`/`rgbw`/`rgbww`/`rgbct` extended_color_light. Other platforms need `as:`. |
+| `cover` | `window_covering`. `garage`, `gate` and `door` classes also get `closure_compat: true` (needs the Closure support branch); the native `closure` type is only ever chosen with `as:`. |
+| `fan` | `fan` |
+| `lock` | `door_lock` |
+| `valve` | `water_valve` (Apple Home does not show it; the plan says so) |
+| `climate` | `thermostat`; `room_air_conditioner` for the air conditioner platforms (`climate_ir_lg`, `coolix`, `daikin`, `mitsubishi`, `midea`, `haier`, ...) |
+| `binary_sensor` `door`, `window`, `opening`, `garage_door` | `contact_sensor` (polarity handled by the device type) |
+| `binary_sensor` `motion`, `occupancy`, `presence` | `occupancy_sensor` |
+| `binary_sensor` `moisture` / `cold` | `water_leak_detector` / `water_freeze_detector` |
+| `binary_sensor` `smoke`, `carbon_monoxide` | `smoke_co_alarm`; both share the endpoint `group:smoke_co_alarm` |
+| `binary_sensor` with no or another class | not inferred. The error lists the classes and the `as:` choices |
 | `sensor` temperature (class, unit, or a `temperature:` sub-sensor) | `temperature_sensor` |
-| `sensor` humidity | `humidity_sensor` |
+| `sensor` humidity / pressure / illuminance / volume_flow_rate | `humidity_sensor` / `pressure_sensor` / `light_sensor` / `flow_sensor` |
+| `sensor` carbon_dioxide, carbon_monoxide, pm1, pm25, pm10, volatile_organic_compounds, nitrogen_dioxide, ozone | `air_quality_sensor`, all merged into one endpoint `group:air_quality`. Attach a temperature or humidity sensor to it with `attach_to: group:air_quality`. |
+| `sensor` power, energy, voltage, current, apparent_power, reactive_power, frequency, power_factor | `electrical_sensor` (see Metering) |
+| `sensor` battery | Power Source (see Battery) |
+| `event` | `generic_switch` without a binding. Send the events with `matter.send_switch_event` from `on_event:`. |
+| `button` | The same, but only when listed by id; globs and `all` skip buttons. |
 
-Sub-sensors nested one or two levels deep (`scd4x: temperature: {id: t}`, `pmsx003: pm_2_5: {id: ...}`) are
-found, and their key is used as the device class hint. Only entities with an explicit `id:` can be exposed.
-More rules are added to a registry (`expose/inference.py`); `as:` is always available.
+Sub-sensors nested one or two levels deep (`scd4x: co2: {id: ...}`, `pmsx003: pm_2_5: {id: ...}`) are found,
+and their key is used as the device class hint (`co2`, `pm_2_5`, `voc`, ... are understood). Only entities with
+an explicit `id:` can be exposed. More rules are added to a registry (`expose/inference.py`).
+
+### Metering
+
+A meter belongs to the endpoint of a switch, light, cover or fan. It is attached to that endpoint (the
+endpoint gets the Electrical Sensor device type next to its own) when:
+
+1. the item has `meters: <load id>` (or `attach_to:`), or
+2. only one load is exposed, or
+3. the sensor id or name starts with the load's (`relay_1_power` for `relay_1`), or ends with the same
+   number (`power_2` for `relay_2`), and exactly one load matches.
+
+Otherwise the meters share one standalone endpoint `group:electrical`. Two sensors of the same kind there
+are an error that points at `meters:`. To force a standalone endpoint use `as: electrical_sensor` (one
+endpoint per sensor), and `options: {current_type: dc}` for DC.
+
+### Battery
+
+A battery sensor puts a Power Source on an application endpoint (`battery:` of the endpoint), like most real
+devices. It goes to the only application endpoint, or to the one named with `attach_to:`. With several
+endpoints and no `attach_to:` it gets its own `power_source` endpoint. (Power Source on endpoint 0 is not
+available yet.)
+
+### Tags and labels
+
+An endpoint that shares an application device type with a sibling (same parent) must carry a Descriptor
+TagList. For such endpoints expose writes a Common Number tag itself and also sets the entity name as the
+endpoint label. The number comes from the id, not from the hashed endpoint number:
+
+- if every id of the set ends in a distinct number (`relay_1`, `relay_2`, `relay_10`), that number;
+- otherwise the position in natural id order (`One`, `Two`, ...), skipping numbers used by explicit
+  `tags:`. Adding an entity before the others renumbers them; the log says so. End ids with numbers or
+  give `tags:` to avoid it.
+
+Endpoints that are alone get neither tag nor label, unless the item has `tags:` or `label:`. A derived label
+longer than 16 bytes is truncated (with a warning); an explicit `label:` that long is an error. Utility device
+types (Power Source, Electrical Sensor) never count as duplicates.
+
+### Skipped unnamed entities
+
+A glob or `all` skips entities without a `name:` (ESPHome treats them as internal). This is logged as a
+warning that lists the ids and the fixes: give each a `name:`, list the id explicitly in `expose:`, or add it
+to `exclude:` to silence it.
+
+### Not supported yet
+
+`bridged: true` is not available: the base has the `bridged_node` and `aggregator` device types but no bridge
+composition, so expose cannot build one. Use `endpoints:` with `parent:` for bridges.
 
 ## Endpoint numbers
 

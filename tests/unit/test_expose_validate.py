@@ -207,7 +207,7 @@ def test_all_skips_nameless_internal_diagnostic_and_platform_default_diagnostic(
     assert reasons["cfg"] == "entity_category: config"
     assert reasons["chip"] == "entity_category: diagnostic (platform default)"
     assert reasons["diag"] == "entity_category: diagnostic"
-    assert "no faithful Matter device type" in reasons["b"]
+    assert "list its id" in reasons["b"]
 
 
 def test_more_than_16_endpoints_warns_with_heap_note(caplog):

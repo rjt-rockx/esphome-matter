@@ -20,6 +20,7 @@ from ..conformance import (
     NAMESPACE_COMMON_NUMBER,
     NUMBER_TAG_MAX,
     _duplicate_components,
+    default_label,
     _tag_entry,
 )
 from .numbering import natural_key
@@ -81,7 +82,7 @@ def assign_duplicate_tags(planned: dict[str, PlannedEndpoint]) -> None:
         for key in keys:
             ep = planned[key]
             if CONF_LABEL not in ep.extra and ep.default_label:
-                ep.extra[CONF_LABEL] = ep.default_label
+                ep.extra[CONF_LABEL] = default_label(ep.default_label, f"entity '{key}'")
         untagged = [k for k in keys if CONF_TAGS not in planned[k].extra]
         if not untagged:
             continue

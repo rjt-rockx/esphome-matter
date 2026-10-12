@@ -105,10 +105,35 @@ _HASH_VERSION = 1
 
 
 def _label(value):
+    """Explicit user-provided label: over-long values are errors, never truncated."""
     value = cv.string_strict(value)
-    if not value or len(value.encode()) > LABEL_MAX:
-        raise cv.Invalid(f"Labels must be 1 to {LABEL_MAX} bytes long, got '{value}'")
+    size = len(value.encode())
+    if not value:
+        raise cv.Invalid(f"Labels must be 1 to {LABEL_MAX} UTF-8 bytes long, got an empty string")
+    if size > LABEL_MAX:
+        raise cv.Invalid(
+            f"Label '{value}' is {size} UTF-8 bytes long, but Matter labels are limited to "
+            f"{LABEL_MAX} bytes; shorten it"
+        )
     return value
+
+
+def default_label(name: str, source: str = "entity name") -> str:
+    """Label derived by default from `name` (e.g. an entity name).
+
+    Unlike an explicit `label:`, a derived label that exceeds LABEL_MAX bytes is
+    truncated on a UTF-8 character boundary with a config-time warning.
+    """
+    encoded = name.encode()
+    if len(encoded) <= LABEL_MAX:
+        return name
+    truncated = encoded[:LABEL_MAX].decode("utf-8", errors="ignore").rstrip()
+    _LOGGER.warning(
+        "Matter endpoint label derived from %s '%s' is %d bytes; truncated to '%s' "
+        "(limit %d bytes). Set an explicit `label:` (max %d bytes) to choose it yourself",
+        source, name, len(encoded), truncated, LABEL_MAX, LABEL_MAX,
+    )
+    return truncated
 
 
 def _namespace(value):
