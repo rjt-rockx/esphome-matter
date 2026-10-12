@@ -6,12 +6,14 @@
 #if defined(USE_MATTER) && defined(USE_CLIMATE) && defined(USE_MATTER_CLIMATE_FAN)
 
 #include "esphome/components/climate/climate.h"
-#include "matter_endpoints.h"
+#include "matter_binding.h"
+#include "matter_climate_logic.h"
 
 #include <app/clusters/fan-control-server/fan-control-delegate.h>
 #include <esp_matter.h>
 
 #include <cstdint>
+#include <vector>
 
 namespace esphome::matter {
 
@@ -44,16 +46,33 @@ uint8_t climate_fan_mode_sequence(climate::Climate *climate);
 esp_err_t add_climate_fan_features(esp_matter::cluster_t *cluster,
                                    climate::Climate *climate, bool step);
 
+// What is mirrored into the cluster: FanMode (and the PercentCurrent that goes
+// with it) and RockSetting.
+struct MatterClimateFanState {
+  bool has_mode{false};
+  uint8_t mode{0};
+  bool has_rock{false};
+  uint8_t rock{0};
+};
+
+// Binding framework implementation (docs/dev/binding-framework.md).
+//
+// Matter -> ESPHome: the delegate callbacks (FanMode changes, which includes
+// the Step command, and RockSetting changes) run on the CHIP task and submit
+// the request; the main loop applies it to the climate. A request the climate
+// can't take is dropped, and the reconcile after the apply puts the settled
+// state back. The pushes of this binding are echoes (PushScope).
+//
+// ESPHome -> Matter: every climate state callback requests a push (coalesced);
+// after a controller request the binding waits for the climate's own publish.
 class MatterClimateFanMapping
-    : public MatterEndpointMappingBase,
+    : public MatterBinding<MatterClimateFanState, MatterClimateFanInbound>,
       public chip::app::Clusters::FanControl::Delegate {
 public:
+  // How long to wait for the climate's own publish after applying a request.
+  static constexpr uint16_t SETTLE_MS = 300;
+
   MatterClimateFanMapping(climate::Climate *climate, uint16_t endpoint_id);
-
-  void initialize() override;
-
-  // Must be called on the ESPHome main loop.
-  void push_state_to_matter();
 
   // FanControl::Delegate. Called on the CHIP task.
   chip::Protocols::InteractionModel::Status
@@ -66,23 +85,22 @@ public:
       override;
 
 protected:
+  void setup_() override;
+  MatterClimateFanState capture_() override;
+  void write_matter_(const MatterClimateFanState &s) override;
+  void merge_inbound_(MatterClimateFanInbound &acc,
+                      const MatterClimateFanInbound &in) override;
+  void apply_inbound_(const MatterClimateFanInbound &in) override;
+
   void apply_fan_mode_(uint8_t fan_mode);
   void apply_rock_(uint8_t rock);
-  // force: also report an unchanged state (to revert a rejected request).
-  void push_state_(bool force);
 
   climate::Climate *climate_;
   bool has_rocking_{false};
   bool has_step_{false};
-  // True while push_state_ writes the cluster (CHIP task only). The delegate
-  // callbacks run synchronously inside those writes, so callbacks seen while
-  // it is set are echoes of our own report, not controller requests.
-  bool pushing_{false};
-  // Last state reported (main loop), to skip pushes when nothing changed.
-  bool pushed_{false};
-  bool last_has_mode_{false};
-  uint8_t last_mode_{0};
-  uint8_t last_rock_{0};
+  // The Step levels (Off, then the sequence's modes, lowest first), built at
+  // setup so the CHIP task doesn't read the climate.
+  std::vector<uint8_t> step_levels_;
 };
 
 } // namespace esphome::matter

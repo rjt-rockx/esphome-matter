@@ -2,7 +2,6 @@
 #if defined(USE_MATTER) && defined(USE_CLIMATE) && defined(USE_MATTER_CLIMATE_FAN)
 
 #include "esphome/core/log.h"
-#include "matter_attributes.h"
 #include "matter_climate_fan.h"
 #include "matter_component.h"
 #include "matter_fan_step.h"
@@ -150,58 +149,48 @@ private:
   }
 };
 
-// RockSupport / RockSetting bits of the climate swing modes.
-constexpr uint8_t ROCK_LEFT_RIGHT =
-    static_cast<uint8_t>(FanControl::RockBitmap::kRockLeftRight);
-constexpr uint8_t ROCK_UP_DOWN =
-    static_cast<uint8_t>(FanControl::RockBitmap::kRockUpDown);
+// The pure RockSetting <-> swing mode mapping (matter_climate_logic.h) over the
+// climate's traits.
+SwingKind swing_kind(ClimateSwingMode mode) {
+  switch (mode) {
+  case climate::CLIMATE_SWING_BOTH:
+    return SwingKind::Both;
+  case climate::CLIMATE_SWING_VERTICAL:
+    return SwingKind::Vertical;
+  case climate::CLIMATE_SWING_HORIZONTAL:
+    return SwingKind::Horizontal;
+  default:
+    return SwingKind::Off;
+  }
+}
 
-uint8_t rock_support(const climate::ClimateTraits &traits) {
-  bool both = traits.supports_swing_mode(climate::CLIMATE_SWING_BOTH);
+ClimateSwingMode swing_mode_of(SwingKind kind) {
+  switch (kind) {
+  case SwingKind::Both:
+    return climate::CLIMATE_SWING_BOTH;
+  case SwingKind::Vertical:
+    return climate::CLIMATE_SWING_VERTICAL;
+  case SwingKind::Horizontal:
+    return climate::CLIMATE_SWING_HORIZONTAL;
+  default:
+    return climate::CLIMATE_SWING_OFF;
+  }
+}
+
+uint8_t swing_support(const climate::ClimateTraits &traits) {
   uint8_t support = 0;
-  if (both || traits.supports_swing_mode(climate::CLIMATE_SWING_HORIZONTAL))
-    support |= ROCK_LEFT_RIGHT;
-  if (both || traits.supports_swing_mode(climate::CLIMATE_SWING_VERTICAL))
-    support |= ROCK_UP_DOWN;
+  for (auto kind :
+       {SwingKind::Vertical, SwingKind::Horizontal, SwingKind::Both}) {
+    if (traits.supports_swing_mode(swing_mode_of(kind)))
+      support |= swing_bit(kind);
+  }
   return support;
 }
 
-uint8_t swing_to_rock(ClimateSwingMode mode) {
-  switch (mode) {
-  case climate::CLIMATE_SWING_BOTH:
-    return ROCK_LEFT_RIGHT | ROCK_UP_DOWN;
-  case climate::CLIMATE_SWING_VERTICAL:
-    return ROCK_UP_DOWN;
-  case climate::CLIMATE_SWING_HORIZONTAL:
-    return ROCK_LEFT_RIGHT;
-  default:
-    return 0;
-  }
+uint8_t rock_support(const climate::ClimateTraits &traits) {
+  return rock_support_of(swing_support(traits));
 }
 
-// The swing mode for a RockSetting; false if the climate can't do it.
-bool rock_to_swing(uint8_t rock, const climate::ClimateTraits &traits,
-                   ClimateSwingMode &mode) {
-  if (rock == 0) {
-    mode = climate::CLIMATE_SWING_OFF;
-    return true;
-  }
-  ClimateSwingMode exact = rock == (ROCK_LEFT_RIGHT | ROCK_UP_DOWN)
-                               ? climate::CLIMATE_SWING_BOTH
-                               : (rock == ROCK_UP_DOWN
-                                      ? climate::CLIMATE_SWING_VERTICAL
-                                      : climate::CLIMATE_SWING_HORIZONTAL);
-  if (traits.supports_swing_mode(exact)) {
-    mode = exact;
-    return true;
-  }
-  // A climate that only swings both ways takes any rock request.
-  if (traits.supports_swing_mode(climate::CLIMATE_SWING_BOTH)) {
-    mode = climate::CLIMATE_SWING_BOTH;
-    return true;
-  }
-  return false;
-}
 
 uint8_t percent_of(FanModeEnum mode) {
   switch (mode) {
@@ -259,13 +248,16 @@ void MatterComponent::register_climate_fan(climate::Climate *climate,
   this->mappings_.push_back(new MatterClimateFanMapping(climate, endpoint_id));
 }
 
+// ESPHome wins at boot: the climate platform owns the state, so push it rather
+// than replaying the FanMode Matter persisted.
 MatterClimateFanMapping::MatterClimateFanMapping(climate::Climate *climate,
                                                  uint16_t endpoint_id)
-    : MatterEndpointMappingBase(endpoint_id),
+    : MatterBinding<MatterClimateFanState, MatterClimateFanInbound>(
+          endpoint_id, BindingPolicy{BootSync::ESPHOME_WINS, SETTLE_MS, true}),
       chip::app::Clusters::FanControl::Delegate(endpoint_id),
       climate_(climate) {}
 
-void MatterClimateFanMapping::initialize() {
+void MatterClimateFanMapping::setup_() {
   if (this->climate_ == nullptr)
     return;
   auto *cluster = find_cluster(this->endpoint_id());
@@ -277,82 +269,86 @@ void MatterClimateFanMapping::initialize() {
   auto features = cluster->GetFeatureMap();
   this->has_rocking_ = features.Has(FanControl::Feature::kRocking);
   this->has_step_ = features.Has(FanControl::Feature::kStep);
-  FanControl::SetDefaultDelegate(this->endpoint_id(), this);
 
+  // The Step levels are Off followed by the modes of the sequence, lowest
+  // first. Auto is not a level: stepping from Auto starts at Off.
+  FanLevels fan_levels(this->climate_->get_traits());
+  this->step_levels_.push_back(static_cast<uint8_t>(FanModeEnum::kOff));
+  for (const auto &level : fan_levels.levels)
+    this->step_levels_.push_back(static_cast<uint8_t>(level.matter));
+
+  FanControl::SetDefaultDelegate(this->endpoint_id(), this);
   this->climate_->add_on_state_callback(
-      [this](climate::Climate &) { this->push_state_(false); });
-  // The climate platform owns the state, so push it at boot rather than
-  // replaying the FanMode Matter persisted.
-  global_matter_component->defer_to_main_loop(
-      [this]() { this->push_state_(true); });
+      [this](climate::Climate &) { this->request_push(); });
 }
 
-void MatterClimateFanMapping::push_state_to_matter() { this->push_state_(false); }
-
-void MatterClimateFanMapping::push_state_(bool force) {
-  uint16_t eid = this->endpoint_id();
+// Main loop.
+MatterClimateFanState MatterClimateFanMapping::capture_() {
+  MatterClimateFanState s;
   auto *climate = this->climate_;
+  if (climate == nullptr)
+    return s;
   FanLevels levels(climate->get_traits());
-  bool has_mode = false;
-  FanModeEnum mode = FanModeEnum::kOff;
   if (!levels.off.has_value() && climate->mode == climate::CLIMATE_MODE_OFF) {
     // No fan mode for Off: the climate being off is the fan being off.
-    has_mode = true;
+    s.has_mode = true;
   } else if (climate->fan_mode.has_value() && !climate->has_custom_fan_mode()) {
     // A custom fan mode has no Matter equivalent, nothing to report then.
-    has_mode = levels.matter_mode(*climate->fan_mode, mode);
+    FanModeEnum mode = FanModeEnum::kOff;
+    s.has_mode = levels.matter_mode(*climate->fan_mode, mode);
+    s.mode = static_cast<uint8_t>(mode);
   }
-  bool has_rock = this->has_rocking_;
-  uint8_t rock = swing_to_rock(climate->swing_mode);
+  s.has_rock = this->has_rocking_;
+  s.rock = swing_to_rock(swing_kind(climate->swing_mode));
+  return s;
+}
 
-  // Climate state callbacks come for every temperature update: report only
-  // what changed.
-  uint8_t mode_value = static_cast<uint8_t>(mode);
-  if (!force && this->pushed_ && has_mode == this->last_has_mode_ &&
-      (!has_mode || mode_value == this->last_mode_) &&
-      (!has_rock || rock == this->last_rock_))
+// Runs on the CHIP task, inside a PushScope: the delegate callbacks that the
+// setters trigger are echoes.
+void MatterClimateFanMapping::write_matter_(const MatterClimateFanState &s) {
+  auto *cluster = find_cluster(this->endpoint_id());
+  if (cluster == nullptr)
     return;
-  this->pushed_ = true;
-  this->last_has_mode_ = has_mode;
-  this->last_mode_ = mode_value;
-  this->last_rock_ = rock;
-
-  run_on_matter_thread([this, eid, has_mode, mode, has_rock, rock]() {
-    auto *cluster = find_cluster(eid);
-    if (cluster == nullptr)
-      return;
-    // The delegate callbacks run synchronously inside the setters.
-    this->pushing_ = true;
-    if (has_mode) {
+  if (s.has_mode) {
+    auto mode = static_cast<FanModeEnum>(s.mode);
+    if (cluster->GetFanMode() != mode)
       cluster->SetFanMode(mode);
-      if (mode != FanModeEnum::kAuto)
-        cluster->SetPercentCurrent(percent_of(mode));
-    }
-    if (has_rock)
-      cluster->SetRockSetting(chip::BitMask<FanControl::RockBitmap>(
-          rock & cluster->GetRockSupport().Raw()));
-    this->pushing_ = false;
-  });
+    if (mode != FanModeEnum::kAuto)
+      cluster->SetPercentCurrent(percent_of(mode));
+  }
+  if (s.has_rock) {
+    chip::BitMask<FanControl::RockBitmap> rock(
+        static_cast<uint8_t>(s.rock & cluster->GetRockSupport().Raw()));
+    if (cluster->GetRockSetting().Raw() != rock.Raw())
+      cluster->SetRockSetting(rock);
+  }
+}
+
+void MatterClimateFanMapping::merge_inbound_(
+    MatterClimateFanInbound &acc, const MatterClimateFanInbound &in) {
+  climate_fan_merge_inbound(acc, in);
 }
 
 // Runs on the CHIP task.
 void MatterClimateFanMapping::OnFanDriveStateChanged(
     const FanControl::FanDriveState &state) {
-  if (this->pushing_)
+  if (MatterBindingBase::is_echo(this->endpoint_id()))
     return;
-  uint8_t mode = static_cast<uint8_t>(state.mode);
-  global_matter_component->defer_to_main_loop(
-      [this, mode]() { this->apply_fan_mode_(mode); });
+  MatterClimateFanInbound in;
+  in.has_mode = true;
+  in.mode = static_cast<uint8_t>(state.mode);
+  this->submit_inbound(in);
 }
 
 // Runs on the CHIP task.
 void MatterClimateFanMapping::OnRockSettingChanged(
     chip::BitMask<FanControl::RockBitmap> value) {
-  if (this->pushing_)
+  if (MatterBindingBase::is_echo(this->endpoint_id()))
     return;
-  uint8_t rock = value.Raw();
-  global_matter_component->defer_to_main_loop(
-      [this, rock]() { this->apply_rock_(rock); });
+  MatterClimateFanInbound in;
+  in.has_rock = true;
+  in.rock = value.Raw();
+  this->submit_inbound(in);
 }
 
 // Runs on the CHIP task, from the cluster command handler.
@@ -363,27 +359,32 @@ chip::Protocols::InteractionModel::Status MatterClimateFanMapping::HandleStep(
   if (cluster == nullptr || !this->has_step_)
     return Status::Failure;
 
-  // The levels are Off followed by the modes of the sequence, lowest first.
-  // Auto is not a level: stepping from Auto starts at Off.
-  FanLevels fan_levels(this->climate_->get_traits());
-  std::vector<FanModeEnum> levels{FanModeEnum::kOff};
-  for (const auto &level : fan_levels.levels)
-    levels.push_back(level.matter);
   int current = 0;
-  for (size_t i = 0; i < levels.size(); i++) {
-    if (levels[i] == cluster->GetFanMode())
+  for (size_t i = 0; i < this->step_levels_.size(); i++) {
+    if (this->step_levels_[i] == static_cast<uint8_t>(cluster->GetFanMode()))
       current = static_cast<int>(i);
   }
   int target = fan_step_target(
-      current, static_cast<int>(levels.size()) - 1,
+      current, static_cast<int>(this->step_levels_.size()) - 1,
       direction == FanControl::StepDirectionEnum::kIncrease, wrap, lowest_off);
   if (target == current)
     return Status::Success;
-  // Calls OnFanDriveStateChanged(), which applies the mode to the climate.
-  return cluster->SetFanMode(levels[target]);
+  // Calls OnFanDriveStateChanged(), which submits the mode (not an echo here:
+  // this is the controller's command).
+  return cluster->SetFanMode(static_cast<FanModeEnum>(this->step_levels_[target]));
 }
 
 // Runs on the ESPHome main loop.
+void MatterClimateFanMapping::apply_inbound_(
+    const MatterClimateFanInbound &in) {
+  if (in.has_mode)
+    this->apply_fan_mode_(in.mode);
+  if (in.has_rock)
+    this->apply_rock_(in.rock);
+}
+
+// Runs on the ESPHome main loop. A request the climate can't take is dropped;
+// the reconcile after the apply reports the climate's state back.
 void MatterClimateFanMapping::apply_fan_mode_(uint8_t fan_mode) {
   auto *climate = this->climate_;
   FanLevels levels(climate->get_traits());
@@ -401,7 +402,6 @@ void MatterClimateFanMapping::apply_fan_mode_(uint8_t fan_mode) {
     }
     ESP_LOGW(TAG, "Endpoint %u: the climate has no fan mode for Matter mode %u",
              this->endpoint_id(), fan_mode);
-    this->push_state_(true);
     return;
   }
   auto call = climate->make_call();
@@ -412,16 +412,14 @@ void MatterClimateFanMapping::apply_fan_mode_(uint8_t fan_mode) {
 // Runs on the ESPHome main loop.
 void MatterClimateFanMapping::apply_rock_(uint8_t rock) {
   auto *climate = this->climate_;
-  ClimateSwingMode mode;
-  if (!rock_to_swing(rock, climate->get_traits(), mode)) {
+  SwingKind kind;
+  if (!rock_to_swing(rock, swing_support(climate->get_traits()), kind)) {
     ESP_LOGW(TAG, "Endpoint %u: the climate does not support RockSetting %u",
              this->endpoint_id(), rock);
-    // Report the settled RockSetting back.
-    this->push_state_(true);
     return;
   }
   auto call = climate->make_call();
-  call.set_swing_mode(mode);
+  call.set_swing_mode(swing_mode_of(kind));
   call.perform();
 }
 
