@@ -94,3 +94,32 @@ Lint failures do not fail CI yet.
 
 Use "Run workflow" on the CI workflow page. The `toolchain` input switches the
 compile jobs between `esp-idf` (default) and `platformio`.
+
+## Golden codegen snapshots
+
+`tests/snapshots/` holds, per `tests/configs/*.yaml`, the Matter-relevant part of
+the generated code: `<config>.main.txt` (every `setup()` statement in
+`src/main.cpp` referencing `matter` / `esp_matter` / `chip::` / a `matter_`
+variable, including the `register_endpoint` lambdas; config-echo comments and
+`#line` pragmas stripped, paths as `<REPO>`, ESPHome version as
+`<ESPHOME_VERSION>`) and `<config>.sdkconfig.txt` (sorted `CONFIG_ESP_MATTER_*`,
+`SUPPORT_*`, `CHIP_*`, `ENABLE_*`, `USE_*`, `*MATTER*` lines). They are the
+byte-identical oracle for refactors: "generated code unchanged" means the
+snapshots do not change. They are **ESPHome dev** output; the pytest checks are
+skipped on other ESPHome versions (`SNAPSHOT_ANY_ESPHOME=1` forces them).
+
+```bash
+# check (exit 1 with a unified diff per changed file); ~1 min for all configs
+.venv/bin/python tools/snapshot_codegen.py --diff
+.venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py
+
+# regenerate after an intended change or after merging branches (one command)
+.venv/bin/python tools/snapshot_codegen.py --update
+UPDATE_SNAPSHOTS=1 .venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py   # equivalent
+
+# a single config (glob allowed, repeatable)
+.venv/bin/python tools/snapshot_codegen.py --update --only esp32-wifi
+```
+
+Review `git diff tests/snapshots` and explain every change in the commit message.
+CI runs the snapshot tests in the unit-tests job on ESPHome dev only.

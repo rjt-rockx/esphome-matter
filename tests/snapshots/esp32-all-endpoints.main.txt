@@ -1,0 +1,61 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 2);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-all-endpoints");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light_switch::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmer_switch::config_t device_config_0{};
+    if (esp_matter::endpoint::dimmer_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  new(matter_mattersetattributeaction_id) matter::MatterSetAttributeAction<bool>();
+  matter_mattersetattributeaction_id->set_endpoint_id(4);
+  matter_mattersetattributeaction_id->set_cluster_id(6);
+  matter_mattersetattributeaction_id->set_attribute_id(0);
+  matter_mattersetattributeaction_id->set_value([]() -> bool {
+      return true;
+  });
+  automation_id->add_actions({matter_mattersetattributeaction_id});
+  matter_mattercomponent_id->register_light(binary_status_light, 3);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_light(dimmable_status_light, 4);
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmable_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 25;
+    device_config_0.level_control.max_level = 229;
+    if (esp_matter::endpoint::dimmable_light::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 100, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint(100, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 101, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint(101, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
