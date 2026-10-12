@@ -35,6 +35,8 @@ from .types import MatterComponent, matter_ns
 _LOGGER = logging.getLogger(__name__)
 
 CONF_ICD = "icd"
+# Cluster-select option that makes esp_matter compile connectedhomeip's ICDManagementCluster.cpp.
+ICD_MANAGEMENT_SDKCONFIG = "CONFIG_SUPPORT_ICD_MANAGEMENT_CLUSTER"
 CONF_MODE = "mode"
 CONF_SLOW_POLL_INTERVAL = "slow_poll_interval"
 CONF_FAST_POLL_INTERVAL = "fast_poll_interval"

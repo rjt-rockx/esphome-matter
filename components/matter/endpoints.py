@@ -52,6 +52,7 @@ from .matter_climate import (
     post_create_lines as climate_post_create_lines,
     prefer_cooling as climate_prefer_cooling,
 )
+from .icd import ICD_MANAGEMENT_SDKCONFIG
 from .lock_valve import device_config_lines, register_entity
 from .generic_switch import multi_press_max_line, register_switch_binding
 from .data_model.units import MEASUREMENT_UNITS
@@ -1398,6 +1399,13 @@ async def register_endpoints(var, config: ConfigType):
             "CONFIG_SUPPORT_SCENES_CLUSTER",
         }
     )
+
+    if config.get("icd") is not None:
+        # esp_matter always compiles data_model_provider/clusters/icd_management/integration.cpp,
+        # which constructs ICDManagementCluster / ICDManagementClusterWithCIP, but only builds the
+        # definitions (connectedhomeip's icd-management-server/ICDManagementCluster.cpp) when this
+        # option is on. Without it the link fails with an undefined reference to the constructor.
+        enabled_sdkconfig_clusters.add(ICD_MANAGEMENT_SDKCONFIG)
 
     plans = CORE.data[CONF_MATTER]["plans"]
     signatures = {}

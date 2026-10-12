@@ -438,3 +438,13 @@ def test_schema_error_is_reported_with_path(run_icd):
     result = run_icd("matter:\n  icd:\n    slow_poll_interval: 30s\n")
     assert not result.ok
     assert "Short Idle Time" in result.output
+
+
+@pytest.mark.parametrize("name", ["esp32-c6-icd", "esp32-h2-icd"])
+def test_icd_management_cluster_sources_are_compiled(name):
+    """esp_matter always compiles the ICD Management integration.cpp, which needs the cluster's
+    ICDManagementCluster.cpp (only built with this option) at link time, for SIT and LIT."""
+    from pathlib import Path
+
+    snapshot = Path(__file__).parent.parent / "snapshots" / f"{name}.sdkconfig.txt"
+    assert f"{icd.ICD_MANAGEMENT_SDKCONFIG}=y" in snapshot.read_text()
