@@ -84,23 +84,21 @@ matter:
 
 # Binary sensors
 
-There are several binary state sensors. These are `contact_sensor`, `occupancy_sensor`, `rain_sensor`, `soil_sensor`. Unlike the simple sensors, these sensors all expose the same boolean_state cluster.
+`contact_sensor`, `occupancy_sensor`, `water_leak_detector`, `water_freeze_detector`, `rain_sensor` and `smoke_co_alarm`
+bind ESPHome `binary_sensor` entities. The `device_class` of the binary sensor selects the contact polarity and the
+occupancy sensor type, see [binary-sensors.md](binary-sensors.md).
 
 ```yaml
 matter:
   endpoints:
     1:
-      contact_sensor:
-        boolean_state: binary_sensor_id
+      contact_sensor: door_sensor_id   # device_class: door is inverted to Matter's "true = closed" automatically
     2:
-      occupancy_sensor:
-        boolean_state: binary_sensor_id
+      occupancy_sensor: motion_sensor_id
     3:
-      soil_sensor:
-        boolean_state: binary_sensor_id
+      water_leak_detector: leak_sensor_id
     4:
-      occupancy_sensor:
-        boolean_state: binary_sensor_id
+      rain_sensor: rain_sensor_id
 ```
 
 # air_quality_sensor
