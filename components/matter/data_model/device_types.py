@@ -5,16 +5,19 @@ from pathlib import Path
 
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import light
+from esphome.components import light, switch
 from esphome.const import CONF_LIGHT_ID
 
-from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
+from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_ID
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
 from .units import percentage
 
 _LOGGER = logging.getLogger(__name__)
+
+# Device types that can be bound to an ESPHome switch through switch_id.
+SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_control")
 
 
 def _parse_cluster_include(data: dict) -> Cluster:
@@ -177,6 +180,9 @@ class DeviceType:
         if self.name.endswith("light"):
             schema[cv.Optional(CONF_LIGHT_ID)] = cv.use_id(light.LightState)
 
+        if self.name in SWITCH_DEVICE_TYPES:
+            schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
+
         if self.name.endswith("light") and any(
             cluster.name == "LevelControl" and cluster.required
             for cluster in self.server_clusters
@@ -196,9 +202,20 @@ class DeviceType:
 
         return schema
 
+    def _validate_entity_ids(self, config):
+        if CONF_LIGHT_ID in config and CONF_SWITCH_ID in config:
+            raise cv.Invalid(
+                f"{CONF_LIGHT_ID} and {CONF_SWITCH_ID} cannot be used together"
+            )
+        return config
+
     def schema(self):
         # TODO: only maybe_empty if there are no clusters or features for which a mandatory choice must be made.
-        return cv.All(maybe_empty(self._schema()), self._validate_features)
+        return cv.All(
+            maybe_empty(self._schema()),
+            self._validate_features,
+            self._validate_entity_ids,
+        )
 
 
 # class ElectricalSensor(DeviceType):

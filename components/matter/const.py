@@ -18,6 +18,7 @@ CONF_FEATURES = "features"
 CONF_MIN_LEVEL = "min_level"
 CONF_MAX_LEVEL = "max_level"
 CONF_ON_ATTRIBUTE = "on_attribute"
+CONF_SWITCH_ID = "switch_id"
 
 # Actions
 CONF_CLUSTER_ID = "cluster_id"
