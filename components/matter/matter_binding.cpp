@@ -82,6 +82,14 @@ public:
     return esp_matter::attribute::get_val(endpoint_id, cluster_id,
                                           attribute_id, &out) == ESP_OK;
   }
+  esp_err_t write_attribute(uint16_t endpoint_id, uint32_t cluster_id,
+                            uint32_t attribute_id, esp_matter_attr_val_t &value,
+                            bool report) override {
+    return report ? esp_matter::attribute::report(endpoint_id, cluster_id,
+                                                  attribute_id, &value)
+                  : esp_matter::attribute::update(endpoint_id, cluster_id,
+                                                  attribute_id, &value);
+  }
 
 private:
   static constexpr size_t GUARDS = 4;

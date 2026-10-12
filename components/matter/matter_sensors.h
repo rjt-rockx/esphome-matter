@@ -5,6 +5,7 @@
 
 #include "matter_conversions.h"
 #include "matter_endpoints.h"
+#include "matter_push_bindings.h"
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -46,21 +47,22 @@ CHIP_ERROR update_code_driven_sensor_attribute(uint16_t endpoint_id,
   return (static_cast<ClusterT *>(server)->*Setter)(converted);
 }
 
-class MatterSensorAttributeMapping : public MatterEndpointMappingBase {
+// ESPHome sensor -> one attribute of a cluster. The newest reading wins
+// (MatterAttributePushBinding): no heap allocation per reading, no dropped
+// final value. `updater` writes code-driven clusters on the CHIP task.
+class MatterSensorAttributeMapping : public MatterAttributePushBinding {
 public:
   MatterSensorAttributeMapping(sensor::Sensor *sensor, uint16_t endpoint_id,
                                uint32_t cluster_id, uint32_t attribute_id,
                                SensorValueConverter converter,
                                SensorAttributeUpdater updater = nullptr);
 
-  void initialize() override;
-
 protected:
-  void publish_(float value);
+  void setup_() override;
+  ValueState capture_() override;
+  void write_attribute_(const ValueState &s) override;
 
   sensor::Sensor *sensor_;
-  uint32_t cluster_id_;
-  uint32_t attribute_id_;
   SensorValueConverter converter_;
   SensorAttributeUpdater updater_;
 };
@@ -74,16 +76,25 @@ public:
                                    SensorValueConverter converter,
                                    uint8_t measurement_unit);
 
-  void initialize() override;
-
 protected:
+  // Creates the cluster on the CHIP task before the first push.
+  void setup_() override;
+
   uint8_t measurement_unit_;
+};
+
+// Converted electrical reading. `valid` is false while the sensor has no state.
+struct ElectricalValue {
+  bool valid{false};
+  bool is_null{true};
+  int64_t value{0};
 };
 
 // Values of the ElectricalPowerMeasurement and ElectricalEnergyMeasurement
 // clusters. The sensor value is converted into a nullable int64 (mW, mV, mA,
 // mHz, 1/100 % or mWh).
-class MatterElectricalSensorMapping : public MatterEndpointMappingBase {
+class MatterElectricalSensorMapping
+    : public MatterBinding<ElectricalValue, NoInbound> {
 public:
   enum class Kind : uint8_t { POWER, ENERGY_IMPORTED, ENERGY_EXPORTED };
 
@@ -91,10 +102,11 @@ public:
                                 Kind kind, uint32_t attribute_id,
                                 SensorValueConverter converter);
 
-  void initialize() override;
-
 protected:
-  void publish_(float value);
+  void setup_() override;
+  ElectricalValue capture_() override;
+  void write_matter_(const ElectricalValue &v) override;
+  void apply_inbound_(const NoInbound &) override {}
 
   sensor::Sensor *sensor_;
   Kind kind_;
@@ -116,7 +128,7 @@ CHIP_ERROR update_boolean_state_attribute(uint16_t endpoint_id,
                                           uint32_t cluster_id,
                                           esp_matter_attr_val_t value);
 
-class MatterBinarySensorAttributeMapping : public MatterEndpointMappingBase {
+class MatterBinarySensorAttributeMapping : public MatterAttributePushBinding {
 public:
   MatterBinarySensorAttributeMapping(binary_sensor::BinarySensor *sensor,
                                      uint16_t endpoint_id, uint32_t cluster_id,
@@ -124,14 +136,12 @@ public:
                                      BinarySensorValueConverter converter,
                                      SensorAttributeUpdater updater = nullptr);
 
-  void initialize() override;
-
 protected:
-  void publish_(bool value);
+  void setup_() override;
+  ValueState capture_() override;
+  void write_attribute_(const ValueState &s) override;
 
   binary_sensor::BinarySensor *sensor_;
-  uint32_t cluster_id_;
-  uint32_t attribute_id_;
   BinarySensorValueConverter converter_;
   SensorAttributeUpdater updater_;
 };

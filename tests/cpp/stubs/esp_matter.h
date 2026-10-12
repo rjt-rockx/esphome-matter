@@ -96,6 +96,8 @@ template<typename T> esp_matter_attr_val_t make(esp_matter_val_type_t t, nullabl
       r.val.u16 = v.value();
     else if constexpr (std::is_same_v<T, uint8_t>)
       r.val.u8 = v.value();
+    else if constexpr (std::is_same_v<T, uint32_t>)
+      r.val.u32 = v.value();
     else if constexpr (std::is_same_v<T, int64_t>)
       r.val.i64 = v.value();
   }
@@ -130,3 +132,13 @@ inline esp_matter_attr_val_t esp_matter_nullable_uint8(nullable<uint8_t> v) {
 inline esp_matter_attr_val_t esp_matter_nullable_int64(nullable<int64_t> v) {
   return host_stub::make(ESP_MATTER_VAL_TYPE_INT64, v);
 }
+inline esp_matter_attr_val_t esp_matter_nullable_uint32(nullable<uint32_t> v) {
+  return host_stub::make(ESP_MATTER_VAL_TYPE_UINT32, v);
+}
+inline esp_matter_attr_val_t esp_matter_enum8(uint8_t v) {
+  esp_matter_attr_val_t r;
+  r.type = ESP_MATTER_VAL_TYPE_ENUM8;
+  r.val.u8 = v;
+  return r;
+}
+inline esp_matter_attr_val_t esp_matter_invalid(void *) { return esp_matter_attr_val_t(); }

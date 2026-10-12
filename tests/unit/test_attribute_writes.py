@@ -23,8 +23,10 @@ STORE_CLUSTERS = {"OnOff", "LevelControl", "ColorControl", "WindowCovering", "wc
 
 # Sources that legitimately call attribute::report()/update() without a push
 # guard: the user facing set_attribute action (an update that is meant to run
-# the callbacks, with its own trigger echo guard) and the sensor store path.
-UNGUARDED_ALLOWED = {"matter_attributes.cpp", "matter_sensors.cpp"}
+# the callbacks, with its own trigger echo guard) and the binding framework's
+# platform seam (BindingPlatform::write_attribute), which is only called inside
+# a MatterBindingBase::PushScope.
+UNGUARDED_ALLOWED = {"matter_attributes.cpp", "matter_binding.cpp"}
 
 WRITE_RE = re.compile(r"esp_matter::attribute::(report|update)\(\s*([^,]+),\s*([A-Za-z_:]+)::Id\b")
 ANY_WRITE_RE = re.compile(r"esp_matter::attribute::(report|update)\(")

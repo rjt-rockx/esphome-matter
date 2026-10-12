@@ -28,58 +28,6 @@ static const char *const TAG = "matter.sensor";
 
 namespace {
 
-struct AttributeUpdate {
-  uint16_t endpoint_id;
-  uint32_t cluster_id;
-  uint32_t attribute_id;
-  esp_matter_attr_val_t value;
-  SensorAttributeUpdater updater;
-};
-
-void update_attribute_on_matter_thread(intptr_t context) {
-  auto *update = reinterpret_cast<AttributeUpdate *>(context);
-  if (update->updater != nullptr) {
-    CHIP_ERROR err =
-        update->updater(update->endpoint_id, update->cluster_id, update->value);
-    if (err != CHIP_NO_ERROR) {
-      ESP_LOGE(TAG,
-               "Failed to update attribute 0x%08" PRIX32
-               " on cluster 0x%08" PRIX32 ", endpoint %u: %s",
-               update->attribute_id, update->cluster_id, update->endpoint_id,
-               err.AsString());
-    }
-    delete update;
-    return;
-  }
-
-  esp_err_t err =
-      esp_matter::attribute::update(update->endpoint_id, update->cluster_id,
-                                    update->attribute_id, &update->value);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG,
-             "Failed to update attribute 0x%08" PRIX32
-             " on cluster 0x%08" PRIX32 ", endpoint %u: %s",
-             update->attribute_id, update->cluster_id, update->endpoint_id,
-             esp_err_to_name(err));
-  }
-  delete update;
-}
-
-void update_attribute(uint16_t endpoint_id, uint32_t cluster_id,
-                      uint32_t attribute_id,
-                      esp_matter_attr_val_t attribute_value,
-                      SensorAttributeUpdater updater = nullptr) {
-  auto *update = new AttributeUpdate{endpoint_id, cluster_id, attribute_id,
-                                     attribute_value, updater};
-  CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
-      update_attribute_on_matter_thread, reinterpret_cast<intptr_t>(update));
-  if (err != CHIP_NO_ERROR) {
-    ESP_LOGE(TAG, "Failed to schedule Matter attribute update: %s",
-             err.AsString());
-    delete update;
-  }
-}
-
 } // namespace
 
 #ifdef USE_SENSOR
@@ -94,26 +42,39 @@ MatterSensorAttributeMapping::MatterSensorAttributeMapping(
     sensor::Sensor *sensor, uint16_t endpoint_id, uint32_t cluster_id,
     uint32_t attribute_id, SensorValueConverter converter,
     SensorAttributeUpdater updater)
-    : MatterEndpointMappingBase(endpoint_id), sensor_(sensor),
-      cluster_id_(cluster_id), attribute_id_(attribute_id),
-      converter_(converter), updater_(updater) {}
+    : MatterAttributePushBinding(endpoint_id, cluster_id, attribute_id),
+      sensor_(sensor), converter_(converter), updater_(updater) {}
 
-void MatterSensorAttributeMapping::initialize() {
+void MatterSensorAttributeMapping::setup_() {
   if (this->sensor_ == nullptr || this->converter_ == nullptr)
     return;
-  this->sensor_->add_on_state_callback(
-      [this](float value) { this->publish_(value); });
-  if (this->sensor_->has_state())
-    this->publish_(this->sensor_->state);
+  this->sensor_->add_on_state_callback([this](float) { this->request_push(); });
 }
 
-void MatterSensorAttributeMapping::publish_(float value) {
-  esp_matter_attr_val_t converted = this->converter_(value);
+ValueState MatterSensorAttributeMapping::capture_() {
+  ValueState s;
+  if (this->sensor_ == nullptr || this->converter_ == nullptr ||
+      !this->sensor_->has_state())
+    return s;
+  s.value = this->converter_(this->sensor_->state);
   // A converter returns an invalid value when the reading cannot be reported.
-  if (converted.type == ESP_MATTER_VAL_TYPE_INVALID)
+  s.valid = s.value.type != ESP_MATTER_VAL_TYPE_INVALID;
+  return s;
+}
+
+void MatterSensorAttributeMapping::write_attribute_(const ValueState &s) {
+  if (this->updater_ == nullptr) {
+    MatterAttributePushBinding::write_attribute_(s);
     return;
-  update_attribute(this->endpoint_id_, this->cluster_id_, this->attribute_id_,
-                   converted, this->updater_);
+  }
+  CHIP_ERROR err = this->updater_(this->endpoint_id_, this->cluster_id_, s.value);
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGE(TAG,
+             "Failed to update attribute 0x%08" PRIX32
+             " on cluster 0x%08" PRIX32 ", endpoint %u: %s",
+             this->attribute_id_, this->cluster_id_, this->endpoint_id_,
+             err.AsString());
+  }
 }
 
 namespace {
@@ -127,7 +88,7 @@ std::set<std::pair<uint16_t, uint32_t>> owned_concentration_clusters;
 
 void ensure_concentration_cluster(uint16_t endpoint_id, uint32_t cluster_id,
                                   uint8_t measurement_unit) {
-  esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
+  // CHIP task: the stack lock is held.
   auto &registry =
       esp_matter::data_model::provider::get_instance().registry();
   if (registry.Get({endpoint_id, cluster_id}) != nullptr) {
@@ -392,56 +353,48 @@ MatterElectricalPowerDelegate *get_electrical_power_delegate(uint16_t endpoint_i
   return delegate;
 }
 
-struct ElectricalUpdate {
-  uint16_t endpoint_id;
-  MatterElectricalSensorMapping::Kind kind;
-  uint32_t attribute_id;
-  bool is_null;
-  int64_t value;
-};
-
-void apply_electrical_update(intptr_t context) {
-  std::unique_ptr<ElectricalUpdate> update(
-      reinterpret_cast<ElectricalUpdate *>(context));
+void apply_electrical_update(uint16_t endpoint_id,
+                             MatterElectricalSensorMapping::Kind kind,
+                             uint32_t attribute_id, bool is_null,
+                             int64_t value_raw) {
   using Kind = MatterElectricalSensorMapping::Kind;
 
-  if (update->kind == Kind::POWER) {
-    auto it = electrical_power_delegates.find(update->endpoint_id);
+  if (kind == Kind::POWER) {
+    auto it = electrical_power_delegates.find(endpoint_id);
     if (it == electrical_power_delegates.end())
       return;
     MatterElectricalPowerDelegate::Nullable64 value;
-    if (!update->is_null)
-      value.SetNonNull(update->value);
-    if (!it->second->set_value(update->attribute_id, value))
+    if (!is_null)
+      value.SetNonNull(value_raw);
+    if (!it->second->set_value(attribute_id, value))
       return;
     esp_matter::data_model::provider::get_instance().ReportAttributeChanged(
-        chip::app::AttributePathParams(update->endpoint_id, EPM::Id,
-                                       update->attribute_id));
+        chip::app::AttributePathParams(endpoint_id, EPM::Id, attribute_id));
     return;
   }
 
   // Cumulative energy. A null value (unknown) can't undo a counter.
-  if (update->is_null)
+  if (is_null)
     return;
   namespace EEM = chip::app::Clusters::ElectricalEnergyMeasurement;
   EEM::Structs::EnergyMeasurementStruct::Type energy;
-  energy.energy = update->value;
+  energy.energy = value_raw;
   energy.endSystime = chip::MakeOptional(static_cast<uint64_t>(
       chip::System::SystemClock().GetMonotonicTimestamp().count()));
   auto measured = chip::app::DataModel::MakeNullable(energy);
   chip::app::DataModel::Nullable<EEM::Structs::EnergyMeasurementStruct::Type>
       none;
-  bool ok = update->kind == Kind::ENERGY_IMPORTED
-                ? EEM::NotifyCumulativeEnergyMeasured(update->endpoint_id,
-                                                      measured, none)
-                : EEM::NotifyCumulativeEnergyMeasured(update->endpoint_id, none,
+  bool ok = kind == Kind::ENERGY_IMPORTED
+                ? EEM::NotifyCumulativeEnergyMeasured(endpoint_id, measured,
+                                                      none)
+                : EEM::NotifyCumulativeEnergyMeasured(endpoint_id, none,
                                                       measured);
   if (!ok) {
     ESP_LOGE(TAG,
              "Failed to update the cumulative energy of endpoint %u. Is the "
              "ElectricalEnergyMeasurement cluster created with the matching "
              "features?",
-             update->endpoint_id);
+             endpoint_id);
   }
 }
 
@@ -492,42 +445,52 @@ MatterConcentrationSensorMapping::MatterConcentrationSensorMapping(
                                    update_concentration_attribute),
       measurement_unit_(measurement_unit) {}
 
-void MatterConcentrationSensorMapping::initialize() {
-  ensure_concentration_cluster(this->endpoint_id_, this->cluster_id_,
-                               this->measurement_unit_);
-  MatterSensorAttributeMapping::initialize();
+void MatterConcentrationSensorMapping::setup_() {
+  // Queued on the CHIP task ahead of the boot push (same FIFO), so the cluster
+  // exists before the first value is written and the main loop never takes the
+  // CHIP stack lock.
+  uint16_t endpoint_id = this->endpoint_id_;
+  uint32_t cluster_id = this->cluster_id_;
+  uint8_t unit = this->measurement_unit_;
+  run_on_matter_thread([endpoint_id, cluster_id, unit]() {
+    ensure_concentration_cluster(endpoint_id, cluster_id, unit);
+  });
+  MatterSensorAttributeMapping::setup_();
 }
 
 MatterElectricalSensorMapping::MatterElectricalSensorMapping(
     sensor::Sensor *sensor, uint16_t endpoint_id, Kind kind,
     uint32_t attribute_id, SensorValueConverter converter)
-    : MatterEndpointMappingBase(endpoint_id), sensor_(sensor), kind_(kind),
-      attribute_id_(attribute_id), converter_(converter) {
+    : MatterBinding<ElectricalValue, NoInbound>(
+          endpoint_id, BindingPolicy{BootSync::ESPHOME_WINS, 0, false}),
+      sensor_(sensor), kind_(kind), attribute_id_(attribute_id),
+      converter_(converter) {
   if (kind == Kind::POWER)
     get_electrical_power_delegate(endpoint_id)->enable(attribute_id);
 }
 
-void MatterElectricalSensorMapping::initialize() {
+void MatterElectricalSensorMapping::setup_() {
   if (this->sensor_ == nullptr || this->converter_ == nullptr)
     return;
-  this->sensor_->add_on_state_callback(
-      [this](float value) { this->publish_(value); });
-  if (this->sensor_->has_state())
-    this->publish_(this->sensor_->state);
+  this->sensor_->add_on_state_callback([this](float) { this->request_push(); });
 }
 
-void MatterElectricalSensorMapping::publish_(float value) {
-  esp_matter_attr_val_t converted = this->converter_(value);
-  auto *update = new ElectricalUpdate{
-      this->endpoint_id_, this->kind_, this->attribute_id_,
-      converted.is_null(), converted.is_null() ? 0 : converted.val.i64};
-  CHIP_ERROR err = chip::DeviceLayer::PlatformMgr().ScheduleWork(
-      apply_electrical_update, reinterpret_cast<intptr_t>(update));
-  if (err != CHIP_NO_ERROR) {
-    ESP_LOGE(TAG, "Failed to schedule Matter attribute update: %s",
-             err.AsString());
-    delete update;
-  }
+ElectricalValue MatterElectricalSensorMapping::capture_() {
+  ElectricalValue v;
+  if (this->sensor_ == nullptr || this->converter_ == nullptr ||
+      !this->sensor_->has_state())
+    return v;
+  esp_matter_attr_val_t converted = this->converter_(this->sensor_->state);
+  v.valid = true;
+  v.is_null = converted.is_null();
+  v.value = v.is_null ? 0 : converted.val.i64;
+  return v;
+}
+
+void MatterElectricalSensorMapping::write_matter_(const ElectricalValue &v) {
+  if (v.valid)
+    apply_electrical_update(this->endpoint_id_, this->kind_, this->attribute_id_,
+                            v.is_null, v.value);
 }
 
 void set_soil_moisture_limits(uint16_t endpoint_id) {
@@ -587,22 +550,39 @@ MatterBinarySensorAttributeMapping::MatterBinarySensorAttributeMapping(
     binary_sensor::BinarySensor *sensor, uint16_t endpoint_id,
     uint32_t cluster_id, uint32_t attribute_id,
     BinarySensorValueConverter converter, SensorAttributeUpdater updater)
-    : MatterEndpointMappingBase(endpoint_id), sensor_(sensor),
-      cluster_id_(cluster_id), attribute_id_(attribute_id),
-      converter_(converter), updater_(updater) {}
+    : MatterAttributePushBinding(endpoint_id, cluster_id, attribute_id),
+      sensor_(sensor), converter_(converter), updater_(updater) {}
 
-void MatterBinarySensorAttributeMapping::initialize() {
+void MatterBinarySensorAttributeMapping::setup_() {
   if (this->sensor_ == nullptr || this->converter_ == nullptr)
     return;
-  this->sensor_->add_on_state_callback(
-      [this](bool value) { this->publish_(value); });
-  if (this->sensor_->has_state())
-    this->publish_(this->sensor_->state);
+  this->sensor_->add_on_state_callback([this](bool) { this->request_push(); });
 }
 
-void MatterBinarySensorAttributeMapping::publish_(bool value) {
-  update_attribute(this->endpoint_id_, this->cluster_id_, this->attribute_id_,
-                   this->converter_(value), this->updater_);
+ValueState MatterBinarySensorAttributeMapping::capture_() {
+  ValueState s;
+  if (this->sensor_ == nullptr || this->converter_ == nullptr ||
+      !this->sensor_->has_state())
+    return s;
+  s.value = this->converter_(this->sensor_->state);
+  s.valid = s.value.type != ESP_MATTER_VAL_TYPE_INVALID;
+  return s;
+}
+
+void MatterBinarySensorAttributeMapping::write_attribute_(
+    const ValueState &s) {
+  if (this->updater_ == nullptr) {
+    MatterAttributePushBinding::write_attribute_(s);
+    return;
+  }
+  CHIP_ERROR err = this->updater_(this->endpoint_id_, this->cluster_id_, s.value);
+  if (err != CHIP_NO_ERROR) {
+    ESP_LOGE(TAG,
+             "Failed to update attribute 0x%08" PRIX32
+             " on cluster 0x%08" PRIX32 ", endpoint %u: %s",
+             this->attribute_id_, this->cluster_id_, this->endpoint_id_,
+             err.AsString());
+  }
 }
 #endif // USE_BINARY_SENSOR
 

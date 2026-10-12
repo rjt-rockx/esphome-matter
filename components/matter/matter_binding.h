@@ -55,6 +55,17 @@ public:
   virtual bool read_attribute(uint16_t endpoint_id, uint32_t cluster_id,
                               uint32_t attribute_id,
                               esp_matter_attr_val_t &out) = 0;
+  // CHIP thread, inside a PushScope. Writes the attribute store:
+  // esp_matter::attribute::report() when `report` (no attribute callbacks,
+  // value unchanged = no report), else attribute::update(). Not pure so
+  // existing platforms keep compiling; the default fails.
+  virtual esp_err_t write_attribute(uint16_t /*endpoint_id*/,
+                                    uint32_t /*cluster_id*/,
+                                    uint32_t /*attribute_id*/,
+                                    esp_matter_attr_val_t & /*value*/,
+                                    bool /*report*/) {
+    return ESP_FAIL;
+  }
 };
 
 // The active platform: the one installed by set_binding_platform(), else the

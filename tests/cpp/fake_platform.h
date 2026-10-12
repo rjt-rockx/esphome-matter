@@ -47,6 +47,19 @@ class FakePlatform : public BindingPlatform {
     return true;
   }
 
+  esp_err_t write_attribute(uint16_t ep, uint32_t cl, uint32_t at, esp_matter_attr_val_t &value,
+                            bool report) override {
+    attribute_writes.push_back({ep, cl, at, value, report, esphome::matter::MatterBindingBase::is_echo(ep)});
+    if (write_result != ESP_OK)
+      return write_result;
+    store[{ep, cl, at}] = value;
+    // attribute::update() runs the POST_UPDATE callback (report() does not). The watch callbacks must
+    // drop it themselves while the write is ESPHome's own (PushScope).
+    if (!report && fire_on_update)
+      fire_attribute(ep, cl, at, value);
+    return ESP_OK;
+  }
+
   // --- Test controls
   // Runs the oldest CHIP work item as the CHIP thread. Returns false if none.
   bool run_chip_one() {
@@ -122,6 +135,16 @@ class FakePlatform : public BindingPlatform {
     uint32_t cl, at;
     std::function<void(const esp_matter_attr_val_t &)> cb;
   };
+  struct AttrWrite {
+    uint16_t ep;
+    uint32_t cl, at;
+    esp_matter_attr_val_t value;
+    bool report;
+    bool echo;  // was inside a PushScope for `ep`
+  };
+  std::vector<AttrWrite> attribute_writes;
+  esp_err_t write_result{ESP_OK};
+  bool fire_on_update{true};
   std::deque<std::pair<void (*)(intptr_t), intptr_t>> chip_queue;
   std::deque<std::function<void()>> main_queue;
   std::vector<Timer> timers;

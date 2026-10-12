@@ -2,8 +2,8 @@
 
 `components/matter/matter_binding.h` / `.cpp` is the shared core for entity
 bindings. It replaces five hand-rolled echo mechanisms and the per-change heap
-allocations in the push paths. No existing binding uses it yet; see
-[Migration order](#migration-order). Thread names follow
+allocations in the push paths. Migrated so far: switch, valve, sensors, binary
+sensors and the power-source flag enums; see [Migration order](#migration-order). Thread names follow
 [threading.md](threading.md): "main" is the ESPHome main loop, "CHIP" is the CHIP
 task.
 
@@ -86,7 +86,9 @@ endpoint counts as echo, the safe direction.
 
 `BindingPlatform` hides everything outside the state machines: `schedule_chip`
 (`PlatformMgr().ScheduleWork`, no allocation), `defer_main`, `main_after`,
-`now_ms`, the legacy guard, attribute watches and store reads. The device build
+`now_ms`, the legacy guard, attribute watches, store reads and
+`write_attribute()` (`attribute::report` / `attribute::update`, CHIP thread,
+inside a `PushScope`; the base implementation fails so older fakes still compile). The device build
 installs `DeviceBindingPlatform` lazily; host tests install `FakePlatform`
 (`tests/cpp/fake_platform.h`) and drive the CHIP queue, the main queue and the
 clock by hand. `ChipWorkSlot::request()` and `main_after` are main-loop only.
@@ -116,13 +118,36 @@ g++ -std=gnu++20 -DMATTER_HOST_TEST -pthread -Itests/cpp/stubs -Itests/cpp \
   -o /tmp/matter-host-tests && /tmp/matter-host-tests [name-filter]
 ```
 
+## Reusable bindings
+
+`matter_push_bindings.h` has no entity or cluster dependencies, so the state
+machines are host-tested (`tests/cpp/test_push_bindings.cpp`):
+
+- `MatterAttributePushBinding`: ESPHome -> Matter mirror of one attribute value
+  (`ValueState{valid, value}`). Sensors, binary sensors and `MatterFlagEnumMapping`
+  derive from it; code-driven clusters override `write_attribute_()` (the old
+  `SensorAttributeUpdater`). The newest reading wins; there is no allocation per
+  reading and no dropped final value. `valid == false` (no state, or a converter
+  that rejects the reading) writes nothing.
+- `MatterOnOffBinding`: OnOff.OnOff with `MATTER_WINS` boot replay, `report()` pushes
+  and reconcile after every applied write (switch).
+
+Valve uses `MatterBinding<MatterValveState, MatterValveCommand>` with a 200 ms
+settle window: a valve that is already at the target never publishes, so the
+window expiry pushes the unchanged state and `CurrentState` leaves
+`Transitioning`. The electrical power/energy sensors use
+`MatterBinding<ElectricalValue, NoInbound>`; the concentration cluster is
+created on the CHIP task (queued ahead of the boot push) instead of under the
+CHIP lock on the main loop.
+
 ## Migration order
 
 Each step is one change; codegen snapshots stay unchanged.
 
-1. Core and host tests (this change).
-2. Switch (smallest).
-3. Sensors, binary sensors, valve (removes the `new AttributeUpdate` per reading).
+1. Core and host tests (done).
+2. Switch (done).
+3. Sensors, binary sensors, valve, power-source flag enums (done; removes the
+   `new AttributeUpdate` per reading).
 4. Lock, cover, closure (`request_push_`/`push_done_`/`schedule_drain_` go away).
 5. Fan and climate fan (delete `pushing_`; wind and step hooks use `is_echo()`).
 6. Climate.
