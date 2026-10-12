@@ -437,6 +437,15 @@ class Api:
     def climate(self, object_id: str, **kw: Any) -> None:
         self._call(self._cli.climate_command, self.entities[object_id].key, **kw)
 
+    def select(self, object_id: str, option: str) -> None:
+        self._call(self._cli.select_command, self.entities[object_id].key, option)
+
+    def cover(self, object_id: str, **kw: Any) -> None:
+        self._call(self._cli.cover_command, self.entities[object_id].key, **kw)
+
+    def lock(self, object_id: str, command: Any) -> None:
+        self._call(self._cli.lock_command, self.entities[object_id].key, command)
+
     def action(self, name: str, **data: Any) -> None:
         self._run(self._cli.execute_service(self.services[name], data), 60)
 
