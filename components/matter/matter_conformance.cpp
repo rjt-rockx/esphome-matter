@@ -4,11 +4,13 @@
 #include "esphome/core/log.h"
 #include "matter_conformance.h"
 
+#include <cstdio>
 #include <cstring>
 #include <limits>
 
 #include <app-common/zap-generated/ids/Clusters.h>
 #include <esp_matter_cluster.h>
+#include <esp_random.h>
 #include <esp_matter_providers.h>
 #include <nvs.h>
 #include <sdkconfig.h>
@@ -19,6 +21,12 @@
 #include <platform/DeviceInfoProvider.h>
 
 static const char *const TAG = "matter.conformance";
+
+// Not declared in a public esp-matter header; the symbol is exported by the library.
+namespace esp_matter::attribute {
+esp_err_t erase_val_in_nvs(uint16_t endpoint_id, uint32_t cluster_id,
+                           uint32_t attribute_id);
+} // namespace esp_matter::attribute
 
 namespace esphome::matter {
 
@@ -175,6 +183,69 @@ void MatterConformance::init_configuration_version() const {
   }
   nvs_close(handle);
   s_configuration_version = version;
+}
+
+// ---------------------------------------------------------------------------
+// Bridged Node identity
+// ---------------------------------------------------------------------------
+namespace {
+constexpr const char *NVS_KEY_BRIDGE_ID = "bridge-id";
+constexpr uint32_t BDBI_CLUSTER = 0x39;
+constexpr uint32_t BDBI_NODE_LABEL = 0x05;
+
+uint32_t bridge_node_id() {
+  static uint32_t id = 0; // NOLINT
+  if (id != 0)
+    return id;
+  nvs_handle_t handle;
+  if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+    ESP_LOGW(TAG, "Cannot open NVS: the bridge node id is not persisted");
+    id = esp_random() | 1u;
+    return id;
+  }
+  uint32_t stored = 0;
+  if (nvs_get_u32(handle, NVS_KEY_BRIDGE_ID, &stored) != ESP_OK || stored == 0) {
+    stored = esp_random() | 1u;
+    if (nvs_set_u32(handle, NVS_KEY_BRIDGE_ID, stored) != ESP_OK ||
+        nvs_commit(handle) != ESP_OK)
+      ESP_LOGW(TAG, "Failed to persist the bridge node id");
+  }
+  nvs_close(handle);
+  id = stored;
+  return id;
+}
+} // namespace
+
+void format_bridge_unique_id(char *out, size_t size, const char *key_hash) {
+  snprintf(out, size, "%08x-%s", static_cast<unsigned>(bridge_node_id()),
+           key_hash);
+}
+
+void reset_changed_node_label(uint16_t endpoint_id, const char *name) {
+  uint32_t hash = 2166136261u; // FNV-1a
+  for (const char *c = name; *c != 0; c++)
+    hash = (hash ^ static_cast<uint8_t>(*c)) * 16777619u;
+  char key[16];
+  snprintf(key, sizeof(key), "nl%x", static_cast<unsigned>(endpoint_id));
+  nvs_handle_t handle;
+  if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK)
+    return;
+  uint32_t stored = 0;
+  bool have = nvs_get_u32(handle, key, &stored) == ESP_OK;
+  if (!have || stored != hash) {
+    if (have) {
+      // The YAML name changed: forget the label a controller wrote (or the previous default).
+      esp_matter::attribute::erase_val_in_nvs(endpoint_id, BDBI_CLUSTER,
+                                              BDBI_NODE_LABEL);
+      ESP_LOGI(TAG, "Endpoint %u: configured name changed, NodeLabel reset",
+               endpoint_id);
+    }
+    if (nvs_set_u32(handle, key, hash) != ESP_OK ||
+        nvs_commit(handle) != ESP_OK)
+      ESP_LOGW(TAG, "Failed to persist the NodeLabel hash of endpoint %u",
+               endpoint_id);
+  }
+  nvs_close(handle);
 }
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGE
 from esphome.core import CORE, ID, HexInt
 from esphome.types import ConfigType
 
-from . import binary_sensors, cluster_options
+from . import binary_sensors, bridge, cluster_options
 from . import conformance
 from . import sensor_extras
 from . import delegates
@@ -483,10 +483,17 @@ class Endpoint:
         """
 
         # Collect the complete endpoint structure before emitting its build callback.
-        for conf_key, device_config in self._config.items():
+        # The Bridged Node device type goes first in the DeviceTypeList (the primary one), like esp-matter's bridge does.
+        for conf_key, device_config in sorted(
+            self._config.items(),
+            key=lambda item: item[0] != bridge.DEVICE_TYPE_BRIDGED_NODE,
+        ):
             device_type = DEVICE_TYPES_BY_CONF_KEY.get(conf_key)
             if device_type:
                 await self._configure_device_type(var, device_type, device_config)
+
+        if bridged_node := self._config.get(bridge.DEVICE_TYPE_BRIDGED_NODE):
+            await self._register_bridged_node(var, bridged_node)
 
         await power_source.register(self, var)
 
@@ -565,6 +572,23 @@ class Endpoint:
                 var, self._endpoint_id, cluster, config
             )
 
+    async def _register_bridged_node(self, var, bridged_node: dict):
+        """Bind BDBI Reachable to a binary sensor. The parent link is part of the conformance plan."""
+        if reachable_id := bridged_node.get(bridge.CONF_REACHABLE):
+            sensor = await cg.get_variable(reachable_id)
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_conversions.h"'
+            )
+            cg.add(
+                var.register_binary_sensor_attribute(
+                    sensor,
+                    self._endpoint_id,
+                    bridge.BDBI_CLUSTER_ID,
+                    bridge.BDBI_REACHABLE_ATTRIBUTE_ID,
+                    cg.RawExpression("esphome::matter::conversion::boolean_state"),
+                )
+            )
+
     def _register_conformance(self, var):
         """Parent, label and semantic tags are applied by matter_conformance.cpp."""
         if self.is_root:
@@ -600,6 +624,9 @@ class Endpoint:
         device_types = ",".join(
             str(i) for i in sorted(t.id for t in self._device_types)
         )
+        if bridged_node := self._config.get(bridge.DEVICE_TYPE_BRIDGED_NODE):
+            # The BDBI attributes a controller reads (NodeLabel, VendorName, ...) are part of the structure.
+            device_types += "|b" + ",".join(sorted(bridge.attribute_names(bridged_node)))
         cluster_text = ",".join(
             f"{cid}[{'+'.join(sorted(features))}]"
             for cid, features in sorted(clusters.items())
@@ -778,6 +805,14 @@ class Endpoint:
         lines = [
             f"esp_matter::endpoint::{device_type.namespace}::config_t {config_var}{{{config_init}}};"
         ]
+        if device_type.name == bridge.DEVICE_TYPE_BRIDGED_NODE:
+            lines.extend(
+                bridge.config_lines(config_var, self._endpoint_id, device_config)
+            )
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_conformance.h"'
+            )
+            self.global_includes.add(bridge.DATA_MODEL_GUARD)
 
         if min_level := device_config.get(CONF_MIN_LEVEL):
             lines.append(f"{config_var}.level_control.min_level = {min_level};")
@@ -929,6 +964,8 @@ class Endpoint:
                     )
                 )
             lines.extend(climate_post_create_lines(climate_, device_type.name))
+        if device_type.name == bridge.DEVICE_TYPE_BRIDGED_NODE:
+            lines.extend(bridge.post_create_lines(device_config))
         return lines
 
     async def _register_sensor_attribute(
@@ -1312,7 +1349,10 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
     """During validation an endpoint registry is built and stored in CORE.data["matter"]["endpoints"]."""
     endpoints = EndpointRegistry()
     plans = conformance.plan_endpoints(matter_config[CONF_ENDPOINTS])
-    endpoint_ids = tuple(matter_config[CONF_ENDPOINTS])
+    # The default EndpointList of the root node Power Source: the node's own endpoints. The Aggregator and
+    # the bridged devices below it have power sources of their own.
+    bridged = bridge.bridge_subtree(matter_config[CONF_ENDPOINTS])
+    endpoint_ids = tuple(e for e in matter_config[CONF_ENDPOINTS] if e not in bridged)
     for endpoint_id, endpoint_config in matter_config[CONF_ENDPOINTS].items():
         endpoints.register(
             Endpoint(endpoint_id, endpoint_config, plans[endpoint_id], endpoint_ids)

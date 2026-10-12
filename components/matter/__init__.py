@@ -21,7 +21,7 @@ from esphome.core import CORE, HexInt
 from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
-from . import ethernet
+from . import bridge, ethernet
 from .actions import register_bound_command_actions
 from .binary_sensors import check_binary_sensors
 from .conformance import validate_composition
@@ -189,6 +189,9 @@ CONFIG_SCHEMA = cv.All(
             # Entity-centric exposure, lowered into `endpoints` by lower_expose (docs/expose.md)
             cv.Optional(CONF_EXPOSE): EXPOSE_SCHEMA,
             cv.Optional(CONF_EXCLUDE): EXCLUDE_SCHEMA,
+            # Aggregator with Bridged Nodes for entities that stand for other devices, lowered into `endpoints`
+            # by bridge.lower_bridge (docs/bridge.md)
+            cv.Optional(bridge.CONF_BRIDGE): bridge.BRIDGE_SCHEMA,
             # Endpoints
             cv.Optional(CONF_ENDPOINTS, default={}): cv.Schema(
                 {
@@ -201,7 +204,9 @@ CONFIG_SCHEMA = cv.All(
     .extend(COMMISSIONING_SCHEMA)
     .extend(BEHAVIOURS_SCHEMA)  # status_led, pairing
     .extend(cv.COMPONENT_SCHEMA),
+    bridge.lower_bridge,
     lower_expose,
+    bridge.validate_topology,
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
     validate_ota_schema,

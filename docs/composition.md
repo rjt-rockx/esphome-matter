@@ -8,6 +8,8 @@ Sibling endpoints that share an application device type, such as four relays or 
 
 esphome-matter adds one automatically: a *Common Number* semantic tag (namespace `0x07`, `One`, `Two`, ...) in order of endpoint ID. Only endpoints that have the same parent and an overlapping device type count as siblings. Utility device types (Power Source, Electrical Sensor, Bridged Node, ...) are ignored. The build log lists the endpoints that received a tag.
 
+Bridged Nodes below an Aggregator are siblings too: identical one-endpoint bridged devices get these tags, and there are only 31 of them (see [bridge.md](bridge.md) for `nested: true`).
+
 To choose the tags yourself use `tags:`. An endpoint with `tags:` is left alone. Up to three tags per endpoint are possible (an esp-matter limit):
 
 ```yaml

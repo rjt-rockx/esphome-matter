@@ -202,7 +202,11 @@ def application_device_type_ids(endpoint_config: dict) -> set[int]:
     ids = set()
     for conf_key in endpoint_config:
         device_type = DEVICE_TYPES_BY_CONF_KEY.get(conf_key)
-        if device_type is not None and device_type.id not in UTILITY_DEVICE_TYPE_IDS:
+        if (
+            device_type is not None
+            and device_type.id not in UTILITY_DEVICE_TYPE_IDS
+            and device_type.id != AGGREGATOR_DEVICE_TYPE_ID
+        ):
             ids.add(device_type.id)
     return ids
 

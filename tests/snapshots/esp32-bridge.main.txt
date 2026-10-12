@@ -1,0 +1,146 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-bridge");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(0, {10}));
+  matter_mattercomponent_id->register_endpoint(0, [](esp_matter::endpoint_t *endpoint) -> bool {
+    if (esp_matter::endpoint::add_device_type(endpoint, esp_matter::endpoint::power_source::get_device_type_id(), esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)
+      return false;
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::wired::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Mains");
+    power_source_config.features.wired.wired_current_type = 0;
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay3, 10);
+  matter_mattercomponent_id->register_endpoint_parent(10, 0);
+  matter_mattercomponent_id->register_endpoint(10, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::aggregator::config_t device_config_0{};
+    if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay1, 2);
+  matter_mattercomponent_id->register_endpoint_parent(2, 1);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "8908c60b");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay 1");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay 1"), 7) == nullptr)
+        return false;
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay2, 3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 1);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "relay-two", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay 2");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay 2"), 7) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("ACME"), 4) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("Relay board"), 11) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_serial_number(bdbi_cluster, const_cast<char *>("R2-0001"), 7) == nullptr)
+        return false;
+    }
+    esp_matter::endpoint::on_off_light::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(garage_online, 4, 57, 17, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_sensor_attribute(garage_battery, 4, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(garage_battery, 4, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(4, {4, 5, 6}));
+  matter_mattercomponent_id->register_endpoint_parent(4, 1);
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = false;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "ffb148ea");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Garage Sensor");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Garage Sensor"), 13) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("Xiaomi"), 6) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("LYWSD03MMC"), 10) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_software_version_string(bdbi_cluster, const_cast<char *>("1.0.0_0130"), 10) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_manufacturing_date(bdbi_cluster, const_cast<char *>("20250131"), 8) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_url(bdbi_cluster, const_cast<char *>("https://example.com/sensor"), 26) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_hardware_version(bdbi_cluster, static_cast<uint16_t>(1U)) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_software_version(bdbi_cluster, static_cast<uint32_t>(2U)) == nullptr)
+        return false;
+    }
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return false;
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(garage_temp, 5, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(5, 4);
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(garage_humidity, 6, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(6, 4);
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x7BA92EE2);

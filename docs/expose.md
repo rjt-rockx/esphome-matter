@@ -171,8 +171,8 @@ to `exclude:` to silence it.
 
 ### Not supported yet
 
-`bridged: true` is not available: the base has the `bridged_node` and `aggregator` device types but no bridge
-composition, so expose cannot build one. Use `endpoints:` with `parent:` for bridges.
+`bridged: true` is not available: `expose:` cannot place entities below an Aggregator. Use the `bridge:` block or
+`endpoints:` for bridges ([bridge.md](bridge.md)); the two can be combined in one config.
 
 ## Endpoint numbers
 

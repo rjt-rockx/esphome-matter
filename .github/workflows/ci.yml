@@ -301,6 +301,7 @@ jobs:
           - s3-wifi
           - c3-wifi
           - c6-closure
+          - c6-bridge-block
           - c6-delegates
           - c6-sensor-extras
           - c6-fan-hvac
@@ -317,6 +318,7 @@ jobs:
           - { slug: c6-fan-hvac, name: C6 fan hvac, variant: ESP32C6, config: tests/configs/esp32-fan-hvac.yaml }
           - { slug: c6-sensor-extras, name: C6 sensor extras, variant: ESP32C6, config: tests/configs/esp32-sensor-extras.yaml }
           - { slug: c6-delegates, name: C6 delegates, variant: ESP32C6, config: tests/configs/esp32-delegates.yaml }
+          - { slug: c6-bridge-block, name: C6 bridge block, variant: ESP32C6, config: tests/configs/esp32-bridge-block.yaml }
           - { slug: c6-closure, name: C6 closure, variant: ESP32C6, config: tests/configs/esp32-closure.yaml }
           - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
     steps:

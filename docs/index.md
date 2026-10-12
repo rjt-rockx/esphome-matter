@@ -18,6 +18,7 @@ esphome-matter is an experimental ESPHome external component that exposes ESPHom
 - [clusters.md](clusters.md): measurement clusters and extra clusters.
 - [actions.md](actions.md): actions and triggers (`matter.send_command`, `set_attribute`, `on_attribute`, ...).
 - [binding.md](binding.md): physical buttons controlling other Matter devices.
+- [bridge.md](bridge.md): the `bridge:` block, Bridged Nodes and Bridged Device Basic Information for BLE, ESP-NOW, IR and other foreign devices.
 
 ### Per domain
 

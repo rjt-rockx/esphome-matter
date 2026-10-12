@@ -12,7 +12,7 @@ import os
 
 from esphome.core import CORE
 
-from . import power_source
+from . import bridge, power_source
 
 ENV_VAR = "MATTER_LAYOUT_JSON"
 
@@ -115,6 +115,14 @@ def _endpoint_layout(endpoint) -> dict:
         ):
             # ColorTemperature is only added when the light can show it.
             dynamic.append("ColorControl")
+    bridge_info = bridge.layout_info(endpoint.endpoint_id, endpoint.config)
+    if bridge_info is not None:
+        # BDBI attributes the component creates after the device type (NodeLabel, identity strings).
+        bdbi = clusters.setdefault(
+            bridge.BDBI_CLUSTER_NAME,
+            {"id": bridge.BDBI_CLUSTER_ID, "source": "device_type", "features": []},
+        )
+        bdbi.setdefault("optional_attributes", []).extend(bridge_info["attributes"])
     device_types = [
         {"name": device_type.name, "id": device_type.id}
         for device_type in endpoint._device_types
@@ -137,4 +145,5 @@ def _endpoint_layout(endpoint) -> dict:
             {"namespace": tag.namespace, "tag": tag.tag, "label": tag.label}
             for tag in endpoint.plan.tags
         ],
+        **({"bridge": bridge_info} if bridge_info is not None else {}),
     }

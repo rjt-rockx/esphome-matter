@@ -3,6 +3,7 @@
 #include "esphome/core/defines.h"
 #ifdef USE_MATTER
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -53,6 +54,17 @@ private:
   std::vector<Entry> entries_;
   uint32_t structure_hash_{0};
 };
+
+// Bridged Node UniqueID without an explicit `unique_id:`: "<node id>-<key hash>".
+// The node id is random, created on first boot and kept in NVS, so renaming the ESPHome node or
+// renumbering endpoints never changes it. key_hash identifies the bridged device (8 hex digits).
+void format_bridge_unique_id(char *out, size_t size, const char *key_hash);
+
+// Bridged Device Basic Information NodeLabel is stored in NVS once a controller writes it, and the
+// stored value wins over the YAML `name:` when the attribute is created. This remembers a hash of
+// the configured name per endpoint and erases the stored label when the YAML name changed. Call it
+// before creating the NodeLabel attribute.
+void reset_changed_node_label(uint16_t endpoint_id, const char *name);
 
 } // namespace esphome::matter
 

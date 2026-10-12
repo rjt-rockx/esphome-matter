@@ -65,6 +65,32 @@ class EndpointInst:
     labels: list[tuple[str, str]] = field(
         default_factory=list
     )  # FixedLabel (label, value)
+    # Bridged Device Basic Information identity (unique_id, node_label, reachable) of a Bridged Node
+    bridge: dict | None = None
+
+
+def parent_map(model: "NodeModel") -> dict[int, int]:
+    """Endpoint -> parent endpoint (0 = child of the root node).
+
+    Layout mode knows the configured parents. A dump only has PartsLists: the parent is the holder with the
+    shortest list (an Aggregator lists all of its descendants, so a grandchild is held by two endpoints).
+    """
+    out: dict[int, int] = {}
+    if any(e.declared_parent is not None for e in model.endpoints.values()):
+        for ep in model.endpoints.values():
+            if ep.id != 0:
+                out[ep.id] = ep.declared_parent or 0
+        return out
+    for ep in model.endpoints.values():
+        if ep.id == 0:
+            continue
+        holders = [
+            (len(o.parts), o.id)
+            for o in model.endpoints.values()
+            if o.id not in (0, ep.id) and o.parts and ep.id in o.parts
+        ]
+        out[ep.id] = min(holders)[1] if holders else 0
+    return out
 
 
 @dataclass
@@ -396,6 +422,8 @@ def from_layout(
         model.endpoints[ep_id] = ep
         if "parent" in e:
             ep.declared_parent = e["parent"]
+        if e.get("bridge"):
+            ep.bridge = dict(e["bridge"])
         ep.tags = [
             (t["namespace"], t["tag"], t.get("label") or None)
             for t in e.get("tags", [])
@@ -570,6 +598,12 @@ def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
                 ep.tags = _parse_tags(attrs.get(4))
             elif cid == 0x40:
                 ep.labels = _parse_labels(attrs.get(0))
+            elif cid == 0x39:
+                ep.bridge = {
+                    "unique_id": attrs.get(0x12),
+                    "node_label": attrs.get(0x5),
+                    "reachable": attrs.get(0x11),
+                }
         model.endpoints[ep.id] = ep
     # radios present on the root node -> network capabilities
     root = model.endpoints.get(0)

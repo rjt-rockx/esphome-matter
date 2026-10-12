@@ -122,7 +122,14 @@ def _describe(o: Overrides) -> str:
     return "{" + ", ".join(parts) + "}"
 
 
-def select(inventory: list[Entity], items: list[Item], excludes: list[str]) -> Selection:
+def select(
+    inventory: list[Entity],
+    items: list[Item],
+    excludes: list[str],
+    bound: frozenset[str] = frozenset(),
+) -> Selection:
+    """`bound` are ids that `bridge:` or hand-written `endpoints:` already publish: globs and `all` pass
+    over them, an explicit id publishes the entity a second time (with a warning)."""
     entities = by_id(inventory)
     ids = list(entities)
     # id -> level -> [Overrides]
@@ -187,6 +194,9 @@ def select(inventory: list[Entity], items: list[Item], excludes: list[str]) -> S
         entity = entities[eid]
         overrides = _merge(level, eid, levels[level])
         if level != EXPLICIT:
+            if eid in bound:
+                skipped.append((eid, "already published by `bridge:` or `endpoints:`"))
+                continue
             if eid in excluded:
                 skipped.append((eid, "excluded"))
                 continue
@@ -202,6 +212,12 @@ def select(inventory: list[Entity], items: list[Item], excludes: list[str]) -> S
                 skipped.append((eid, str(exc)))
                 continue
         else:
+            if eid in bound:
+                _LOGGER.warning(
+                    "matter.expose: '%s' is exposed explicitly but `bridge:` or `endpoints:` already publishes "
+                    "it; controllers will show it twice",
+                    eid,
+                )
             if reason := entity.skipped_by_glob:
                 _LOGGER.warning(
                     "matter.expose: '%s' is exposed explicitly although it is %s", eid, reason

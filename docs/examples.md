@@ -18,6 +18,9 @@ The [examples/](../examples/) directory holds complete ESPHome configs. They are
 | [all-sensors.yaml](../examples/all-sensors.yaml) | Environmental, air quality and electrical sensors with a battery | [sensors.md](sensors.md) |
 | [wireless-button.yaml](../examples/wireless-button.yaml) | Stateless button (generic switch) | [generic-switch.md](generic-switch.md) |
 | [esp32-dimmer-button.yaml](../examples/esp32-dimmer-button.yaml) | A dimmer switch (over Thread) that controls another Matter light through a binding | [binding.md](binding.md) |
+| [bridge-ble-thermometers.yaml](../examples/bridge-ble-thermometers.yaml) | Two Bluetooth thermometers as Bridged Nodes (temperature, humidity, battery, Reachable) | [bridge.md](bridge.md) |
+| [bridge-espnow-sensors.yaml](../examples/bridge-espnow-sensors.yaml) | ESP-NOW sensor nodes and a relay as Bridged Nodes | [bridge.md](bridge.md) |
+| [bridge-ir-ac.yaml](../examples/bridge-ir-ac.yaml) | Two infrared air conditioners as Bridged Nodes | [bridge.md](bridge.md) |
 | [commissioning.yaml](../examples/commissioning.yaml) | Pairing text sensors and commissioning triggers | [commissioning.md](commissioning.md) |
 | [identify-status-led.yaml](../examples/identify-status-led.yaml) | Identify action driving a status LED | [device-info.md](device-info.md) |
 | [matter-ota.yaml](../examples/matter-ota.yaml) | Matter OTA requestor | [matter-ota.md](matter-ota.md) |
