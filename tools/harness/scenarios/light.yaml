@@ -1,0 +1,50 @@
+# On/Off, dimmable and colour-temperature light. Override the endpoint with: --var ep=2
+name: light on/off
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: OnOff }]
+setup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, within: 3s }
+steps:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: On }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: true, via: report, within: 2s }
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, via: report, within: 2s }
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Toggle }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: true, within: 2s }
+cleanup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+---
+name: light level (dimmable_light and above)
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: LevelControl }]
+steps:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: On }
+  - invoke:
+      ep: "${ep}"
+      cluster: LevelControl
+      command: MoveToLevel
+      args: { level: 128, transitionTime: 0, optionsMask: {}, optionsOverride: {} }
+  - expect: { ep: "${ep}", cluster: LevelControl, attribute: CurrentLevel, equals: 128, within: 3s }
+  - invoke:
+      ep: "${ep}"
+      cluster: LevelControl
+      command: MoveToLevelWithOnOff
+      args: { level: 1, transitionTime: 0, optionsMask: {}, optionsOverride: {} }
+  - expect: { ep: "${ep}", cluster: LevelControl, attribute: CurrentLevel, equals: 1, within: 3s }
+cleanup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+---
+name: light colour temperature (color_temperature_light and above)
+vars: { ep: 1, mireds: 300 }
+requires: [{ ep: "${ep}", cluster: ColorControl }]
+steps:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: On }
+  - invoke:
+      ep: "${ep}"
+      cluster: ColorControl
+      command: MoveToColorTemperature
+      args: { colorTemperatureMireds: "${mireds}", transitionTime: 0, optionsMask: {}, optionsOverride: {} }
+  - expect: { ep: "${ep}", cluster: ColorControl, attribute: ColorTemperatureMireds, equals: 300, within: 3s }
+cleanup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
