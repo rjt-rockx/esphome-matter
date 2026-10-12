@@ -81,6 +81,74 @@ The sequences are cross-checked in `tests/unit/test_switch_sequences.py` with a 
 
 The `CurrentPosition` attribute follows the button: it is `1` while the button is pressed and `0` otherwise (`NumberOfPositions` is 2), also when the enabled features have no event for the press or release. For a `LatchingSwitch`, the sensor state is the position and `switch_latched` is sent on each change.
 
+## Binding an event entity
+
+ESPHome `event` entities (a `template` event driven from `on_...` triggers, a remote's receiver, a BLE button, ...) report one event per finished gesture: "single", "double", "hold". `event_id` replays each of them on the Switch cluster as the press and release of a physical button, through the same state machine as `binary_sensor_id`. The Matter events and their order are therefore identical for both kinds of source.
+
+```yaml
+event:
+  - platform: template
+    id: remote
+    name: Remote
+    event_types: [single, double, hold]
+
+matter:
+  endpoints:
+    1:
+      generic_switch:
+        event_id: remote
+```
+
+With no `event_map`, the names of the entity's `event_types` are recognised (case, spaces and dashes do not matter). Types with another name are left out and logged at debug level when they occur.
+
+| Gesture | Names | Switch events (for the enabled features) |
+|---|---|---|
+| 1 press | `press`, `pressed`, `single`, `single_press`, `single_click`, `click`, `tap`, `short_press`, `short`, `ring`, `doorbell`, `doorbell_pressed`, `ding`, `button` | `initial_press`, `short_release`, `multi_press_complete` (count 1) |
+| 2, 3, 4 presses | `double`, `double_press`, `double_click`, `double_tap`, `press_2`; `triple...`, `press_3`; `quadruple`, `quad`, `press_4` | the sequence of that many presses, `multi_press_complete` with the count at the end |
+| `long_press` | `long`, `long_press`, `hold`, `held`, `long_click`, `press_and_hold` | `initial_press`, `long_press`, then `long_release` at once, unless another event type is mapped to `press_end` |
+| `press_start` | `press_start`, `initial_press`, `button_down`, `down` | the press edge only (`initial_press`) |
+| `press_end` | `press_end`, `release`, `released`, `short_release`, `long_release`, `hold_release`, `long_press_end`, `button_up`, `up` | the release edge: `short_release`, or `long_release` after a long press |
+
+### event_map
+
+`event_map` names the gesture of each event type explicitly. Its keys must be `event_types` of the entity. A number is that many presses, and `long_press`, `press_start` and `press_end` are the gestures above.
+
+```yaml
+      generic_switch:
+        event_id: remote
+        multi_press_max: 3
+        event_map:
+          tap: 1
+          tap_twice: 2
+          tap_three_times: 3
+          hold: long_press      # the remote sends "release" when the button is let go,
+          release: press_end    # so the long press stays open until then
+```
+
+An event entity that does not list `event_types` in its configuration (a platform that fixes them in code) needs an `event_map`.
+
+### Rules
+
+- The default features are the ones of a bound binary sensor (`MomentarySwitchRelease`, `MomentarySwitchLongPress`, `MomentarySwitchMultiPress`). A gesture needs its feature: a gesture of 2 or more presses needs `MomentarySwitchMultiPress` and at most `multi_press_max` presses (the default is 2, raise it for `triple`). Both are checked when the configuration is validated. Without `MomentarySwitchLongPress` a long press is sent as a short press.
+- A timeline in the sequence of one source is shared: two "single" events less than `multi_press_window` apart count as one double press, exactly like two presses of a button. `long_press_time` has no effect on the long press of an event (the entity already decided that it was long) but is used when the first edge comes from `press_start`.
+- Event entities are momentary. `LatchingSwitch` is rejected; use a `binary_sensor` for a toggle switch.
+- `event_id` and `binary_sensor_id` cannot be used on the same endpoint.
+- `event_id` works on every device type with a Switch cluster (`generic_switch`, `doorbell`).
+
+## Doorbell
+
+The `doorbell` device type (0x0148) has the same Switch cluster, with `MomentarySwitch` required, plus an optional Chime client. It takes the same options (`binary_sensor_id`, `event_id`, `event_map`, `long_press_time`, `multi_press_window`, `multi_press_max`, `with_features`). A doorbell only needs `initial_press`, so a bell button can drop the long and multi press features:
+
+```yaml
+matter:
+  expose:
+    - {id: bell, features: [MomentarySwitchRelease]}   # bell: event, device_class: doorbell
+```
+
+`with_features` replaces the defaults, so list every feature you want.
+
+`audio_doorbell` and `video_doorbell` are not supported: they require the Camera AV Stream Management and WebRTC clusters, which this component does not implement. The `chime` device type is not supported either, because its mandatory Chime cluster is not created. Use `doorbell`. In `expose:`, `as: audio_doorbell` and `as: video_doorbell` are errors that say so.
+
 ## matter.send_switch_event
 
 The `matter.send_switch_event` action sends a single event. Use it for buttons that are not binary sensors, or to build custom gestures, for example from `on_multi_click`.

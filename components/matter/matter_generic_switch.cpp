@@ -102,17 +102,13 @@ void send_switch_event(uint16_t endpoint_id, MatterSwitchEvent event,
              err.Format());
 }
 
-#ifdef USE_BINARY_SENSOR
-
-void MatterGenericSwitchMapping::initialize() {
-  if (this->sensor_ == nullptr)
-    return;
+bool MatterSwitchSequencer::read_switch_features_() {
   using namespace chip::app::Clusters;
   if (!this->has_server_cluster(Switch::Id)) {
     ESP_LOGE(TAG,
              "Endpoint %u has no Switch cluster. Switch events are disabled",
              this->endpoint_id());
-    return;
+    return false;
   }
 
   // Only emit events of the features that are enabled on the endpoint: Matter
@@ -137,12 +133,19 @@ void MatterGenericSwitchMapping::initialize() {
                                      Switch::Attributes::MultiPressMax::Id,
                                      &value) == ESP_OK)
     this->multi_press_max_ = value.val.u8;
+  return true;
+}
 
+#ifdef USE_BINARY_SENSOR
+void MatterGenericSwitchMapping::initialize() {
+  if (this->sensor_ == nullptr || !this->read_switch_features_())
+    return;
   this->sensor_->add_on_state_callback(
       [this](bool pressed) { this->on_state_(pressed); });
 }
+#endif // USE_BINARY_SENSOR
 
-void MatterGenericSwitchMapping::dump_config() {
+void MatterSwitchSequencer::dump_config() {
   ESP_LOGCONFIG(TAG,
                 "Matter Switch:\n"
                 "  Endpoint: %u\n"
@@ -155,7 +158,7 @@ void MatterGenericSwitchMapping::dump_config() {
                 this->multi_press_max_, this->multi_press_window_ms_);
 }
 
-void MatterGenericSwitchMapping::on_state_(bool pressed) {
+void MatterSwitchSequencer::on_state_(bool pressed) {
   if (this->latching_) {
     send_switch_event(this->endpoint_id(), MatterSwitchEvent::SWITCH_LATCHED,
                       pressed ? 1 : 0);
@@ -166,7 +169,7 @@ void MatterGenericSwitchMapping::on_state_(bool pressed) {
   }
 }
 
-void MatterGenericSwitchMapping::on_press_() {
+void MatterSwitchSequencer::on_press_() {
   if (this->pressed_)
     return;
   this->pressed_ = true;
@@ -200,16 +203,20 @@ void MatterGenericSwitchMapping::on_press_() {
 
   // A press that continues a multi-press sequence is never a long press.
   if (this->long_press_ && this->press_count_ == 1) {
-    this->set_timeout("long_press", this->long_press_ms_, [this]() {
-      this->long_press_sent_ = true;
-      this->press_count_ = 0;
-      this->multi_press_overflow_ = false;
-      send_switch_event(this->endpoint_id(), MatterSwitchEvent::LONG_PRESS);
-    });
+    this->set_timeout("long_press", this->long_press_ms_,
+                      [this]() { this->fire_long_press_(); });
   }
 }
 
-void MatterGenericSwitchMapping::on_release_() {
+void MatterSwitchSequencer::fire_long_press_() {
+  this->cancel_timeout("long_press");
+  this->long_press_sent_ = true;
+  this->press_count_ = 0;
+  this->multi_press_overflow_ = false;
+  send_switch_event(this->endpoint_id(), MatterSwitchEvent::LONG_PRESS);
+}
+
+void MatterSwitchSequencer::on_release_() {
   if (!this->pressed_)
     return;
   this->pressed_ = false;
@@ -234,7 +241,7 @@ void MatterGenericSwitchMapping::on_release_() {
   }
 }
 
-void MatterGenericSwitchMapping::finish_multi_press_() {
+void MatterSwitchSequencer::finish_multi_press_() {
   uint8_t count = this->multi_press_overflow_ ? 0 : this->press_count_;
   this->press_count_ = 0;
   this->multi_press_overflow_ = false;
@@ -242,7 +249,93 @@ void MatterGenericSwitchMapping::finish_multi_press_() {
                     MatterSwitchEvent::MULTI_PRESS_COMPLETE, 1, count);
 }
 
-#endif // USE_BINARY_SENSOR
+void MatterSwitchSequencer::gesture_press_(uint8_t presses) {
+  if (this->latching_) {
+    ESP_LOGW(TAG, "Endpoint %u is a latching switch, press gesture ignored",
+             this->endpoint_id());
+    return;
+  }
+  // Close a press that was started with PRESS_START and never ended.
+  if (this->pressed_)
+    this->on_release_();
+  for (uint8_t i = 0; i < presses; i++) {
+    this->on_press_();
+    this->on_release_();
+  }
+}
+
+void MatterSwitchSequencer::gesture_long_press_(bool auto_release) {
+  if (this->latching_) {
+    ESP_LOGW(TAG, "Endpoint %u is a latching switch, long press ignored",
+             this->endpoint_id());
+    return;
+  }
+  if (this->pressed_)
+    this->on_release_();
+  if (!this->long_press_) {
+    // Without MomentarySwitchLongPress a long press is a short press.
+    this->on_press_();
+    if (auto_release)
+      this->on_release_();
+    return;
+  }
+  this->on_press_();
+  // Only the first press of a sequence can be a long press.
+  if (this->press_count_ == 1)
+    this->fire_long_press_();
+  if (auto_release)
+    this->on_release_();
+}
+
+#ifdef USE_EVENT
+
+void MatterGenericSwitchEventMapping::initialize() {
+  if (this->event_ == nullptr || !this->read_switch_features_())
+    return;
+  if (this->latching_) {
+    ESP_LOGE(TAG,
+             "Endpoint %u is a latching switch. Event entities are momentary, "
+             "events are ignored",
+             this->endpoint_id());
+    return;
+  }
+  this->event_->add_on_event_callback(
+      [this](StringRef event_type) { this->on_event_(event_type); });
+}
+
+void MatterGenericSwitchEventMapping::dump_config() {
+  MatterSwitchSequencer::dump_config();
+  for (const auto &entry : this->entries_)
+    ESP_LOGCONFIG(TAG, "  Event '%s': gesture %u, count %u%s",
+                  entry.event_type, static_cast<unsigned>(entry.gesture),
+                  entry.count, entry.auto_release ? ", auto release" : "");
+}
+
+void MatterGenericSwitchEventMapping::on_event_(StringRef event_type) {
+  for (const auto &entry : this->entries_) {
+    if (!(event_type == entry.event_type))
+      continue;
+    switch (entry.gesture) {
+    case MatterEventGesture::PRESS:
+      this->gesture_press_(entry.count);
+      break;
+    case MatterEventGesture::LONG_PRESS:
+      this->gesture_long_press_(entry.auto_release);
+      break;
+    case MatterEventGesture::PRESS_START:
+      this->on_press_();
+      break;
+    case MatterEventGesture::PRESS_END:
+      this->on_release_();
+      break;
+    }
+    return;
+  }
+  ESP_LOGD(TAG, "Endpoint %u: event type '%s' is not mapped",
+           this->endpoint_id(), event_type.c_str());
+}
+
+#endif // USE_EVENT
 
 } // namespace esphome::matter
 

@@ -233,9 +233,10 @@ def _plan_skips(expose):
     yield sel.skipped
 
 
-def test_event_becomes_an_unbound_generic_switch(raw):
+def test_event_becomes_a_generic_switch_bound_to_its_events(raw):
     ep = ep_of_unbound(run(["knob"]))
     assert types_of(ep) == ["generic_switch"]
+    assert ep["generic_switch"]["event_id"].id == "knob"
     assert "binary_sensor_id" not in ep["generic_switch"]
 
 

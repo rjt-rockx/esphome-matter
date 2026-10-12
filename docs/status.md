@@ -59,7 +59,7 @@ Open work as of the latest plan and repro reports:
 - A config can validate and still fail at boot: if an endpoint cannot be built, the log shows "Failed to build endpoint" and the Matter component is marked failed, without saying which cluster or feature caused it.
 - Echo suppression (a controller write being pushed back to the controller) is implemented in several different ways across domains; wave merges must keep each guard.
 - Sensor updates use one scheduled work item per reading with no coalescing; if the Matter event queue is full an update is dropped and the final value can be lost.
-- Not implemented yet: the `event` entity to Generic Switch binding, `as: doorbell` in `expose:`, the `status_led` and `pairing` behaviours, `matter.remove_fabric` and a controllers sensor, entity-addressed actions, a bridge, and footprint measurement.
+- Not implemented yet: the `status_led` and `pairing` behaviours, `matter.remove_fabric` and a controllers sensor, entity-addressed actions, a bridge, and footprint measurement.
 - Tags and labels: the duplicate-endpoint check ignores tag labels, the tag error does not mention esp-matter's limit of 3 tags, the FixedLabel key is fixed to `name`, and there is no warning for a "structure only, no delegate" endpoint.
 - Deferred: EVSE and device energy management, Service Area, thermostat remote sensing and presets, ICD (low-power) devices.
 - Reconnect after a restart can take up to a minute ([troubleshooting-network.md](troubleshooting-network.md)).

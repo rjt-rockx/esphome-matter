@@ -10,7 +10,12 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #endif // USE_BINARY_SENSOR
 
+#ifdef USE_EVENT
+#include "esphome/components/event/event.h"
+#endif // USE_EVENT
+
 #include <cstdint>
+#include <vector>
 
 namespace esphome::matter {
 
@@ -56,9 +61,9 @@ protected:
   MatterSwitchEvent event_{MatterSwitchEvent::INITIAL_PRESS};
 };
 
-#ifdef USE_BINARY_SENSOR
-// Turns the presses of a binary sensor into Switch cluster events. Only events
-// of the features enabled on the endpoint are generated:
+// The press/release state machine shared by the bindings that turn a button
+// into Switch cluster events. Only events of the features enabled on the
+// endpoint are generated:
 //   every press      -> InitialPress, then MultiPressOngoing for presses
 //                       2..max. An action switch sends InitialPress only for
 //                       the first press and never MultiPressOngoing.
@@ -66,26 +71,33 @@ protected:
 //   release          -> ShortRelease (not after a long press)
 //   window expires   -> MultiPressComplete(count, 0 when aborted)
 // A LatchingSwitch emits SwitchLatched for every state change instead.
-class MatterGenericSwitchMapping : public MatterEndpointMappingBase,
-                            public Component {
+class MatterSwitchSequencer : public MatterEndpointMappingBase,
+                              public Component {
 public:
-  MatterGenericSwitchMapping(binary_sensor::BinarySensor *sensor,
-                      uint16_t endpoint_id, uint32_t long_press_ms,
-                      uint32_t multi_press_window_ms)
-      : MatterEndpointMappingBase(endpoint_id), sensor_(sensor),
-        long_press_ms_(long_press_ms),
+  MatterSwitchSequencer(uint16_t endpoint_id, uint32_t long_press_ms,
+                        uint32_t multi_press_window_ms)
+      : MatterEndpointMappingBase(endpoint_id), long_press_ms_(long_press_ms),
         multi_press_window_ms_(multi_press_window_ms) {}
 
-  void initialize() override;
   void dump_config() override;
 
 protected:
+  // Reads the enabled Switch features. Returns false (and logs) when the
+  // endpoint has no Switch cluster.
+  bool read_switch_features_();
+
   void on_state_(bool pressed);
   void on_press_();
   void on_release_();
+  void fire_long_press_();
   void finish_multi_press_();
 
-  binary_sensor::BinarySensor *sensor_;
+  // Whole gestures for sources that report a finished gesture instead of
+  // press and release edges (event entities). They go through the same state
+  // machine as a physical button, so the emitted sequences are identical.
+  void gesture_press_(uint8_t presses);
+  void gesture_long_press_(bool auto_release);
+
   uint32_t long_press_ms_;
   uint32_t multi_press_window_ms_;
 
@@ -101,7 +113,69 @@ protected:
   bool multi_press_overflow_{false};
   uint8_t press_count_{0};
 };
+
+#ifdef USE_BINARY_SENSOR
+// Turns the presses of a binary sensor into Switch cluster events.
+class MatterGenericSwitchMapping : public MatterSwitchSequencer {
+public:
+  MatterGenericSwitchMapping(binary_sensor::BinarySensor *sensor,
+                             uint16_t endpoint_id, uint32_t long_press_ms,
+                             uint32_t multi_press_window_ms)
+      : MatterSwitchSequencer(endpoint_id, long_press_ms,
+                              multi_press_window_ms),
+        sensor_(sensor) {}
+
+  void initialize() override;
+
+protected:
+  binary_sensor::BinarySensor *sensor_;
+};
 #endif // USE_BINARY_SENSOR
+
+#ifdef USE_EVENT
+// What an event type of an ESPHome event entity does to the switch.
+enum class MatterEventGesture : uint8_t {
+  PRESS,       // `count` presses: press, release, ... (multi press)
+  LONG_PRESS,  // a press that is already a long press; released at once when
+               // `auto_release`, else by a PRESS_END event
+  PRESS_START, // button down (press edge)
+  PRESS_END,   // button up (release edge); ends a long press with LongRelease
+};
+
+// Turns the events of an ESPHome event entity (one event per finished gesture:
+// "single", "double", "hold", ...) into Switch cluster events.
+class MatterGenericSwitchEventMapping : public MatterSwitchSequencer {
+public:
+  MatterGenericSwitchEventMapping(event::Event *event, uint16_t endpoint_id,
+                                  uint32_t long_press_ms,
+                                  uint32_t multi_press_window_ms)
+      : MatterSwitchSequencer(endpoint_id, long_press_ms,
+                              multi_press_window_ms),
+        event_(event) {}
+
+  // `event_type` must outlive the mapping (a string literal in generated code).
+  void add_event(const char *event_type, MatterEventGesture gesture,
+                 uint8_t count, bool auto_release) {
+    this->entries_.push_back({event_type, gesture, count, auto_release});
+  }
+
+  void initialize() override;
+  void dump_config() override;
+
+protected:
+  struct Entry {
+    const char *event_type;
+    MatterEventGesture gesture;
+    uint8_t count;
+    bool auto_release;
+  };
+
+  void on_event_(StringRef event_type);
+
+  event::Event *event_;
+  std::vector<Entry> entries_;
+};
+#endif // USE_EVENT
 
 } // namespace esphome::matter
 
