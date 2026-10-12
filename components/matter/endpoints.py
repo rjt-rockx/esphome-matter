@@ -42,8 +42,8 @@ def light_restore_warning(matter_config: dict, full_config: Config):
                 light_config = full_config.get_config_for_path(light_path)
             except KeyError:
                 continue
-            restore_mode = light_config[CONF_RESTORE_MODE]
-            if restore_mode != "ALWAYS_OFF":
+            restore_mode = light_config.get(CONF_RESTORE_MODE)
+            if restore_mode is not None and restore_mode != "ALWAYS_OFF":
                 _LOGGER.warning(
                     "Light '%s' is exposed through Matter with restore mode %s and should use "
                     "restore_mode: ALWAYS_OFF so Matter can restore its power-on state",
