@@ -56,9 +56,10 @@ matter:
       extended_color_light:
         light_id: rgb_strip
         with_features:
-          - Hue And Saturation
-          - Enhanced Hue
+          # Deliberately not in dependency order: the code adds them in bit order.
           - Color Loop
+          - Enhanced Hue
+          - Hue And Saturation
         color_loop_effect: Color loop
 
 output:

@@ -131,6 +131,17 @@ protected:
                        uint8_t options_mask, uint8_t options_override);
   void register_commands_();
 
+  // Color loop (see docs/lights.md).
+  bool color_loop_effect_running_() const;
+  void stop_color_loop_effect_();
+  void watch_color_loop_();
+  void check_color_loop_();
+  // Runs on the CHIP task.
+  void deactivate_chip_color_loop_();
+  // A change that came from ESPHome ends the windows of Matter commands.
+  void end_windows_for_local_change_();
+  void settle_when_idle_(bool light, bool color);
+
   // Run on the ESPHome main loop.
   void queue_update_(MatterLightPendingUpdate update);
   void apply_pending_();
@@ -146,10 +157,16 @@ protected:
   MatterLightCapabilities capabilities_;
   // Name of the ESPHome effect that runs while a Matter color loop is active.
   const char *color_loop_effect_;
-  // A color loop effect is running: CHIP walks the hue attributes in the
-  // background, those steps are not applied to the light and not reported
-  // from it. Written on the main loop, read on the CHIP task.
-  std::atomic<bool> color_loop_active_{false};
+  // The color loop effect is running on the light: CHIP walks the hue
+  // attributes in the background, those steps are not applied to the light
+  // and the color of the light is not reported. Main loop only (set only when
+  // the effect really started).
+  bool color_loop_active_{false};
+  // A ColorLoopSet that activates the loop was accepted and not ended since.
+  // CHIP's loop runs (ColorLoopActive) whether or not the effect started.
+  // Written on the CHIP task when the command is decoded.
+  std::atomic<bool> color_loop_requested_{false};
+  uint32_t settle_retries_{0};
 
   // Main loop only.
   MatterLightPendingUpdate pending_;

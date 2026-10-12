@@ -305,3 +305,185 @@ def test_light_binding_config_generates_expected_code(tmp_path):
     assert "level_control_config.feature_flags" not in code
     assert "level_control::feature::on_off::add" in code
     assert "level_control::feature::lighting::add" in code
+    # features of an endpoint are added in bit order whatever the YAML order
+    hue = code.index("feature::hue_saturation::add")
+    enhanced = code.index("feature::enhanced_hue::add")
+    loop = code.index("feature::color_loop::add")
+    assert hue < enhanced < loop
+
+
+def test_color_loop_feature_dependencies_are_added(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              extended_color_light:
+                light_id: strip
+                with_features: [Color Loop]
+                color_loop_effect: Rainbow
+        """
+        + LIGHTS
+    )
+    assert result.ok, result.output
+    assert "HueAndSaturation" in result.output
+    assert "EnhancedHue" in result.output
+
+
+def test_dependency_table_has_color_chain():
+    from components.matter.data_model.device_types import FEATURE_DEPENDENCIES
+
+    assert FEATURE_DEPENDENCIES["ColorLoop"] == (("EnhancedHue",),)
+    assert FEATURE_DEPENDENCIES["EnhancedHue"] == (("HueAndSaturation",),)
+
+
+def test_standalone_color_control_config_and_commands():
+    from components.matter.endpoints import Endpoint
+
+    cluster = CLUSTERS_BY_NAME["ColorControl"]
+
+    def features(*codes):
+        return [f for f in cluster.features if f.code in codes]
+
+    lines = Endpoint._standalone_cluster_config_lines(
+        cluster, "cfg", features("HS", "EHUE")
+    )
+    assert "cfg.color_mode = 0;" in lines
+    assert "cfg.enhanced_color_mode = 3;" in lines
+    lines = Endpoint._standalone_cluster_config_lines(
+        cluster, "cfg", features("XY", "CT")
+    )
+    assert "cfg.color_mode = 1;" in lines and "cfg.enhanced_color_mode = 1;" in lines
+    lines = Endpoint._standalone_cluster_config_lines(cluster, "cfg", features("CT"))
+    assert "cfg.color_mode = 2;" in lines
+    extra = "\n".join(Endpoint._standalone_cluster_extra_lines(cluster, "cc"))
+    assert "create_stop_move_step(cc)" in extra
+    assert "create_remaining_time(cc, 0)" in extra
+    on_off = "\n".join(
+        Endpoint._standalone_cluster_extra_lines(CLUSTERS_BY_NAME["OnOff"], "oo")
+    )
+    assert "create_on(oo)" in on_off and "create_toggle(oo)" in on_off
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Groups",
+        "FanControl",
+        "ScenesManagement",
+        "ModeSelect",
+        "DoorLock",
+        "BooleanStateConfiguration",
+        "ValveConfigurationandControl",
+        "OnOff",
+        "LevelControl",
+        "ColorControl",
+    ],
+)
+def test_clusters_without_feature_flags(name):
+    from components.matter.data_model import espmatter_names
+
+    assert not espmatter_names.cluster_has_feature_flags(name)
+
+
+def test_feature_flags_table_matches_sdk_headers():
+    """Whether config_t has feature_flags is read from the esp-matter headers."""
+    import importlib.util
+
+    from conftest import REPO_ROOT
+
+    from components.matter.data_model import espmatter_names
+
+    spec = importlib.util.spec_from_file_location(
+        "gen_espmatter_names", REPO_ROOT / "tools" / "gen_espmatter_names.py"
+    )
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    try:
+        headers = gen.Headers(gen._find_esp_matter())
+    except (SystemExit, FileNotFoundError, OSError):
+        pytest.skip("esp-matter headers not available")
+    for name, entry in espmatter_names.TABLE["clusters"].items():
+        namespace = entry["namespace"]
+        if namespace is None:
+            continue
+        expected = headers.clusters.get(namespace, {}).get("feature_flags", False)
+        assert entry["feature_flags"] == expected, name
+        assert espmatter_names.cluster_has_feature_flags(name) == expected
+
+
+def test_transition_time_rounding_warns(caplog):
+    from esphome.core import TimePeriod
+
+    with caplog.at_level("WARNING"):
+        light_binding._warn_transition_rounding(TimePeriod(milliseconds=50))
+        light_binding._warn_transition_rounding(TimePeriod(milliseconds=250))
+        light_binding._warn_transition_rounding(TimePeriod(milliseconds=500))
+    assert "becomes 0" in caplog.text
+    assert "rounded down" in caplog.text
+    assert caplog.text.count("on_off_transition_time") == 2
+
+
+def test_light_has_color_temperature():
+    assert light_binding.light_has_color_temperature({"platform": "rgbww"})
+    assert light_binding.light_has_color_temperature(
+        {"platform": "x", "cold_white_color_temperature": 1}
+    )
+    assert not light_binding.light_has_color_temperature({"platform": "rgb"})
+
+
+def test_rgb_only_light_warns_about_non_conformance(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              extended_color_light:
+                light_id: strip
+        """
+        + LIGHTS
+    )
+    assert result.ok, result.output
+    assert "doesn't advertise the ColorTemperature feature" in result.output
+
+
+def _created_elements(body: str) -> list[str]:
+    """Ordered cluster/feature/attribute/command creation calls of a function body."""
+    import re
+
+    calls = re.findall(
+        r"((?:\w+::)*(?:create\w*|add|add_device_type))\(\s*(?:endpoint|\w+_cluster)",
+        body,
+    )
+    return [
+        c.replace("esp_matter::", "").replace("cluster::", "").replace("endpoint::", "")
+        for c in calls
+    ]
+
+
+def test_add_extended_color_light_matches_sdk():
+    """Our copy of extended_color_light::add() creates what the SDK's does."""
+    import importlib.util
+
+    from conftest import COMPONENTS, REPO_ROOT
+
+    spec = importlib.util.spec_from_file_location(
+        "gen_espmatter_names", REPO_ROOT / "tools" / "gen_espmatter_names.py"
+    )
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    try:
+        sdk = (
+            gen._find_esp_matter() / "data_model" / "legacy" / "esp_matter_endpoint.cpp"
+        ).read_text()
+    except (SystemExit, FileNotFoundError, OSError):
+        pytest.skip("esp-matter sources not available")
+    namespace = sdk.index("namespace extended_color_light {")
+    start = sdk.index("esp_err_t add(endpoint_t *endpoint", namespace)
+    start = sdk.index("{", start)
+    sdk_body = sdk[start : sdk.index("return ESP_OK;", start)]
+    ours = (COMPONENTS / "matter" / "matter_lights.cpp").read_text()
+    start = ours.index("esp_err_t add_extended_color_light(")
+    start = ours.index("{", start)
+    our_body = ours[start : ours.index("return ESP_OK;", start)]
+    assert _created_elements(our_body) == _created_elements(sdk_body)

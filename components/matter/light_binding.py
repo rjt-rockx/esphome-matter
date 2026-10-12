@@ -64,6 +64,62 @@ def _light_id_not_supported(device_type_name: str):
     return validator
 
 
+def _warn_transition_rounding(value):
+    """The attribute has a resolution of 1/10 s."""
+    milliseconds = value.total_milliseconds
+    if 0 < milliseconds < 100:
+        _LOGGER.warning(
+            "%s %s is shorter than 1/10 s, the resolution of the OnOffTransitionTime "
+            "attribute, and becomes 0 (no transition)",
+            CONF_ON_OFF_TRANSITION_TIME,
+            value,
+        )
+    elif milliseconds % 100:
+        _LOGGER.warning(
+            "%s %s is rounded down to 1/10 s, the resolution of the "
+            "OnOffTransitionTime attribute",
+            CONF_ON_OFF_TRANSITION_TIME,
+            value,
+        )
+    return value
+
+
+# Light platforms that have a color temperature range.
+COLOR_TEMPERATURE_PLATFORMS = ("rgbct", "rgbww", "cwww")
+
+
+def light_has_color_temperature(light_config) -> bool:
+    """Whether a (validated) light config describes a color temperature range."""
+    if light_config.get("platform") in COLOR_TEMPERATURE_PLATFORMS:
+        return True
+    return any(
+        key in light_config
+        for key in ("cold_white_color_temperature", "warm_white_color_temperature")
+    )
+
+
+def warn_missing_color_temperature(matter_config: dict, full_config: Config) -> None:
+    """Say that an RGB only light isn't a conformant Extended Color Light."""
+    for endpoint_id, endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).items():
+        device_config = endpoint_config.get("extended_color_light")
+        if not isinstance(device_config, dict):
+            continue
+        light_id = device_config.get(CONF_LIGHT_ID)
+        light_config = _light_config(full_config, light_id) if light_id else None
+        if light_config is None or light_has_color_temperature(light_config):
+            continue
+        _LOGGER.warning(
+            "Light '%s' has no color temperature range, so Matter endpoint %s "
+            "(extended_color_light) doesn't advertise the ColorTemperature feature. "
+            "The Matter specification requires ColorTemperature for this device "
+            "type, so controllers and certification tools may consider the endpoint "
+            "non-conformant. Controllers that follow the features show no color "
+            "temperature control for it.",
+            light_id,
+            endpoint_id,
+        )
+
+
 def light_schema_options(device_type) -> dict:
     """Schema keys that a device type has for binding a light."""
     name = device_type.name
@@ -84,6 +140,7 @@ def light_schema_options(device_type) -> dict:
     schema[cv.Optional(CONF_ON_OFF_TRANSITION_TIME)] = cv.All(
         cv.positive_time_period_milliseconds,
         cv.Range(max=cv.TimePeriod(milliseconds=6553500)),
+        _warn_transition_rounding,
     )
     if name == "extended_color_light":
         schema[cv.Optional(CONF_COLOR_LOOP_EFFECT)] = cv.string_strict

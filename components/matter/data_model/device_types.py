@@ -55,6 +55,10 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
         ("MomentarySwitchRelease", "ActionSwitch"),
     ),
     "ActionSwitch": (("MomentarySwitch",),),
+    # ColorControl: esp-matter refuses ColorLoop without EnhancedHue and
+    # EnhancedHue without HueAndSaturation (the endpoint build would fail at boot).
+    "ColorLoop": (("EnhancedHue",),),
+    "EnhancedHue": (("HueAndSaturation",),),
 }
 
 # Clusters whose esp-matter create() function evaluates every feature in

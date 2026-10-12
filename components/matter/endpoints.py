@@ -37,6 +37,7 @@ from .data_model.device_types import (
     DEVICE_TYPES,
     DEVICE_TYPES_BY_CONF_KEY,
     DEVICE_TYPES_BY_ID,
+    FEATURE_DEPENDENCIES,
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
@@ -63,6 +64,7 @@ from .sensor_mapping import (
     sensor_unit_info,
     validate_battery_binding,
 )
+from .data_model import espmatter_names
 from .data_model.events import Event
 from . import light_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
@@ -166,11 +168,6 @@ ENDPOINT_SCHEMA = cv.All(
     _validate_on_attribute_forms,
     validate_battery_binding,
 )
-
-
-# Clusters whose esp-matter config_t has no feature_flags. Their features are
-# added to the cluster after it was created.
-NO_FEATURE_FLAGS_CLUSTERS = frozenset({"OnOff", "LevelControl", "ColorControl"})
 
 
 @dataclass
@@ -849,6 +846,43 @@ class Endpoint:
             )
             cg.add(register_sensor_attribute)
 
+    @staticmethod
+    def _standalone_cluster_config_lines(cluster: Cluster, config_var, features):
+        """Initial config of clusters that a device type would normally configure."""
+        if cluster.name != "ColorControl":
+            return []
+        codes = {feature.code for feature in features}
+        # ColorMode: 0 hue/saturation, 1 XY, 2 color temperature; the enhanced
+        # mode adds 3 for enhanced hue.
+        if "XY" in codes:
+            mode = 1
+        elif "CT" in codes:
+            mode = 2
+        else:
+            mode = 0
+        enhanced = 3 if "EHUE" in codes and mode == 0 else mode
+        return [
+            f"{config_var}.color_mode = {mode};",
+            f"{config_var}.enhanced_color_mode = {enhanced};",
+        ]
+
+    @staticmethod
+    def _standalone_cluster_extra_lines(cluster: Cluster, cluster_var):
+        """The mandatory elements that device types add after creating the cluster."""
+        if cluster.name == "OnOff":
+            ns = "esp_matter::cluster::on_off::command"
+            return [
+                f"{ns}::create_on({cluster_var});",
+                f"{ns}::create_toggle({cluster_var});",
+            ]
+        if cluster.name == "ColorControl":
+            ns = "esp_matter::cluster::color_control"
+            return [
+                f"{ns}::attribute::create_remaining_time({cluster_var}, 0);",
+                f"{ns}::command::create_stop_move_step({cluster_var});",
+            ]
+        return []
+
     def _make_cluster_lines(self, cluster: Cluster):
         """Build lines for a cluster not created by a device type."""
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
@@ -872,9 +906,12 @@ class Endpoint:
             feature_flags.append(
                 f"{cluster_ns}::feature::{feature.namespace}::get_id()"
             )
-        if cluster.name in NO_FEATURE_FLAGS_CLUSTERS:
+        if not espmatter_names.cluster_has_feature_flags(cluster.name) and (
+            features or cluster.name in ("OnOff", "ColorControl")
+        ):
             # The config has no feature_flags: the features are added to the
             # created cluster (in bit order, enhanced features need the base one).
+            lines.extend(self._standalone_cluster_config_lines(cluster, config_var, features))
             lines.extend(
                 (
                     f"auto *{cluster_var} = {cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER);",
@@ -889,6 +926,7 @@ class Endpoint:
                         "  return false;",
                     )
                 )
+            lines.extend(self._standalone_cluster_extra_lines(cluster, cluster_var))
             return lines
         if feature_flags:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
@@ -900,8 +938,22 @@ class Endpoint:
         )
         return lines
 
+    def _expand_feature_dependencies(self) -> None:
+        """Enable the features that enabled features need (all configuration paths)."""
+        for cluster_name, cluster_config in self._cluster_configs.items():
+            enabled = cluster_config.enabled_features
+            changed = True
+            while changed:
+                changed = False
+                for name in [n for n, on in enabled.items() if on]:
+                    for alternatives in FEATURE_DEPENDENCIES.get(name, ()):
+                        if not any(enabled.get(alt) for alt in alternatives):
+                            enabled[alternatives[0]] = True
+                            changed = True
+
     def _make_build_callback(self) -> str:
         """ """
+        self._expand_feature_dependencies()
         lines = ["[](esp_matter::endpoint_t *endpoint) -> bool {"]
 
         for index, device_type in enumerate(self._device_types):
@@ -921,16 +973,21 @@ class Endpoint:
             if cluster_name in FLAG_DRIVEN_CLUSTERS:
                 continue  # All features are already set through feature_flags.
             features_by_name = {feature.name: feature for feature in cluster.features}
-            direct_features = [
-                features_by_name[feature_name]
-                for feature_name, enabled in cluster_config.enabled_features.items()
-                if enabled
-                and feature_name in features_by_name
-                and (
-                    features_by_name[feature_name].conformance is None
-                    or features_by_name[feature_name].conformance.choice is None
-                )
-            ]
+            # In bit order: dependent features (ColorLoop, EnhancedHue) come after
+            # the ones they need.
+            direct_features = sorted(
+                (
+                    features_by_name[feature_name]
+                    for feature_name, enabled in cluster_config.enabled_features.items()
+                    if enabled
+                    and feature_name in features_by_name
+                    and (
+                        features_by_name[feature_name].conformance is None
+                        or features_by_name[feature_name].conformance.choice is None
+                    )
+                ),
+                key=lambda feature: feature.bit,
+            )
             # Features of a bound fan come from its traits instead.
             bound_fan = self._fan_variable if cluster.name == "FanControl" else None
             if not direct_features and bound_fan is None:

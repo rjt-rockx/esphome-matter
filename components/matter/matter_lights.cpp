@@ -9,10 +9,14 @@
 
 #include <algorithm>
 #include <app-common/zap-generated/cluster-objects.h>
+#include <app/clusters/color-control-server/color-control-server.h>
+#include <app/clusters/level-control/level-control.h>
 #include <app/ConcreteCommandPath.h>
 #include <app/data-model/Decode.h>
 #include <cinttypes>
 #include <cmath>
+#include <cstring>
+#include <strings.h>
 #include <esp_matter_cluster.h>
 #include <esp_matter_command.h>
 #include <lib/core/TLVReader.h>
@@ -43,6 +47,12 @@ constexpr float RGB_EPSILON = 1.0f / 256.0f;
 // a little after the nominal end). Then the light is synchronized with the
 // final attribute values, which corrects clamping and other differences.
 constexpr uint32_t COMMAND_MARGIN_MS = 500;
+// How often the window end checks whether CHIP is done with its transition
+// (RemainingTime is 0), at most this many times.
+constexpr uint32_t SETTLE_RETRY_MS = 250;
+constexpr uint32_t SETTLE_MAX_RETRIES = 2400;
+// How often is checked that the color loop effect is still the active effect.
+constexpr uint32_t COLOR_LOOP_WATCH_MS = 250;
 // Transition times in commands are in 1/10 s.
 constexpr uint32_t DECISECOND_MS = 100;
 // Highest valid CurrentLevel, CurrentHue and CurrentSaturation values.
@@ -519,7 +529,43 @@ void MatterLightMapping::on_light_remote_values_update() {
       return;
     this->applied_values_valid_ = false;
   }
+  // A change from the ESPHome side. The effect of the color loop may have
+  // ended with it.
+  if (this->color_loop_active_)
+    this->check_color_loop_();
+  this->end_windows_for_local_change_();
   this->push_state_to_matter();
+}
+
+// A change on the ESPHome side during the window of a Matter command wins:
+// the window ends and CHIP stops its transition where it is, so the end of
+// that transition doesn't overwrite the local change.
+void MatterLightMapping::end_windows_for_local_change_() {
+  bool light = this->light_window_active_;
+  bool color = this->color_window_active_;
+  if (!light && !color)
+    return;
+  this->light_window_active_ = false;
+  this->color_window_active_ = false;
+  this->pending_ = MatterLightPendingUpdate{};
+  uint16_t eid = this->endpoint_id();
+  uint8_t level =
+      conversion::to_matter::brightness(this->light_->remote_values.get_brightness());
+  // Runs before the report of push_state_to_matter() (FIFO).
+  chip::DeviceLayer::SystemLayer().ScheduleLambda([eid, light, color, level]() {
+    using namespace chip::app::Clusters;
+    if (color)
+      ColorControlServer::Instance().stopAllColorTransitions(eid);
+    if (light) {
+      // MoveToLevel without a transition replaces the running one.
+      LevelControl::Commands::MoveToLevel::DecodableType data;
+      data.level = level;
+      data.transitionTime.SetNonNull(0);
+      data.optionsMask.Set(LevelControl::OptionsBitmap::kExecuteIfOff);
+      data.optionsOverride.Set(LevelControl::OptionsBitmap::kExecuteIfOff);
+      LevelControlServer::MoveToLevel(eid, data);
+    }
+  });
 }
 
 // Pushes the whole state of the light to Matter. esp-matter "deduplicates"
@@ -585,8 +631,16 @@ void MatterLightMapping::push_state_to_matter() {
     esp_matter::attribute::report(eid, OnOff::Id, OnOff::Attributes::OnOff::Id,
                                   &on_val);
     if (report.has_level) {
+      // CurrentLevel stays within MinLevel and MaxLevel.
+      uint8_t min_level = 0;
+      uint8_t max_level = MATTER_MAX_LEVEL;
+      read_u8_attribute(eid, LevelControl::Id,
+                        LevelControl::Attributes::MinLevel::Id, min_level);
+      read_u8_attribute(eid, LevelControl::Id,
+                        LevelControl::Attributes::MaxLevel::Id, max_level);
+      uint8_t level = std::min(max_level, std::max(min_level, report.level));
       esp_matter_attr_val_t level_val =
-          esp_matter_nullable_uint8(nullable<uint8_t>(report.level));
+          esp_matter_nullable_uint8(nullable<uint8_t>(level));
       esp_matter::attribute::report(
           eid, LevelControl::Id, LevelControl::Attributes::CurrentLevel::Id,
           &level_val);
@@ -894,6 +948,18 @@ void MatterLightMapping::register_commands_() {
     hook(ColorControl::Id,
          ColorControl::Commands::EnhancedMoveToHueAndSaturation::Id);
     hook(ColorControl::Id, ColorControl::Commands::StopMoveStep::Id);
+    // The rate based commands are not followed with a transition (CHIP
+    // writes every step), but they end a color loop.
+    hook(ColorControl::Id, ColorControl::Commands::MoveColor::Id);
+    hook(ColorControl::Id, ColorControl::Commands::StepColor::Id);
+    hook(ColorControl::Id, ColorControl::Commands::MoveHue::Id);
+    hook(ColorControl::Id, ColorControl::Commands::StepHue::Id);
+    hook(ColorControl::Id, ColorControl::Commands::MoveSaturation::Id);
+    hook(ColorControl::Id, ColorControl::Commands::StepSaturation::Id);
+    hook(ColorControl::Id, ColorControl::Commands::EnhancedMoveHue::Id);
+    hook(ColorControl::Id, ColorControl::Commands::EnhancedStepHue::Id);
+    hook(ColorControl::Id, ColorControl::Commands::MoveColorTemperature::Id);
+    hook(ColorControl::Id, ColorControl::Commands::StepColorTemperature::Id);
     if (this->color_loop_effect_ != nullptr)
       hook(ColorControl::Id, ColorControl::Commands::ColorLoopSet::Id);
   }
@@ -1020,6 +1086,9 @@ bool MatterLightMapping::decode_on_off_command_(uint32_t command_id,
   } else {
     return false;
   }
+  // On while on and Off while off change nothing (no window to open).
+  if (command_id != OnOff::Commands::Toggle::Id && on == target)
+    return false;
   command.on = target;
   if (target) {
     // Turning on goes to OnLevel when it is set, else to the level that the
@@ -1076,10 +1145,12 @@ bool MatterLightMapping::decode_color_command_(uint32_t command_id,
                                data.optionsMask.Raw(),
                                data.optionsOverride.Raw()))
       return false;
-    command.color_loop =
-        data.action == ColorControl::ColorLoopActionEnum::kDeactivate
-            ? MatterLightCommand::ColorLoop::STOP
-            : MatterLightCommand::ColorLoop::START;
+    bool activate =
+        data.action != ColorControl::ColorLoopActionEnum::kDeactivate;
+    // Tracked here, on the CHIP task, in the order of the commands.
+    this->color_loop_requested_ = activate;
+    command.color_loop = activate ? MatterLightCommand::ColorLoop::START
+                                  : MatterLightCommand::ColorLoop::STOP;
     return true;
   }
 
@@ -1210,9 +1281,6 @@ bool MatterLightMapping::decode_color_command_(uint32_t command_id,
   command.color = color;
   command.transition_ms = command_transition_ms(transition_ds);
   command.color_group = true;
-  // Any other color command ends a running color loop.
-  if (this->color_loop_active_)
-    command.color_loop = MatterLightCommand::ColorLoop::STOP;
   return true;
 }
 
@@ -1223,14 +1291,27 @@ void MatterLightMapping::handle_command(uint32_t cluster_id,
   using namespace chip::app::Clusters;
   MatterLightCommand command;
   bool handled = false;
+  // Every color command except ColorLoopSet ends a color loop. CHIP's own loop
+  // is deactivated first (it doesn't execute colour commands while it runs).
+  bool loop_stop = false;
+  if (cluster_id == ColorControl::Id &&
+      command_id != ColorControl::Commands::ColorLoopSet::Id &&
+      this->color_loop_requested_.exchange(false)) {
+    this->deactivate_chip_color_loop_();
+    loop_stop = true;
+  }
   if (cluster_id == OnOff::Id)
     handled = this->decode_on_off_command_(command_id, command);
   else if (cluster_id == LevelControl::Id)
     handled = this->decode_level_command_(command_id, reader, command);
   else if (cluster_id == ColorControl::Id)
     handled = this->decode_color_command_(command_id, reader, command);
-  if (!handled)
+  if (!handled && !loop_stop)
     return;
+  if (!handled)
+    command = MatterLightCommand{};
+  if (loop_stop)
+    command.color_loop = MatterLightCommand::ColorLoop::STOP;
 
   // CHIP stops where it is. Synchronize with that once it has executed the
   // command (the read runs after the current work item on the CHIP task).
@@ -1249,6 +1330,10 @@ void MatterLightMapping::handle_command(uint32_t cluster_id,
 // Moves the light to the target of a command with the transition time of the
 // command, as one light call.
 void MatterLightMapping::apply_command_(const MatterLightCommand &command) {
+  // The effect is stopped in a call of its own: it would otherwise take the
+  // transition of the call that follows.
+  if (command.color_loop == MatterLightCommand::ColorLoop::STOP)
+    this->stop_color_loop_effect_();
   if (command.stop_light || command.stop_color) {
     // The values to settle on follow from the CHIP task.
     if (command.stop_light)
@@ -1258,18 +1343,31 @@ void MatterLightMapping::apply_command_(const MatterLightCommand &command) {
     return;
   }
   if (command.color_loop == MatterLightCommand::ColorLoop::START) {
-    // ColorLoopSet: run the effect. CHIP's own steps are ignored until a
-    // later command ends the loop.
-    this->pending_.color.reset();
-    this->color_loop_active_ = true;
+    // ColorLoopSet: run the effect. CHIP's own steps are ignored until the
+    // loop ends, but only if the effect really started (it doesn't on a light
+    // that is off).
     this->last_apply_valid_ = false;
     auto call = this->light_->make_call();
     call.set_effect(std::string(this->color_loop_effect_));
     this->synchronizing_from_matter_ = true;
     call.perform();
     this->synchronizing_from_matter_ = false;
+    if (this->color_loop_effect_running_()) {
+      this->pending_.color.reset();
+      this->color_loop_active_ = true;
+      this->watch_color_loop_();
+    } else {
+      ESP_LOGW(TAG,
+               "Color loop effect '%s' didn't start on endpoint %u (is the light "
+               "off?), the light follows CHIP's loop instead",
+               this->color_loop_effect_, this->endpoint_id());
+    }
     return;
   }
+  if (command.color_loop == MatterLightCommand::ColorLoop::STOP &&
+      command.color.has_value() == false && !command.on.has_value() &&
+      !command.level.has_value())
+    return; // Nothing else in this command.
 
   const auto &values = this->light_->remote_values;
   auto call = this->light_->make_call();
@@ -1294,17 +1392,6 @@ void MatterLightMapping::apply_command_(const MatterLightCommand &command) {
   if (command.color.has_value() &&
       this->add_color_to_call_(call, *command.color, false))
     changed = true;
-
-  // A color command ends the color loop: the effect stops and the light goes to
-  // the color of the command (or, for ColorLoopSet deactivate, the color that
-  // CHIP restores, which follows from the read scheduled for this command).
-  if (command.color_loop == MatterLightCommand::ColorLoop::STOP) {
-    if (this->color_loop_active_) {
-      call.set_effect(std::string("None"));
-      changed = true;
-    }
-    this->color_loop_active_ = false;
-  }
 
   // Ignore CHIP's steps towards the target of this command, but not for the
   // other attribute group which isn't part of it. A change that was queued
@@ -1350,9 +1437,123 @@ void MatterLightMapping::finish_command_windows_() {
   bool color = this->color_window_active_;
   if (!light && !color)
     return;
-  this->light_window_active_ = false;
-  this->color_window_active_ = false;
-  this->schedule_full_read_(true, light, color);
+  this->settle_when_idle_(light, color);
+}
+
+// CHIP's transition timer can run behind the nominal time. Settling on its
+// attributes while RemainingTime is not 0 would jump to a value in the middle
+// of the transition, so wait (the windows stay open) until it is done.
+void MatterLightMapping::settle_when_idle_(bool light, bool color) {
+  uint16_t eid = this->endpoint_id();
+  chip::DeviceLayer::SystemLayer().ScheduleLambda([this, eid, light, color]() {
+    using namespace chip::app::Clusters;
+    uint16_t remaining = 0;
+    bool busy = false;
+    if (light && read_u16_attribute(eid, LevelControl::Id,
+                                    LevelControl::Attributes::RemainingTime::Id,
+                                    remaining) &&
+        remaining != 0)
+      busy = true;
+    if (color && read_u16_attribute(
+                     eid, ColorControl::Id,
+                     ColorControl::Attributes::RemainingTime::Id, remaining) &&
+        remaining != 0)
+      busy = true;
+    global_matter_component->defer_to_main_loop([this, light, color, busy]() {
+      uint32_t now = millis();
+      // A newer command has its own timer.
+      if (this->light_group_suppressed_(now) || this->color_group_suppressed_(now))
+        return;
+      if (busy && this->settle_retries_ < SETTLE_MAX_RETRIES) {
+        this->settle_retries_++;
+        if (light)
+          this->light_window_until_ms_ = now + SETTLE_RETRY_MS;
+        if (color)
+          this->color_window_until_ms_ = now + SETTLE_RETRY_MS;
+        global_matter_component->run_on_main_loop_after(
+            SETTLE_RETRY_MS, [this]() { this->finish_command_windows_(); });
+        return;
+      }
+      this->settle_retries_ = 0;
+      this->light_window_active_ = false;
+      this->color_window_active_ = false;
+      this->schedule_full_read_(true, light, color);
+    });
+  });
+}
+
+// ---- Color loop -------------------------------------------------------------
+
+bool MatterLightMapping::color_loop_effect_running_() const {
+  if (this->color_loop_effect_ == nullptr)
+    return false;
+  auto name = this->light_->get_effect_name();
+  size_t length = strlen(this->color_loop_effect_);
+  return name.size() == length && length != 0 &&
+         strncasecmp(name.c_str(), this->color_loop_effect_, length) == 0;
+}
+
+// Stops the color loop effect in a call of its own.
+void MatterLightMapping::stop_color_loop_effect_() {
+  if (this->color_loop_active_ || this->color_loop_effect_running_()) {
+    auto call = this->light_->make_call();
+    call.set_effect(std::string("None"));
+    this->synchronizing_from_matter_ = true;
+    call.perform();
+    this->synchronizing_from_matter_ = false;
+  }
+  this->color_loop_active_ = false;
+}
+
+void MatterLightMapping::watch_color_loop_() {
+  global_matter_component->run_on_main_loop_after(
+      COLOR_LOOP_WATCH_MS, [this]() {
+        if (!this->color_loop_active_)
+          return;
+        this->check_color_loop_();
+        if (this->color_loop_active_)
+          this->watch_color_loop_();
+      });
+}
+
+// The effect can end without Matter: another effect was picked, the light was
+// turned off (also by a Matter Off command). Then CHIP's loop is deactivated
+// so ColorLoopActive goes back to 0.
+void MatterLightMapping::check_color_loop_() {
+  if (!this->color_loop_active_ || this->color_loop_effect_running_())
+    return;
+  this->color_loop_active_ = false;
+  this->color_loop_requested_ = false;
+  // CHIP restores the hue from before the loop. That is not a color the light
+  // is going to show, so ignore it for a moment and report the light's own
+  // color afterwards.
+  this->color_window_active_ = true;
+  this->color_window_until_ms_ = millis() + COMMAND_MARGIN_MS;
+  this->reported_color_valid_ = false;
+  chip::DeviceLayer::SystemLayer().ScheduleLambda(
+      [this]() { this->deactivate_chip_color_loop_(); });
+  global_matter_component->run_on_main_loop_after(
+      COMMAND_MARGIN_MS + 50, [this]() {
+        this->color_window_active_ = false;
+        this->push_state_to_matter();
+      });
+}
+
+// Runs on the CHIP task.
+void MatterLightMapping::deactivate_chip_color_loop_() {
+  using namespace chip::app::Clusters;
+  uint8_t active = 0;
+  if (!read_u8_attribute(this->endpoint_id(), ColorControl::Id,
+                         ColorControl::Attributes::ColorLoopActive::Id,
+                         active) ||
+      active == 0)
+    return;
+  ColorControl::Commands::ColorLoopSet::DecodableType data;
+  data.updateFlags.Set(ColorControl::UpdateFlagsBitmap::kUpdateAction);
+  data.action = ColorControl::ColorLoopActionEnum::kDeactivate;
+  data.optionsMask.Set(ColorControl::OptionsBitmap::kExecuteIfOff);
+  data.optionsOverride.Set(ColorControl::OptionsBitmap::kExecuteIfOff);
+  ColorControlServer::Instance().colorLoopCommand(this->endpoint_id(), data);
 }
 
 } // namespace esphome::matter

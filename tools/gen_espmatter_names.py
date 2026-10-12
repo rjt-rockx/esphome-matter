@@ -145,10 +145,17 @@ class Headers:
 
     def _cluster_entry(self, name: str) -> dict:
         return self.clusters.setdefault(
-            name, {"create": False, "features": {}, "attributes": set()}
+            name,
+            {
+                "create": False,
+                "feature_flags": False,
+                "features": {},
+                "attributes": set(),
+            },
         )
 
     def _parse_clusters(self, path: Path) -> None:
+        shared_config: dict[str, str] = {}
         for _stack, ns, line in self._walk(path):
             if (
                 len(ns) == 3
@@ -156,6 +163,20 @@ class Headers:
                 and re.search(r"\bcluster_t\s*\*\s*create\(", line)
             ):
                 self._cluster_entry(ns[2])["create"] = True
+            elif (
+                len(ns) == 3
+                and ns[:2] == ["esp_matter", "cluster"]
+                and re.search(r"\bfeature_flags\s*;", line)
+            ):
+                # config_t::feature_flags: create() evaluates the features.
+                self._cluster_entry(ns[2])["feature_flags"] = True
+            elif len(ns) == 3 and ns[:2] == ["esp_matter", "cluster"]:
+                shared = re.search(r"using\s+config_t\s*=\s*(\w+)::config_t", line)
+                if shared:
+                    shared_config[ns[2]] = shared.group(1)
+        for name, target in shared_config.items():
+            if self.clusters.get(target, {}).get("feature_flags"):
+                self._cluster_entry(name)["feature_flags"] = True
 
     def _resolve_aliases(self, path: Path) -> None:
         """Handle ``namespace feature = other_cluster::feature;`` (shared sets).
@@ -339,8 +360,14 @@ def build_table(headers: Headers) -> dict:
         # Key: the CamelCase name used as Cluster.name in clusters.py.
         key = re.sub(r"[/ \-.]", "", spec_name)
         ns = _match(spec_name, created, CLUSTER_ALIASES.get(spec_name))
-        entry: dict = {"namespace": ns, "features": {}, "attributes": {}}
         info = headers.clusters.get(ns) if ns else None
+        entry: dict = {
+            "namespace": ns,
+            # Whether esp-matter's config_t of the cluster has feature_flags.
+            "feature_flags": bool(info and info["feature_flags"]),
+            "features": {},
+            "attributes": {},
+        }
 
         def walk_features(items):
             for feature in items:
