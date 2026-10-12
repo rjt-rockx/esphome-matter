@@ -19,6 +19,27 @@ await import("@matter/nodejs");
 const { Logger } = await import("@matter/main");
 Logger.level = process.env.HARNESS_LOG ?? "error";
 
+/**
+ * Pin the operational (CASE) address of every peer to `ip:port` when mDNS discovery finds nothing.
+ * Needed when the device sits behind NAT that does not forward multicast (QEMU user networking):
+ * PASE can use --ip directly, but the operational reconnect needs an address for the node's
+ * compressed fabric id, which is normally resolved through DNS-SD.
+ */
+export async function pinOperationalAddress(ip, port = 5540) {
+    const { ObservablePeerDescriptor } = await import("@matter/protocol");
+    const pinned = { type: "udp", ip, port: Number(port) };
+    const desc = Object.getOwnPropertyDescriptor(ObservablePeerDescriptor.prototype, "operationalAddress");
+    Object.defineProperty(ObservablePeerDescriptor.prototype, "operationalAddress", {
+        configurable: true,
+        get() {
+            return desc.get.call(this) ?? pinned;
+        },
+        set(v) {
+            desc.set.call(this, v);
+        },
+    });
+}
+
 export const DEFAULT_STATE_DIR = process.env.HARNESS_STATE ?? resolve(process.cwd(), ".harness-state");
 
 /** Decode an 11/21 digit manual pairing code or an MT: QR payload. */
