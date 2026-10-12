@@ -321,7 +321,10 @@ void MatterComponent::replay_attribute_callback(uint16_t endpoint_id,
                                                 uint32_t cluster_id,
                                                 uint32_t attribute_id) {
   esp_matter_attr_val_t value;
-  if (esp_matter::attribute::get_val(endpoint_id, cluster_id, attribute_id,
+  // get_val on a missing (optional, not created) attribute logs an error.
+  if (esp_matter::attribute::get(endpoint_id, cluster_id, attribute_id) !=
+          nullptr &&
+      esp_matter::attribute::get_val(endpoint_id, cluster_id, attribute_id,
                                      &value) == ESP_OK)
     this->dispatch_attribute_update(endpoint_id, cluster_id, attribute_id,
                                     value);
@@ -331,6 +334,10 @@ void replay_attribute_triggers(MatterComponent *component) {
   chip::DeviceLayer::SystemLayer().ScheduleLambda([component]() {
     for (auto *trigger : component->attribute_triggers_) {
       esp_matter_attr_val_t value;
+      if (esp_matter::attribute::get(trigger->endpoint_id(),
+                                     trigger->cluster_id(),
+                                     trigger->attribute_id()) == nullptr)
+        continue;  // optional attribute that was not created
       esp_err_t err = esp_matter::attribute::get_val(
           trigger->endpoint_id(), trigger->cluster_id(),
           trigger->attribute_id(), &value);
