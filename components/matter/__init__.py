@@ -1,302 +1,396 @@
-"""ESPHome Matter component.
-
-Drop ``matter:`` into an ESPHome YAML and opted-in entities auto-expose as
-Matter device types. ESP-IDF only; ESP32-C6 / S3 supported in v0.
-
-See plan in repo README for the full v0 scope and roadmap.
-"""
-
 import logging
-from typing import Any
 
-from esphome import automation
 import esphome.codegen as cg
+import esphome.config_validation as cv
+import esphome.final_validate as fv
 from esphome.components.esp32 import (
     add_idf_component,
     add_idf_sdkconfig_option,
-    only_on_variant,
+    require_vfs_select,
 )
-from esphome.components.esp32.const import (
-    KEY_ESP32,
-    KEY_EXTRA_BUILD_FILES,
-    VARIANT_ESP32C6,
-    VARIANT_ESP32S3,
+from esphome.const import (
+    CONF_DEBUG,
+    CONF_ENABLE_IPV6,
+    CONF_ID,
+    Framework,
 )
-import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_INTERNAL
 from esphome.core import CORE, HexInt
+from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
-from .const import (
-    CONF_DEVICE_TYPE,
-    CONF_DISCRIMINATOR,
-    CONF_ENDPOINT,
-    CONF_MATTER,
-    CONF_MATTER_ID,
-    CONF_ON_COMMISSION,
-    CONF_PASSCODE,
-    CONF_PRODUCT_ID,
-    CONF_VENDOR_ID,
-    DEFAULT_DISCRIMINATOR,
-    DEFAULT_PASSCODE,
-    DEFAULT_PRODUCT_ID,
-    DEFAULT_VENDOR_ID,
-    DEVICE_TYPE_NAMES,
-    KEY_ENDPOINTS,
-    KEY_MATTER,
-    MatterComponent,
-    matter_ns,
+from . import bridge, ethernet, sensor_extras
+from .actions import register_bound_command_actions
+from .behaviours import BEHAVIOURS_SCHEMA, behaviours_to_code
+from .binary_sensors import check_binary_sensors
+from .closure import validate_closure_bindings, validate_unique_cover_bindings
+from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
+from .conformance import validate_composition
+from .const import *
+from .covers import validate_cover_bindings
+from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+from .delegates import validate_delegate_clusters
+from .device_info import (
+    DEVICE_INFO_SCHEMA,
+    setup_device_info,
+    setup_identify_triggers,
 )
+from .endpoints import (
+    ENDPOINT_SCHEMA,
+    build_endpoints,
+    register_endpoints,
+    switch_restore_warning,
+)
+from .event_binding import validate_event_bindings
+from .expose import (
+    CONF_EXCLUDE,
+    CONF_EXPOSE,
+    EXCLUDE_SCHEMA,
+    EXPOSE_SCHEMA,
+    check_expose,
+    lower_expose,
+    plan_to_code,
+)
+from .fan_binding import fan_restore_warning
+from .fan_binding import final_validate as fan_final_validate
+from .icd import CONF_ICD, final_validate_icd, icd_to_code, validate_icd_schema
+from .incomplete import SCHEMA_OPTIONS as INCOMPLETE_SCHEMA_OPTIONS
+from .incomplete import validate_incomplete_device_types, validate_openthread_clusters
+from .light_binding import (
+    light_restore_warning,
+    validate_light_effects,
+    warn_missing_color_temperature,
+)
+from .matter_ble import (
+    CONF_BLE_COMMISSIONING,
+    add_ble_sdkconfig,
+    validate_ble_commissioning,
+)
+from .network_config import configure_network
+from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
+from .power_source import validate_power_configuration
+from .power_topology import validate_topologies
+from .sensor_mapping import validate_sensor_bindings
+from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
 
-CODEOWNERS = ["@rjt-rockx"]
-AUTO_LOAD = []
-DEPENDENCIES = ["esp32"]
+register_bound_command_actions()
+
+CODEOWNERS = ["@DavidvtWout"]
+
+AUTO_LOAD = ["network"]
+
+MIN_ESPHOME_THREAD_VERSION = "2026.6.0"
+MIN_ESPHOME_IDF_TOOLCHAIN_VERSION = "2026.9.0"
+ESP_MATTER_VERSION = "1.6.0~2"
+
+# Matter spec section 5.1.7.1: these passcodes are explicitly forbidden.
+_FORBIDDEN_PASSCODES = {
+    11111111,
+    22222222,
+    33333333,
+    44444444,
+    55555555,
+    66666666,
+    77777777,
+    88888888,
+    99999999,
+    12345678,
+    87654321,
+}
 
 
-def _validate_passcode(value: int) -> int:
-    # Matter spec rejects a small list of trivially-guessable passcodes.
-    invalid = {
-        0,
-        11111111,
-        22222222,
-        33333333,
-        44444444,
-        55555555,
-        66666666,
-        77777777,
-        88888888,
-        99999999,
-        12345678,
-        87654321,
-    }
-    value = cv.int_range(min=1, max=99999998)(value)
-    if value in invalid:
-        raise cv.Invalid(f"{value} is a Matter-reserved invalid passcode")
+def _validate_passcode(value):
+    value = cv.int_(value)
+    if not (0 < value <= 99999998) or value in _FORBIDDEN_PASSCODES:
+        raise cv.Invalid(
+            f"Passcode {value} is not allowed by the Matter specification (section 5.1.7.1)"
+        )
     return value
+
+
+def _configure_basic_information(config):
+    for config_option, define in (
+        (CONF_VENDOR_NAME, "CHIP_DEVICE_CONFIG_DEVICE_VENDOR_NAME"),
+        (CONF_PRODUCT_NAME, "CHIP_DEVICE_CONFIG_DEVICE_PRODUCT_NAME"),
+        (
+            CONF_HARDWARE_VERSION_STRING,
+            "CHIP_DEVICE_CONFIG_DEFAULT_DEVICE_HARDWARE_VERSION_STRING",
+        ),
+    ):
+        if value := config.get(config_option):
+            cg.add_build_flag(f'-D{define}=\\"{value}\\"')
+
+    for config_option, sdk_option in (
+        (CONF_VENDOR_ID, "CONFIG_DEVICE_VENDOR_ID"),
+        (CONF_PRODUCT_ID, "CONFIG_DEVICE_PRODUCT_ID"),
+        (CONF_HARDWARE_VERSION, "CONFIG_DEFAULT_DEVICE_HARDWARE_VERSION"),
+    ):
+        if value := config.get(config_option):
+            if sdk_option.endswith("_ID"):
+                value = HexInt(value)
+            add_idf_sdkconfig_option(sdk_option, value)
+
+
+def _require_vfs_select(config):
+    """Register VFS select requirement during config validation."""
+    if CORE.is_esp32:
+        require_vfs_select()
+    return config
+
+
+def _require_platformio_toolchain(config):
+    if not CORE.using_toolchain_platformio:
+        raise cv.Invalid(
+            "The esphome-matter external component currently requires the ESP32 PlatformIO "
+            "toolchain. Please use `esp32.toolchain: platformio`."
+        )
+    return config
+
+
+def _truncate(string: str, length: int):
+    if len(string) > length:
+        _LOGGER.warning(f"{string} got truncated to {length} characters")
+        return string[:length]
+    return string
 
 
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
-            cv.GenerateID(CONF_ID): cv.declare_id(MatterComponent),
-            cv.Optional(CONF_VENDOR_ID, default=DEFAULT_VENDOR_ID): cv.hex_uint16_t,
-            cv.Optional(CONF_PRODUCT_ID, default=DEFAULT_PRODUCT_ID): cv.hex_uint16_t,
-            cv.Optional(CONF_DISCRIMINATOR, default=DEFAULT_DISCRIMINATOR): cv.int_range(
-                min=0, max=0xFFF
+            cv.GenerateID(): cv.declare_id(MatterComponent),
+            cv.Optional(CONF_DISCRIMINATOR): cv.int_range(min=0, max=4095),
+            # BLE commissioning is automatic without wifi/openthread; this only asserts it.
+            cv.Optional(CONF_BLE_COMMISSIONING): cv.boolean,
+            cv.Optional(CONF_PASSCODE): _validate_passcode,
+            # Vendor name
+            cv.Optional(CONF_VENDOR_NAME, default="ESPHome"): cv.All(
+                cv.string_strict, cv.Length(min=1, max=32)
             ),
-            cv.Optional(CONF_PASSCODE, default=DEFAULT_PASSCODE): _validate_passcode,
-            cv.Optional(CONF_ON_COMMISSION): automation.validate_automation(
-                single=False
+            # Vendor ID
+            cv.Optional(CONF_VENDOR_ID): cv.int_range(min=1, max=0xFFFE),
+            # Product name
+            cv.Optional(
+                CONF_PRODUCT_NAME,
+                default=_truncate(CORE.name, 32),
+            ): cv.All(cv.string_strict, cv.Length(min=1, max=32)),
+            # Product ID
+            cv.Optional(CONF_PRODUCT_ID): cv.int_range(min=1, max=0xFFFE),
+            # Hardware version
+            cv.Optional(CONF_HARDWARE_VERSION): cv.int_range(min=0, max=0xFFFF),
+            # Hardware version string
+            cv.Optional(CONF_HARDWARE_VERSION_STRING): cv.All(
+                cv.string_strict, cv.Length(min=0, max=64)
+            ),
+            # Log reconnect timing milestones (IP up, DNS-SD, SRP, CASE, subscription)
+            cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+            **OTA_SCHEMA_KEYS,  # ota / ota_requestor / software_version (ota.py)
+            # Opt-in for device types that cannot work yet (incomplete.py)
+            **INCOMPLETE_SCHEMA_OPTIONS,
+            # Battery powered Thread device (Matter ICD), experimental (icd.py, docs/icd.md)
+            cv.Optional(CONF_ICD): validate_icd_schema,
+            # Entity-centric exposure, lowered into `endpoints` by lower_expose (docs/expose.md)
+            cv.Optional(CONF_EXPOSE): EXPOSE_SCHEMA,
+            cv.Optional(CONF_EXCLUDE): EXCLUDE_SCHEMA,
+            # Aggregator with Bridged Nodes for entities that stand for other devices, lowered into `endpoints`
+            # by bridge.lower_bridge (docs/bridge.md)
+            cv.Optional(bridge.CONF_BRIDGE): bridge.BRIDGE_SCHEMA,
+            # Endpoints
+            cv.Optional(CONF_ENDPOINTS, default={}): cv.Schema(
+                {
+                    cv.int_range(min=0, max=65534): ENDPOINT_SCHEMA,
+                }
             ),
         }
-    ).extend(cv.COMPONENT_SCHEMA),
+    )
+    .extend(DEVICE_INFO_SCHEMA)  # node_label, serial_number, on_identify, ...
+    .extend(COMMISSIONING_SCHEMA)
+    .extend(BEHAVIOURS_SCHEMA)  # status_led, pairing
+    .extend(cv.COMPONENT_SCHEMA),
+    bridge.lower_bridge,
+    lower_expose,
+    bridge.validate_topology,
     cv.only_on_esp32,
-    cv.only_with_framework("esp-idf"),
-    only_on_variant(supported=[VARIANT_ESP32C6, VARIANT_ESP32S3]),
+    cv.only_with_framework(Framework.ESP_IDF),
+    validate_ota_schema,
+    _require_vfs_select,  # TODO: Only needed when openthread is enabled
 )
 
 
-# Per-entity opt-in schema. Entity platforms `.extend(MATTER_*_SCHEMA)`.
-def _entity_schema(default_type: str | None = None) -> cv.Schema:
-    return cv.Schema(
-        {
-            cv.Optional(CONF_MATTER): cv.Any(
-                cv.boolean,
-                cv.Schema(
-                    {
-                        cv.Optional(CONF_ENDPOINT): cv.int_range(min=1, max=65534),
-                        cv.Optional(CONF_DEVICE_TYPE, default=default_type): cv.enum(
-                            DEVICE_TYPE_NAMES, lower=True
-                        )
-                        if default_type
-                        else cv.enum(DEVICE_TYPE_NAMES, lower=True),
-                    }
-                ),
-            ),
-        }
-    )
+def _final_validate(config: dict):
+    full_config = fv.full_config.get()
+    if "openthread" in full_config:
+        cv.validate_esphome_version(MIN_ESPHOME_THREAD_VERSION)
+    if CORE.using_toolchain_esp_idf:
+        cv.validate_esphome_version(MIN_ESPHOME_IDF_TOOLCHAIN_VERSION)
 
+    ethernet.final_validate(full_config)
 
-MATTER_SWITCH_SCHEMA = _entity_schema(default_type="on_off_plug_in_unit")
-MATTER_LIGHT_SCHEMA = _entity_schema()
-MATTER_BINARY_SENSOR_SCHEMA = _entity_schema()
-MATTER_SENSOR_SCHEMA = _entity_schema()
-
-
-def _normalize_matter_block(config: ConfigType) -> ConfigType | None:
-    """Convert `matter: true` to a normalized dict; return None when opted out."""
-    block = config.get(CONF_MATTER)
-    if block is None or block is False:
-        return None
-    if block is True:
-        return {}
-    return block
-
-
-def consume_endpoint(
-    config: ConfigType, *, domain: str, default_type: str | None
-) -> ConfigType:
-    """Allocate an endpoint id for an opted-in entity at validate time."""
-    if "matter" not in CORE.loaded_integrations or config.get(CONF_INTERNAL):
-        return config
-    block = _normalize_matter_block(config)
-    if block is None:
-        return config
-
-    device_type = block.get(CONF_DEVICE_TYPE) or default_type
-    if device_type is None:
+    network_config = full_config.get("network", {})
+    if not network_config.get(CONF_ENABLE_IPV6, False):
         raise cv.Invalid(
-            f"{domain}: matter type cannot be inferred; specify "
-            f"`matter: {{type: ...}}` (one of {sorted(DEVICE_TYPE_NAMES)})"
+            "Matter requires IPv6 to be enabled in the network component. "
+            "Please set `enable_ipv6: true` in the `network` configuration."
         )
 
-    data: dict[str, Any] = CORE.data.setdefault(KEY_MATTER, {})
-    endpoints: list[dict[str, Any]] = data.setdefault(KEY_ENDPOINTS, [])
+    validate_ble_commissioning(config, full_config)
+    validate_composition(config.get(CONF_ENDPOINTS, {}))
+    validate_delegate_clusters(config, full_config)
+    validate_incomplete_device_types(config)
+    validate_openthread_clusters(config, full_config)
+    validate_power_configuration(config)
+    validate_topologies(config)
 
-    explicit = block.get(CONF_ENDPOINT)
-    if explicit is None:
-        # Endpoint 0 is the Matter Root Node. Entities start at 1.
-        used = {ep["endpoint"] for ep in endpoints}
-        nxt = 1
-        while nxt in used:
-            nxt += 1
-        explicit = nxt
+    light_restore_warning(config, full_config)
+    validate_light_effects(config, full_config)
+    warn_missing_color_temperature(config, full_config)
+    switch_restore_warning(config, full_config)
+    check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
+    validate_event_bindings(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
+    fan_restore_warning(config, full_config)
+    fan_final_validate(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
+    validate_cover_bindings(config, full_config)
+    validate_closure_bindings(config, full_config)
+    validate_unique_cover_bindings(config)
+    validate_sensor_bindings(config, full_config)
+    sensor_extras.check_final(config, full_config)
+    final_validate_ota(config, full_config)
+    final_validate_icd(config, full_config)
+    check_expose(config, full_config)
 
-    endpoints.append(
-        {
-            "endpoint": explicit,
-            "domain": domain,
-            "device_type": device_type,
-            "config_id": config[CONF_ID],
-        }
-    )
-    config[CONF_MATTER_ID] = explicit
-    return config
-
-
-def validate_switch(config: ConfigType) -> ConfigType:
-    return consume_endpoint(
-        config, domain="switch", default_type="on_off_plug_in_unit"
-    )
-
-
-def validate_light(config: ConfigType) -> ConfigType:
-    return consume_endpoint(config, domain="light", default_type=None)
+    # Should be done during validation instead of codegen to make sure an invalid config fails early.
+    build_endpoints(config, full_config)
 
 
-def validate_binary_sensor(config: ConfigType) -> ConfigType:
-    return consume_endpoint(config, domain="binary_sensor", default_type=None)
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
-def validate_sensor(config: ConfigType) -> ConfigType:
-    return consume_endpoint(config, domain="sensor", default_type=None)
+# The esp32 component already sets board_build.cmake_extra_args at FINAL priority so we need
+# to set it after that to prevent this platformio option from being overwritten.
+# TODO: remove when esphome-matter requires ESPHome >=2026.9.0
+@coroutine_with_priority(CoroPriority.FINAL - 1)
+async def _set_executable_component_name():
+    # esp_matter's CMakeLists.txt defaults EXECUTABLE_COMPONENT_NAME to "main", but ESPHome names
+    # the app component "src".
+    if CORE.using_toolchain_platformio:
+        key = "board_build.cmake_extra_args"
+        value = CORE.platformio_options.get(key, "")
+        value += " -DEXECUTABLE_COMPONENT_NAME=src"
+        cg.add_platformio_option(key, value)
 
 
-# Final validation: hard-error when BLE coexistence would brick the build.
-def _final_validate_no_ble(_config: ConfigType) -> None:
-    forbidden = {
-        "esp32_ble",
-        "esp32_ble_beacon",
-        "esp32_ble_server",
-        "esp32_ble_tracker",
-        "ble_client",
-        "esp32_improv",
-    }
-    conflicts = forbidden & set(CORE.loaded_integrations)
-    if conflicts:
-        raise cv.Invalid(
-            "matter cannot coexist with BLE components in v0: "
-            + ", ".join(sorted(conflicts))
-            + ". esp-matter tears down BLE after commissioning and the two stacks "
-            "fight over the controller. Remove the BLE component or wait for v1."
-        )
-
-
-FINAL_VALIDATE_SCHEMA = _final_validate_no_ble
-
-
-def _add_partition_table() -> None:
-    from pathlib import Path
-
-    csv = Path(__file__).parent / "partitions.csv"
-    CORE.data.setdefault(KEY_ESP32, {}).setdefault(KEY_EXTRA_BUILD_FILES, {})[
-        "partitions.csv"
-    ] = {"path": str(csv)}
-
-
-def _add_sdkconfig() -> None:
-    add_idf_sdkconfig_option("CONFIG_PARTITION_TABLE_CUSTOM", True)
-    add_idf_sdkconfig_option("CONFIG_PARTITION_TABLE_FILENAME", "partitions.csv")
-    add_idf_sdkconfig_option("CONFIG_PARTITION_TABLE_OFFSET", 0xC000)
-    add_idf_sdkconfig_option("CONFIG_ESPTOOLPY_FLASHSIZE_4MB", True)
-
-    add_idf_sdkconfig_option("CONFIG_BT_ENABLED", True)
-    add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLED", True)
-    add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT", False)
-
-    add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_AUTOCONFIG", True)
-    add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_NUM_ADDRESSES", 6)
-    add_idf_sdkconfig_option("CONFIG_LWIP_HOOK_IP6_ROUTE_DEFAULT", True)
-    add_idf_sdkconfig_option("CONFIG_LWIP_HOOK_ND6_GET_GW_DEFAULT", True)
-
-    add_idf_sdkconfig_option("CONFIG_MBEDTLS_HKDF_C", True)
-    add_idf_sdkconfig_option("CONFIG_ENABLE_OTA_REQUESTOR", True)
-    add_idf_sdkconfig_option("CONFIG_ESP_WIFI_SOFTAP_SUPPORT", False)
-    add_idf_sdkconfig_option("CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT", 16)
-
-
-async def to_code(config: ConfigType) -> None:
-    cg.add_define("USE_MATTER")
-    _add_partition_table()
-    _add_sdkconfig()
-    add_idf_component(
-        name="espressif/esp_matter",
-        ref="1.5.0",
-    )
-
+@coroutine_with_priority(CoroPriority.NETWORK_SERVICES)
+async def to_code(config: ConfigType):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    cg.add(var.set_vendor_id(config[CONF_VENDOR_ID]))
-    cg.add(var.set_product_id(config[CONF_PRODUCT_ID]))
-    cg.add(var.set_discriminator(config[CONF_DISCRIMINATOR]))
-    cg.add(var.set_passcode(config[CONF_PASSCODE]))
+    add_idf_component(
+        name="davidvtwout/esp_matter",
+        ref=ESP_MATTER_VERSION,
+    )
 
-    for conf in config.get(CONF_ON_COMMISSION, []):
-        await automation.build_automation(
-            var.get_commission_trigger(), [(cg.bool_, "x")], conf
+    cg.add_define("USE_MATTER")
+
+    # esp_matter's CMakeLists.txt defaults EXECUTABLE_COMPONENT_NAME to "main", but ESPHome
+    # names the app component "src".
+    try:
+        cg.add_cmake_arg("EXECUTABLE_COMPONENT_NAME", "src")
+    except AttributeError:
+        CORE.add_job(_set_executable_component_name)
+
+    add_idf_sdkconfig_option("CONFIG_MBEDTLS_HKDF_C", True)
+    try:
+        from esphome.components.esp32 import require_mbedtls_tls_extras
+
+        # CHIP needs AES-CCM and deterministic ECDSA, trimmed by default since esphome#19088
+        require_mbedtls_tls_extras(
+            ("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC")
         )
+    except ImportError:
+        pass
+    try:
+        from esphome.components.esp32 import require_certificate_bundle
 
+        # Supported from ESPHome 2026.9.0
+        require_certificate_bundle()
+    except ImportError:
+        # TODO: remove when esphome-matter requires ESPHome >=2026.9.0
+        add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE", True)
 
-ACTION_SCHEMA = automation.maybe_simple_id(
-    {cv.GenerateID(): cv.use_id(MatterComponent)}
-)
+    if CONF_DISCRIMINATOR in config:
+        cg.add_define("MATTER_DISCRIMINATOR", config[CONF_DISCRIMINATOR])
+    if CONF_PASSCODE in config:
+        cg.add_define("MATTER_PASSCODE", config[CONF_PASSCODE])
+    _configure_basic_information(config)
+    await setup_device_info(var, config)
+    await setup_identify_triggers(var, config)
+    await commissioning_to_code(config)
+    await behaviours_to_code(config)
 
-FactoryResetAction = matter_ns.class_(
-    "FactoryResetAction", automation.Action, cg.Parented.template(MatterComponent)
-)
-OpenCommissioningWindowAction = matter_ns.class_(
-    "OpenCommissioningWindowAction",
-    automation.Action,
-    cg.Parented.template(MatterComponent),
-)
+    use_openthread = "openthread" in CORE.loaded_integrations
+    use_wifi = "wifi" in CORE.loaded_integrations
+    use_ethernet = "ethernet" in CORE.loaded_integrations
+    # has_connectivity determines whether the device should be commissioned over BLE or not.
+    has_connectivity = use_openthread or use_wifi or use_ethernet
 
+    # CONFIG_USE_MINIMAL_MDNS=n makes connectedhomeip use the espressif/mdns component.
+    add_idf_sdkconfig_option("CONFIG_USE_MINIMAL_MDNS", False)
 
-@automation.register_action("matter.factory_reset", FactoryResetAction, ACTION_SCHEMA)
-async def factory_reset_action(config, action_id, template_arg, args):
-    var = cg.new_Pvariable(action_id, template_arg)
-    await cg.register_parented(var, config[CONF_ID])
-    return var
+    # CONFIG_ENABLE_MATTER_OVER_THREAD is enabled by default and must explicitly be disabled when not needed.
+    add_idf_sdkconfig_option(
+        "CONFIG_ENABLE_MATTER_OVER_THREAD", use_openthread or not has_connectivity
+    )
+    if use_openthread:
+        # Prevent esp-matter from trying to initialize another openthread stack.
+        add_idf_sdkconfig_option("CONFIG_ESP_MATTER_ENABLE_OPENTHREAD", False)
+    if use_openthread or not has_connectivity:
+        add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_NUM_ADDRESSES", 6)
 
+    if has_connectivity:
+        # Force the Matter DNS-SD bridge object into the final link. ESP-IDF/PlatformIO may compile
+        # component sources that the static-link step still discards unless an exported symbol is referenced.
+        cg.add_build_flag("-Wl,-u,esphome_matter_link_dnssd")
 
-@automation.register_action(
-    "matter.open_commissioning_window",
-    OpenCommissioningWindowAction,
-    ACTION_SCHEMA,
-)
-async def open_commissioning_window_action(config, action_id, template_arg, args):
-    var = cg.new_Pvariable(action_id, template_arg)
-    await cg.register_parented(var, config[CONF_ID])
-    return var
+    add_idf_sdkconfig_option("CONFIG_ENABLE_WIFI_AP", False)
+    # CONFIG_ENABLE_WIFI_STATION is enabled by default and must explicitly be disabled when not needed.
+    add_idf_sdkconfig_option(
+        "CONFIG_ENABLE_WIFI_STATION", use_wifi or not has_connectivity
+    )
+    if use_wifi:
+        cg.add_build_flag(
+            "-Wl,--wrap=_ZN4chip11DeviceLayer23ConnectivityManagerImpl8InitWiFiEv"
+        )
+        cg.add_build_flag(
+            "-Wl,--wrap=_ZN4chip11DeviceLayer8Internal10ESP32Utils13InitWiFiStackEv"
+        )
+    if use_wifi or use_ethernet:
+        # lwIP must add the route to the thread network via the border router to its routing table.
+        add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_ND6_ROUTE_INFO_OPTION_SUPPORT", True)
+
+    # Has nothing to do with telemetry... But this is how connectedhomeip names the option that enables ethernet.
+    add_idf_sdkconfig_option("CONFIG_ENABLE_ETHERNET_TELEMETRY", use_ethernet)
+    if use_ethernet:
+        ethernet.to_code()
+
+    # CONFIG_ENABLE_CHIPOBLE is enabled by default and must explicitly be disabled when not needed.
+    add_idf_sdkconfig_option("CONFIG_ENABLE_CHIPOBLE", not has_connectivity)
+    if not has_connectivity:
+        # If no network is configured, commissioning over the network isn't possible and esphome-matter must fall
+        # back to BlueTooth (BLE) commissioning (the default for most matter devices). In this mode, the device can be
+        # commissioned as matter-over-thread or matter-over-wifi device depending on the hardware capabilities of the
+        # device. If the device supports both, it can be commissioned in either mode.
+
+        # TODO: only enable if device supports it
+        add_idf_sdkconfig_option("CONFIG_OPENTHREAD_ENABLED", True)
+        add_idf_sdkconfig_option("CONFIG_OPENTHREAD_CLI", False)
+        add_idf_sdkconfig_option("CONFIG_OPENTHREAD_CONSOLE_ENABLE", False)
+        add_idf_sdkconfig_option("CONFIG_OPENTHREAD_SRP_CLIENT", True)
+
+        add_ble_sdkconfig()
+
+    configure_network(debug=config[CONF_DEBUG])
+    await icd_to_code(config)
+    await to_code_ota(config)
+
+    await register_endpoints(var, config)
+    plan_to_code()

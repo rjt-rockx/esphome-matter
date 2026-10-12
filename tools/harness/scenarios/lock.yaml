@@ -1,0 +1,12 @@
+# door_lock bound to an ESPHome lock. LockState: 0 NotFullyLocked, 1 Locked, 2 Unlocked, 3 Unlatched.
+name: door lock lock/unlock
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: DoorLock }]
+steps:
+  - invoke: { ep: "${ep}", cluster: DoorLock, command: LockDoor }
+  - expect: { ep: "${ep}", cluster: DoorLock, attribute: LockState, equals: 1, within: 5s }
+  - invoke: { ep: "${ep}", cluster: DoorLock, command: UnlockDoor }
+  - expect: { ep: "${ep}", cluster: DoorLock, attribute: LockState, equals: 2, within: 5s }
+  - expect_event: { ep: "${ep}", cluster: DoorLock, event: LockOperation, within: 1s }
+cleanup:
+  - invoke: { ep: "${ep}", cluster: DoorLock, command: LockDoor }

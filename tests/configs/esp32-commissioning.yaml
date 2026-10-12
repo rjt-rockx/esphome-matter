@@ -1,0 +1,65 @@
+esphome:
+  name: matter-ci-commissioning
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
+  on_commissioned:
+    - logger.log: "Commissioned"
+  on_decommissioned:
+    - logger.log: "Decommissioned"
+  endpoints:
+    1:
+      on_off_light:
+
+text_sensor:
+  - platform: matter
+    commissioning_state:
+      name: Matter state
+    fabric_count:
+      name: Matter fabrics
+    manual_pairing_code:
+      name: Matter pairing code
+    qr_code:
+      name: Matter QR code
+    fabric_1:
+      label:
+        name: Matter fabric 1 label
+      node_id:
+        name: Matter fabric 1 node id
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO9
+    name: Pair button
+    on_press:
+      matter.open_commissioning_window:
+        timeout: 5min
+    on_double_click:
+      matter.factory_reset:
+    on_multi_click:
+      - timing:
+          - ON for at least 10s
+        then:
+          matter.reset_identity:

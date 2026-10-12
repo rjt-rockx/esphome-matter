@@ -1,0 +1,54 @@
+# mirrors: xiaomi-lywsd03mmc-ble
+# Variant (a) of ble-proxy-bridge.yaml: the same BLE thermometer, exposed with the `expose:` shorthand as a NATIVE
+# node (DIRECTION P6: bridging is never inferred). The ESP32 itself is the Matter device; the thermometer is just a
+# data source. Temperature and humidity become two sibling endpoints. This is the right answer when the ESP32 sits next to the sensor or
+# only one remote sensor exists; it is the wrong one when each remote sensor must be its own accessory in a room.
+#
+# Matches the sensor clusters of the bridge variant; differs in identity (one Basic Information for the ESP32, battery
+# is reported as the ESP32's), and Reachable is not modelled (stale values stay until the next advertisement).
+
+esphome:
+  name: matter-ble-native
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+
+matter:
+  expose: [therm_temperature, therm_humidity]
+  # GAP: `expose: [therm_battery]` is rejected today ("no device type is inferred for this sensor"); the node-level
+  # Power Source inference of DIRECTION D11 (M3) is not implemented. The explicit form below puts the battery on
+  # its own Power Source endpoint (0x0011), as the Aqara P2 does (the Matter-preferred place is EP0, M3).
+  endpoints:
+    90:
+      power_source: {with_features: [battery]}
+      battery: therm_battery
+
+sensor:
+  - platform: xiaomi_lywsd03mmc
+    mac_address: A4:C1:38:4E:16:78
+    bindkey: e9efaa6873f9f9c87a5e75a5f814801c
+    temperature:
+      id: therm_temperature
+      name: Bedroom temp   # <=16 bytes: the default endpoint label (FixedLabel) is the entity name
+    humidity:
+      id: therm_humidity
+      name: Bedroom humid
+    battery_level:
+      id: therm_battery
+      name: Bedroom thermometer battery

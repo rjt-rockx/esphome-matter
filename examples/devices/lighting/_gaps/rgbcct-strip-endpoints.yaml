@@ -1,0 +1,62 @@
+# mirrors: tuya-rgbcct-strip
+# Mirrors: catalog entry "tuya-rgbcct-strip" (Tuya style RGBCCT LED controller re-flashed with ESPHome, evidence=inferred)
+#   Layout in the catalog: one extended_color_light, labels ['RGBCCT'], ColorControl[HS,EHUE,CL,XY,CT],
+#   ColorTempPhysicalMin/Max 153/500, ColorMode XY or CT.
+# Hardware: the usual 5 PWM channels of such a controller (R, G, B, CW, WW) -> `rgbww` light with color_interlock off,
+#   so white and color can be on together, constant_brightness for a flat CCT sweep.
+# Representation (b): explicit `endpoints:` with every optional color feature the catalog lists, plus a label.
+# Matches: extended_color_light with HS|EHUE|CL|XY|CT, ColorTempPhysical range from the light traits.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-rgbcct-strip
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - {platform: ledc, id: out_r, pin: GPIO3}
+  - {platform: ledc, id: out_g, pin: GPIO4}
+  - {platform: ledc, id: out_b, pin: GPIO5}
+  - {platform: ledc, id: out_cw, pin: GPIO6}
+  - {platform: ledc, id: out_ww, pin: GPIO7}
+
+light:
+  - platform: rgbww
+    id: strip
+    name: "Strip"
+    red: out_r
+    green: out_g
+    blue: out_b
+    cold_white: out_cw
+    warm_white: out_ww
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2000 K
+    color_interlock: false
+    constant_brightness: true
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      label: RGBCCT
+      extended_color_light:
+        light_id: strip
+        with_features: [hue_and_saturation, enhanced_hue, color_loop]

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Validate every YAML in tests/configs with `esphome config`. Wrapper around
+# tests/validate.sh which picks the toolchain that matches the installed ESPHome
+# (platformio below 2026.9.0, esp-idf otherwise).
+# Usage: tools/validate-configs [esphome-binary]
+set -euo pipefail
+
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ $# -ge 1 ]]; then
+  esphome_bin="$1"
+elif [[ -x "${repo_dir}/.venv/bin/esphome" ]]; then
+  esphome_bin="${repo_dir}/.venv/bin/esphome"
+else
+  esphome_bin="$(command -v esphome)"
+fi
+
+VALIDATE_DIRS=tests/configs exec "${repo_dir}/tests/validate.sh" "${esphome_bin}"

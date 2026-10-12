@@ -1,0 +1,486 @@
+# Golden behavioural firmware for the runtime tests (tests/runtime, docs/dev/runtime-tests.md).
+# ESP32 classic + OpenCores Ethernet, built and booted by tools/qemu/run.sh.
+#
+# Endpoints (see tests/runtime/test_golden.py):
+#   1  on_off_light         binary light
+#   2  dimmable_light       monochromatic light
+#   3  on_off_plug_in_unit  template switch that can refuse turn_on (api action set_refuse)
+#   4  temperature_sensor   template sensor (api action set_temp)
+#   5  generic_switch       template binary_sensor driven by api action press (short|double|long)
+#   6  fan                  3-speed template-output fan
+#   7  thermostat           heat-only thermostat climate, visual range 10..30 C
+#   8  room_air_conditioner cool/heat climate with low/high fan modes (Fan Control bound to the climate)
+#   9  laundry_washer       3 program modes bound to a select, operational state with start/stop/pause/resume
+#  10  mode_select          3 modes bound to a select
+#  11  window_covering      template cover that moves 5 % per 500 ms; set_refuse_cover makes it ignore commands
+#  12  door_lock            template lock; set_refuse_lock makes it ignore commands
+#  13  extended_color_light RGBWW light (153..370 mireds), template outputs
+# Passcode 20202021 / discriminator 3840 give the manual code 34970112332.
+esphome:
+  # Same name as esp32-openeth.yaml so that both can share one build directory (incremental rebuilds).
+  name: matter-qemu
+  on_boot:
+    # A template binary sensor has no initial state, and ESPHome treats the first published state as the
+    # initial one without triggering state callbacks: publish OFF now so the first `press` is a real press.
+    priority: -100
+    then:
+      - lock.template.publish:
+          id: golden_lock
+          state: LOCKED
+      - binary_sensor.template.publish:
+          id: golden_button
+          state: false
+
+esp32:
+  variant: ESP32
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+  hardware_uart: UART0
+  level: DEBUG
+
+api:
+  reboot_timeout: 0s # Matter operation does not require an ESPHome API client.
+  actions:
+    - action: set_temp
+      variables:
+        value: float
+      then:
+        - sensor.template.publish:
+            id: golden_temp
+            state: !lambda "return value;"
+    - action: set_refuse_cover
+      variables:
+        refuse: bool
+      then:
+        - globals.set:
+            id: refuse_cover
+            value: !lambda "return refuse;"
+    - action: set_refuse_lock
+      variables:
+        refuse: bool
+      then:
+        - globals.set:
+            id: refuse_lock
+            value: !lambda "return refuse;"
+    - action: op_complete
+      then:
+        - matter.operational_state.completed:
+            endpoint: 9
+    - action: op_set
+      variables:
+        state: string
+      then:
+        - matter.operational_state.set:
+            endpoint: 9
+            state: !lambda "return state;"
+    - action: set_refuse
+      variables:
+        refuse: bool
+      then:
+        - globals.set:
+            id: refuse_on
+            value: !lambda "return refuse;"
+    # Drives the generic switch: kind is "short", "double" or "long".
+    - action: press
+      variables:
+        kind: string
+      then:
+        - binary_sensor.template.publish:
+            id: golden_button
+            state: true
+        - if:
+            condition:
+              lambda: 'return kind == "long";'
+            then:
+              - delay: 1200ms
+            else:
+              - delay: 100ms
+        - binary_sensor.template.publish:
+            id: golden_button
+            state: false
+        - if:
+            condition:
+              lambda: 'return kind == "double";'
+            then:
+              - delay: 100ms
+              - binary_sensor.template.publish:
+                  id: golden_button
+                  state: true
+              - delay: 100ms
+              - binary_sensor.template.publish:
+                  id: golden_button
+                  state: false
+
+network:
+  enable_ipv6: true
+
+ethernet:
+  type: OPENETH
+
+matter:
+  passcode: 20202021
+  discriminator: 3840
+  endpoints:
+    1:
+      on_off_light:
+        light_id: golden_binary_light
+    2:
+      dimmable_light:
+        light_id: golden_mono_light
+    3:
+      on_off_plug_in_unit:
+        switch_id: golden_switch
+    4:
+      temperature_sensor:
+        temperature: golden_temp
+    5:
+      generic_switch:
+        binary_sensor_id: golden_button
+        long_press_time: 600ms
+        multi_press_window: 800ms
+        multi_press_max: 3
+    6:
+      fan:
+        fan_id: golden_fan
+    9:
+      laundry_washer: {}
+      clusters:
+        laundry_washer_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Delicate, tags: [delicate, quiet]}
+            - {label: Heavy, tags: [heavy, max]}
+          select: golden_program
+          on_change_to_mode:
+            - logger.log:
+                format: "golden_program mode %d"
+                args: [mode]
+        operational_state:
+          phases: [Wash, Rinse]
+          state: golden_wash_state
+          on_start:
+            - logger.log: "golden_wash: start"
+            - select.set:
+                id: golden_wash_state
+                option: Running
+          on_stop:
+            - logger.log: "golden_wash: stop"
+            - select.set:
+                id: golden_wash_state
+                option: Stopped
+          on_pause:
+            - logger.log: "golden_wash: pause"
+            - select.set:
+                id: golden_wash_state
+                option: Paused
+          on_resume:
+            - logger.log: "golden_wash: resume"
+            - select.set:
+                id: golden_wash_state
+                option: Running
+    10:
+      mode_select: {}
+      clusters:
+        mode_select:
+          description: Golden preset
+          modes:
+            - {label: Low, tags: [{mfg_code: 0xFFF1, value: 1}]}
+            - {label: Mid}
+            - {label: High}
+          select: golden_preset
+          on_change_to_mode:
+            - logger.log:
+                format: "golden_preset mode %d"
+                args: [mode]
+    11:
+      window_covering:
+        cover_id: golden_cover
+    12:
+      door_lock:
+        lock_id: golden_lock
+    13:
+      extended_color_light:
+        light_id: golden_color_light
+        with_features:
+          - hue_and_saturation
+    7:
+      thermostat:
+        climate_id: golden_heater
+    8:
+      room_air_conditioner:
+        climate_id: golden_ac
+      clusters:
+        fan_control:
+          climate_id: golden_ac
+
+globals:
+  - id: refuse_on
+    type: bool
+    initial_value: "false"
+  - id: refuse_cover
+    type: bool
+    initial_value: "false"
+  - id: refuse_lock
+    type: bool
+    initial_value: "false"
+  - id: cover_pos # ESPHome convention: 1.0 open, 0.0 closed
+    type: float
+    initial_value: "1.0"
+  - id: cover_target
+    type: float
+    initial_value: "1.0"
+
+# Moves the cover 5 % every 500 ms towards cover_target and publishes position and operation.
+interval:
+  - interval: 500ms
+    then:
+      - lambda: |-
+          float p = id(cover_pos), t = id(cover_target);
+          auto op = cover::COVER_OPERATION_IDLE;
+          if (t > p + 0.001f) { p = std::min(t, p + 0.05f); op = cover::COVER_OPERATION_OPENING; }
+          else if (t < p - 0.001f) { p = std::max(t, p - 0.05f); op = cover::COVER_OPERATION_CLOSING; }
+          if (p >= t - 0.001f && p <= t + 0.001f) op = cover::COVER_OPERATION_IDLE;
+          static bool first = true;
+          if (first || p != id(cover_pos) || id(golden_cover).current_operation != op) {
+            first = false;
+            id(cover_pos) = p;
+            id(golden_cover).position = p;
+            id(golden_cover).current_operation = op;
+            id(golden_cover).publish_state(false);
+          }
+
+output:
+  - platform: template
+    id: golden_binary_out
+    type: binary
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_mono_out
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_r
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_g
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_b
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_cw
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_color_ww
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_fan_out
+    type: float
+    write_action:
+      - lambda: ""
+
+light:
+  - platform: binary
+    id: golden_binary_light
+    name: Golden Binary Light
+    output: golden_binary_out
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: golden_mono_light
+    name: Golden Mono Light
+    output: golden_mono_out
+    default_transition_length: 0s
+    gamma_correct: 1.0 # brightness == level, so the Matter and API values are directly comparable
+    restore_mode: ALWAYS_OFF
+
+  - platform: rgbww
+    id: golden_color_light
+    name: Golden Color Light
+    red: golden_color_r
+    green: golden_color_g
+    blue: golden_color_b
+    cold_white: golden_color_cw
+    warm_white: golden_color_ww
+    cold_white_color_temperature: 153 mireds
+    warm_white_color_temperature: 370 mireds
+    color_interlock: true
+    default_transition_length: 0s
+    gamma_correct: 1.0
+    restore_mode: ALWAYS_OFF
+
+# Not optimistic: the state only changes through publish_state, so turn_on can be refused.
+switch:
+  - platform: template
+    id: golden_switch
+    name: Golden Switch
+    optimistic: false
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - if:
+          condition:
+            lambda: "return !id(refuse_on);"
+          then:
+            - switch.template.publish:
+                id: golden_switch
+                state: true
+          else:
+            - logger.log: "golden_switch: turn_on refused"
+    turn_off_action:
+      - switch.template.publish:
+          id: golden_switch
+          state: false
+
+select:
+  - platform: template
+    id: golden_program
+    name: Golden Program
+    options: [Normal, Delicate, Heavy]
+    initial_option: Normal
+    optimistic: true
+  - platform: template
+    id: golden_preset
+    name: Golden Preset
+    options: [Low, Mid, High]
+    initial_option: Low
+    optimistic: true
+  - platform: template
+    id: golden_wash_state
+    name: Golden Wash State
+    options: [Stopped, Running, Paused]
+    initial_option: Stopped
+    optimistic: true
+
+cover:
+  - platform: template
+    id: golden_cover
+    name: Golden Cover
+    has_position: true
+    open_action:
+      - lambda: |-
+          if (!id(refuse_cover)) id(cover_target) = 1.0f;
+    close_action:
+      - lambda: |-
+          if (!id(refuse_cover)) id(cover_target) = 0.0f;
+    stop_action:
+      - lambda: |-
+          if (!id(refuse_cover)) id(cover_target) = id(cover_pos);
+    position_action:
+      - lambda: |-
+          if (!id(refuse_cover)) id(cover_target) = pos;
+
+lock:
+  - platform: template
+    id: golden_lock
+    name: Golden Lock
+    optimistic: false
+    lock_action:
+      - if:
+          condition:
+            lambda: "return !id(refuse_lock);"
+          then:
+            - lock.template.publish:
+                id: golden_lock
+                state: LOCKED
+          else:
+            - logger.log: "golden_lock: lock refused"
+    unlock_action:
+      - if:
+          condition:
+            lambda: "return !id(refuse_lock);"
+          then:
+            - lock.template.publish:
+                id: golden_lock
+                state: UNLOCKED
+          else:
+            - logger.log: "golden_lock: unlock refused"
+
+climate:
+  - platform: thermostat
+    id: golden_heater
+    name: Golden Heater
+    sensor: golden_room_temp
+    default_preset: home
+    preset:
+      - name: home
+        default_target_temperature_low: 18
+    min_idle_time: 1s
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    heat_action:
+      - logger.log: "golden_heater: heating"
+    idle_action:
+      - logger.log: "golden_heater: idle"
+    visual:
+      min_temperature: 10
+      max_temperature: 30
+      temperature_step: 0.5
+  - platform: thermostat
+    id: golden_ac
+    name: Golden AC
+    sensor: golden_room_temp
+    min_idle_time: 1s
+    min_cooling_off_time: 1s
+    min_cooling_run_time: 1s
+    min_heating_off_time: 1s
+    min_heating_run_time: 1s
+    cool_action:
+      - logger.log: "golden_ac: cooling"
+    heat_action:
+      - logger.log: "golden_ac: heating"
+    idle_action:
+      - logger.log: "golden_ac: idle"
+    min_fan_mode_switching_time: 1s
+    fan_mode_low_action:
+      - logger.log: "golden_ac: fan low"
+    fan_mode_high_action:
+      - logger.log: "golden_ac: fan high"
+    visual:
+      min_temperature: 10
+      max_temperature: 30
+      temperature_step: 0.5
+
+sensor:
+  - platform: template
+    id: golden_room_temp
+    name: Golden Room Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: "return 20.0f;"
+    update_interval: 60s
+  - platform: template
+    id: golden_temp
+    name: Golden Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+
+binary_sensor:
+  - platform: template
+    id: golden_button
+    name: Golden Button
+
+fan:
+  - platform: speed
+    id: golden_fan
+    name: Golden Fan
+    output: golden_fan_out
+    speed_count: 3
+    restore_mode: ALWAYS_OFF

@@ -1,0 +1,112 @@
+# mirrors: shelly-plus-2pm
+# Real device: Shelly Plus 2PM in switch mode (doc evidence): two outputs each with its own power measurement + temp.
+# ADE7953 over I2C, energy integrated from power. Two sibling plugs get Common Number tags automatically.
+
+esphome:
+  name: shelly-plus-2pm
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+switch:
+  - platform: gpio
+    id: output_1
+    name: Output 1
+    pin: GPIO10
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: output_2
+    name: Output 2
+    pin: GPIO11
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: ade7953_i2c
+    irq_pin: GPIO8
+    voltage: {id: mains_voltage, name: Voltage}
+    current_a: {id: ch1_current, name: Output 1 current}
+    current_b: {id: ch2_current, name: Output 2 current}
+    active_power_a: {id: ch1_power, name: Output 1 power}
+    active_power_b: {id: ch2_power, name: Output 2 power}
+  # The ADE7953 has no cumulative energy output here: integrate power into Wh.
+  - platform: integration
+    id: ch1_energy
+    name: Output 1 energy
+    sensor: ch1_power
+    time_unit: h
+    restore: true
+    device_class: energy
+    state_class: total_increasing
+  - platform: integration
+    id: ch2_energy
+    name: Output 2 energy
+    sensor: ch2_power
+    time_unit: h
+    restore: true
+    device_class: energy
+    state_class: total_increasing
+
+  # Board temp from an NTC on an ADC pin.
+  - platform: adc
+    id: ntc_adc
+    pin: GPIO3
+    attenuation: 12db
+    update_interval: 10s
+    internal: true
+  - platform: resistance
+    id: ntc_resistance
+    sensor: ntc_adc
+    configuration: DOWNSTREAM
+    resistor: 10kohm
+    internal: true
+  - platform: ntc
+    id: board_temp
+    name: Board temp
+    sensor: ntc_resistance
+    calibration:
+      b_constant: 3350
+      reference_temperature: 25 °C
+      reference_resistance: 10kohm
+
+matter:
+  endpoints:
+    1:
+      label: Output 1
+      on_off_plug_in_unit:
+        switch_id: output_1
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch1_current
+        active_power: ch1_power
+        energy_imported: ch1_energy
+    2:
+      label: Output 2
+      on_off_plug_in_unit:
+        switch_id: output_2
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch2_current
+        active_power: ch2_power
+        energy_imported: ch2_energy
+    3:
+      label: Board temp
+      temperature_sensor:
+        temperature: board_temp

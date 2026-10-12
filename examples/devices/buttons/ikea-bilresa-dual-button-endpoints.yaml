@@ -1,0 +1,91 @@
+# mirrors: ikea-bilresa-dual-button
+# IKEA BILRESA two-button remote rebuilt as an ESPHome node. VARIANT (a): explicit `endpoints:` with tags.
+#
+# Mirrors: HA fixture ikea_bilresa_dual_button.json (evidence=dump; Thread, battery, ICD).
+#   Real layout: EP0 root + OTA Requestor + Power Source (BAT, REPLC); EP1/EP2 generic_switch rev 3,
+#   Switch MS+MSR+MSL+MSM with MultiPressMax 2; Descriptor TagList per endpoint with FOUR tags:
+#     EP1: Position:Left,  Switches:On,  Switches:Up,   Switches:Custom label "button 1"
+#     EP2: Position:Right, Switches:Off, Switches:Down, Switches:Custom label "button 2"
+# Matches: two generic_switch endpoints, feature map, MultiPressMax 2, TagList with namespace 8 (position) and 67
+#   (switches), custom tag label, battery Power Source.
+# Differs:
+#   - GAP-SDK/limit: esp-matter stores at most 3 semantic tags per endpoint (ESP_MATTER_MAX_SEMANTIC_TAG_COUNT), the
+#     real device has 4. We keep Position + On/Off + Custom("button N") and drop Up/Down.
+#   - GAP-COMPONENT: the battery Power Source is on the endpoint (or its own endpoint) and not on EP0; no OTA Requestor
+#     device type on EP0 (matter: ota: true adds the cluster only); no ICD/LIT.
+#   - Generic Switch revision: we emit the esp-matter revision of the device type, not necessarily rev 3.
+esphome:
+  name: bilresa-dual-endpoints
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  ota: true
+  software_version: 1
+  endpoints:
+    1:
+      label: "Button 1"
+      tags:
+        - {namespace: common_position, tag: left}
+        - {namespace: switches, tag: "on"}
+        - {namespace: switches, tag: custom, label: "button 1"}
+      generic_switch:
+        binary_sensor_id: btn_left
+        multi_press_max: 2
+      battery: batt          # Power Source (BAT) on the first button endpoint
+    2:
+      label: "Button 2"
+      tags:
+        - {namespace: common_position, tag: right}
+        - {namespace: switches, tag: "off"}
+        - {namespace: switches, tag: custom, label: "button 2"}
+      generic_switch:
+        binary_sensor_id: btn_right
+        multi_press_max: 2
+
+binary_sensor:
+  - platform: gpio
+    id: btn_left
+    name: "Button left"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_right
+    name: "Button right"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+
+sensor:
+  - platform: adc
+    id: batt_v
+    pin: GPIO2
+    attenuation: 12db
+    update_interval: 10min
+    internal: true
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return id(batt_v).state;
+    filters:
+      - calibrate_linear:    # 2x AAA, 1.8 V = 0 %, 3.0 V = 100 %
+          - 1.8 -> 0.0
+          - 3.0 -> 100.0

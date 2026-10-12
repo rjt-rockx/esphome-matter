@@ -1,0 +1,57 @@
+# mirrors: onoff-light-with-levelcontrol-present
+# Mirrors: HA fixture "onoff_light_with_levelcontrol_present" (Leviton D215S dimmer, VID 0x109B, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/onoff_light_with_levelcontrol_present.json
+# The real device reports device type On/Off Light (0x0100) but also serves LevelControl[OO,LT]. Home Assistant has a
+#   quirk for this, so a dimmer shows up as a dimmable light.
+# Hardware an ESPHome user would build: the same phase-cut dimmer as dimmable-light-ac-dimmer.yaml, but modelled as an
+#   on_off_light with the optional LevelControl server cluster.
+# Representation (c): power-user: on_off_light device type plus `clusters: level_control:`. `light_id` on an
+#   on_off_light never uses level, so the ESPHome light is wired with on_attribute actions instead.
+# BLOCKED today: any `clusters: <name>:` entry crashes `esphome config` with KeyError 'level_control'
+#   (endpoints.py resolve() and register() index CLUSTERS_BY_NAME, keyed by the CamelCase name, with the snake_case conf key).
+#   Kept outside examples/devices/lighting/*.yaml so tests/validate.sh does not trip on it. Verified with a one-line
+#   local patch (CLUSTERS_BY_CONF_KEY) that the rest of the pipeline then works.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-onoff-light-level
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: led_out
+    pin: GPIO19
+
+light:
+  - platform: monochromatic
+    id: lamp
+    name: "Dimmer"
+    output: led_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: lamp
+      clusters:
+        level_control:
+          with_features: [on_off, lighting]   # required by the On/Off Light device type when LevelControl is present

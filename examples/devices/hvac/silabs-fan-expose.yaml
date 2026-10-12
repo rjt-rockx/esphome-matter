@@ -1,0 +1,60 @@
+# mirrors: silabs-fan
+# Mirrors: Silicon Labs reference fan / SwitchBot circulator fan (see silabs-fan.yaml).
+# Variant (a) `expose:` shorthand.
+#
+# Matches:  identical lowering to the explicit file (fan + fan_id).
+# Differs:  `fan` has no inference rule yet (DIRECTION s6: fan -> fan with MultiSpeed/Rocking/Direction from the
+#           traits), so `as: fan` is required today; `expose: [pedestal_fan]` is the goal (G2).
+#           `features: [wind, step]` is accepted but those features are not backed by behaviour (G10).
+
+substitutions:
+  name: matter-fan-expose
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: pedestal_fan, as: fan}
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO2
+    frequency: 25kHz
+  - platform: gpio
+    id: oscillation_relay
+    pin: GPIO3
+  - platform: gpio
+    id: direction_relay
+    pin: GPIO6
+
+fan:
+  - platform: speed
+    id: pedestal_fan
+    name: Pedestal fan
+    output: fan_pwm
+    speed_count: 4
+    oscillation_output: oscillation_relay
+    direction_output: direction_relay
+    restore_mode: ALWAYS_OFF

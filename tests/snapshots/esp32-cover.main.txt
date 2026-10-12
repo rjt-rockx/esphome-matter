@@ -1,0 +1,36 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-cover");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_cover(living_room_shade, 1);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint_tag(1, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(1, "shade", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 1, "shade");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(bedroom_blind, 2);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint_tag(2, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(2, "blind", 13)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 2, "blind");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 2: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(open_close_awning, 3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint_tag(3, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(3, "awning", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 3, "awning");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x3A7FEC60);

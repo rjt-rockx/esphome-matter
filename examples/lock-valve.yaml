@@ -1,0 +1,68 @@
+# Exposes an ESPHome lock as a Matter Door Lock and an ESPHome valve as a
+# Matter Water Valve. See docs/lock-valve.md.
+esphome:
+  name: matter-lock-valve
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter
+    components: [matter]
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        lock_type: DEAD_BOLT
+        # Report jams as DoorState "DoorJammed".
+        with_features:
+          - DoorPositionSensor
+    2:
+      water_valve:
+        valve_id: garden_valve
+        # Adds CurrentLevel and TargetLevel. Levels below 100 only have an effect on
+        # valves that support position; this template valve is simply opened.
+        with_features:
+          - Level
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO4
+  - platform: gpio
+    id: valve_relay
+    pin: GPIO5
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+switch:
+  - platform: output
+    id: valve_switch
+    output: valve_relay
+
+valve:
+  - platform: template
+    id: garden_valve
+    name: Garden valve
+    optimistic: true
+    open_action:
+      - switch.turn_on: valve_switch
+    close_action:
+      - switch.turn_off: valve_switch

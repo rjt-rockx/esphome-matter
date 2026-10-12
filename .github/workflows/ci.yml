@@ -1,0 +1,447 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/**"
+      - "tests/**"
+      - "examples/**"
+      - "packages/**"
+      - "tools/**"
+      - ".github/**"
+  pull_request:
+    paths:
+      - "components/**"
+      - "tests/**"
+      - "examples/**"
+      - "packages/**"
+      - "tools/**"
+      - ".github/**"
+  workflow_dispatch:
+    inputs:
+      toolchain:
+        description: >-
+          ESP32 toolchain used by the compile jobs. "esp-idf" (native, default)
+          rewrites "toolchain: platformio" in a temporary copy of the test
+          config; "platformio" compiles the configs unmodified.
+        type: choice
+        options:
+          - esp-idf
+          - platformio
+        default: esp-idf
+
+# Cancel superseded runs of the same PR/branch. Runs on main are kept so that
+# every merge gets to save its caches (ccache, IDF tools, managed components).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_PYTHON: "3.12" # Same as ESPHome
+  # Native ESP-IDF toolchain by default; platformio only via workflow_dispatch.
+  CI_TOOLCHAIN: ${{ inputs.toolchain || 'esp-idf' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ruff
+        run: python -m pip install ruff==0.17.0
+      - name: ruff check
+        run: ruff check --output-format=github components .github tests
+      - name: ruff format --check
+        run: ruff format --check --diff components .github tests
+      - name: Detect clang-format config
+        id: clang
+        run: |
+          if [ -f .clang-format ] || [ -f _clang-format ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .clang-format found; skipping clang-format check." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: clang-format check
+        if: steps.clang.outputs.present == 'true'
+        continue-on-error: true
+        run: |
+          mapfile -t files < <(git ls-files 'components/**/*.h' 'components/**/*.cpp' 'components/**/*.c' 'components/**/*.hpp')
+          if [ ${#files[@]} -eq 0 ]; then echo "No C/C++ files."; exit 0; fi
+          clang-format --version
+          clang-format --dry-run --Werror "${files[@]}"
+
+  # ---------------------------------------------------------------------------
+  # `esphome config` on every YAML in tests/configs/ and examples/
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate configs (ESPHome ${{ matrix.esphome-version }})
+    runs-on: ubuntu-24.04
+    # ESPHome dev can break independently of this repository; report it, but
+    # do not block on it.
+    continue-on-error: ${{ matrix.esphome-version == 'dev' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome-version:
+          - 2026.6.0
+          - 2026.7.4
+          - dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ESPHome
+        run: |
+          python -m venv .venv
+          if [ "${{ matrix.esphome-version }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          fi
+          .venv/bin/esphome version
+
+      # Every tests/configs/*.yaml is picked up automatically (glob).
+      - name: Validate tests/configs/*.yaml
+        env:
+          VALIDATE_DIRS: tests/configs
+        run: tests/validate.sh .venv/bin/esphome
+
+      # Runs the code generation (`esphome compile --only-generate`) for every
+      # test config; `esphome config` alone does not execute to_code().
+      - name: Generate code for tests/configs/*.yaml
+        env:
+          VALIDATE_DIRS: tests/configs
+          VALIDATE_GENERATE: "1"
+        run: tests/validate.sh .venv/bin/esphome
+
+      # The examples are user-facing templates; several need user-specific
+      # values (SSID, variant, ...) and do not validate as-is. Report only.
+      - name: Validate examples/*.yaml (non-blocking)
+        continue-on-error: true
+        env:
+          VALIDATE_DIRS: examples
+        run: tests/validate.sh .venv/bin/esphome
+
+  # ---------------------------------------------------------------------------
+  # pytest suite in tests/unit (data model, config validation, codegen)
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests (ESPHome ${{ matrix.esphome-version }})
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.esphome-version == 'dev' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome-version:
+          - 2026.6.0
+          - 2026.7.4
+          - dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ESPHome and pytest
+        run: |
+          python -m venv .venv
+          if [ "${{ matrix.esphome-version }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install "esphome==${{ matrix.esphome-version }}"
+          fi
+          .venv/bin/python -m pip install pytest
+          .venv/bin/esphome version
+      - name: pytest (fast)
+        run: .venv/bin/python -m pytest tests/unit -m "not slow"
+      - name: pytest (slow, code generation)
+        run: .venv/bin/python -m pytest tests/unit -m slow
+      - name: Golden codegen snapshots (dev only)
+        if: matrix.esphome-version == 'dev'
+        run: .venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py
+
+  # ---------------------------------------------------------------------------
+  # Matter spec conformance of every test config (tools/conformance)
+  # ---------------------------------------------------------------------------
+  conformance:
+    name: Matter conformance
+    runs-on: ubuntu-24.04
+    env:
+      MATTER_CONFORMANCE_REQUIRE: "1"
+      MATTER_DATA_MODEL: ${{ github.workspace }}/connectedhomeip/data_model
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Fetch the Matter data model (public, not vendored)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/project-chip/connectedhomeip.git
+          git -C connectedhomeip sparse-checkout set data_model/1.6
+      - name: Install ESPHome and pytest
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev" pytest
+      - name: Conformance unit tests
+        run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
+      - name: Check every test config
+        run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-report
+          path: conformance.json
+
+  # ---------------------------------------------------------------------------
+  # Node test harness self-test against the simulator (non-blocking)
+  # ---------------------------------------------------------------------------
+  harness:
+    name: Test harness selftest (non-blocking)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Selftest (simulated transport)
+        working-directory: tools/harness
+        run: |
+          npm ci
+          node src/cli.mjs selftest --transport sim
+
+  # ---------------------------------------------------------------------------
+  # Validates the data model JSON against the esp-matter sources
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Validate esp-matter data model
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Install ESPHome
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome==2026.7.4" pytest
+
+      - name: Read esp-matter version
+        id: esp-matter
+        run: echo "version=$(tools/esp-matter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache esp-matter source
+        id: esp-matter-cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/esp-matter
+          key: esp-matter-${{ runner.os }}-${{ steps.esp-matter.outputs.version }}
+
+      - name: Resolve esp-matter source
+        if: steps.esp-matter-cache.outputs.cache-hit != 'true'
+        run: |
+          # ESPHome 2026.7.4 needs the PlatformIO toolchain (see tests/validate.sh).
+          path=$(python .github/scripts/ci_prepare.py tests/configs/esp32-wifi.yaml --toolchain platformio)
+          .venv/bin/esphome compile "$path"
+          mkdir -p .cache
+          cp -a tests/configs/.esphome/build/matter-ci-wifi/managed_components/davidvtwout__esp_matter .cache/esp-matter
+
+      - name: Run integration tests
+        env:
+          ESP_MATTER_SOURCE: .cache/esp-matter
+        run: .venv/bin/python -m pytest --color=yes tests/integration
+
+  # ---------------------------------------------------------------------------
+  # Compile matrix (native ESP-IDF toolchain)
+  # ---------------------------------------------------------------------------
+  compile:
+    name: Compile ${{ matrix.name }} (ESPHome ${{ matrix.esphome }})
+    runs-on: ubuntu-24.04
+    needs: validate
+    timeout-minutes: 120
+    continue-on-error: ${{ matrix.esphome == 'dev' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome:
+          - dev
+          - release
+        slug:
+          - c6-wifi
+          - c6-thread
+          - h2-thread
+          - h2-icd
+          - c6-icd
+          - s3-wifi
+          - c3-wifi
+          - c6-closure
+          - c6-bridge-block
+          - c6-delegates
+          - c6-sensor-extras
+          - c6-fan-hvac
+          - c6-light-bindings
+          - c6-power-source
+          - c6-compile-all
+        include:
+          # Extra properties per slug (matched on `slug`, applied to every ESPHome version).
+          - { slug: c6-wifi, name: C6 wifi, variant: ESP32C6, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-thread, name: C6 thread, variant: ESP32C6, config: tests/configs/esp32-thread.yaml }
+          - { slug: h2-thread, name: H2 thread, variant: ESP32H2, config: tests/configs/esp32-thread.yaml }
+          - { slug: h2-icd, name: H2 thread ICD (SIT), variant: ESP32H2, config: tests/configs/esp32-h2-icd.yaml }
+          - { slug: c6-icd, name: C6 thread ICD (LIT), variant: ESP32C6, config: tests/configs/esp32-c6-icd.yaml }
+          - { slug: s3-wifi, name: S3 wifi, variant: ESP32S3, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-power-source, name: C6 power source, variant: ESP32C6, config: tests/configs/esp32-power-source.yaml }
+          - { slug: c6-light-bindings, name: C6 light bindings, variant: ESP32C6, config: tests/configs/esp32-light-bindings.yaml }
+          - { slug: c6-fan-hvac, name: C6 fan hvac, variant: ESP32C6, config: tests/configs/esp32-fan-hvac.yaml }
+          - { slug: c6-sensor-extras, name: C6 sensor extras, variant: ESP32C6, config: tests/configs/esp32-sensor-extras.yaml }
+          - { slug: c6-delegates, name: C6 delegates, variant: ESP32C6, config: tests/configs/esp32-delegates.yaml }
+          - { slug: c6-bridge-block, name: C6 bridge block, variant: ESP32C6, config: tests/configs/esp32-bridge-block.yaml }
+          - { slug: c6-closure, name: C6 closure, variant: ESP32C6, config: tests/configs/esp32-closure.yaml }
+          - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-compile-all, name: C6 compile all, variant: ESP32C6, config: tests/configs/esp32-compile-all.yaml }
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+
+      - name: Install ccache
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache
+
+      - name: Configure cache locations
+        id: cfg
+        run: |
+          # ESPHome uses ccache automatically when it is on PATH. Keep the IDF
+          # tools and the ccache directory in separate, individually cached
+          # folders (ESPHome would otherwise nest ccache inside the IDF prefix).
+          echo "ESPHOME_ESP_IDF_PREFIX=$HOME/.cache/esphome-idf" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Install ESPHome
+        run: |
+          python -m venv .venv
+          if [ "${{ matrix.esphome }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install --upgrade esphome
+          fi
+          .venv/bin/esphome version | tee esphome-version.txt
+
+      # ESP-IDF toolchains + python env (several GB; refreshed weekly).
+      - name: Cache ESP-IDF install
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ESPHOME_ESP_IDF_PREFIX }}
+            ~/.espressif
+          key: idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-${{ steps.cfg.outputs.week }}
+          restore-keys: |
+            idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-
+            idf-${{ runner.os }}-${{ matrix.esphome }}-
+
+      # esp_matter (+ connectedhomeip) fetched by the IDF component manager.
+      - name: Cache managed_components (esp_matter)
+        uses: actions/cache@v6
+        with:
+          path: |
+            tests/configs/.esphome/build/*/managed_components
+            tests/configs/.esphome/build/*/dependencies.lock
+          key: managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-${{ hashFiles('components/matter/__init__.py') }}
+          restore-keys: |
+            managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-
+            managed-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.slug }}-
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Cache PlatformIO (only with platformio toolchain)
+        if: env.CI_TOOLCHAIN == 'platformio'
+        uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.variant }}-${{ steps.cfg.outputs.week }}
+          restore-keys: |
+            pio-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Prepare config (local components, toolchain ${{ env.CI_TOOLCHAIN }})
+        id: prep
+        run: |
+          if [ "$CI_TOOLCHAIN" = "platformio" ]; then tc=keep; else tc=esp-idf; fi
+          path=$(python .github/scripts/ci_prepare.py "${{ matrix.config }}" --toolchain "$tc")
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          grep -n "toolchain" "$path" || echo "(no toolchain line; ESPHome default applies)"
+
+      - name: Compile
+        run: |
+          set -o pipefail
+          ccache --zero-stats || true
+          .venv/bin/esphome -s esp32_variant "${{ matrix.variant }}" compile "${{ steps.prep.outputs.path }}" 2>&1 | tee compile.log
+
+      - name: Firmware size summary
+        if: always()
+        run: |
+          python .github/scripts/size_summary.py compile.log tests/configs/.esphome/build \
+            "${{ matrix.name }}, ESPHome ${{ matrix.esphome }} ($(tail -n1 esphome-version.txt)), toolchain ${CI_TOOLCHAIN}"
+
+      - name: ccache statistics
+        if: always()
+        run: |
+          {
+            echo "<details><summary>ccache statistics (${{ matrix.name }}, ESPHome ${{ matrix.esphome }})</summary>"
+            echo
+            echo '```'
+            ccache --show-stats || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compile log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compile-log-${{ matrix.slug }}-${{ matrix.esphome }}
+          path: compile.log
+          retention-days: 7

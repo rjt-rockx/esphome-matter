@@ -1,0 +1,56 @@
+esphome:
+  name: door-and-motion
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# A door contact, a garage reed switch and a motion sensor exposed as Matter devices.
+# See docs/binary-sensors.md.
+matter:
+  endpoints:
+    1:
+      # device_class: door means ON = open in ESPHome. Matter's BooleanState is true when the contact is closed, so
+      # the state is inverted automatically.
+      contact_sensor: front_door
+    2:
+      # No device_class and ON = open: force the inversion.
+      contact_sensor:
+        boolean_state: garage_reed
+        inverted: true
+    3:
+      # device_class: motion enables the PassiveInfrared feature (PIR sensor type).
+      occupancy_sensor: hallway_motion
+
+binary_sensor:
+  - platform: gpio
+    id: front_door
+    device_class: door
+    # Reed switch to ground: the pin is LOW while the door is closed (OFF) and HIGH when it is open (ON).
+    pin:
+      number: GPIO2
+      mode: INPUT_PULLUP
+  - platform: gpio
+    id: garage_reed
+    pin:
+      number: GPIO3
+      mode: INPUT_PULLUP
+  - platform: gpio
+    id: hallway_motion
+    device_class: motion
+    pin: GPIO10

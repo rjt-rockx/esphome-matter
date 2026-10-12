@@ -1,0 +1,161 @@
+# mirrors: ikea-scroll-wheel
+# IKEA BILRESA scroll-wheel remote (3 wheel+button groups) rebuilt as an ESPHome node. Explicit `endpoints:`.
+#
+# Mirrors: HA fixture ikea_scroll_wheel.json (evidence=dump, Thread, ICD). Real layout: EP0 root + OTA Requestor +
+#   Power Source; EP1..EP9 = 3 groups of (rotary-up, rotary-down, button). Each endpoint has generic_switch rev 3 and
+#   a Descriptor TagList; rotary endpoints are Switch MS+MSR+MSM (no long press), buttons MS+MSR+MSL+MSM.
+#   Tags per endpoint (real): Position:Column(6) label "<group 1..3>", Switches:Up/Down (rotary) or
+#   Switches:Toggle+Previous+Next (button), Switches:Custom label "rotary"/"button" -> 4 or 5 tags.
+# Matches: 9 generic_switch endpoints with the same feature maps, all siblings under the root, TagList on each, and
+#   the group tag, the up/down direction and the rotary/button custom label.
+# Differs:
+#   - GAP-COMPONENT (validator too strict): the real device tells the three groups apart only by the LABEL of the
+#     Position:Column tag ("1","2","3"). The checker compares (namespace, tag) only and rejects identical tag sets with
+#     different labels, so we use Common Number 1..3 as group tag instead of Position:Column with a label.
+#   - GAP-SDK: esp-matter allows 3 semantic tags per endpoint; the dump has up to 5 (button endpoints carry
+#     Toggle+Previous+Next in addition). We keep group number + Up/Down (or Toggle) + Custom label.
+#   - GAP-COMPONENT: rotary steps have no binding. A rotary_encoder is turned into Matter events by hand with
+#     `matter.send_switch_event` (multi_press_complete, count = steps), no sensor/event mapping.
+#   - GAP-COMPONENT: no node-level Power Source on EP0 (EndpointList), no OTA Requestor device type, no ICD.
+esphome:
+  name: bilresa-scroll-wheel
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:                                   # wheel 1 up
+      tags:
+        - {namespace: common_number, tag: 1}
+        - {namespace: switches, tag: up}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    2:                                   # wheel 1 down
+      tags:
+        - {namespace: common_number, tag: 1}
+        - {namespace: switches, tag: down}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    3:                                   # wheel 1 push button
+      tags:
+        - {namespace: common_number, tag: 1}
+        - {namespace: switches, tag: toggle}
+        - {namespace: switches, tag: custom, label: button}
+      generic_switch:
+        binary_sensor_id: wheel_1_button
+    4:                                   # wheel 2 up
+      tags:
+        - {namespace: common_number, tag: 2}
+        - {namespace: switches, tag: up}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    5:                                   # wheel 2 down
+      tags:
+        - {namespace: common_number, tag: 2}
+        - {namespace: switches, tag: down}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    6:                                   # wheel 2 push button
+      tags:
+        - {namespace: common_number, tag: 2}
+        - {namespace: switches, tag: toggle}
+        - {namespace: switches, tag: custom, label: button}
+      generic_switch:
+        binary_sensor_id: wheel_2_button
+    7:                                   # wheel 3 up
+      tags:
+        - {namespace: common_number, tag: 3}
+        - {namespace: switches, tag: up}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    8:                                   # wheel 3 down
+      tags:
+        - {namespace: common_number, tag: 3}
+        - {namespace: switches, tag: down}
+        - {namespace: switches, tag: custom, label: rotary}
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchMultiPress]
+        multi_press_max: 8
+    9:                                   # wheel 3 push button
+      tags:
+        - {namespace: common_number, tag: 3}
+        - {namespace: switches, tag: toggle}
+        - {namespace: switches, tag: custom, label: button}
+      generic_switch:
+        binary_sensor_id: wheel_3_button
+
+binary_sensor:
+  - platform: gpio
+    id: wheel_1_button
+    name: "Wheel 1 button"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: wheel_2_button
+    name: "Wheel 2 button"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: wheel_3_button
+    name: "Wheel 3 button"
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+
+sensor:
+  - platform: rotary_encoder
+    id: wheel_1
+    name: "Wheel 1"
+    internal: true
+    pin_a: GPIO1
+    pin_b: GPIO2
+    on_clockwise:
+      - matter.send_switch_event: {endpoint: 1, event: multi_press_complete, count: 1}
+    on_anticlockwise:
+      - matter.send_switch_event: {endpoint: 2, event: multi_press_complete, count: 1}
+  - platform: rotary_encoder
+    id: wheel_2
+    name: "Wheel 2"
+    internal: true
+    pin_a: GPIO4
+    pin_b: GPIO5
+    on_clockwise:
+      - matter.send_switch_event: {endpoint: 4, event: multi_press_complete, count: 1}
+    on_anticlockwise:
+      - matter.send_switch_event: {endpoint: 5, event: multi_press_complete, count: 1}
+  - platform: rotary_encoder
+    id: wheel_3
+    name: "Wheel 3"
+    internal: true
+    pin_a: GPIO7
+    pin_b: GPIO8
+    on_clockwise:
+      - matter.send_switch_event: {endpoint: 7, event: multi_press_complete, count: 1}
+    on_anticlockwise:
+      - matter.send_switch_event: {endpoint: 8, event: multi_press_complete, count: 1}

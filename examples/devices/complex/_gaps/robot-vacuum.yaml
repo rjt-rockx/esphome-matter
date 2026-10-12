@@ -1,0 +1,65 @@
+# mirrors: eufy-vacuum-omni-e28
+# Mirrors: a robot vacuum (Robotic Vacuum Cleaner 0x0074). Real dumps: HA fixtures eufy_vacuum_omni_e28 and roborock_saros_10
+# (both Matter-over-Wi-Fi shipping products): EP1 = Power Source 0x0011 (FM=6 BAT|REC) + RVC 0x0074 stacked, with RvcRunMode,
+# RvcCleanMode, RvcOperationalState (cmds Pause/Resume/GoHome) and Service Area (FM 6 / 4). mock_vacuum_cleaner is the same.
+# ESPHome side: a DIY/retrofit vacuum brain: battery % ADC, motor drivers, a state machine in `select`/`text_sensor`.
+#
+# FEASIBILITY (esp-matter 1.6): esp-matter has endpoint::robotic_vacuum_cleaner and the RVC Run/Clean/Operational State
+# and Service Area clusters, and the component can create the endpoint (this compiles). All of these clusters are delegate
+# driven (rvc run/clean mode = ModeBase delegates, RvcOperationalState delegate, ServiceArea delegate), and the
+# component has no delegate plumbing, so commands (ChangeToMode, GoHome, Pause) are unusable. The Power Source cluster is
+# real: `battery:` binds BatPercentRemaining. Battery state (BatChargeState, BatChargeLevel) is not bindable.
+# HA/Apple/Google only drive an RVC through RunMode + OperationalState, so without the delegates nothing is controllable.
+# Pragmatic fallback shown in robot-vacuum-switch.yaml.
+
+esphome:
+  name: matter-vacuum
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      robotic_vacuum_cleaner: {}
+      power_source:
+        with_features: [battery, rechargeable]
+      battery: vac_battery
+      clusters:
+        rvc_clean_mode: {}
+
+sensor:
+  - platform: adc
+    id: vac_battery_voltage
+    pin: GPIO1
+    attenuation: 12db
+    internal: true
+  - platform: template
+    id: vac_battery
+    name: Vacuum battery
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return clamp((id(vac_battery_voltage).state - 3.3f) / (4.2f - 3.3f) * 100.0f, 0.0f, 100.0f);
+    update_interval: 60s
+
+select:
+  - platform: template
+    id: vac_state
+    name: Vacuum state
+    options: [docked, cleaning, paused, returning, error]
+    initial_option: docked
+    optimistic: true

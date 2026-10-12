@@ -1,0 +1,85 @@
+# Hardware: ESP32-C6 or ESP32-H2 board (default esp32-c6-devkitc-1) with two push buttons to GND (GPIO0, GPIO1).
+# Demonstrates: a Matter dimmer switch (controller side). Short press toggles a bound light on/off, holding
+# dims it up/down via Matter binding commands (matter.send_command).
+#
+# This example involved a pre-configured openthread network. This way, the api is immediately available, even before
+# matter is commissioned.
+# After commissioning, the binding cluster (0x1e or 31) of the dimmer switch endpoint needs to be configured to point
+# to the node ID and cluster ID of a Matter light. Configure this through the Binding cluster in your Matter
+# controller. The controller must also grant this device access to the light through the light's ACL.
+
+substitutions:
+  name: matter-dimmer-button
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  button_up_pin: GPIO0
+  button_down_pin: GPIO1
+
+esphome:
+  name: ${name}
+  friendly_name: Matter Dimmer Button
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      id: dimmer_endpoint
+      dimmer_switch:
+
+# The two buttons are configured to be triggered when the GPIO pin is pulled down to GND.
+binary_sensor:
+  - name: "Button up"
+    platform: gpio
+    pin:
+      number: ${button_up_pin}
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command: dimmer_endpoint.on_off.on
+    on_press:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move_with_on_off
+        arguments:
+          move_mode: up
+          rate: 20 %/s
+    on_release:
+      matter.send_command: dimmer_endpoint.level_control.stop_with_on_off
+  - name: "Button down"
+    id: button_down
+    platform: gpio
+    pin:
+      number: ${button_down_pin}
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command: dimmer_endpoint.on_off.off
+    on_press:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move
+        arguments:
+          move_mode: down
+          rate: 20 %/s
+    on_release:
+      matter.send_command: dimmer_endpoint.level_control.stop

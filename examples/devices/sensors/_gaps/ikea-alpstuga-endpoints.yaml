@@ -1,0 +1,64 @@
+# mirrors: ikea-air-quality-monitor
+# GAP: fails to validate today (air_quality_sensor with_features level_indication, see repro-sensors.md G4)
+# Mirrors: IKEA ALPSTUGA air quality monitor (Thread, VID 4476 / PID 12289), HA fixture ikea_air_quality_monitor.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/ikea_air_quality_monitor.json
+# Real device: ONE endpoint (EP1, Air Quality Sensor 0x002C) carrying AirQuality, TemperatureMeasurement,
+# RelativeHumidityMeasurement, CarbonDioxideConcentrationMeasurement (MEA, LEV), PM2.5ConcentrationMeasurement (MEA, LEV)
+# and an OnOff cluster with the DeadFront feature (the display on/off); root has TimeSynchronization (TZ).
+# Variant (b): explicit single `air_quality_sensor` endpoint, the shape the real device has. The AirQuality enum itself
+# stays Unknown (no ESPHome entity feeds it). Differs: no OnOff DeadFront cluster for the display, no TimeSynchronization,
+# measurement Min/Max/Peak/Average attributes not populated, LEV (level indication) attributes present but inert.
+esphome:
+  name: ikea-alpstuga-endpoints
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+uart:
+  tx_pin: GPIO4
+  rx_pin: GPIO5
+  baud_rate: 9600
+
+sensor:
+  - platform: scd4x
+    co2:
+      id: co2
+      name: CO2
+    temperature:
+      id: air_t
+      name: Temperature
+    humidity:
+      id: air_h
+      name: Humidity
+  - platform: pmsx003
+    type: PMSX003
+    pm_2_5:
+      id: pm25
+      name: PM2.5
+
+matter:
+  endpoints:
+    1:
+      air_quality_sensor:
+        carbon_dioxide: co2
+        pm_2_5: pm25
+        temperature: air_t
+        relative_humidity: air_h
+        with_features: [level_indication]

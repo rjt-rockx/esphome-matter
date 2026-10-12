@@ -1,0 +1,62 @@
+# mirrors: shelly-i4-gen4-pid1819
+# Shelly i4 style 4-input controller (Wi-Fi, mains) exposing each input as a Generic Switch. VARIANT (a): `expose:`.
+#
+# Mirrors: Shelly i4 Gen4 Matter (evidence=doc: DCL pid 0x1819, device type Generic Switch; four inputs inferred as four
+#   Generic Switch endpoints; ESPHome analogue = 4 GPIO inputs with optocouplers, shelly-i4 devices.esphome.io).
+# Matches: 4 sibling generic_switch endpoints; the Duplicate rule gives each one a Common Number TagList tag (auto).
+# Differs:
+#   - Shelly inputs are wired wall switches, i.e. latching: LatchingSwitch (SwitchLatched event, 2 positions) is the
+#     natural type; a push button is the momentary alternative. The expose item below uses LatchingSwitch for ALL four
+#     (`features:`). Note: Matter forbids mixing Latching with the momentary features, so long/double press cannot be
+#     had on a latching input (ACCEPTABLE: spec).
+#   - GAP-COMPONENT: auto tag numbers follow hashed endpoint ids, not input order ("Input 1" can get Number 3).
+#   - SDK limit: all 4 endpoints share one Wi-Fi node so no ICD/Thread concerns; mains powered: no Power Source.
+esphome:
+  name: shelly-i4-expose
+
+esp32:
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: "input_*", as: generic_switch, features: [LatchingSwitch]}
+
+binary_sensor:
+  - platform: gpio
+    id: input_1
+    name: "Input 1"
+    pin: {number: GPIO0, inverted: true}
+    filters:
+      - delayed_on_off: 50ms
+  - platform: gpio
+    id: input_2
+    name: "Input 2"
+    pin: {number: GPIO1, inverted: true}
+    filters:
+      - delayed_on_off: 50ms
+  - platform: gpio
+    id: input_3
+    name: "Input 3"
+    pin: {number: GPIO2, inverted: true}
+    filters:
+      - delayed_on_off: 50ms
+  - platform: gpio
+    id: input_4
+    name: "Input 4"
+    pin: {number: GPIO3, inverted: true}
+    filters:
+      - delayed_on_off: 50ms

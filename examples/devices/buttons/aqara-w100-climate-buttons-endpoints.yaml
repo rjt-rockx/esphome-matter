@@ -1,0 +1,113 @@
+# mirrors: aqara-sensor-w100
+# Aqara Climate Sensor W100 (temperature, humidity, 3 buttons, battery) rebuilt as an ESPHome node.
+# VARIANT (a): explicit `endpoints:`, endpoint numbers pinned to the real ones.
+#
+# Mirrors: HA fixture aqara_sensor_w100.json (evidence=dump, Thread, ICD).
+#   Real: EP1 temperature_sensor, EP2 humidity_sensor, EP3-5 generic_switch (MS+MSR+MSL+MSM, MultiPressMax 2) with
+#   TagList [Common Number n, Common Position top/middle/bottom], EP6 power_source (BAT+REPLC, EndpointList empty).
+# Matches: endpoint ids, device types, feature maps, 2-tag TagLists (number + position), MultiPressMax, battery as a
+#   dedicated power_source endpoint (same shape as the real device).
+# Differs: no REPLC feature / BatChargeLevel / Order on the Power Source; no ICD; no OTA Requestor device type on EP0;
+#   Identify cluster present on all endpoints (the real device has it too).
+esphome:
+  name: w100-endpoints
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor:
+        temperature: temp
+    2:
+      humidity_sensor:
+        relative_humidity: hum
+    3:
+      tags:
+        - {namespace: common_number, tag: one}
+        - {namespace: common_position, tag: top}
+      generic_switch:
+        binary_sensor_id: btn_top
+        multi_press_max: 2
+    4:
+      tags:
+        - {namespace: common_number, tag: two}
+        - {namespace: common_position, tag: middle}
+      generic_switch:
+        binary_sensor_id: btn_middle
+        multi_press_max: 2
+    5:
+      tags:
+        - {namespace: common_number, tag: three}
+        - {namespace: common_position, tag: bottom}
+      generic_switch:
+        binary_sensor_id: btn_bottom
+        multi_press_max: 2
+    6:
+      power_source:
+        battery: batt
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: temp
+      name: Temperature
+    humidity:
+      id: hum
+      name: Humidity
+    update_interval: 60s
+  - platform: adc
+    id: batt_v
+    pin: GPIO2
+    attenuation: 12db
+    update_interval: 10min
+    internal: true
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return id(batt_v).state;
+    filters:
+      - calibrate_linear:
+          - 2.0 -> 0.0
+          - 3.0 -> 100.0
+
+binary_sensor:
+  - platform: gpio
+    id: btn_top
+    name: "Button top"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_middle
+    name: "Button middle"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_bottom
+    name: "Button bottom"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms

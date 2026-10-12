@@ -1,0 +1,68 @@
+# mirrors: shelly-i4-gen4-pid1819
+# Shelly i4 style 4-input controller, push-button mode. VARIANT (b): explicit `endpoints:` with pinned numbers.
+#
+# Mirrors: Shelly i4 Gen4 Matter (evidence=doc, see shelly-i4-expose.yaml). This variant treats the inputs as
+#   momentary push buttons (single / double / long press) and pins endpoints 1..4 so tags and numbers are the obvious
+#   Input 1..4.
+# Matches: 4 generic_switch siblings with TagList Common Number 1..4 and labels Input 1..4.
+# Differs: see shelly-i4-expose.yaml. Compared to it, this one gives deterministic tag order (input n = tag n).
+esphome:
+  name: shelly-i4-endpoints
+
+esp32:
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: "Input 1"
+      generic_switch: {binary_sensor_id: input_1, multi_press_max: 3}
+    2:
+      label: "Input 2"
+      generic_switch: {binary_sensor_id: input_2, multi_press_max: 3}
+    3:
+      label: "Input 3"
+      generic_switch: {binary_sensor_id: input_3, multi_press_max: 3}
+    4:
+      label: "Input 4"
+      generic_switch: {binary_sensor_id: input_4, multi_press_max: 3}
+
+binary_sensor:
+  - platform: gpio
+    id: input_1
+    name: "Input 1"
+    pin: {number: GPIO0, inverted: true}
+    filters:
+      - delayed_on_off: 30ms
+  - platform: gpio
+    id: input_2
+    name: "Input 2"
+    pin: {number: GPIO1, inverted: true}
+    filters:
+      - delayed_on_off: 30ms
+  - platform: gpio
+    id: input_3
+    name: "Input 3"
+    pin: {number: GPIO2, inverted: true}
+    filters:
+      - delayed_on_off: 30ms
+  - platform: gpio
+    id: input_4
+    name: "Input 4"
+    pin: {number: GPIO3, inverted: true}
+    filters:
+      - delayed_on_off: 30ms

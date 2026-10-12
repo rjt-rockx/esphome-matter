@@ -1,0 +1,80 @@
+# mirrors: aqara-presence-fp300
+# Mirrors: Aqara Presence Multi-Sensor FP300 (Thread, VID 4447 / PID 8197), HA fixture aqara_presence_fp300.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/aqara_presence_fp300.json
+# Real device: EP1 Occupancy Sensor with the Radar feature + BooleanStateConfiguration (SENSLVL), EP2 Light Sensor,
+# EP3 Temperature Sensor, EP4 Humidity Sensor, EP5 Power Source (BAT, REPLC); root has ICD Management and diagnostics.
+# Variant (b): explicit flat endpoints; mmWave radar (LD2410 `has_target`), SHT4x, BH1750.
+# Differs: Occupancy HoldTime / HoldTimeLimits / PIR delays are not exposed (no ESPHome entity), no REPLC, no ICD.
+esphome:
+  name: aqara-fp300-endpoints
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+uart:
+  tx_pin: GPIO4
+  rx_pin: GPIO5
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+ld2410:
+
+binary_sensor:
+  - platform: ld2410
+    has_target:
+      id: radar_presence
+      name: Presence
+      device_class: presence    # selects the Radar feature
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: fp_t
+      name: Temperature
+    humidity:
+      id: fp_h
+      name: Humidity
+  - platform: bh1750
+    id: fp_lux
+    name: Illuminance
+  - platform: template
+    id: fp_batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 100.0f;
+
+matter:
+  endpoints:
+    1:
+      occupancy_sensor: radar_presence
+      # BooleanStateConfiguration (SENSLVL) cannot be added: `clusters:` crashes (KeyError) and the device type has no BSC option
+    2:
+      light_sensor: fp_lux
+    3:
+      temperature_sensor: fp_t
+    4:
+      humidity_sensor:
+        relative_humidity: fp_h
+    5:
+      power_source:
+        battery: fp_batt

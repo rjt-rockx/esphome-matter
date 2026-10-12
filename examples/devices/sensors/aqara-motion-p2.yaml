@@ -1,0 +1,60 @@
+# mirrors: aqara-motion-p2
+# Mirrors: Aqara Motion and Light Sensor P2 (Thread, VID 4447 / PID 8195), HA fixture aqara_motion_p2.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/aqara_motion_p2.json
+# Real device: EP1 Occupancy Sensor (PIR feature, OccupancySensorType 0) + BooleanStateConfiguration (SENSLVL),
+# EP2 Light Sensor (IlluminanceMeasurement), EP3 Power Source (BAT, REPLC); ICD Management on root.
+# Variant (b): explicit endpoints, the PIR on a gpio binary_sensor and a BH1750 for lux.
+# Differs: no REPLC, SensitivityLevel inert, no ICD; Illuminance bounds (Min/Max) left at defaults.
+esphome:
+  name: aqara-motion-p2
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+binary_sensor:
+  - platform: gpio
+    id: pir
+    name: Motion
+    device_class: motion       # selects the PassiveInfrared feature
+    pin: GPIO4
+
+sensor:
+  - platform: bh1750
+    id: lux
+    name: Illuminance
+    update_interval: 60s
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 100.0f;
+
+matter:
+  endpoints:
+    1:
+      occupancy_sensor: pir
+      # BooleanStateConfiguration (SENSLVL) cannot be added: `clusters:` crashes (KeyError) and the device type has no BSC option
+    2:
+      light_sensor: lux
+    3:
+      power_source:
+        battery: batt

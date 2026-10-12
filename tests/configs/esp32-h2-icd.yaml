@@ -1,0 +1,62 @@
+# EXPERIMENTAL, not verified on hardware: battery powered Thread sensor, Short Idle Time ICD (docs/icd.md).
+esphome:
+  name: matter-ci-h2-icd
+
+substitutions:
+  esp32_variant: ESP32H2
+
+esp32:
+  toolchain: platformio
+  variant: ${esp32_variant}
+  watchdog_timeout: 60s
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+  baud_rate: 0
+
+network:
+  enable_ipv6: true
+
+openthread:
+  device_type: MTD
+  poll_period: 15s
+  network_key: 0xdfd34f0f05cad978ec4e32b0413038ff
+  network_name: matter-ci-icd
+  pan_id: 0x1234
+  channel: 15
+
+matter:
+  icd:
+    mode: sit
+    slow_poll_interval: 5s
+    idle_interval: 60s
+    on_active:
+      - component.update: internal_temp
+  endpoints:
+    1:
+      temperature_sensor: internal_temp
+    2:
+      contact_sensor: door
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp
+    update_interval: never
+
+binary_sensor:
+  - platform: gpio
+    id: door
+    device_class: door
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      - matter.icd.trigger_active
+    on_release:
+      - matter.icd.trigger_active

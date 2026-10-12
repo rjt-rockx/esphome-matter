@@ -1,0 +1,51 @@
+# mirrors: color-temperature-light
+# Mirrors: HA fixture "color_temperature_light" (Signify Mock, VID 0x100B, evidence=dump)
+# Representation (b)+(c): explicit `endpoints:` with the `color_temperature` light platform (one
+#   brightness output plus one color-temperature output, as used by a typical Tuya/Shelly style CCT driver) instead
+#   of two white channels, and a hand set `min_level`.
+# Matches: color_temperature_light, OnOff[LT], LevelControl[OO,LT], ColorControl[CT].
+# Differs: no ModeSelect. ESPHome's `color_temperature` platform needs `color_temperature` + `brightness` outputs.
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-ct-light-ep
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - {platform: ledc, id: out_brightness, pin: GPIO6}
+  - {platform: ledc, id: out_ct, pin: GPIO7}
+
+light:
+  - platform: color_temperature
+    id: ct_bulb
+    name: "CT Bulb"
+    color_temperature: out_ct
+    brightness: out_brightness
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2000 K
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      color_temperature_light:
+        light_id: ct_bulb
+        min_level: 5%

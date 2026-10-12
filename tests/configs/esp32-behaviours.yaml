@@ -1,0 +1,77 @@
+esphome:
+  name: matter-ci-behaviours
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+output:
+  - platform: gpio
+    id: status_led_out
+    pin: GPIO10
+
+binary_sensor:
+  - platform: gpio
+    id: pair_button
+    pin:
+      number: GPIO11
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 30ms
+
+matter:
+  expose: []
+  # Commissioning state on an LED (1 Hz blink: uncommissioned, 4 Hz: window open,
+  # solid: commissioned, double flash: error).
+  status_led:
+    output: status_led_out
+    commissioned: on
+  # Hold 3 s and release: open the commissioning window. Hold 10 s and release:
+  # factory reset. The LED confirms each stage while the button is held.
+  pairing:
+    binary_sensor: pair_button
+    open_window_hold: 3s
+    factory_reset_hold: 10s
+    timeout: 5min
+  on_decommissioned:
+    - logger.log: "Decommissioned"
+  endpoints:
+    1:
+      on_off_light:
+
+text_sensor:
+  - platform: matter
+    commissioning_state:
+      name: Matter state
+    controllers:
+      name: Matter controllers
+    manual_pairing_code:
+      name: Matter pairing code
+    qr_code:
+      name: Matter QR code
+
+button:
+  - platform: template
+    name: Remove first controller
+    on_press:
+      - matter.remove_fabric:
+          fabric_index: 1

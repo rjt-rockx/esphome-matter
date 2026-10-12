@@ -1,0 +1,58 @@
+# mirrors: sdk-chef-sensor-hub-9ep
+# Mirrors: connectedhomeip chef "rootnode_contactsensor..." style sensor hub: contact, light, occupancy, temperature,
+# pressure, flow, humidity, air quality (all concentrations), power source. Plus a soil sensor and rain/freeze/leak
+# probes (mock-soil-sensor fixture).  Variant (b): explicit endpoints, one device type each; stress case for the
+# endpoint count (13 endpoints).  Differs: chef's Binding client clusters are not created.
+esphome:
+  name: chef-sensor-hub
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+binary_sensor:
+  - {platform: template, id: b_contact, device_class: door, lambda: "return false;"}
+  - {platform: template, id: b_occ, device_class: occupancy, lambda: "return false;"}
+  - {platform: template, id: b_leak, device_class: moisture, lambda: "return false;"}
+  - {platform: template, id: b_freeze, device_class: cold, lambda: "return false;"}
+  - {platform: template, id: b_rain, device_class: moisture, lambda: "return false;"}
+
+sensor:
+  - {platform: template, id: s_lux, unit_of_measurement: lx, device_class: illuminance, lambda: "return 100.0;"}
+  - {platform: template, id: s_t, unit_of_measurement: "°C", device_class: temperature, lambda: "return 21.0;"}
+  - {platform: template, id: s_p, unit_of_measurement: hPa, device_class: pressure, lambda: "return 1013.0;"}
+  - {platform: template, id: s_flow, unit_of_measurement: "m³/h", lambda: "return 1.0;"}
+  - {platform: template, id: s_h, unit_of_measurement: "%", device_class: humidity, lambda: "return 40.0;"}
+  - {platform: template, id: s_co2, unit_of_measurement: ppm, device_class: carbon_dioxide, lambda: "return 600.0;"}
+  - {platform: template, id: s_pm25, unit_of_measurement: "µg/m³", device_class: pm25, lambda: "return 5.0;"}
+  - {platform: template, id: s_soil, unit_of_measurement: "%", lambda: "return 30.0;"}
+  - {platform: template, id: s_batt, unit_of_measurement: "%", device_class: battery, lambda: "return 90.0;"}
+
+matter:
+  endpoints:
+    1: {contact_sensor: b_contact}
+    2: {light_sensor: s_lux}
+    3: {occupancy_sensor: b_occ}
+    4: {temperature_sensor: s_t}
+    5: {pressure_sensor: s_p}
+    6: {flow_sensor: s_flow}
+    7: {humidity_sensor: {relative_humidity: s_h}}
+    8: {air_quality_sensor: {carbon_dioxide: s_co2, pm_2_5: s_pm25}}
+    9: {power_source: {battery: s_batt}}
+    10: {water_leak_detector: b_leak}
+    11: {water_freeze_detector: b_freeze}
+    12: {rain_sensor: b_rain}
+    13: {soil_sensor: {temperature: s_t, soil_moisture: s_soil}}

@@ -1,0 +1,58 @@
+# mirrors: zemismart-mt25b
+# Real device: Zemismart MT25B roller blind motor (VID 5020 / PID 65376), Thread, battery powered.
+# Source: HA fixture zemismart_mt25b.json (evidence=dump).
+# Real shape: EP1 window_covering (rev 2) with WindowCovering LF+PA_LF+ABS (Type 0) AND, on the SAME endpoint,
+# PowerSource (BAT+RECHG, Order=Rechargeable Battery) and FixedLabel/UserLabel (room/orientation/floor/direction).
+# Mirrors: ESPHome `tuya` cover + `tuya` battery sensor, the common Tuya blind motor firmware.
+#
+# Variant (a): expose shorthand. `attach_to` moves the battery onto the blind's endpoint (DIRECTION section 6 says the
+# default for a battery sensor is Power Source on EP0).
+esphome:
+  name: matter-zemismart-blind-x
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  expose:
+    - {id: blind, as: window_covering, label: Bedroom blind}
+    - {id: blind_battery, as: power_source, attach_to: blind}
+
+uart:
+  tx_pin: GPIO16
+  rx_pin: GPIO17
+  baud_rate: 9600
+
+tuya:
+
+cover:
+  - platform: tuya
+    id: blind
+    name: Blind
+    device_class: blind
+    position_datapoint: 2
+    control_datapoint: 1
+    invert_position: true   # Tuya reports 100 = closed
+
+sensor:
+  # Battery level reported by the MCU as datapoint 13 (0..100 %).
+  - platform: tuya
+    id: blind_battery
+    name: Blind battery
+    sensor_datapoint: 13
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0

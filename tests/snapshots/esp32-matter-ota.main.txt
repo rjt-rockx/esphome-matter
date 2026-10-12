@@ -1,0 +1,28 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-ota");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("2");
+  new(matter_matterota_id) matter::MatterOta();
+  App.register_component_(matter_matterota_id, 4);
+  matter_matterota_id->set_query_interval(43200);
+  matter_matterota_id->set_watchdog_timeout(300);
+  new(matter_matterotastatetrigger_id) matter::MatterOtaStateTrigger(matter_matterota_id);
+  new(automation_id) Automation<std::string>(matter_matterotastatetrigger_id);
+  new(matter_ota_state) template_::TemplateTextSensor();
+  App.register_text_sensor(matter_ota_state, "Matter OTA state", 1067051259, 0);
+  matter_ota_state->set_update_interval(60000);
+  App.register_component_(matter_ota_state, 11);
+  new(matter_matterotaeventtrigger_id) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::DOWNLOAD_STARTED);
+  new(automation_id_2) Automation<>(matter_matterotaeventtrigger_id);
+  new(matter_matterotaeventtrigger_id_2) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::APPLY_FAILED);
+  new(automation_id_3) Automation<>(matter_matterotaeventtrigger_id_2);
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 1, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type temperature_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x7D9AABAA);

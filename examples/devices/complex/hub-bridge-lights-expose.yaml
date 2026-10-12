@@ -1,0 +1,57 @@
+# mirrors: sdk-chb-bridge-aggregator-dimmable
+# Variant (a) of hub-bridge-lights.yaml: what a user would TRY first with the `expose:` shorthand. This is the
+# native-node answer (DIRECTION P6): three light endpoints directly under the root, no aggregator. Controllers show one
+# device with three lights. There is no `expose` item for bridging (`layout: bridged` is M5b sugar and not implemented),
+# so a bridge needs the explicit tree of hub-bridge-lights.yaml.
+#
+# Matches the light device types of the bridge variant exactly; differs only in composition (flat vs Aggregator tree).
+
+esphome:
+  name: matter-light-hub-native
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose: [ceiling, shelf, desk]
+
+output:
+  - {platform: ledc, id: ww_out, pin: GPIO0}
+  - {platform: ledc, id: cw_out, pin: GPIO1}
+  - {platform: ledc, id: r_out, pin: GPIO2}
+  - {platform: ledc, id: g_out, pin: GPIO3}
+  - {platform: ledc, id: b_out, pin: GPIO4}
+  - {platform: ledc, id: desk_out, pin: GPIO5}
+
+light:
+  - platform: cwww
+    id: ceiling
+    name: Ceiling
+    warm_white: ww_out
+    cold_white: cw_out
+    warm_white_color_temperature: 2700 K
+    cold_white_color_temperature: 6500 K
+  - platform: rgb
+    id: shelf
+    name: Shelf strip
+    red: r_out
+    green: g_out
+    blue: b_out
+  - platform: monochromatic
+    id: desk
+    name: Desk lamp
+    output: desk_out

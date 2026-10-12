@@ -1,0 +1,198 @@
+name: Runtime tests
+
+# The real firmware under Espressif's QEMU, driven by the matter.js harness and the ESPHome API.
+# See docs/dev/runtime-tests.md.
+#
+#   every PR            smoke test (boot, commission, toggle a light); non-blocking for now
+#   PR label `runtime`  smoke + golden behavioural tests
+#   nightly / manual    smoke + golden behavioural tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "components/**"
+      - "tests/runtime/**"
+      - "tests/qemu/**"
+      - "tools/qemu/**"
+      - "tools/harness/**"
+      - ".github/workflows/runtime.yml"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Tests to run"
+        type: choice
+        options:
+          - golden
+          - smoke
+        default: golden
+
+concurrency:
+  group: runtime-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_PYTHON: "3.12"
+  QEMU_TAG: "20260417"
+
+jobs:
+  runtime:
+    name: Runtime tests (${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'runtime') && 'smoke' || (inputs.suite || 'golden') }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # Smoke on pull requests does not block merging until it has proven stable.
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    env:
+      RUNTIME_BUILD_DIR: ${{ github.workspace }}/.cache/build-qemu
+      RUNTIME_CACHE: ${{ github.workspace }}/.cache/runtime-images
+      RUNTIME_ARTIFACTS: ${{ github.workspace }}/test-artifacts/runtime
+      ESPHOME_ESP_IDF_PREFIX: ${{ github.workspace }}/.cache/esphome-idf
+      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
+      QEMU_DIR: ${{ github.workspace }}/.cache/qemu/x/qemu
+    steps:
+      # A label other than `runtime` re-triggers this workflow on `labeled`: do nothing for those.
+      - name: Check that this event should run
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
+          HAS_RUNTIME_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'runtime') }}
+          SUITE_INPUT: ${{ inputs.suite }}
+        run: |
+          run=true
+          if [ "$EVENT" = pull_request ] && [ "$ACTION" = labeled ] && [ "$LABEL" != runtime ]; then run=false; fi
+          if [ "$EVENT" = pull_request ]; then
+            if [ "$HAS_RUNTIME_LABEL" = true ]; then suite=golden; else suite=smoke; fi
+          else
+            suite=${SUITE_INPUT:-golden}
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "suite=$suite" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT action=$ACTION suite=$suite run=$run"
+
+      - name: Check out repository
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v7
+
+      - name: Free disk space
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+
+      - name: Set up Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install system packages
+        if: steps.gate.outputs.run == 'true'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache libslirp0 libglib2.0-0 libsdl2-2.0-0 libpixman-1-0
+
+      - name: Install ESPHome, aioesphomeapi and pytest
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev" pytest
+          .venv/bin/esphome version | tee esphome-version.txt
+
+      - name: Install the harness
+        if: steps.gate.outputs.run == 'true'
+        working-directory: tools/harness
+        run: npm ci
+
+      - name: Compute cache keys
+        if: steps.gate.outputs.run == 'true'
+        id: keys
+        run: |
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+          echo "matter=$(tools/esp-matter-version)" >> "$GITHUB_OUTPUT"
+
+      # Espressif's QEMU (a release tarball, not on PyPI/apt).
+      - name: Cache QEMU
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .cache/qemu
+          key: qemu-${{ runner.os }}-${{ env.QEMU_TAG }}
+
+      # ESP-IDF toolchains and python env (several GB; refreshed weekly).
+      - name: Cache ESP-IDF install
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .cache/esphome-idf
+          key: runtime-idf-${{ runner.os }}-${{ steps.keys.outputs.week }}
+          restore-keys: runtime-idf-${{ runner.os }}-
+
+      # esp_matter (+ connectedhomeip) fetched by the IDF component manager, and the ESPHome build tree
+      # (WORK_NAME=runtime is shared by all runtime YAMLs, so a YAML change is an incremental build).
+      - name: Cache managed_components and build tree
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: |
+            .cache/build-qemu/runtime/.esphome/build/*/managed_components
+            .cache/build-qemu/runtime/.esphome/build/*/dependencies.lock
+          key: runtime-managed-${{ runner.os }}-${{ steps.keys.outputs.matter }}-${{ hashFiles('components/matter/__init__.py') }}
+          restore-keys: runtime-managed-${{ runner.os }}-${{ steps.keys.outputs.matter }}-
+
+      - name: Cache ccache
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .cache/ccache
+          key: runtime-ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: runtime-ccache-${{ runner.os }}-
+
+      # Merged flash images, keyed by the same content hash that tests/runtime/conftest.py uses
+      # (YAML + components/ + run.sh): a re-run of the same commit skips the build entirely.
+      - name: Cache firmware images
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .cache/runtime-images
+          key: runtime-image-${{ hashFiles('tests/qemu/golden.yaml', 'tools/qemu/run.sh', 'components/**') }}
+
+      - name: Run tests (${{ steps.gate.outputs.suite }})
+        if: steps.gate.outputs.run == 'true'
+        env:
+          SUITE: ${{ steps.gate.outputs.suite }}
+        run: |
+          mkdir -p "$RUNTIME_ARTIFACTS"
+          export PATH="$PWD/.venv/bin:$PATH"
+          if [ "$SUITE" = smoke ]; then sel=(-m smoke); else sel=(); fi
+          .venv/bin/python -m pytest tests/runtime "${sel[@]}" -v --color=yes \
+            --junitxml="$RUNTIME_ARTIFACTS/junit.xml" -p no:cacheprovider
+
+      - name: Show the end of the UART log
+        if: always() && steps.gate.outputs.run == 'true'
+        run: tail -n 80 "$RUNTIME_ARTIFACTS/uart.log" 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true
+
+      - name: ccache statistics
+        if: always() && steps.gate.outputs.run == 'true'
+        run: ccache --show-stats || true
+
+      - name: Upload logs and JUnit
+        if: always() && steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-${{ steps.gate.outputs.suite }}-${{ github.run_id }}
+          path: test-artifacts/runtime/
+          if-no-files-found: warn
+          retention-days: 14

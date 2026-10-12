@@ -1,0 +1,49 @@
+# mirrors: sdk-chef-mounted-dimmable-load-control
+# EXPECTED TO FAIL `esphome config`: light_id is not available on mounted_dimmable_load_control.
+
+esphome:
+  name: wall-dimmer-mounted-dimmable-lo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: dimmer_out
+    pin: GPIO4
+
+light:
+  - platform: monochromatic
+    id: load
+    name: Load
+    output: dimmer_out
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+binary_sensor:
+  - platform: gpio
+    id: paddle
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        - light.toggle: load
+
+matter:
+  endpoints:
+    1:
+      mounted_dimmable_load_control:
+        light_id: load   # not accepted: light_id exists only on device types whose name ends in `light`

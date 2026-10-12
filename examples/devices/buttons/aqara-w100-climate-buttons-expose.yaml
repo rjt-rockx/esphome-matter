@@ -1,0 +1,72 @@
+# mirrors: aqara-sensor-w100
+# Aqara Climate Sensor W100 rebuilt with the `expose:` shorthand. VARIANT (b).
+#
+# Mirrors: HA fixture aqara_sensor_w100.json. Compare with aqara-w100-climate-buttons-endpoints.yaml.
+# What a user writes when they want "the sensors and the three buttons": five lines. What is lost:
+#   - GAP-COMPONENT: no `tags:` on an expose item, so no Position (top/middle/bottom) tags; the auto Common Number
+#     tags follow the hash-ordered endpoint numbers, not the button order.
+#   - GAP-COMPONENT: battery is not inferred by expose (power_source sensor), a hand-pinned endpoint is mixed in.
+#   - endpoint numbers are hashes, not 1..6 (fine for a new device, not for a device that must replace a real one).
+esphome:
+  name: w100-expose
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+matter:
+  expose:
+    - temp
+    - hum
+    - {id: "btn_*", as: generic_switch, options: {multi_press_max: 2}}
+  endpoints:
+    6:
+      power_source:
+        battery: batt
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: temp
+      name: Temperature
+    humidity:
+      id: hum
+      name: Humidity
+    update_interval: 60s
+  - platform: template
+    id: batt
+    name: Battery
+    device_class: battery
+    unit_of_measurement: "%"
+    update_interval: 10min
+    lambda: return 100.0;
+
+binary_sensor:
+  - platform: gpio
+    id: btn_top
+    name: "Button top"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_middle
+    name: "Button middle"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_bottom
+    name: "Button bottom"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}

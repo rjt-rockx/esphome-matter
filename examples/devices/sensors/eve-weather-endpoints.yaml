@@ -1,0 +1,60 @@
+# mirrors: eve-weather-sensor
+# Mirrors: Eve Weather (Thread), HA fixture eve_weather_sensor.json (see eve-weather-expose.yaml for the full layout)
+# Variant (b): explicit `endpoints:` with the real endpoint numbers (1 = temperature, 2 = humidity). The real device
+# keeps the battery Power Source on the ROOT endpoint (EP0); `endpoints: 0` is rejected by the component, so the
+# battery gets its own dedicated `power_source` endpoint (3) instead, which is the Aqara layout.
+# Differs: Power Source is a child endpoint (EndpointList cannot be set), no manufacturer history cluster.
+esphome:
+  name: eve-weather-endpoints
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: weather_t
+      name: Temperature
+    humidity:
+      id: weather_h
+      name: Humidity
+  - platform: adc
+    pin: GPIO1
+    id: batt_v
+    attenuation: 12db
+    update_interval: 10min
+  - platform: template
+    id: weather_batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 10min
+    lambda: return clamp((id(batt_v).state - 2.0f) / (3.0f - 2.0f) * 100.0f, 0.0f, 100.0f);
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor: weather_t
+    2:
+      humidity_sensor:
+        relative_humidity: weather_h
+    3:
+      power_source:
+        battery: weather_batt

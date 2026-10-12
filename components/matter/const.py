@@ -1,60 +1,52 @@
-import esphome.codegen as cg
-
-CODEOWNERS = ["@rjt-rockx"]
-
-matter_ns = cg.esphome_ns.namespace("matter")
-MatterComponent = matter_ns.class_("MatterComponent", cg.Component)
-MatterEntity = matter_ns.class_("MatterEntity")
-MatterSwitch = matter_ns.class_("MatterSwitch", MatterEntity)
-
-KEY_MATTER = "matter"
-KEY_ENDPOINTS = "endpoints"
-
 CONF_MATTER = "matter"
-CONF_MATTER_ID = "matter_id"
-CONF_VENDOR_ID = "vendor_id"
-CONF_PRODUCT_ID = "product_id"
+CONF_ENDPOINTS = "endpoints"
 CONF_DISCRIMINATOR = "discriminator"
 CONF_PASSCODE = "passcode"
+CONF_MANUAL_PAIRING_CODE = "manual_pairing_code"
+CONF_QR_CODE = "qr_code"
+CONF_COMPRESSED_FABRIC_ID = "compressed_fabric_id"
+CONF_FABRIC_ID = "fabric_id"
+CONF_LABEL = "label"
+CONF_NODE_ID = "node_id"
+
+# BasicInformation cluster attributes
+CONF_HARDWARE_VERSION = "hardware_version"
+CONF_HARDWARE_VERSION_STRING = "hardware_version_string"
+CONF_PRODUCT_ID = "product_id"
+CONF_PRODUCT_NAME = "product_name"
+CONF_VENDOR_ID = "vendor_id"
+CONF_VENDOR_NAME = "vendor_name"
+CONF_NODE_LABEL = "node_label"
+CONF_SERIAL_NUMBER = "serial_number"
+CONF_SOFTWARE_VERSION_STRING = "software_version_string"
+CONF_UNIQUE_ID = "unique_id"
+
+# Fabric limit (CONFIG_MAX_FABRICS)
+CONF_MAX_FABRICS = "max_fabrics"
+
+# Identify cluster automation
+CONF_ON_IDENTIFY = "on_identify"
+
+# Endpoint config options. The device type names are all derived from
+# device_types.json and don't have a CONF key configured here.
+CONF_CLUSTERS = "clusters"
+CONF_WITH_FEATURES = "with_features"
+CONF_MIN_LEVEL = "min_level"
+CONF_MAX_LEVEL = "max_level"
+CONF_ON_ATTRIBUTE = "on_attribute"
+CONF_SWITCH_ID = "switch_id"
+CONF_COVER_ID = "cover_id"
+CONF_END_PRODUCT_TYPE = "end_product_type"
+
+# Actions
+CONF_ENDPOINT_ID = "endpoint_id"
+CONF_CLUSTER_ID = "cluster_id"
+CONF_COMMAND_ID = "command_id"
 CONF_ENDPOINT = "endpoint"
-CONF_DEVICE_TYPE = "type"
-CONF_ON_COMMISSION = "on_commission"
-
-# CSA-issued test credentials. Triggers an "uncertified accessory" warning
-# in Apple Home but works for development.
-DEFAULT_VENDOR_ID = 0xFFF2
-DEFAULT_PRODUCT_ID = 0x8001
-DEFAULT_DISCRIMINATOR = 3840
-DEFAULT_PASSCODE = 20202021
-
-# Matter device type IDs (subset for v0)
-DEVICE_TYPE_ON_OFF_PLUG_IN_UNIT = 0x010A
-DEVICE_TYPE_ON_OFF_LIGHT = 0x0100
-DEVICE_TYPE_DIMMABLE_LIGHT = 0x0101
-DEVICE_TYPE_COLOR_TEMPERATURE_LIGHT = 0x010C
-DEVICE_TYPE_EXTENDED_COLOR_LIGHT = 0x010D
-DEVICE_TYPE_CONTACT_SENSOR = 0x0015
-DEVICE_TYPE_OCCUPANCY_SENSOR = 0x0107
-DEVICE_TYPE_WATER_LEAK_DETECTOR = 0x0043
-DEVICE_TYPE_GENERIC_SWITCH = 0x000F
-DEVICE_TYPE_TEMPERATURE_SENSOR = 0x0302
-DEVICE_TYPE_HUMIDITY_SENSOR = 0x0307
-DEVICE_TYPE_LIGHT_SENSOR = 0x0106
-DEVICE_TYPE_PRESSURE_SENSOR = 0x0305
-
-# String names accepted in the YAML `matter: {type: ...}` override
-DEVICE_TYPE_NAMES = {
-    "on_off_plug_in_unit": DEVICE_TYPE_ON_OFF_PLUG_IN_UNIT,
-    "on_off_light": DEVICE_TYPE_ON_OFF_LIGHT,
-    "dimmable_light": DEVICE_TYPE_DIMMABLE_LIGHT,
-    "color_temperature_light": DEVICE_TYPE_COLOR_TEMPERATURE_LIGHT,
-    "extended_color_light": DEVICE_TYPE_EXTENDED_COLOR_LIGHT,
-    "contact_sensor": DEVICE_TYPE_CONTACT_SENSOR,
-    "occupancy_sensor": DEVICE_TYPE_OCCUPANCY_SENSOR,
-    "water_leak_detector": DEVICE_TYPE_WATER_LEAK_DETECTOR,
-    "generic_switch": DEVICE_TYPE_GENERIC_SWITCH,
-    "temperature_sensor": DEVICE_TYPE_TEMPERATURE_SENSOR,
-    "humidity_sensor": DEVICE_TYPE_HUMIDITY_SENSOR,
-    "light_sensor": DEVICE_TYPE_LIGHT_SENSOR,
-    "pressure_sensor": DEVICE_TYPE_PRESSURE_SENSOR,
-}
+CONF_CLUSTER = "cluster"
+CONF_ATTRIBUTE = "attribute"
+CONF_COMMAND = "command"
+CONF_EVENT = "event"
+CONF_ARGUMENTS = "arguments"
+CONF_FIELDS = "fields"
+CONF_DATA = "data"

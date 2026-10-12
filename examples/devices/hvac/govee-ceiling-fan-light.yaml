@@ -1,0 +1,91 @@
+# mirrors: govee-ceiling-fan-light-pid1310
+# Mirrors: Govee ceiling fan with light (DCL vid 4999 pid 0x1310; evidence=doc, light endpoint inferred), also
+#   Big Ass Fans Haiku (CT light) and Inovelli VTM36-style fan+light.
+#   EP1 fan (0x002B): FanControl;  EP2 extended_color_light (0x010D)  -- two SIBLING endpoints under root.
+# Natural build: 3-speed fan (ledc/triac driver) + RGBWW light.  Variant (b) explicit `endpoints:` <- this file;
+# ceiling-fan-light-composed.yaml has the fan-parent composition; vtm36-fan-light-expose.yaml the shorthand.
+#
+# Matches:  fan + extended_color_light as siblings (different device types, so no Duplicate / TagList needed),
+#           ColorTemp physical range from the kelvin values.
+# Differs:  none structurally.  No grouping hint ties the light to the fan (same in the Silabs hood dump).
+
+substitutions:
+  name: matter-ceiling-fan-light
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: ceiling_fan
+    2:
+      extended_color_light:
+        light_id: fan_light
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO2
+    frequency: 25kHz
+  - platform: gpio
+    id: fan_dir
+    pin: GPIO3
+  - platform: ledc
+    id: r_out
+    pin: GPIO6
+  - platform: ledc
+    id: g_out
+    pin: GPIO7
+  - platform: ledc
+    id: b_out
+    pin: GPIO10
+  - platform: ledc
+    id: cw_out
+    pin: GPIO11
+  - platform: ledc
+    id: ww_out
+    pin: GPIO12
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm
+    speed_count: 3
+    direction_output: fan_dir
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: rgbww
+    id: fan_light
+    name: Fan light
+    red: r_out
+    green: g_out
+    blue: b_out
+    cold_white: cw_out
+    warm_white: ww_out
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+    restore_mode: ALWAYS_OFF

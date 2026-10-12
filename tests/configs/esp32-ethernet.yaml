@@ -1,0 +1,54 @@
+# WT32-ETH01 (ESP32 + LAN8720, RMII). Matter over Ethernet only: no wifi, no BLE, no Thread.
+esphome:
+  name: matter-ci-ethernet
+
+esp32:
+  variant: ESP32
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+  reboot_timeout: 0s # Matter operation does not require an ESPHome API client.
+
+network:
+  enable_ipv6: true
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk:
+    pin: GPIO0
+    mode: CLK_OUT
+  phy_addr: 1
+  power_pin: GPIO16
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: ethernet_light_entity
+    2:
+      temperature_sensor:
+        temperature: internal_temp
+
+output:
+  - platform: gpio
+    id: led_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: ethernet_light_entity
+    name: Ethernet Light
+    output: led_output
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp

@@ -1,0 +1,43 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-climate");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_climate(heater, 1, false);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint_tag(1, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, heater, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type thermostat");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, heater, false))
+      return MATTER_BUILD_FAIL("endpoint 1: thermostat extension");
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(aircon, 2, true);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, aircon, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 2: device type room_air_conditioner");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, aircon, true))
+      return MATTER_BUILD_FAIL("endpoint 2: thermostat extension");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint_tag(3, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    device_config_0.thermostat.feature_flags = esp_matter::cluster::thermostat::feature::heating::get_id() | esp_matter::cluster::thermostat::feature::cooling::get_id();
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: device type thermostat");
+    auto *thermostat_cluster = esp_matter::cluster::get(endpoint, 513);
+    if (thermostat_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 3: cluster Thermostat missing after device type creation");
+    if (esphome::matter::add_feature(thermostat_cluster, esp_matter::cluster::thermostat::feature::auto_mode::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: cluster Thermostat feature AutoMode");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0xF988D17C);

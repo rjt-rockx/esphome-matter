@@ -1,0 +1,15 @@
+# Expected: without the owning component the key is an unknown option.
+esphome:
+  name: entity-ext-demo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+switch:
+  - platform: template
+    id: relay
+    name: Relay
+    optimistic: true
+    matter_entity_demo: true

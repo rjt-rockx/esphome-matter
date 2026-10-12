@@ -1,0 +1,76 @@
+# mirrors: spec-ceiling-fan-with-light
+# Mirrors: the spec-derived ceiling fan + light (catalog spec-ceiling-fan-with-light, evidence=inferred) and Big Ass
+# Fans Haiku (fan + color-temperature light).  Variant (c) "composed": the light is a PART of the fan endpoint
+# (parent: 1) so controllers that follow the Descriptor PartsList can group it under the fan.
+#
+# Matches:  fan with PartsList [2]; the CT light is nested.
+# Differs:  the catalog/Silabs hood shape is flat siblings.  Nesting is spec-legal but how Apple/Google render a
+#           Fan with a child light is unverified (G13, documentation / G4 hardware gate); it is the only way to
+#           express the "ceiling fan with light" relationship at all.
+#           Fan Control is bound; the light is a color_temperature_light with physical mireds from the kelvin values.
+
+substitutions:
+  name: matter-haiku-style
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: ceiling_fan
+    2:
+      parent: 1
+      color_temperature_light:
+        light_id: fan_light
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO2
+    frequency: 25kHz
+  - platform: ledc
+    id: cw_out
+    pin: GPIO3
+  - platform: ledc
+    id: ww_out
+    pin: GPIO6
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm
+    speed_count: 7
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: cwww
+    id: fan_light
+    name: Fan light
+    cold_white: cw_out
+    warm_white: ww_out
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+    restore_mode: ALWAYS_OFF

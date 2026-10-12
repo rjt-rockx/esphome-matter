@@ -1,0 +1,105 @@
+esphome:
+  name: matter-ci-generic-switch
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Momentary switch with all events, driven by a binary sensor.
+    1:
+      id: button_endpoint
+      generic_switch:
+        binary_sensor_id: button
+        long_press_time: 600ms
+        multi_press_window: 350ms
+        multi_press_max: 3
+    # Features are selected explicitly. Events are sent from automations.
+    2:
+      id: manual_endpoint
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress]
+    # Latching switch (e.g. a toggle switch).
+    3:
+      generic_switch:
+        binary_sensor_id: toggle
+        with_features: [LatchingSwitch]
+    # Bare config: MomentarySwitch and MomentarySwitchRelease.
+    4:
+      generic_switch:
+    # Action switch: multi press is implied, multi_press_max still applies.
+    5:
+      generic_switch:
+        binary_sensor_id: action_button
+        with_features: [ActionSwitch, MomentarySwitchLongPress]
+        multi_press_max: 4
+    # Other device types with a Switch cluster.
+    6:
+      doorbell:
+    7:
+      audio_doorbell:
+        with_features: [Audio]
+
+binary_sensor:
+  - id: button
+    platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+  - id: action_button
+    platform: gpio
+    pin: GPIO3
+  - id: toggle
+    platform: gpio
+    pin:
+      number: GPIO1
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+  - id: manual_button
+    platform: gpio
+    pin:
+      number: GPIO2
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_press:
+      - matter.send_switch_event:
+          endpoint: manual_endpoint
+          event: initial_press
+    on_release:
+      - matter.send_switch_event:
+          endpoint: manual_endpoint
+          event: short_release
+    on_multi_click:
+      - timing:
+          - ON for at least 1s
+        then:
+          - matter.send_switch_event:
+              endpoint: 2
+              event: long_press
+              position: 1

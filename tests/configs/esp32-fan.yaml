@@ -1,0 +1,63 @@
+esphome:
+  name: matter-ci-fan
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: ceiling_fan
+    2:
+      # A fan with only on/off support
+      fan:
+        fan_id: relay_fan
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO4
+  - platform: gpio
+    id: fan_oscillation
+    pin: GPIO5
+  - platform: gpio
+    id: fan_direction
+    pin: GPIO6
+  - platform: gpio
+    id: fan_relay
+    pin: GPIO7
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm
+    speed_count: 3
+    oscillation_output: fan_oscillation
+    direction_output: fan_direction
+    restore_mode: ALWAYS_OFF
+  - platform: binary
+    id: relay_fan
+    name: Relay fan
+    output: fan_relay
+    restore_mode: ALWAYS_OFF

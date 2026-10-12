@@ -1,0 +1,105 @@
+# mirrors: ratgdo-garage
+# Real device family: garage door openers. Evidence: ratgdo (esphome-hardware catalog, evidence=inferred: Closure by spec),
+# DCL rows of retail Matter openers (Konnected GDOv2 = Window Covering 514, Smart Garage Door Opener 3RDO01058W = On/Off
+# Light Switch, Sonoff SmartGarageDoorController = On/Off Plug-in Unit); Meross MSG has no cluster dump. The only real
+# Closure device is the HA test mock `mock_closure_covering_lift.json` (dump).
+# The ratgdo ESPHome component is an external component, so a template cover with device_class garage stands in for
+# `cover: platform: ratgdo` here (same entity interface: position, door state, open/close/stop).
+#
+# Variant (b) "workaround": the component rejects `device_class: garage` on a Matter-bound cover (Window Covering is the wrong
+# semantic, the Closure device type is not implemented). The workaround is a class-less template cover that forwards to the
+# real garage cover, plus the reed switch as a Contact Sensor and the light as On/Off Light, as in the catalog row.
+# Result: a Window Covering (RollerShade) in every controller, "blinds" in Apple Home / Google Home.
+esphome:
+  name: matter-garage-wc
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Garage door
+      window_covering:
+        cover_id: garage_matter       # not `garage_door`: that has device_class garage and is rejected
+        end_product_type: roller_shutter
+    2:
+      label: Door sensor
+      contact_sensor:
+        boolean_state: door_reed
+    3:
+      label: Garage light
+      on_off_light:
+        light_id: garage_light
+
+output:
+  - platform: gpio
+    id: door_relay
+    pin: GPIO10
+  - platform: gpio
+    id: light_relay
+    pin: GPIO11
+
+binary_sensor:
+  - platform: gpio
+    id: door_reed
+    name: Garage door closed
+    device_class: garage_door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+
+light:
+  - platform: binary
+    id: garage_light
+    name: Garage light
+    output: light_relay
+
+cover:
+  # Stand-in for `platform: ratgdo` (device_class garage).
+  - platform: template
+    id: garage_door
+    name: Garage door
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+    close_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+    stop_action:
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+  # What Matter sees: same state, no device_class.
+  - platform: template
+    id: garage_matter
+    name: Garage door (Matter)
+    internal: true
+    has_position: true
+    lambda: |-
+      return id(garage_door).position;
+    open_action:
+      - cover.open: garage_door
+    close_action:
+      - cover.close: garage_door
+    stop_action:
+      - cover.stop: garage_door

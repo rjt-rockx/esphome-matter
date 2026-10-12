@@ -1,0 +1,35 @@
+esphome:
+  name: matter-ci-ble
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+# No wifi/openthread: the device is commissioned over BLE and Matter owns the
+# radio. api is accepted but its reboot_timeout is forced to 0s (see
+# docs/ble-commissioning.md).
+api:
+
+network:
+  enable_ipv6: true
+
+matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
+  ble_commissioning: true
+  endpoints:
+    1:
+      temperature_sensor:
+        temperature: internal_temp
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp

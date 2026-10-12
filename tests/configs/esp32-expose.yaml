@@ -1,0 +1,128 @@
+esphome:
+  name: matter-ci-expose
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  expose:
+    - relay_*                               # glob, natural-sort order
+    - {id: desk, features: [Hue And Saturation]}
+    - {id: room_temp, label: Room, was: old_room_temp}
+    - {id: scd_t, endpoint: 100}            # pin
+    - {id: lamp, as: on_off_light}          # `as:` beats the monochromatic default
+    - {id: scd_h}
+  exclude: [relay_3]
+  endpoints:
+    20:                                     # hand-written endpoints mix with expose
+      on_off_plug_in_unit:
+        switch_id: plug
+
+switch:
+  - platform: template
+    id: relay_1
+    name: Relay 1
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay_2
+    name: Relay 2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay_10
+    name: Relay 10
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay_3
+    name: Relay 3 (excluded)
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: plug
+    name: Plug
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+output:
+  - platform: template
+    id: out_r
+    type: float
+    write_action: []
+  - platform: template
+    id: out_g
+    type: float
+    write_action: []
+  - platform: template
+    id: out_b
+    type: float
+    write_action: []
+  - platform: template
+    id: out_cw
+    type: float
+    write_action: []
+  - platform: template
+    id: out_ww
+    type: float
+    write_action: []
+  - platform: template
+    id: out_lamp
+    type: float
+    write_action: []
+
+light:
+  - platform: rgbww
+    id: desk
+    name: Desk
+    red: out_r
+    green: out_g
+    blue: out_b
+    cold_white: out_cw
+    warm_white: out_ww
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: lamp
+    name: Lamp
+    output: out_lamp
+    restore_mode: ALWAYS_OFF
+
+i2c:
+
+sensor:
+  - platform: template
+    id: room_temp
+    name: Room Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: return 21.5;
+  - platform: scd4x
+    co2:
+      name: CO2
+    temperature:
+      id: scd_t
+      name: SCD Temperature
+    humidity:
+      id: scd_h
+      name: SCD Humidity

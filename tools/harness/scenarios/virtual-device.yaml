@@ -1,0 +1,25 @@
+# Scenarios for the harness's own virtual device (light on ep1, temperature sensor on ep2).
+name: virtual device light toggle
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: OnOff }]
+setup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, within: 3s }
+steps:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: On }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: true, via: report, within: 2s }
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Toggle }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, via: report, within: 2s }
+  # OnOff is read-only: the write must be rejected
+  - write: { ep: "${ep}", cluster: OnOff, attribute: OnOff, value: true, expectError: true }
+---
+name: virtual device temperature
+vars: { ep: 2 }
+requires: [{ ep: "${ep}", cluster: TemperatureMeasurement }]
+steps:
+  - read: { ep: "${ep}", cluster: TemperatureMeasurement, attribute: MeasuredValue, equals: 2000 }
+---
+name: scenario is skipped when the device lacks the cluster
+requires: [{ ep: 1, cluster: Thermostat }]
+steps:
+  - log: "never reached"

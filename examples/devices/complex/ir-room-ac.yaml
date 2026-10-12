@@ -1,0 +1,72 @@
+# mirrors: ir-room-ac-climate
+# Mirrors: an IR-controlled split / window air conditioner as a Matter Room Air Conditioner (0x0072).
+# Sources: research/devices/esphome-hardware.jsonl ir-room-ac-climate (esphome climate_ir + remote_transmitter),
+# HA fixture mock_room_airconditioner (RAC EP1 with OnOff + Thermostat FM=35 + FanControl FM=11, and a child Temperature
+# Sensor EP2 listed in the RAC PartsList), sdk-reference sdk-chef-room-airconditioner-composed.
+#
+# Hardware: ESP32-C6, IR LED on GPIO2 (via a transistor), DS18B20 / SHT room temperature sensor.
+# ESPHome side: `climate: coolix` (any climate_ir platform: daikin, mitsubishi, midea, gree ... works the same). IR is
+# one-way, so the climate's state is *assumed*; Matter still sees a well behaved thermostat.
+#
+# Matches: one endpoint with Thermostat (Heating/Cooling/AutoMode derived from the climate's traits), OnOff following
+# the climate mode, a child Temperature Sensor endpoint (PartsList of the RAC) for the room sensor.
+# Differs: FanControl is missing (climate fan modes -> Fan Control binding is "Not supported yet", docs/climate.md), so
+# the RAC has no fan speed/mode in controllers. See ir-room-ac-expose.yaml for the shorthand and ir-hub-bridge.yaml
+# for the "each IR target is its own accessory" bridge form.
+
+esphome:
+  name: matter-ir-ac
+  friendly_name: Matter IR AC
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      room_air_conditioner:
+        climate_id: bedroom_ac
+    2:
+      parent: 1
+      temperature_sensor: room_temperature
+
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO2
+  carrier_duty_percent: 50%
+
+sensor:
+  - platform: dallas_temp
+    id: room_temperature
+    name: Bedroom temperature
+    address: 0x1c0000031edd2a28
+    update_interval: 30s
+
+one_wire:
+  - platform: gpio
+    pin: GPIO3
+
+climate:
+  - platform: coolix
+    id: bedroom_ac
+    name: Bedroom AC
+    transmitter_id: ir_tx
+    sensor: room_temperature
+    visual:
+      min_temperature: 17 °C
+      max_temperature: 30 °C
+      temperature_step: 1 °C

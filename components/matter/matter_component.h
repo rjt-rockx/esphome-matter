@@ -1,0 +1,226 @@
+#pragma once
+
+#include "esphome/core/defines.h"
+#ifdef USE_MATTER
+#include "esphome/core/automation.h"
+#include "esphome/core/component.h"
+#include "matter_text_sensors.h"
+
+#include "matter_attributes.h"
+#include "matter_cover.h"
+#include "matter_climate.h"
+#include "matter_closure.h"
+#include "matter_climate_fan.h"
+#include "matter_conformance.h"
+#include "matter_device_info.h"
+#include "matter_endpoints.h"
+#include "matter_fan.h"
+#include "matter_filter_monitoring.h"
+#include "matter_generic_switch.h"
+#include "matter_lights.h"
+#include "matter_lock.h"
+#include "matter_sensors.h"
+#include "matter_generic_switch.h"
+#include "matter_switch.h"
+#include "matter_valve.h"
+
+#include <functional>
+#include <string>
+#include <vector>
+
+#include <esp_matter.h>
+
+namespace esphome::matter {
+
+class MatterComponent : public Component {
+public:
+  void setup() override;
+  void dump_config() override;
+  float get_setup_priority() const override {
+    // Must run after ESPHome's network service components. On Wi-Fi/Ethernet
+    // this lets ESPHome initialize the shared mDNS responder before Matter
+    // publishes DNS-SD records; on Thread it keeps Matter after SRP setup.
+    return setup_priority::AFTER_CONNECTION - 5.0f;
+    // TODO: AFTER_BLUETOOTH in BLE commissioning mode.
+  }
+
+  void factory_reset();
+
+  // Basic Information overrides (node label, serial number, ...)
+  DeviceInfoConfig &get_device_info() { return this->device_info_; }
+#ifdef USE_TEXT_SENSOR
+  void set_fabric_compressed_id_sensor(size_t slot,
+                                       text_sensor::TextSensor *sensor);
+  void set_fabric_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_label_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_node_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_vendor_id_sensor(size_t slot,
+                                   text_sensor::TextSensor *sensor);
+  void schedule_fabric_sensor_update();
+#endif
+
+  // Register Matter endpoints
+  void register_endpoint(uint16_t endpoint_id, MatterEndpointBuildFn build_fn);
+
+  // Spec conformance of the endpoint composition (matter_conformance.h).
+  // register_endpoint_parent(endpoint, parent): parent 0 is the root node.
+  void register_endpoint_parent(uint16_t endpoint_id, uint16_t parent_id) {
+    this->conformance_.register_parent(endpoint_id, parent_id);
+  }
+  void register_endpoint_label(uint16_t endpoint_id, const char *label) {
+    this->conformance_.register_label(endpoint_id, label);
+  }
+  void register_endpoint_tag(uint16_t endpoint_id, uint8_t namespace_id,
+                             uint8_t tag, const char *label) {
+    this->conformance_.register_tag(endpoint_id, namespace_id, tag, label);
+  }
+  void set_structure_hash(uint32_t hash) {
+    this->conformance_.set_structure_hash(hash);
+  }
+
+  // Register attribute update actions
+  void register_attribute_trigger(MatterAttributeTriggerBase *trigger) {
+    this->attribute_triggers_.push_back(trigger);
+    this->register_attribute_callback(
+        trigger->endpoint_id(), trigger->cluster_id(), trigger->attribute_id(),
+        [trigger](const esp_matter_attr_val_t &value) {
+          trigger->dispatch(value);
+        });
+  }
+  void register_attribute_callback(uint16_t endpoint_id, uint32_t cluster_id,
+                                   uint32_t attribute_id,
+                                   MatterAttributeCallback callback);
+  void dispatch_attribute_update(uint16_t endpoint_id, uint32_t cluster_id,
+                                 uint32_t attribute_id,
+                                 const esp_matter_attr_val_t &value);
+  void replay_attribute_callback(uint16_t endpoint_id, uint32_t cluster_id,
+                                 uint32_t attribute_id);
+  std::vector<MatterAttributeTriggerBase *> attribute_triggers_;
+
+  // Register ESPHome entities
+#ifdef USE_LIGHT
+  // color_loop_effect is the name of the ESPHome effect that ColorLoopSet runs.
+  void register_light(light::LightState *light, uint16_t endpoint_id,
+                      const char *color_loop_effect = nullptr);
+#endif // USE_LIGHT
+#ifdef USE_SWITCH
+  void register_switch(switch_::Switch *sw, uint16_t endpoint_id);
+#endif // USE_SWITCH
+#ifdef USE_FAN
+  // wind_natural / wind_sleep: names of the fan preset modes that stand for the
+  // Wind feature (nullptr = not mapped).
+  void register_fan(fan::Fan *fan, uint16_t endpoint_id,
+                    const char *wind_natural = nullptr,
+                    const char *wind_sleep = nullptr);
+#endif // USE_FAN
+#ifdef USE_COVER
+  void register_cover(cover::Cover *cover, uint16_t endpoint_id);
+#endif // USE_COVER
+#if defined(USE_COVER) && defined(USE_MATTER_CLOSURE)
+  void register_closure(cover::Cover *cover, uint16_t endpoint_id);
+#endif // USE_COVER && USE_MATTER_CLOSURE
+#ifdef USE_CLIMATE
+  void register_climate(climate::Climate *climate, uint16_t endpoint_id,
+                        bool prefer_cooling, bool heating_only = false);
+  // Fan Control cluster bound to the fan and swing modes of a climate.
+#ifdef USE_MATTER_CLIMATE_FAN
+  void register_climate_fan(climate::Climate *climate, uint16_t endpoint_id);
+#endif
+#endif // USE_CLIMATE
+#ifdef USE_LOCK
+  void register_lock(lock::Lock *lock, uint16_t endpoint_id);
+#endif // USE_LOCK
+#ifdef USE_VALVE
+  void register_valve(valve::Valve *valve, uint16_t endpoint_id);
+#endif // USE_VALVE
+#ifdef USE_SENSOR
+  void register_sensor_attribute(sensor::Sensor *sensor, uint16_t endpoint_id,
+                                 uint32_t cluster_id, uint32_t attribute_id,
+                                 SensorValueConverter converter);
+
+  template <
+      typename ClusterT, typename ValueT,
+      CHIP_ERROR (ClusterT::*Setter)(chip::app::DataModel::Nullable<ValueT>)>
+  void register_code_driven_sensor_attribute(sensor::Sensor *sensor,
+                                             uint16_t endpoint_id,
+                                             uint32_t cluster_id,
+                                             uint32_t attribute_id,
+                                             SensorValueConverter converter) {
+    this->mappings_.push_back(new MatterSensorAttributeMapping(
+        sensor, endpoint_id, cluster_id, attribute_id, converter,
+        update_code_driven_sensor_attribute<ClusterT, ValueT, Setter>));
+  }
+
+  // Defined in matter_sensors.cpp
+  void register_concentration_sensor(sensor::Sensor *sensor,
+                                     uint16_t endpoint_id, uint32_t cluster_id,
+                                     uint32_t attribute_id,
+                                     SensorValueConverter converter,
+                                     uint8_t measurement_unit);
+  void register_soil_moisture_sensor(sensor::Sensor *sensor,
+                                     uint16_t endpoint_id, uint32_t cluster_id,
+                                     uint32_t attribute_id,
+                                     SensorValueConverter converter);
+  void register_electrical_power_sensor(sensor::Sensor *sensor,
+                                        uint16_t endpoint_id,
+                                        uint32_t attribute_id,
+                                        SensorValueConverter converter);
+  void register_electrical_energy_sensor(sensor::Sensor *sensor,
+                                         uint16_t endpoint_id,
+                                         uint32_t attribute_id,
+                                         SensorValueConverter converter);
+#endif // USE_SENSOR
+#ifdef USE_BINARY_SENSOR
+  void
+  register_binary_sensor_attribute(binary_sensor::BinarySensor *sensor,
+                                   uint16_t endpoint_id, uint32_t cluster_id,
+                                   uint32_t attribute_id,
+                                   BinarySensorValueConverter converter,
+                                   SensorAttributeUpdater updater = nullptr);
+#endif // USE_BINARY_SENSOR
+
+  // Register an ESPHome entity mapping created by codegen.
+  void register_mapping(MatterEndpointMappingBase *mapping) {
+    this->mappings_.push_back(mapping);
+  }
+
+  // Public wrapper around the protected Component scheduler; used by the
+  // Matter-thread callbacks to hop onto the main loop (defer is thread-safe).
+  void defer_to_main_loop(std::function<void()> &&f) {
+    this->defer(std::move(f));
+  }
+  // Main loop only: runs `f` on the main loop after `delay_ms`.
+  void run_on_main_loop_after(uint32_t delay_ms, std::function<void()> &&f) {
+    this->set_timeout(delay_ms, std::move(f));
+  }
+
+private:
+  // Defined in matter_endpoints.cpp
+  bool create_endpoints_(esp_matter::node_t *node);
+  void initialize_endpoint_mappings_();
+
+  DeviceInfoConfig device_info_;
+#ifdef USE_TEXT_SENSOR
+  std::vector<MatterFabricSensorRegistration> fabric_sensors_;
+  MatterFabricSensorRegistration &get_fabric_sensors_(size_t slot);
+  void publish_fabric_sensors_();
+#endif
+  MatterConformance conformance_;
+  std::vector<MatterEndpointRegistration> endpoint_registrations_;
+  std::vector<MatterEndpointMappingBase *> mappings_;
+  std::vector<MatterAttributeCallbackRegistration> attribute_callbacks_;
+};
+
+extern MatterComponent *
+    global_matter_component; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+template <typename... Ts>
+class MatterFactoryResetAction : public Action<Ts...>,
+                                 public Parented<MatterComponent> {
+public:
+  void play(const Ts &...x) override { this->parent_->factory_reset(); }
+};
+
+} // namespace esphome::matter
+
+#endif // USE_MATTER

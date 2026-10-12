@@ -1,0 +1,47 @@
+# mirrors: mock-dimmable-light
+# Mirrors: HA fixture "mock_dimmable_light" (Nabu Casa Mock Dimmable Light, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/mock_dimmable_light.json
+# Hardware an ESPHome user would build: one PWM LED / MOSFET channel (monochromatic light on a ledc output).
+# Representation (a): `expose:` shorthand with no overrides. The default expose endpoint number is a hash of the
+#   entity id (not 1); the plan printed by `esphome config` shows it.
+# Matches: dimmable_light (0x0101), Identify, Groups, OnOff[LT], LevelControl[OO,LT], Descriptor.
+# Differs: ScenesManagement (newer device type revision), FixedLabel "Light" (expose copies the entity name into a
+#   label), no Switch/FixedLabel/UserLabel on the root node and no empty endpoint 6 (SDK example leftovers).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-dimmable-light
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: led_out
+    pin: GPIO19
+
+light:
+  - platform: monochromatic
+    id: lamp
+    name: "Light"
+    output: led_out
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose: [lamp]

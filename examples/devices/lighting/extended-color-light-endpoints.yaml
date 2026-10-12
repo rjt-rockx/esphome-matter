@@ -1,0 +1,58 @@
+# mirrors: extended-color-light
+# Mirrors: HA fixture "extended_color_light" (Signify Mock Extended Color Light, VID 0x100B, evidence=dump)
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/extended_color_light.json
+# Representation (b): explicit `endpoints:` tree. Same hardware as extended-color-light-expose.yaml (RGBWW bulb).
+# Matches: endpoint 1 extended_color_light, OnOff[LT], LevelControl[OO,LT], ColorControl[HS,XY,CT],
+#   endpoint number 1 as on the real device (expose would hash it unless pinned).
+# Differs: no ModeSelect, no BridgedDeviceBasicInformation; adds ScenesManagement (device type revision 4 vs 1).
+#   No FixedLabel here (expose adds one per endpoint, explicit endpoints do not).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-extended-color-light-ep
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - {platform: ledc, id: out_r, pin: GPIO3}
+  - {platform: ledc, id: out_g, pin: GPIO10}
+  - {platform: ledc, id: out_b, pin: GPIO11}
+  - {platform: ledc, id: out_cw, pin: GPIO6}
+  - {platform: ledc, id: out_ww, pin: GPIO7}
+
+light:
+  - platform: rgbww
+    id: bulb
+    name: "Bulb"
+    red: out_r
+    green: out_g
+    blue: out_b
+    cold_white: out_cw
+    warm_white: out_ww
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2000 K
+    restore_mode: ALWAYS_OFF
+
+matter:
+  endpoints:
+    1:
+      extended_color_light:
+        light_id: bulb
+        with_features: [Hue And Saturation]

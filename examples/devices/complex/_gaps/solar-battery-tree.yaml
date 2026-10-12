@@ -1,0 +1,82 @@
+# mirrors: mock-solar-battery-storage (variant: Parts tree, TREE topology on the parent)
+# KNOWN GAP (GAP-PT-TREE): electrical_sensor always adds NodeTopology, so tree_topology yields NODE+TREE and the checker
+# reports CL-CHOICE. Kept to document the missing choice. esphome config itself passes.
+# Mirrors: a hybrid solar inverter + home battery. HA mock fixture mock_solar_battery_storage (EP1 Battery Storage 0x0018
+# + Power Source + Electrical Sensor + DEM, with child EP2 Temperature Sensor and EP3 Solar Power 0x0017 + Power Source
+# + Electrical Sensor + DEM, as a Parts tree) and mock_solar_inverter (EP1 Electrical Sensor + Power Source + Solar Power).
+# These are HA test mocks (evidence=mock), not shipping products: no real solar/battery Matter 1.4 device dump exists.
+#
+# ESPHome side: a Modbus/RS485 hybrid inverter read with `modbus_controller` (shown here as template sensors fed by
+# it), giving PV power/energy, battery SoC/power/voltage and the battery temperature.
+#
+# Variant (c): the Parts TREE shape of the mock. The parent endpoint uses tree_topology, the child node_topology.
+# See solar-battery-hybrid.yaml for the flat form and the gap list.
+
+esphome:
+  name: matter-hybrid-tree
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1: # battery storage is the tree root: its Power Topology covers itself and its children
+      battery_storage: {}
+      electrical_sensor:
+        with_features: [tree_topology]
+        active_power: bat_power
+        voltage: bat_voltage
+        energy_imported: bat_energy_in
+        current_type: dc
+      power_source:
+        with_features: [battery, rechargeable]
+      battery: bat_soc
+    2: # solar is a child part of the battery storage endpoint (mock_solar_battery_storage EP1 parts [2,3])
+      parent: 1
+      solar_power: {}
+      electrical_sensor:
+        with_features: [node_topology]
+        active_power: pv_power
+        voltage: pv_voltage
+        energy_exported: pv_energy
+        current_type: dc
+      power_source:
+        with_features: [wired]
+
+uart:
+  tx_pin: GPIO16
+  rx_pin: GPIO17
+  baud_rate: 9600
+
+modbus:
+  id: inverter_bus
+
+modbus_controller:
+  - id: inverter
+    address: 1
+    modbus_id: inverter_bus
+    update_interval: 10s
+
+sensor:
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: pv_power, name: PV power, address: 0x1000, register_type: holding, value_type: U_WORD, unit_of_measurement: W, device_class: power}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: pv_voltage, name: PV voltage, address: 0x1001, register_type: holding, value_type: U_WORD, unit_of_measurement: V, device_class: voltage, filters: [{multiply: 0.1}]}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: pv_energy, name: PV energy, address: 0x1002, register_type: holding, value_type: U_DWORD, unit_of_measurement: kWh, device_class: energy, state_class: total_increasing, filters: [{multiply: 0.1}]}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: bat_power, name: Battery power, address: 0x1010, register_type: holding, value_type: S_WORD, unit_of_measurement: W, device_class: power}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: bat_voltage, name: Battery voltage, address: 0x1011, register_type: holding, value_type: U_WORD, unit_of_measurement: V, device_class: voltage, filters: [{multiply: 0.1}]}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: bat_soc, name: Battery SoC, address: 0x1012, register_type: holding, value_type: U_WORD, unit_of_measurement: "%", device_class: battery}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: bat_energy_in, name: Battery charged, address: 0x1013, register_type: holding, value_type: U_DWORD, unit_of_measurement: kWh, device_class: energy, state_class: total_increasing, filters: [{multiply: 0.1}]}
+  - {platform: modbus_controller, modbus_controller_id: inverter, id: bat_energy_out, name: Battery discharged, address: 0x1015, register_type: holding, value_type: U_DWORD, unit_of_measurement: kWh, device_class: energy, state_class: total_increasing, filters: [{multiply: 0.1}]}

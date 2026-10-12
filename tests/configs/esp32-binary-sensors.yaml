@@ -1,0 +1,129 @@
+esphome:
+  name: matter-ci-binary-sensors
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Contact sensors. ON = open for opening device classes, inverted automatically.
+    1:
+      contact_sensor: front_door
+    2:
+      contact_sensor: window
+    3:
+      contact_sensor:
+        boolean_state: reed_switch
+        inverted: true
+    4:
+      contact_sensor:
+        boolean_state: closed_switch
+        inverted: false
+    # Occupancy sensors. Sensor type feature follows the device_class unless `features` is set.
+    5:
+      occupancy_sensor: hallway_motion
+    6:
+      occupancy_sensor: office_presence
+    7:
+      occupancy_sensor:
+        occupancy: desk_pressure_mat
+        with_features: [PhysicalContact]
+    8:
+      occupancy_sensor: living_room_occupancy
+    # Leak, freeze and rain.
+    10:
+      water_leak_detector: basement_leak
+    11:
+      water_freeze_detector: pipe_cold
+    12:
+      rain_sensor: roof_rain
+    # Smoke and CO.
+    13:
+      smoke_co_alarm:
+        smoke_state: kitchen_smoke
+        co_state: kitchen_co
+    14:
+      smoke_co_alarm:
+        smoke_state: hall_smoke
+    # Questionable mappings. These only produce configuration warnings.
+    20:
+      contact_sensor: bad_class
+    21:
+      contact_sensor: unclassified_contact
+    22:
+      contact_sensor:
+        boolean_state: door_not_inverted
+        inverted: false
+    23:
+      water_leak_detector: door_as_leak
+
+binary_sensor:
+  - platform: template
+    id: front_door
+    device_class: door
+  - platform: template
+    id: window
+    device_class: window
+  - platform: template
+    id: reed_switch
+  - platform: template
+    id: closed_switch
+  - platform: template
+    id: hallway_motion
+    device_class: motion
+  - platform: template
+    id: office_presence
+    device_class: presence
+  - platform: template
+    id: desk_pressure_mat
+  - platform: template
+    id: living_room_occupancy
+    device_class: occupancy
+  - platform: template
+    id: basement_leak
+    device_class: moisture
+  - platform: template
+    id: pipe_cold
+    device_class: cold
+  - platform: template
+    id: roof_rain
+    device_class: moisture
+  - platform: template
+    id: kitchen_smoke
+    device_class: smoke
+  - platform: template
+    id: kitchen_co
+    device_class: carbon_monoxide
+  - platform: template
+    id: hall_smoke
+    device_class: smoke
+  - platform: template
+    id: bad_class
+    device_class: motion
+  - platform: template
+    id: unclassified_contact
+  - platform: template
+    id: door_not_inverted
+    device_class: garage_door
+  - platform: template
+    id: door_as_leak
+    device_class: door

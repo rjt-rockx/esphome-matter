@@ -1,0 +1,337 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-delegates");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  new(matter_mattermodemapping_id) matter::MatterModeMapping(1, 84);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id);
+  matter_mattermodemapping_id->add_mode("Idle", 0, "Idle");
+  matter_mattermodemapping_id->add_tag(16384, 0, false);
+  matter_mattermodemapping_id->add_mode("Cleaning", 1, "Cleaning");
+  matter_mattermodemapping_id->add_tag(16385, 0, false);
+  matter_mattermodemapping_id->add_mode("Mapping", 2, "Mapping");
+  matter_mattermodemapping_id->add_tag(16386, 0, false);
+  new(matter_matteroperationalstatesetaction_id) matter::MatterOperationalStateSetAction<>();
+  matter_matteroperationalstatesetaction_id->set_endpoint_id(2);
+  matter_matteroperationalstatesetaction_id->set_cluster_id(96);
+  matter_matteroperationalstatesetaction_id->set_state(ESPHOME_F("running"));
+  matter_matteroperationalstatesetaction_id->set_phase(ESPHOME_F("Wash"));
+  new(matter_matteroperationalstateerroraction_id) matter::MatterOperationalStateErrorAction<>();
+  matter_matteroperationalstateerroraction_id->set_endpoint_id(1);
+  matter_matteroperationalstateerroraction_id->set_cluster_id(97);
+  matter_matteroperationalstateerroraction_id->set_error([]() -> uint8_t {
+      return 65;
+  });
+  matter_matteroperationalstateerroraction_id->set_label(ESPHOME_F("Wheels stuck"));
+  new(matter_matteroperationalstatecompletedaction_id) matter::MatterOperationalStateCompletedAction<>();
+  matter_matteroperationalstatecompletedaction_id->set_endpoint_id(2);
+  matter_matteroperationalstatecompletedaction_id->set_cluster_id(96);
+  matter_matteroperationalstatecompletedaction_id->set_error([]() -> uint8_t {
+      return 0;
+  });
+  matter_matteroperationalstatecompletedaction_id->set_total_operational_time([]() -> uint32_t {
+      return 3600;
+  });
+  new(matter_mattermodesetaction_id) matter::MatterModeSetAction<>();
+  matter_mattermodesetaction_id->set_endpoint_id(2);
+  matter_mattermodesetaction_id->set_cluster_id(81);
+  matter_mattermodesetaction_id->set_mode([]() -> uint8_t {
+      return 10;
+  });
+  automation_id_11->add_action(matter_matteroperationalstatesetaction_id);
+  automation_id_11->add_action(matter_matteroperationalstateerroraction_id);
+  automation_id_11->add_action(matter_matteroperationalstatecompletedaction_id);
+  automation_id_11->add_action(matter_mattermodesetaction_id);
+  matter_mattermodemapping_id->set_select(vacuum_run_mode);
+  matter_mattermodemapping_id->set_decision(true, 250);
+  matter_mattermodemapping_id->set_accept_when_idle(false);
+  new(matter_matterchangetomodetrigger_id) matter::MatterChangeToModeTrigger();
+  matter_mattermodemapping_id->add_change_trigger(matter_matterchangetomodetrigger_id);
+  new(automation_id) Automation<uint8_t>(matter_matterchangetomodetrigger_id);
+  new(matter_mattermoderejectaction_id) matter::MatterModeRejectAction<uint8_t>();
+  matter_mattermoderejectaction_id->set_status([](uint8_t mode) -> uint8_t {
+      return 67;
+  });
+  matter_mattermoderejectaction_id->set_text(ESPHOME_F("Empty the dust bin first"));
+  ifaction_id->add_then_action(matter_mattermoderejectaction_id);
+  new(matter_mattermodemapping_id_2) matter::MatterModeMapping(1, 85);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_2);
+  matter_mattermodemapping_id_2->add_mode("Vacuum", 0, "Vacuum");
+  matter_mattermodemapping_id_2->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_2->add_mode("Mop", 1, "Mop");
+  matter_mattermodemapping_id_2->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_2->add_tag(2, 0, false);
+  matter_mattermodemapping_id_2->add_mode("Vacuum then mop", 5, "Vacuum then mop");
+  matter_mattermodemapping_id_2->add_tag(16387, 0, false);
+  matter_mattermodemapping_id_2->set_decision(false, 250);
+  matter_mattermodemapping_id_2->set_accept_when_idle(false);
+  new(matter_matterchangetomodetrigger_id_2) matter::MatterChangeToModeTrigger();
+  matter_mattermodemapping_id_2->add_change_trigger(matter_matterchangetomodetrigger_id_2);
+  new(automation_id_2) Automation<uint8_t>(matter_matterchangetomodetrigger_id_2);
+  new(matter_matteroperationalstatemapping_id) matter::MatterOperationalStateMapping(1, 97);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id);
+  matter_matteroperationalstatemapping_id->add_state(0, "");
+  matter_matteroperationalstatemapping_id->add_state(1, "");
+  matter_matteroperationalstatemapping_id->add_state(2, "");
+  matter_matteroperationalstatemapping_id->add_state(3, "");
+  matter_matteroperationalstatemapping_id->add_state(64, "");
+  matter_matteroperationalstatemapping_id->add_state(65, "");
+  matter_matteroperationalstatemapping_id->add_state(66, "");
+  matter_matteroperationalstatemapping_id->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id->add_state_name("seeking_charger", 64);
+  matter_matteroperationalstatemapping_id->add_state_name("charging", 65);
+  matter_matteroperationalstatemapping_id->add_state_name("docked", 66);
+  matter_matteroperationalstatemapping_id->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id->add_error_name("failed_to_find_charging_dock", 64);
+  matter_matteroperationalstatemapping_id->add_error_name("stuck", 65);
+  matter_matteroperationalstatemapping_id->add_error_name("dust_bin_missing", 66);
+  matter_matteroperationalstatemapping_id->add_error_name("dust_bin_full", 67);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_empty", 68);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_missing", 69);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_lid_open", 70);
+  matter_matteroperationalstatemapping_id->add_error_name("mop_cleaning_pad_missing", 71);
+  matter_matteroperationalstatemapping_id->add_error_name("low_battery", 72);
+  matter_matteroperationalstatemapping_id->add_error_name("cannot_reach_target_area", 73);
+  matter_matteroperationalstatemapping_id->add_error_name("dirty_water_tank_full", 74);
+  matter_matteroperationalstatemapping_id->add_error_name("dirty_water_tank_missing", 75);
+  matter_matteroperationalstatemapping_id->add_error_name("wheels_jammed", 76);
+  matter_matteroperationalstatemapping_id->add_error_name("brush_jammed", 77);
+  matter_matteroperationalstatemapping_id->add_error_name("navigation_sensor_obscured", 78);
+  matter_matteroperationalstatemapping_id->add_phase("Cleaning");
+  matter_matteroperationalstatemapping_id->add_phase("Returning");
+  matter_matteroperationalstatemapping_id->set_decision(true, 300);
+  matter_matteroperationalstatemapping_id->add_idle_state(0);
+  matter_matteroperationalstatemapping_id->add_idle_state(66);
+  matter_matteroperationalstatemapping_id->add_idle_state(65);
+  matter_matteroperationalstatemapping_id->set_state_select(vacuum_state);
+  matter_matteroperationalstatemapping_id->set_phase_text_sensor(vacuum_phase);
+  matter_matteroperationalstatemapping_id->set_countdown_sensor(vacuum_eta);
+  new(matter_matteroperationalcommandtrigger_id) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::PAUSE, matter_matteroperationalcommandtrigger_id);
+  new(automation_id_3) Automation<>(matter_matteroperationalcommandtrigger_id);
+  new(matter_matteroperationalcommandtrigger_id_2) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::RESUME, matter_matteroperationalcommandtrigger_id_2);
+  new(automation_id_4) Automation<>(matter_matteroperationalcommandtrigger_id_2);
+  new(matter_matteroperationalcommandtrigger_id_3) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::GO_HOME, matter_matteroperationalcommandtrigger_id_3);
+  new(automation_id_5) Automation<>(matter_matteroperationalcommandtrigger_id_3);
+  new(matter_matteroperationalstaterejectaction_id) matter::MatterOperationalStateRejectAction<>();
+  matter_matteroperationalstaterejectaction_id->set_error([]() -> uint8_t {
+      return 3;
+  });
+  automation_id_5->add_action(matter_matteroperationalstaterejectaction_id);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::robotic_vacuum_cleaner::config_t device_config_0{};
+    if (esp_matter::endpoint::robotic_vacuum_cleaner::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type robotic_vacuum_cleaner");
+    esp_matter::cluster::rvc_clean_mode::config_t rvc_clean_mode_config{};
+    if (esp_matter::cluster::rvc_clean_mode::create(endpoint, &rvc_clean_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 1: cluster RVCCleanMode create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0054))
+      return MATTER_BUILD_FAIL("endpoint 1: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0055))
+      return MATTER_BUILD_FAIL("endpoint 1: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0061))
+      return MATTER_BUILD_FAIL("endpoint 1: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_3) matter::MatterModeMapping(2, 81);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_3);
+  matter_mattermodemapping_id_3->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_3->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_3->add_mode("Delicate", 1, "Delicate");
+  matter_mattermodemapping_id_3->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_3->add_tag(2, 0, false);
+  matter_mattermodemapping_id_3->add_mode("Heavy", 10, "Heavy");
+  matter_mattermodemapping_id_3->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_3->add_tag(7, 0, false);
+  matter_mattermodemapping_id_3->set_select(washer_program);
+  matter_mattermodemapping_id_3->set_decision(false, 250);
+  matter_mattermodemapping_id_3->set_accept_when_idle(true);
+  new(matter_matterlaundrycontrolsmapping_id) matter::MatterLaundryControlsMapping(2);
+  matter_mattercomponent_id->register_mapping(matter_matterlaundrycontrolsmapping_id);
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("Off");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("400");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("800");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("1200");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(0, "none");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(1, "normal");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(2, "extra");
+  matter_matterlaundrycontrolsmapping_id->set_spin_speed_select(washer_spin);
+  matter_matterlaundrycontrolsmapping_id->set_rinses_select(washer_rinses);
+  new(matter_matteroperationalstatemapping_id_2) matter::MatterOperationalStateMapping(2, 96);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id_2);
+  matter_matteroperationalstatemapping_id_2->add_state(0, "");
+  matter_matteroperationalstatemapping_id_2->add_state(1, "");
+  matter_matteroperationalstatemapping_id_2->add_state(2, "");
+  matter_matteroperationalstatemapping_id_2->add_state(3, "");
+  matter_matteroperationalstatemapping_id_2->add_state(128, "Soaking");
+  matter_matteroperationalstatemapping_id_2->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id_2->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id_2->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id_2->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Soaking", 128);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Idle", 0);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Washing", 1);
+  matter_matteroperationalstatemapping_id_2->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id_2->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id_2->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id_2->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id_2->add_phase("Pre-wash");
+  matter_matteroperationalstatemapping_id_2->add_phase("Wash");
+  matter_matteroperationalstatemapping_id_2->add_phase("Rinse");
+  matter_matteroperationalstatemapping_id_2->add_phase("Spin");
+  matter_matteroperationalstatemapping_id_2->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::START, 0);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 1);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 2);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(0);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(2);
+  matter_matteroperationalstatemapping_id_2->set_state_select(washer_state);
+  matter_matteroperationalstatemapping_id_2->set_countdown_sensor(washer_remaining);
+  new(matter_matteroperationalcommandtrigger_id_6) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::PAUSE, matter_matteroperationalcommandtrigger_id_6);
+  new(automation_id_8) Automation<>(matter_matteroperationalcommandtrigger_id_6);
+  new(matter_matteroperationalcommandtrigger_id_7) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::RESUME, matter_matteroperationalcommandtrigger_id_7);
+  new(automation_id_9) Automation<>(matter_matteroperationalcommandtrigger_id_7);
+  new(matter_matteroperationalcommandtrigger_id_4) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::START, matter_matteroperationalcommandtrigger_id_4);
+  new(automation_id_6) Automation<>(matter_matteroperationalcommandtrigger_id_4);
+  new(matter_matteroperationalcommandtrigger_id_5) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::STOP, matter_matteroperationalcommandtrigger_id_5);
+  new(automation_id_7) Automation<>(matter_matteroperationalcommandtrigger_id_5);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::laundry_washer::config_t device_config_0{};
+    if (esp_matter::endpoint::laundry_washer::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 2: device type laundry_washer");
+    esp_matter::cluster::laundry_washer_mode::config_t laundry_washer_mode_config{};
+    if (esp_matter::cluster::laundry_washer_mode::create(endpoint, &laundry_washer_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 2: cluster LaundryWasherMode create");
+    esp_matter::cluster::laundry_washer_controls::config_t laundry_washer_controls_config{};
+    laundry_washer_controls_config.feature_flags = esp_matter::cluster::laundry_washer_controls::feature::spin::get_id() | esp_matter::cluster::laundry_washer_controls::feature::rinse::get_id();
+    laundry_washer_controls_config.features.rinse.number_of_rinses = 0;
+    if (esp_matter::cluster::laundry_washer_controls::create(endpoint, &laundry_washer_controls_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 2: cluster LaundryWasherControls create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0051))
+      return MATTER_BUILD_FAIL("endpoint 2: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0053))
+      return MATTER_BUILD_FAIL("endpoint 2: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0060))
+      return MATTER_BUILD_FAIL("endpoint 2: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodeselectmapping_id) matter::MatterModeSelectMapping(3);
+  matter_mattercomponent_id->register_mapping(matter_mattermodeselectmapping_id);
+  matter_mattermodeselectmapping_id->add_mode("Low", 0, "Low");
+  matter_mattermodeselectmapping_id->add_tag(1, 65521, true);
+  matter_mattermodeselectmapping_id->add_mode("High", 1, "High");
+  matter_mattermodeselectmapping_id->set_select(fan_preset);
+  new(matter_matterchangetomodetrigger_id_3) matter::MatterChangeToModeTrigger();
+  matter_mattermodeselectmapping_id->add_change_trigger(matter_matterchangetomodetrigger_id_3);
+  new(automation_id_10) Automation<uint8_t>(matter_matterchangetomodetrigger_id_3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::mode_select::config_t device_config_0{};
+    strncpy(device_config_0.mode_select.description, "Fan speed preset", sizeof(device_config_0.mode_select.description) - 1);
+    device_config_0.mode_select.current_mode = 0;
+    if (esp_matter::endpoint::mode_select::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: device type mode_select");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0050))
+      return MATTER_BUILD_FAIL("endpoint 3: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_4) matter::MatterModeMapping(4, 158);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_4);
+  matter_mattermodemapping_id_4->add_mode("Off", 0, "Off");
+  matter_mattermodemapping_id_4->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_4->add_mode("Manual", 1, "Manual");
+  matter_mattermodemapping_id_4->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_4->add_mode("Timed", 2, "Timed");
+  matter_mattermodemapping_id_4->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_4->add_tag(5, 0, false);
+  matter_mattermodemapping_id_4->set_decision(false, 250);
+  matter_mattermodemapping_id_4->set_accept_when_idle(false);
+  matter_mattercomponent_id->register_endpoint_parent(4, 0);
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_heater::config_t device_config_0{};
+    device_config_0.thermostat.feature_flags = esp_matter::cluster::thermostat::feature::heating::get_id();
+    if (esp_matter::endpoint::water_heater::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 4: device type water_heater");
+    if (!esphome::matter::attach_delegate(endpoint, 0x009E))
+      return MATTER_BUILD_FAIL("endpoint 4: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_5) matter::MatterModeMapping(5, 89);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_5);
+  matter_mattermodemapping_id_5->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_5->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_5->add_mode("Heavy", 1, "Heavy");
+  matter_mattermodemapping_id_5->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_5->add_mode("Light", 2, "Light");
+  matter_mattermodemapping_id_5->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_5->add_tag(1, 0, false);
+  matter_mattermodemapping_id_5->set_decision(false, 250);
+  matter_mattermodemapping_id_5->set_accept_when_idle(false);
+  new(matter_matteroperationalstatemapping_id_3) matter::MatterOperationalStateMapping(5, 96);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id_3);
+  matter_matteroperationalstatemapping_id_3->add_state(0, "");
+  matter_matteroperationalstatemapping_id_3->add_state(1, "");
+  matter_matteroperationalstatemapping_id_3->add_state(2, "");
+  matter_matteroperationalstatemapping_id_3->add_state(3, "");
+  matter_matteroperationalstatemapping_id_3->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id_3->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id_3->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id_3->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id_3->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id_3->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id_3->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_3->add_idle_state(0);
+  matter_matteroperationalstatemapping_id_3->set_state_select(dishwasher_state);
+  matter_mattercomponent_id->register_endpoint_parent(5, 0);
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dish_washer::config_t device_config_0{};
+    if (esp_matter::endpoint::dish_washer::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 5: device type dishwasher");
+    esp_matter::cluster::dish_washer_mode::config_t dish_washer_mode_config{};
+    if (esp_matter::cluster::dish_washer_mode::create(endpoint, &dish_washer_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 5: cluster DishwasherMode create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0059))
+      return MATTER_BUILD_FAIL("endpoint 5: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0060))
+      return MATTER_BUILD_FAIL("endpoint 5: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_6) matter::MatterModeMapping(6, 82);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_6);
+  matter_mattermodemapping_id_6->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_6->add_tag(0, 0, false);
+  matter_mattermodemapping_id_6->add_mode("Rapid cool", 1, "Rapid cool");
+  matter_mattermodemapping_id_6->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_6->add_mode("Rapid freeze", 2, "Rapid freeze");
+  matter_mattermodemapping_id_6->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_6->set_decision(false, 250);
+  matter_mattermodemapping_id_6->set_accept_when_idle(false);
+  matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::refrigerator::config_t device_config_0{};
+    if (esp_matter::endpoint::refrigerator::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 6: device type refrigerator");
+    esp_matter::cluster::refrigerator_and_tcc_mode::config_t refrigerator_and_tcc_mode_config{};
+    if (esp_matter::cluster::refrigerator_and_tcc_mode::create(endpoint, &refrigerator_and_tcc_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 6: cluster RefrigeratorAndTemperatureControlledCabinetMode create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0052))
+      return MATTER_BUILD_FAIL("endpoint 6: cluster delegate attach");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x6FAFB8DA);

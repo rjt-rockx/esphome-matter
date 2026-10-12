@@ -1,0 +1,63 @@
+# mirrors: apollo-air-1
+# Mirrors: Apollo AIR-1 (ESPHome-native device) exposed over Matter, see apollo-air1-split.yaml for the sensors.
+# Variant (c): "single tile" layout. Temperature and humidity are bound to the air_quality_sensor endpoint itself (the
+# device type allows optional Temperature/RelativeHumidity measurement clusters), the way IKEA ALPSTUGA does it. One
+# endpoint means one tile in Apple Home / Google Home. Pressure keeps a separate endpoint (air_quality_sensor does not
+# allow PressureMeasurement).
+# The same result in `expose:` would be `{id: air_t, attach_to: co2}` (DIRECTION scenario (c)), which needs the
+# air-quality merge group that the current expose package does not have.
+esphome:
+  name: apollo-air1-single
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: sen5x
+    id: sen55
+    pm_2_5:
+      id: pm25
+      name: PM2.5
+    temperature:
+      id: air_t
+      name: Temperature
+    humidity:
+      id: air_h
+      name: Humidity
+  - platform: scd4x
+    co2:
+      id: co2
+      name: CO2
+  - platform: dps310
+    pressure:
+      id: air_p
+      name: Pressure
+
+matter:
+  endpoints:
+    1:
+      air_quality_sensor:
+        carbon_dioxide: co2
+        pm_2_5: pm25
+        temperature: air_t
+        relative_humidity: air_h
+    2:
+      pressure_sensor: air_p

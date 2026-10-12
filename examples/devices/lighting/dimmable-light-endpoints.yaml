@@ -1,0 +1,50 @@
+# mirrors: mock-dimmable-light
+# Mirrors: HA fixture "mock_dimmable_light" (Nabu Casa Mock Dimmable Light, evidence=dump)
+# Representation (b): explicit `endpoints:` on endpoint 1, with a level floor. This is the same shape as
+#   examples/extended-color-light.yaml and the README quickstart.
+# Matches: dimmable_light, endpoint 1, OnOff[LT], LevelControl[OO,LT], Identify, Groups.
+# Differs: ScenesManagement from the newer device type revision; `min_level` is a real-hardware tweak (LEDs that
+#   turn off at very low duty) and sets LevelControl.MinLevel (real mock: 1).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-dimmable-light-ep
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: ledc
+    id: led_out
+    pin: GPIO19
+
+light:
+  - platform: monochromatic
+    id: lamp
+    name: "Light"
+    output: led_out
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+matter:
+  endpoints:
+    1:
+      dimmable_light:
+        light_id: lamp
+        min_level: 2%

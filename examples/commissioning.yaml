@@ -1,0 +1,60 @@
+esphome:
+  name: matter-commissioning
+
+esp32:
+  board: esp32-c6-devkitc-1
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# See docs/commissioning.md
+matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
+  # persist_passcode: until_commissioned  # default: keep the code across reboots until the first commissioning
+  # persist_passcode: true   # keep the plaintext passcode in flash forever
+  # persist_passcode: false  # RAM only: a new code on every boot until commissioned
+  on_commissioned:
+    - logger.log: "Commissioned"
+  on_decommissioned:
+    - logger.log: "Decommissioned"
+  endpoints:
+    1:
+      on_off_light:
+
+text_sensor:
+  - platform: matter
+    commissioning_state:
+      name: Matter state
+    fabric_count:
+      name: Matter fabrics
+    # Only non-empty while a commissioning window is open.
+    manual_pairing_code:
+      name: Matter pairing code
+      disabled_by_default: false
+
+button:
+  - platform: template
+    name: Matter allow pairing
+    entity_category: config
+    on_press:
+      - matter.open_commissioning_window:
+          timeout: 5min
+  - platform: template
+    name: Matter remove from all ecosystems
+    entity_category: config
+    on_press:
+      - matter.factory_reset:
+  - platform: template
+    name: Matter reset identity
+    entity_category: config
+    on_press:
+      - matter.reset_identity:

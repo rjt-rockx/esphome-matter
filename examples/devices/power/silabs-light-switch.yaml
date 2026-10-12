@@ -1,0 +1,41 @@
+# mirrors: silabs-light-switch
+# Real device: Silabs light switch sample, HA fixture silabs_light_switch.json, evidence=dump: on_off_light_switch (client OnOff,
+# Scenes, Color...) plus generic_switch. Ours: client binding with matter.send_command toggle and a bound button.
+
+esphome:
+  name: silabs-light-switch
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    pin: {number: GPIO9, mode: INPUT_PULLUP, inverted: true}
+    on_click:
+      then:
+        # Send On/Off Toggle to whatever this switch is bound to (set by a controller).
+        - matter.send_command: switch_endpoint.on_off.toggle
+
+matter:
+  endpoints:
+    1:
+      id: switch_endpoint
+      on_off_light_switch:
+    2:
+      generic_switch:
+        binary_sensor_id: button

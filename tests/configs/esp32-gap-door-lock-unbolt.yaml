@@ -1,0 +1,63 @@
+# Real device: Matter SDK test lock as dumped by HA (mock_door_lock_with_unbolt.json, evidence=dump, Thread).
+# Real shape: EP1 door_lock (rev 1) with PIN,RID,YDSCH,HDSCH,UBOLT,WDSCH,DPS,COTA,USR + OnOff + PowerSource(BAT,REPLC) on the
+# same endpoint (OnOff on a lock is not part of the Door Lock device type).
+# Mirrors: lock with door position sensor and battery. Schedules and credential database have no ESPHome backing.
+#
+# Variant (b): explicit endpoint; `battery:` places PowerSource(BAT) on the lock endpoint like the real dump.
+#
+esphome:
+  name: matter-mock-lock
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: "0e08000000000001000000030000134a0300001035060004001fffe00208dead00beef00cafe0708fd00000000000001051000112233445566778899aabbccddeeff030f4f70656e5468726561642d65737001021234"
+
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        with_features:
+          - PIN Credential
+          - RFID Credential
+          - YearDayAccessSchedules
+          - HolidaySchedules
+          - WeekDayAccessSchedules
+          - Unbolt
+          - DoorPositionSensor
+          - CredentialsOverTheAirAccess
+          - User
+      battery: lock_battery
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO10
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+sensor:
+  - platform: template
+    id: lock_battery
+    name: Lock battery
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: return 80.0;
+    update_interval: 10min

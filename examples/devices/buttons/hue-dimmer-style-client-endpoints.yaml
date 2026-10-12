@@ -1,0 +1,113 @@
+# mirrors: sdk-chef-onoff-light-switch-controller
+# 4-button dimmer remote (Philips Hue dimmer switch layout: On, Brighter, Dimmer, Off) as a Matter CLIENT.
+# VARIANT (a): `dimmer_switch` + Binding + `matter.send_command` (the controller binds the remote to a light/group).
+#
+# Mirrors: sdk-reference chef/esp-matter "light_switch" family and the Dimmer Switch endpoint of the Inovelli dump
+#   (HA fixture inovelli_vtm31.json EP2): server Identify/Descriptor/Binding, client Identify/OnOff/LevelControl.
+#   The Hue dimmer itself is Zigbee; behind a Hue bridge it appears as Matter Generic Switches (see variant b).
+# Matches: Dimmer Switch device type (0x0104), Binding server, OnOff + LevelControl client commands:
+#   On / Off on short press, MoveWithOnOff (rate) on hold, Stop on release, StepWithOnOff on tap of up/down.
+# Differs:
+#   - GAP-COMPONENT: no way to see the binding result (no OnOff subscription to the bound light, a toggle can drift,
+#     KNOWLEDGE b9b); `send_command` iterates the binding table before taking the CHIP lock (race, documented).
+#   - GAP-COMPONENT: the Binding cluster is filled by a controller (HA matterjs-server UI, chip-tool); there is no
+#     YAML way to pre-bind to a node id or group id (`bindings:`).
+#   - Controllers (Apple, Google) mostly do not create bindings for third-party switches: ecosystem limit.
+esphome:
+  name: hue-style-dimmer-client
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      id: dimmer
+      dimmer_switch:
+
+binary_sensor:
+  - platform: gpio
+    id: btn_on
+    name: "On"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      then:
+        - matter.send_command: dimmer.on_off.on
+  - platform: gpio
+    id: btn_off
+    name: "Off"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      then:
+        - matter.send_command: dimmer.on_off.off
+  - platform: gpio
+    id: btn_up
+    name: "Brighter"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      min_length: 20ms
+      max_length: 400ms
+      then:
+        - matter.send_command:
+            path: dimmer.level_control.step_with_on_off
+            arguments:
+              step_mode: up
+              step_size: 25
+              transition_time: 3
+    on_press:
+      then:
+        - delay: 400ms
+        - matter.send_command:
+            path: dimmer.level_control.move_with_on_off
+            arguments:
+              move_mode: up
+              rate: 40
+    on_release:
+      then:
+        - matter.send_command: dimmer.level_control.stop_with_on_off
+  - platform: gpio
+    id: btn_down
+    name: "Dimmer"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      min_length: 20ms
+      max_length: 400ms
+      then:
+        - matter.send_command:
+            path: dimmer.level_control.step_with_on_off
+            arguments:
+              step_mode: down
+              step_size: 25
+              transition_time: 3
+    on_press:
+      then:
+        - delay: 400ms
+        - matter.send_command:
+            path: dimmer.level_control.move_with_on_off
+            arguments:
+              move_mode: down
+              rate: 40
+    on_release:
+      then:
+        - matter.send_command: dimmer.level_control.stop_with_on_off

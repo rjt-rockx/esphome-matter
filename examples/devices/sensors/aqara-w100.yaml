@@ -1,0 +1,63 @@
+# mirrors: aqara-sensor-w100
+# Mirrors: Aqara Climate Sensor W100 (Thread, VID 4447 / PID 8196), HA fixture aqara_sensor_w100.json
+# Real device: EP1 Temperature, EP2 Humidity, EP3-5 three Generic Switch endpoints (Switch MS+MSR+MSL+MSM,
+# MultiPressMax 2, TagList with Common Number 1..3 plus a second namespace tag), EP6 Power Source (BAT, REPLC); ICD on root.
+# Variant (b): explicit endpoints; three gpio buttons bound with binary_sensor_id. Auto Common Number tags are added
+# to the generic_switch siblings by the component. Differs: no second-namespace position tags (could be added with
+# `tags:`), no REPLC, no ICD.
+esphome:
+  name: aqara-w100
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+binary_sensor:
+  - {platform: gpio, id: btn_minus, pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}}
+  - {platform: gpio, id: btn_center, pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}}
+  - {platform: gpio, id: btn_plus, pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}}
+
+sensor:
+  - platform: sht4x
+    temperature: {id: w_t, name: Temperature}
+    humidity: {id: w_h, name: Humidity}
+  - platform: template
+    id: w_batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 100.0f;
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor: w_t
+    2:
+      humidity_sensor:
+        relative_humidity: w_h
+    3:
+      generic_switch: {binary_sensor_id: btn_minus}
+    4:
+      generic_switch: {binary_sensor_id: btn_center}
+    5:
+      generic_switch: {binary_sensor_id: btn_plus}
+    6:
+      power_source:
+        battery: w_batt

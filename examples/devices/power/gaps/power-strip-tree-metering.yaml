@@ -1,0 +1,124 @@
+# mirrors: spec-power-strip-per-outlet-metering
+# EXPECTED NON-CONFORMANT: tree_topology is accepted but NodeTopology is also forced (CL-CHOICE in tools.conformance).
+
+esphome:
+  name: power-strip-tree-metering
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+switch:
+  - platform: gpio
+    id: outlet_1
+    name: Outlet 1
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_2
+    name: Outlet 2
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_3
+    name: Outlet 3
+    pin: GPIO6
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_4
+    name: Outlet 4
+    pin: GPIO7
+    restore_mode: ALWAYS_OFF
+
+uart:
+  rx_pin: GPIO20
+  tx_pin: GPIO21
+  baud_rate: 19200
+
+sensor:
+  - platform: bl0906
+    update_interval: 10s
+    voltage: {id: mains_voltage, name: Voltage}
+    total_power: {id: total_power, name: Total power}
+    total_energy: {id: total_energy, name: Total energy}
+    channel_1:
+      current: {id: ch1_current, name: "Outlet 1 current"}
+      power: {id: ch1_power, name: "Outlet 1 power"}
+      energy: {id: ch1_energy, name: "Outlet 1 energy"}
+    channel_2:
+      current: {id: ch2_current, name: "Outlet 2 current"}
+      power: {id: ch2_power, name: "Outlet 2 power"}
+      energy: {id: ch2_energy, name: "Outlet 2 energy"}
+    channel_3:
+      current: {id: ch3_current, name: "Outlet 3 current"}
+      power: {id: ch3_power, name: "Outlet 3 power"}
+      energy: {id: ch3_energy, name: "Outlet 3 energy"}
+    channel_4:
+      current: {id: ch4_current, name: "Outlet 4 current"}
+      power: {id: ch4_power, name: "Outlet 4 power"}
+      energy: {id: ch4_energy, name: "Outlet 4 energy"}
+
+matter:
+  endpoints:
+    # Matter has no power strip device type: the strip is an electrical sensor (the total) and the outlets are
+    # On/Off Plug-in Units, each with its own electrical sensor, as children of the total.
+    1:
+      label: Strip total
+      electrical_sensor:
+        with_features: [tree_topology]
+        voltage: mains_voltage
+        active_power: total_power
+        energy_imported: total_energy
+    2:
+      parent: 1
+      label: Outlet 1
+      on_off_plug_in_unit:
+        switch_id: outlet_1
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch1_current
+        active_power: ch1_power
+        energy_imported: ch1_energy
+    3:
+      parent: 1
+      label: Outlet 2
+      on_off_plug_in_unit:
+        switch_id: outlet_2
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch2_current
+        active_power: ch2_power
+        energy_imported: ch2_energy
+    4:
+      parent: 1
+      label: Outlet 3
+      on_off_plug_in_unit:
+        switch_id: outlet_3
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch3_current
+        active_power: ch3_power
+        energy_imported: ch3_energy
+    5:
+      parent: 1
+      label: Outlet 4
+      on_off_plug_in_unit:
+        switch_id: outlet_4
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: ch4_current
+        active_power: ch4_power
+        energy_imported: ch4_energy

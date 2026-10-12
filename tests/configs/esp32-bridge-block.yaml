@@ -1,0 +1,101 @@
+# The `bridge:` block: devices lower into an Aggregator and Bridged Nodes at hashed, stable endpoint numbers.
+esphome:
+  name: matter-ci-bridge-block
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  bridge:
+    devices:
+      # Several device types: Bridged Node endpoint plus one child endpoint each.
+      kitchen_thermometer:
+        name: Kitchen Thermometer
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        reachable: kitchen_seen
+        battery: kitchen_battery
+        temperature_sensor: kitchen_temp
+        humidity_sensor: kitchen_humidity
+      # One device type: it shares the endpoint with the Bridged Node.
+      relay_a:
+        name: Relay A
+        endpoint: 100 # pinned
+        on_off_plug_in_unit:
+          switch_id: relay_a
+      # A single device type in child form (no sibling Number tags when many identical devices exist).
+      relay_b:
+        nested: true
+        on_off_plug_in_unit:
+          switch_id: relay_b
+
+      # primary: this device type shares the Bridged Node endpoint, the others get child endpoints.
+      heater:
+        name: Heater
+        primary: on_off_plug_in_unit
+        on_off_plug_in_unit:
+          switch_id: relay_c
+        temperature_sensor: heater_temp
+
+switch:
+  - platform: template
+    id: relay_c
+    name: Relay C
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay_a
+    name: Relay A
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay_b
+    name: Relay B
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: template
+    id: heater_temp
+    name: Heater Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: kitchen_temp
+    name: Kitchen Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: kitchen_humidity
+    name: Kitchen Humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+  - platform: template
+    id: kitchen_battery
+    name: Kitchen Battery
+    unit_of_measurement: "%"
+    device_class: battery
+
+binary_sensor:
+  - platform: template
+    id: kitchen_seen
+    name: Kitchen thermometer seen

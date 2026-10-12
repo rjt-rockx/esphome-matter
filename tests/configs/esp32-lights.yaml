@@ -1,0 +1,140 @@
+esphome:
+  name: matter-ci-lights
+
+esp32:
+  variant: ESP32S3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: binary_light
+    2:
+      dimmable_light:
+        light_id: dimmable_light
+        min_level: 10%
+    3:
+      color_temperature_light:
+        light_id: ct_light
+    4:
+      extended_color_light:
+        light_id: rgbww_light
+        with_features:
+          - Hue And Saturation
+          - EnhancedHue
+          - ColorLoop
+        color_loop_effect: Color loop
+    5:
+      extended_color_light:
+        light_id: rgb_light
+
+# One output per channel, nothing shared between lights. The ESP32-S3 has 8 LEDC
+# channels, which the dimmable, color temperature and RGBWW lights use up. The
+# binary light uses a GPIO and the RGB light template outputs, so that no LEDC
+# channel is used twice.
+output:
+  - platform: gpio
+    id: output_binary
+    pin: GPIO10
+  - platform: ledc
+    id: output_dimmable
+    pin: GPIO1
+  - platform: ledc
+    id: output_ct_cold
+    pin: GPIO2
+  - platform: ledc
+    id: output_ct_warm
+    pin: GPIO4
+  - platform: ledc
+    id: output_rgbww_red
+    pin: GPIO5
+  - platform: ledc
+    id: output_rgbww_green
+    pin: GPIO6
+  - platform: ledc
+    id: output_rgbww_blue
+    pin: GPIO7
+  - platform: ledc
+    id: output_rgbww_cold
+    pin: GPIO8
+  - platform: ledc
+    id: output_rgbww_warm
+    pin: GPIO9
+  - platform: template
+    id: output_rgb_red
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: output_rgb_green
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: output_rgb_blue
+    type: float
+    write_action:
+      - lambda: ""
+
+light:
+  - platform: binary
+    id: binary_light
+    output: output_binary
+  - platform: monochromatic
+    id: dimmable_light
+    output: output_dimmable
+  - platform: cwww
+    id: ct_light
+    cold_white: output_ct_cold
+    warm_white: output_ct_warm
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+  - platform: rgbww
+    id: rgbww_light
+    red: output_rgbww_red
+    green: output_rgbww_green
+    blue: output_rgbww_blue
+    cold_white: output_rgbww_cold
+    warm_white: output_rgbww_warm
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 3000 K
+    color_interlock: false
+    effects:
+      - lambda:
+          name: Color loop
+          update_interval: 200ms
+          lambda: |-
+            static int hue = 0;
+            hue = (hue + 10) % 360;
+            float r, g, b;
+            hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
+            auto call = id(rgbww_light).turn_on();
+            call.set_rgb(r, g, b);
+            call.set_white_if_supported(0);
+            call.set_cold_white_if_supported(0);
+            call.set_warm_white_if_supported(0);
+            call.set_transition_length(0);
+            call.perform();
+  - platform: rgb
+    id: rgb_light
+    red: output_rgb_red
+    green: output_rgb_green
+    blue: output_rgb_blue

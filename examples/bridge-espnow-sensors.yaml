@@ -1,0 +1,115 @@
+# Bridge battery powered ESP-NOW sensor nodes and an ESP-NOW relay to Matter. The nodes talk ESP-NOW to this gateway
+# (no Wi-Fi association, long battery life); the gateway turns every node into its own Matter Bridged Node. The sensor
+# nodes can be ESPHome devices or any ESP32 sketch that sends this 4 byte payload to the gateway MAC:
+# int16 temperature in 0.01 C (little endian), uint8 humidity, uint8 battery percent.
+# See docs/bridge.md.
+#
+# ESP-NOW uses the channel of the Wi-Fi network, so the gateway needs Wi-Fi (not Thread). Not run on hardware yet.
+
+esphome:
+  name: matter-espnow-gateway
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+globals:
+  - {id: garage_seen, type: uint32_t, initial_value: "0"}
+  - {id: shed_seen, type: uint32_t, initial_value: "0"}
+  - {id: pump_seen, type: uint32_t, initial_value: "0"}
+
+espnow:
+  auto_add_peer: false
+  peers:
+    - AA:BB:CC:00:00:01 # garage sensor
+    - AA:BB:CC:00:00:02 # shed sensor
+    - AA:BB:CC:00:00:03 # pump relay
+  on_receive:
+    - address: AA:BB:CC:00:00:01
+      then:
+        - lambda: |-
+            id(garage_seen) = millis();
+            id(garage_temperature).publish_state((int16_t)(data[0] | (data[1] << 8)) / 100.0f);
+            id(garage_humidity).publish_state(data[2]);
+            id(garage_battery).publish_state(data[3]);
+    - address: AA:BB:CC:00:00:02
+      then:
+        - lambda: |-
+            id(shed_seen) = millis();
+            id(shed_temperature).publish_state((int16_t)(data[0] | (data[1] << 8)) / 100.0f);
+            id(shed_humidity).publish_state(data[2]);
+            id(shed_battery).publish_state(data[3]);
+    - address: AA:BB:CC:00:00:03
+      then:
+        - lambda: |-
+            id(pump_seen) = millis();
+            id(pump_relay).publish_state(data[0] != 0);
+
+matter:
+  bridge:
+    devices:
+      garage_sensor:
+        name: Garage Sensor
+        reachable: garage_online
+        battery: garage_battery
+        temperature_sensor: garage_temperature
+        humidity_sensor: garage_humidity
+      shed_sensor:
+        name: Shed Sensor
+        reachable: shed_online
+        battery: shed_battery
+        temperature_sensor: shed_temperature
+        humidity_sensor: shed_humidity
+      pump:
+        name: Pond Pump
+        reachable: pump_online
+        on_off_plug_in_unit:
+          switch_id: pump_relay
+
+sensor:
+  - {platform: template, id: garage_temperature, name: Garage temperature, unit_of_measurement: "°C", device_class: temperature}
+  - {platform: template, id: garage_humidity, name: Garage humidity, unit_of_measurement: "%", device_class: humidity}
+  - {platform: template, id: garage_battery, name: Garage battery, unit_of_measurement: "%", device_class: battery}
+  - {platform: template, id: shed_temperature, name: Shed temperature, unit_of_measurement: "°C", device_class: temperature}
+  - {platform: template, id: shed_humidity, name: Shed humidity, unit_of_measurement: "%", device_class: humidity}
+  - {platform: template, id: shed_battery, name: Shed battery, unit_of_measurement: "%", device_class: battery}
+
+switch:
+  # A relay controlled over ESP-NOW. Its state comes back from the relay (optimistic: false).
+  - platform: template
+    id: pump_relay
+    name: Pond pump
+    optimistic: false
+    turn_on_action:
+      - espnow.send: {address: AA:BB:CC:00:00:03, data: [0x01]}
+    turn_off_action:
+      - espnow.send: {address: AA:BB:CC:00:00:03, data: [0x00]}
+
+binary_sensor:
+  # Reachable = something was heard from the node recently.
+  - platform: template
+    id: garage_online
+    internal: true
+    lambda: return id(garage_seen) != 0 && millis() - id(garage_seen) < 30 * 60 * 1000;
+  - platform: template
+    id: shed_online
+    internal: true
+    lambda: return id(shed_seen) != 0 && millis() - id(shed_seen) < 30 * 60 * 1000;
+  - platform: template
+    id: pump_online
+    internal: true
+    lambda: return id(pump_seen) != 0 && millis() - id(pump_seen) < 5 * 60 * 1000;

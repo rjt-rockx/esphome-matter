@@ -1,0 +1,65 @@
+# Real device: Aqara Smart Lock U200 (VID 4447 / PID 10242), Thread, battery.
+# Source: HA fixture aqara_u200.json (evidence=dump).
+# Real shape: EP1 door_lock with DoorLock features PIN+RID+COTA+USR (LockType 9 = DeadLatch) plus a manufacturer cluster;
+# EP2 power_source (BAT, BatPercentRemaining 80, Order Rechargeable, empty EndpointList).
+# Mirrors: ESPHome lock + a battery level sensor on its own Power Source endpoint.
+# Differs: the user/credential database (USR/PIN/RID) has no ESPHome backing. Enabling the features gives the cluster
+# but no credential storage, so the lock would accept "SetCredential" and forget it (see report).
+#
+# Variant (b): explicit endpoints.
+#
+# BLOCKED: the feature names below make the endpoint fail code generation with 'Unsupported conformance term operator: condition' (Door Lock) / 'rule type: described' (TimeSync).
+esphome:
+  name: matter-aqara-u200
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        lock_type: DEAD_LATCH
+        with_features:
+          - PIN Credential
+          - RFID Credential
+          - CredentialsOverTheAirAccess
+          - User
+    2:
+      power_source:
+        battery: lock_battery
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO10
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+sensor:
+  - platform: template
+    id: lock_battery
+    name: Lock battery
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: return 80.0;
+    update_interval: 10min

@@ -1,0 +1,55 @@
+# mirrors: (none; FP2-style multi-zone presence, no Matter dump exists. Single-zone reference: aqara-presence-fp300)
+# Multi-zone presence in the style of the Aqara FP2: one occupancy endpoint per zone, each told apart by explicit
+# `tags:` (common_position) and a `label:`. ESPHome side: LD2450 overall presence plus per-zone presence (template stubs).
+# This is the natural lowering and works today. Differs from a real FP2: no per-zone sensitivity, no
+# fall detection, zones are not a Matter concept (Occupancy Sensing is per endpoint), controllers just show N sensors.
+esphome:
+  name: fp2-multizone
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+uart:
+  tx_pin: GPIO4
+  rx_pin: GPIO5
+  baud_rate: 256000
+
+ld2450:
+
+binary_sensor:
+  - platform: ld2450
+    has_target:
+      id: any_presence
+      name: Any presence
+  # Zone presence: derive from the ld2450 `zone:` target-count sensors in a real build (stubbed here).
+  - {platform: template, id: zone_sofa, name: Sofa, device_class: occupancy, lambda: "return false;"}
+  - {platform: template, id: zone_door, name: Door, device_class: occupancy, lambda: "return false;"}
+
+matter:
+  endpoints:
+    1:
+      label: Room
+      occupancy_sensor: any_presence
+      tags: [{namespace: common_position, tag: middle}]
+    2:
+      label: Sofa
+      occupancy_sensor: zone_sofa
+      tags: [{namespace: common_position, tag: left}]
+    3:
+      label: Door
+      occupancy_sensor: zone_door
+      tags: [{namespace: common_position, tag: right}]

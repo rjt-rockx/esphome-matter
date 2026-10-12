@@ -1,0 +1,46 @@
+# mirrors: eve-contact-sensor
+# Mirrors: Eve Door & Window (Thread), HA fixture eve_contact_sensor.json (see eve-contact-endpoints.yaml)
+# Variant (a): `expose:` shorthand. A bare binary_sensor is never inferred (DIRECTION D11), so the user must say
+# `as: contact_sensor` even though device_class: door is set. The battery sensor can only become a separate
+# `power_source` endpoint, so the single-endpoint Eve layout is not reachable through `expose:` today.
+esphome:
+  name: eve-contact-expose
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+binary_sensor:
+  - platform: gpio
+    id: door
+    name: Door
+    device_class: door
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+
+sensor:
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 10min
+    lambda: return 90.0f;
+
+matter:
+  expose:
+    - {id: door, as: contact_sensor}
+    - {id: batt, as: power_source, attach_to: door}   # battery as a second device type on the contact endpoint

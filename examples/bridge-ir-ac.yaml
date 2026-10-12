@@ -1,0 +1,80 @@
+# Bridge two infrared controlled air conditioners to Matter. Each AC is a climate_ir entity; the Matter bridge makes it
+# a Bridged Node of its own with a Room Air Conditioner (and, for the first AC, a room temperature sensor), so each AC
+# has its own name and room in the Matter controller. IR is one way: the climate state is assumed (what was last
+# sent), not read back. See docs/bridge.md and docs/climate.md.
+#
+# Not run on hardware yet.
+
+esphome:
+  name: matter-ir-bridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO2
+  carrier_duty_percent: 50%
+  non_blocking: true
+
+one_wire:
+  - platform: gpio
+    pin: GPIO3
+
+matter:
+  bridge:
+    devices:
+      bedroom_ac:
+        name: Bedroom AC
+        vendor_name: Daikin
+        # primary: the AC shares the Bridged Node endpoint, the room sensor gets a child endpoint.
+        primary: room_air_conditioner
+        room_air_conditioner:
+          climate_id: bedroom_climate
+        temperature_sensor: bedroom_temperature
+      living_room_ac:
+        name: Living Room AC
+        vendor_name: Mitsubishi
+        room_air_conditioner:
+          climate_id: living_room_climate
+
+sensor:
+  - platform: dallas_temp
+    id: bedroom_temperature
+    name: Bedroom temperature
+    address: 0x1c0000031edd2a28
+    update_interval: 30s
+
+climate:
+  - platform: coolix
+    id: bedroom_climate
+    name: Bedroom AC
+    transmitter_id: ir_tx
+    sensor: bedroom_temperature
+    visual:
+      min_temperature: 17 °C
+      max_temperature: 30 °C
+      temperature_step: 1 °C
+  - platform: mitsubishi
+    id: living_room_climate
+    name: Living Room AC
+    transmitter_id: ir_tx
+    visual:
+      min_temperature: 16 °C
+      max_temperature: 31 °C
+      temperature_step: 1 °C

@@ -1,0 +1,119 @@
+# A battery powered Thread temperature and humidity sensor (Matter ICD, light sleep).
+#
+# EXPERIMENTAL and NOT verified on hardware. See docs/icd.md before you build on it, in particular the
+# "Hardware-unverified" section and the power budget (measure your own device).
+#
+# How it saves power:
+#  * `matter: icd:` makes the device a Thread sleepy end device. The ICD manager owns the poll period and the
+#    CPU light-sleeps between polls.
+#  * On ESPHome versions that support it, add `esphome: loop_interval: 1s`. A 60 s watchdog and a silent logger let the ESPHome main loop sleep instead of waking every
+#    16 ms. There is no `api:` and no `ota: platform: esphome`: both keep the radio busy. Update over Matter OTA.
+#  * The sensor does not poll on its own (`update_interval: never`). It is read when the ICD enters active mode
+#    (`on_active`), which happens at least every `idle_interval`, so each reading rides along with the keepalive
+#    report the controller already expects.
+
+esphome:
+  name: battery-sensor
+  friendly_name: Battery Sensor
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+  # Lets the main loop sleep for up to 24 s (the default 5 s caps it at 2 s).
+  watchdog_timeout: 60s
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+# The serial port keeps the chip awake. Turn logging back on only while debugging.
+logger:
+  baud_rate: 0
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+  # Required for ICD: a minimal Thread device with a poll period above 0 makes ESPHome configure the radio as a
+  # sleepy end device. The ICD manager overrides the period at run time.
+  device_type: MTD
+  poll_period: 15s
+
+matter:
+  # Matter OTA instead of ESPHome OTA (which does not work on a sleepy device). See docs/matter-ota.md.
+  ota: true
+  software_version: 1
+  icd:
+    # sit (default): behaves like a normal Matter device on every controller.
+    # lit: Long Idle Time, only worth it with Home Assistant or SmartThings. Needs uat_hint, see docs/icd.md.
+    mode: sit
+    # The controller sees this as the liveness interval of the subscription.
+    idle_interval: 60s
+    on_active:
+      - component.update: sht
+      - component.update: battery_voltage
+  endpoints:
+    0:
+      battery:
+        percent: battery_percent
+        voltage: battery_millivolts
+        replaceability: user_replaceable
+        replacement_description: AAA
+        quantity: 2
+    1:
+      temperature_sensor: temperature
+    2:
+      humidity_sensor: humidity
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+sensor:
+  - platform: sht3xd
+    id: sht
+    address: 0x44
+    update_interval: never
+    temperature:
+      id: temperature
+      # Only a change of at least 0.2 degrees is reported.
+      filters:
+        - delta: 0.2
+    humidity:
+      id: humidity
+      filters:
+        - delta: 2.0
+
+  # Two AAA cells through a 1:2 divider on GPIO4 (ADC1 channel 3 on the H2).
+  - platform: adc
+    id: battery_voltage
+    pin: GPIO4
+    attenuation: 12db
+    update_interval: never
+    filters:
+      - multiply: 2.0
+    unit_of_measurement: V
+    accuracy_decimals: 2
+    internal: true
+
+  - platform: template
+    id: battery_millivolts
+    unit_of_measurement: mV
+    device_class: voltage
+    update_interval: 1h
+    lambda: return id(battery_voltage).state * 1000.0;
+    internal: true
+
+  - platform: template
+    id: battery_percent
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 1h
+    # Linear between 2.0 V (empty) and 3.0 V (full) for two alkaline AAA cells; adjust for your cells.
+    lambda: |-
+      float v = id(battery_voltage).state;
+      if (v != v) return NAN;
+      float p = (v - 2.0f) / (3.0f - 2.0f) * 100.0f;
+      return p < 0 ? 0 : (p > 100 ? 100 : p);
+    internal: true

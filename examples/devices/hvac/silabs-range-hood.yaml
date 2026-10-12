@@ -1,0 +1,65 @@
+# mirrors: silabs-range-hood-fan-light
+# Mirrors: Silabs range hood (evidence=dump): EP1 extractor_hood (0x007A) FanControl only, EP2 on_off_light, flat siblings.
+# Natural build: hood fan (speed) + lamp relay.  Variant (b) explicit `endpoints:`.
+#
+# Matches:  extractor_hood + on_off_light siblings.
+# Differs:  `fan_id` is only accepted on the `fan` device type, so the hood's FanControl exists but is NOT bound to
+#           the ESPHome fan: G8 (M).  The same blocker applies to air_purifier and room_air_conditioner.
+
+substitutions:
+  name: matter-range-hood
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      extractor_hood:
+        with_features: [multi_speed]     # wanted: fan_id: hood_fan
+    2:
+      on_off_light:
+        light_id: hood_light
+
+output:
+  - platform: ledc
+    id: hood_pwm
+    pin: GPIO2
+  - platform: gpio
+    id: lamp
+    pin: GPIO3
+
+fan:
+  - platform: speed
+    id: hood_fan
+    name: Hood fan
+    output: hood_pwm
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: binary
+    id: hood_light
+    name: Hood light
+    output: lamp
+    restore_mode: ALWAYS_OFF

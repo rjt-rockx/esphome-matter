@@ -1,0 +1,23 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("Identify Test Node");
+  matter_mattercomponent_id->get_device_info().set_serial_number("SN-0001");
+  matter_mattercomponent_id->get_device_info().set_unique_id("identify-test-0001");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("rev-b");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("1.2.3");
+  matter_mattercomponent_id->get_device_info().set_max_fabrics(8);
+  new(matter_identifytrigger_id) matter::IdentifyTrigger(matter_mattercomponent_id, 65535);
+  matter::register_identify_trigger(matter_identifytrigger_id);
+  new(automation_id) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id);
+  new(matter_identifytrigger_id_2) matter::IdentifyTrigger(matter_mattercomponent_id, 1);
+  matter::register_identify_trigger(matter_identifytrigger_id_2);
+  new(automation_id_2) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id_2);
+  matter_mattercomponent_id->register_switch(relay, 1);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x91132AD);

@@ -1,0 +1,75 @@
+# Hardware: any ESP32-C6 board (default esp32-c6-devkitc-1) with four relays on GPIO4 to GPIO7.
+# Demonstrates: four sibling on/off plug-in units. The component adds a Descriptor TagList with a Common
+# Number tag (One to Four) to each of them automatically, because endpoints that share a device type must be
+# distinguishable (Matter "Duplicate" condition). `label:` additionally publishes a FixedLabel "name" and uses it
+# as the label of the generated tag. Uses Wi-Fi.
+
+substitutions:
+  name: matter-multi-relay
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+  friendly_name: Matter Multi Relay
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Relay 1
+      on_off_plug_in_unit:
+        switch_id: relay_1
+    2:
+      label: Relay 2
+      on_off_plug_in_unit:
+        switch_id: relay_2
+    3:
+      label: Relay 3
+      on_off_plug_in_unit:
+        switch_id: relay_3
+    4:
+      label: Relay 4
+      on_off_plug_in_unit:
+        switch_id: relay_4
+
+switch:
+  - platform: gpio
+    id: relay_1
+    name: Relay 1
+    pin: GPIO4
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: relay_2
+    name: Relay 2
+    pin: GPIO5
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: relay_3
+    name: Relay 3
+    pin: GPIO6
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: relay_4
+    name: Relay 4
+    pin: GPIO7
+    restore_mode: ALWAYS_OFF

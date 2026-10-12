@@ -1,0 +1,57 @@
+# mirrors: generic-thread-3button-scene-switch
+# 4-button dimmer remote as four Generic Switches (how a Hue dimmer appears behind the Hue bridge's Matter endpoint).
+# VARIANT (b): `expose:` glob with `as: generic_switch` plus explicit `endpoints:` for the semantic tags.
+#
+# Mirrors: bridge-presented Hue dimmer switch (ecosystem-rendering: generic multi-button Matter switch; evidence=doc).
+#   Each button is a Generic Switch with a Switches-namespace tag (On / Up / Down / Off) so a controller can label them.
+# Result: see the second file in this pair, hue-dimmer-style-generic-switch-endpoints.yaml, for the tagged version.
+#   Here: expose only. 4 siblings get the automatic Common Number tags in HASH order (not button order) and the
+#   FixedLabel names; there is no way to say "this one is On, that one is Up" (GAP-COMPONENT: `tags:` on expose items).
+esphome:
+  name: hue-style-dimmer-events
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  expose:
+    - {id: "btn_*", as: generic_switch}
+
+binary_sensor:
+  - platform: gpio
+    id: btn_on
+    name: "On"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_up
+    name: "Brighter"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_down
+    name: "Dimmer"
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+  - platform: gpio
+    id: btn_off
+    name: "Off"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms

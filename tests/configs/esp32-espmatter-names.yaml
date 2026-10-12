@@ -1,0 +1,86 @@
+esphome:
+  name: matter-ci-espmatter-names
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+# Features whose esp-matter namespace differs from the snake_cased spec name
+# (see components/matter/data_model/espmatter_names.json).
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        lock_type: DEAD_BOLT
+        with_features:
+          - Unbolt
+          - WeekDayAccessSchedules
+          - CredentialsOverTheAirAccess
+          - DoorPositionSensor
+    2:
+      # Auto has no ESPHome equivalent, so it can't be combined with fan_id.
+      fan:
+        with_features:
+          - Auto
+    3:
+      extended_color_light:
+        light_id: rgb_light
+        with_features:
+          - Hue And Saturation
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO4
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO5
+  - platform: ledc
+    id: out_r
+    pin: GPIO1
+  - platform: ledc
+    id: out_g
+    pin: GPIO2
+  - platform: ledc
+    id: out_b
+    pin: GPIO3
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm
+    speed_count: 3
+
+light:
+  - platform: rgb
+    id: rgb_light
+    name: RGB light
+    red: out_r
+    green: out_g
+    blue: out_b

@@ -1,0 +1,63 @@
+# mirrors: heiman-co-sensor
+# Mirrors: Heiman CO Sensor (Thread, VID 4619 / PID 4103), HA fixture heiman_co_sensor.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/heiman_co_sensor.json
+# Real device: EP1 with TWO device types Power Source (0x0011) + Smoke CO Alarm (0x0076); clusters SmokeCOAlarm
+# (CO feature), PowerSource (BAT, REPLC) and CarbonMonoxideConcentrationMeasurement (MEA); root with FixedLabel
+# (room/orientation/floor/direction), UserLabel, ICD (CIP/UAT/LITS/DSLS).
+# Variant (b): explicit endpoint with `smoke_co_alarm: co_state` and a battery. The CO concentration (ppm) is read by
+# an MQ-7 style ADC sensor in ESPHome, but there is no binding from a ppm sensor to the optional
+# CarbonMonoxideConcentrationMeasurement cluster of smoke_co_alarm (only air_quality_sensor binds concentrations).
+# Differs: no CO concentration cluster, power_source device type absent (cluster only), no FixedLabel on root, no ICD.
+esphome:
+  name: heiman-co-sensor
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+sensor:
+  - platform: adc
+    pin: GPIO1
+    id: co_adc
+    attenuation: 12db
+    update_interval: 10s
+  - platform: template
+    id: co_ppm
+    name: CO
+    unit_of_measurement: ppm
+    device_class: carbon_monoxide
+    update_interval: 10s
+    lambda: return id(co_adc).state * 100.0f;
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 97.0f;
+
+binary_sensor:
+  - platform: template
+    id: co_alarm
+    name: CO alarm
+    device_class: carbon_monoxide
+    lambda: return id(co_ppm).state > 35.0f;
+
+matter:
+  endpoints:
+    1:
+      smoke_co_alarm:
+        co_state: co_alarm
+      battery: batt

@@ -1,0 +1,62 @@
+# mirrors: heiman-motion-sensor-m1
+# Mirrors: Heiman Motion Sensor M1 (Thread, VID 4619 / PID 4097), HA fixture heiman_motion_sensor_m1.json
+#   https://github.com/home-assistant/core/blob/dev/tests/components/matter/fixtures/nodes/heiman_motion_sensor_m1.json
+# Real device: EP1 carries TWO device types, Occupancy Sensor (0x0107, PIR) and Power Source (0x0011, BAT, REPLC), plus
+# BooleanStateConfiguration (SENSLVL); EP2 Light Sensor. Root: ICD Management with CIP/UAT/LITS/DSLS (long-idle-time
+# ICD), FixedLabel + UserLabel + LocalizationConfiguration, AccessControl EXTS.
+# Variant (b): explicit endpoints with both device types on EP1 (this pattern is supported). The ICD side
+# (a sleepy LIT device) is NOT reproducible: nothing sets CONFIG_ENABLE_ICD_SERVER. The closest honest approximation is
+# an MTD that polls its parent; Matter still sees it as an always-on node and controllers keep treating the
+# subscription as live (see "ICD gap" in research/devices/repro-sensors.md).
+esphome:
+  name: heiman-motion-m1
+
+esp32:
+  variant: ESP32H2
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+  device_type: MTD
+  poll_period: 3s            # sleepy end device; ESPHome OTA is unavailable while poll_period > 0
+
+i2c:
+  sda: GPIO12
+  scl: GPIO22
+
+binary_sensor:
+  - platform: gpio
+    id: pir
+    name: Motion
+    device_class: motion
+    pin: GPIO4
+
+sensor:
+  - platform: bh1750
+    id: lux
+    name: Illuminance
+  - platform: template
+    id: batt
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    update_interval: 30min
+    lambda: return 100.0f;
+
+matter:
+  endpoints:
+    1:
+      occupancy_sensor: pir
+      power_source:
+        battery: batt
+    2:
+      light_sensor: lux

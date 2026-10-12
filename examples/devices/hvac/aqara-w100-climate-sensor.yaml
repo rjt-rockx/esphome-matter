@@ -1,0 +1,93 @@
+# mirrors: aqara-climate-sensor-w100
+# Mirrors: Aqara Climate Sensor W100 (evidence=dump, Thread): the room sensor/remote that drives thermostats.
+#   EP1 temperature_sensor, EP2 humidity_sensor, EP3-5 generic_switch[MS,MSR,MSL,MSM] with TagList (ns7 number +
+#   ns8 position), EP6 power_source BAT/REPLC, root ICD Management.
+# Natural build: SHT4x + three buttons (+/-/centre) + battery level.  Variant (b) explicit `endpoints:`.
+# The "remote sensing" use: a controller binds a thermostat's client TemperatureMeasurement to EP1; our node is the
+# SERVER side and needs nothing special (the thermostat side is gap G5).
+#
+# Matches:  temperature/humidity endpoints, three generic switches with auto Common Number TagList (Duplicate rule).
+# Differs:  * Position tags (ns 8) not emitted: explicit `tags:` can do it but only common_position names; ACCEPTABLE.
+#           * Battery as Power Source on EP1 instead of its own EP6: ACCEPTABLE (use `power_source: battery:` for EP6).
+#           * ICD/LIT not available (KNOWLEDGE b10).
+
+substitutions:
+  name: matter-w100-style
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      temperature_sensor: room_temperature
+    2:
+      humidity_sensor: room_humidity
+    3:
+      generic_switch:
+        binary_sensor_id: btn_plus
+        multi_press_max: 3
+    4:
+      generic_switch:
+        binary_sensor_id: btn_minus
+        multi_press_max: 3
+    5:
+      generic_switch:
+        binary_sensor_id: btn_center
+        multi_press_max: 3
+    6:
+      power_source:
+        battery: battery_level
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: room_temperature
+    humidity:
+      id: room_humidity
+    update_interval: 60s
+  - platform: adc
+    pin: GPIO1
+    id: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    attenuation: 12db
+    filters:
+      - multiply: 100
+      - clamp: {min_value: 0, max_value: 100}
+    internal: false
+
+binary_sensor:
+  - platform: gpio
+    id: btn_plus
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_minus
+    pin: {number: GPIO3, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_center
+    pin: {number: GPIO10, mode: INPUT_PULLUP, inverted: true}

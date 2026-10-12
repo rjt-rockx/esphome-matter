@@ -1,0 +1,44 @@
+# mirrors: tuya-rgbcct-strip
+# Mirrors: catalog entry "tuya-rgbcct-strip" (Extended Color Light, evidence=inferred) with a different ESPHome source:
+#   an addressable WS2812 strip (esp32_rmt_led_strip), and the catalog's "ecosystem" use of one tile per strip.
+# Representation (a): `expose:` shorthand. `esp32_rmt_led_strip` is not in the platform inference table, so `as:` is
+#   needed (an `rgb`-capable ESPHome light maps to extended_color_light).
+# Differs: an RGB-only strip has no color temperature range, so ColorControl[XY,(HS)] is still offered with CT enabled;
+#   the physical mireds range is the esp-matter default (the light traits have none).
+# See research/devices/repro-lighting.md.
+
+substitutions:
+  name: matter-ws2812-strip
+
+esphome:
+  name: ${name}
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: strip
+    name: "Strip"
+    pin: GPIO18
+    num_leds: 60
+    chipset: WS2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+
+matter:
+  expose:
+    - {id: strip, as: extended_color_light, features: [Hue And Saturation]}

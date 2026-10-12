@@ -1,0 +1,79 @@
+# mirrors: mock-room-airconditioner
+# Mirrors: HA fixture mock_room_airconditioner.json (evidence=dump; Matter SDK test-app mock, Thread)
+#   source: home-assistant/core tests/components/matter/fixtures/nodes/mock_room_airconditioner.json
+#   EP1 room_air_conditioner (0x0072): OnOff + Thermostat[HEAT,COOL,AUTO] + FanControl[SPD,AUT,WND]  (ONE endpoint)
+#   EP2 temperature_sensor (0x0302), parent = EP1
+# Natural build: split AC driven over IR (climate_ir coolix) plus a DHT22 room sensor.
+# Variant (b) explicit `endpoints:`  <- this file.  Siblings: -expose (shorthand), ir-room-ac-single (no sensor).
+#
+# Matches:  device type, OnOff, Thermostat Heating/Cooling/AutoMode (derived from the climate traits at runtime),
+#           child temperature sensor with parent: 1 (PartsList nesting like the dump).
+# Differs:  FanControl exists (`clusters: fan_control`) but is NOT bound to the climate fan modes (docs/climate.md
+#           "Not supported yet"), so FanMode/PercentSetting writes do nothing: GAP-COMPONENT G1.
+#           Wind (WND) can be listed but nothing implements it.
+# Bug:      `clusters:` raises KeyError on this branch (B1, being fixed separately); lives in _gaps/ until then.
+
+substitutions:
+  name: matter-room-ac
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+  friendly_name: Matter Room AC
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      room_air_conditioner:
+        climate_id: split_ac
+        with_features: [multi_speed, auto, wind]   # FanControl SPD, AUT, WND as in the dump
+      clusters:
+        fan_control: {}                            # optional on the RAC; NOT bound to the climate (gap G1)
+    2:
+      parent: 1                                    # the sensor is a part of the AC, like the dump
+      temperature_sensor: room_temperature
+
+remote_transmitter:
+  pin: GPIO2
+  carrier_duty_percent: 50%
+
+sensor:
+  - platform: dht
+    pin: GPIO3
+    model: DHT22
+    temperature:
+      id: room_temperature
+      name: Room temperature
+    update_interval: 30s
+
+climate:
+  - platform: coolix
+    id: split_ac
+    name: Split AC
+    sensor: room_temperature
+    supports_heat: true
+    supports_cool: true
+    visual:
+      min_temperature: 17 °C
+      max_temperature: 30 °C
+      temperature_step: 1 °C
+    # The IR protocol is one-way: the unit cannot report its real state back (assumed state).

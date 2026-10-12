@@ -1,0 +1,4 @@
+node_modules/
+.harness-state/
+.vdev-state/
+*.log

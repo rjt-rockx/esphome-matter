@@ -1,0 +1,104 @@
+# mirrors: aqara-shutter-switch-h2
+# Wall shutter switch: motor cover + two rocker buttons exposed as Generic Switches (Aqara Shutter Switch H2 EU pattern).
+# VARIANT (a): explicit `endpoints:`.
+#
+# Mirrors: HA fixture aqara_shutter_switch_h2.json (evidence=dump, Thread).
+#   EP0 root + Electrical Sensor (NODE) + OTA Requestor; EP1 window_covering (Lift + PositionAware Lift) with TagList
+#   [Position:Left]; EP2/EP3 generic_switch rev 3, Switch MS only (just InitialPress), TagList
+#   [Position:Right, Number 1 / Number 2].
+# Matches: EP1 window covering lift with position, EP2/EP3 two sibling Generic Switches with MS-only feature map and a
+#   TagList of two tags (position + number); a TagList on the non-duplicate cover endpoint.
+# Differs:
+#   - GAP-COMPONENT: the Electrical Sensor (power measurement of the motor) lives on EP0 in the real device. The root
+#     endpoint cannot take device types or clusters from YAML (endpoint 0 is rejected), see the `power` sensor below
+#     which can only go on an application endpoint.
+#   - Switch MS only: events limited to InitialPress. Rocker "press" starts the motor locally via ESPHome, the Matter
+#     event is just a notification (ACCEPTABLE).
+#   - no OTA Requestor device type on EP0 (matter: ota: true adds the cluster only).
+esphome:
+  name: shutter-switch-h2
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      tags:
+        - {namespace: common_position, tag: left}
+      window_covering:
+        cover_id: shutter
+    2:
+      tags:
+        - {namespace: common_position, tag: right}
+        - {namespace: common_number, tag: one}
+      generic_switch:
+        binary_sensor_id: rocker_up
+        with_features: []
+    3:
+      tags:
+        - {namespace: common_position, tag: right}
+        - {namespace: common_number, tag: two}
+      generic_switch:
+        binary_sensor_id: rocker_down
+        with_features: []
+
+switch:
+  - platform: gpio
+    id: motor_up
+    pin: GPIO4
+    interlock: [motor_down]
+    internal: true
+  - platform: gpio
+    id: motor_down
+    pin: GPIO5
+    interlock: [motor_up]
+    internal: true
+
+cover:
+  - platform: time_based
+    id: shutter
+    name: Shutter
+    device_class: shutter
+    open_action:
+      - switch.turn_on: motor_up
+    open_duration: 25s
+    close_action:
+      - switch.turn_on: motor_down
+    close_duration: 25s
+    stop_action:
+      - switch.turn_off: motor_up
+      - switch.turn_off: motor_down
+
+binary_sensor:
+  - platform: gpio
+    id: rocker_up
+    name: "Rocker up"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_press:
+      then:
+        - cover.open: shutter
+  - platform: gpio
+    id: rocker_down
+    name: "Rocker down"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_press:
+      then:
+        - cover.close: shutter

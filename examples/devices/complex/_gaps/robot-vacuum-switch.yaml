@@ -1,0 +1,68 @@
+# mirrors: eufy-vacuum-omni-e28
+# Variant (a) of robot-vacuum.yaml: the controllable fallback that works today. "Start cleaning" and "Return to dock" are
+# two On/Off Plug-in Units (momentary template switches that run the vacuum's start / dock actions) and the battery is the
+# node Power Source. Controllers show a switch, not a vacuum: this is what matterbridge-appliance-as-switch does
+# (research/devices/ecosystem-rendering.jsonl). It loses RVC modes, state, and areas but is fully functional on every
+# controller. The Matter-correct version needs the RVC delegates (GAP-APPLIANCE-DELEGATES).
+
+esphome:
+  name: matter-vacuum-switch
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+api:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose: [vac_clean, vac_dock]
+  endpoints:
+    90:
+      power_source: {with_features: [battery]}
+      battery: vac_battery
+
+switch:
+  - platform: template
+    id: vac_clean
+    name: Vacuum clean
+    optimistic: true
+    turn_on_action:
+      - lambda: id(vac_state).make_call().set_option("cleaning").perform();
+      - delay: 1s
+      - switch.turn_off: vac_clean
+  - platform: template
+    id: vac_dock
+    name: Vacuum dock
+    optimistic: true
+    turn_on_action:
+      - lambda: id(vac_state).make_call().set_option("returning").perform();
+      - delay: 1s
+      - switch.turn_off: vac_dock
+
+select:
+  - platform: template
+    id: vac_state
+    name: Vacuum state
+    options: [docked, cleaning, paused, returning, error]
+    initial_option: docked
+    optimistic: true
+
+sensor:
+  - platform: template
+    id: vac_battery
+    name: Vacuum battery
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 80.0f;
+    update_interval: 60s

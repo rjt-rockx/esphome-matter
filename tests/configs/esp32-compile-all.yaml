@@ -1,0 +1,1977 @@
+# Compile-everything image: as many device types, bindings and options as fit in one
+# ESP32-C6 firmware (Wi-Fi). It is compiled on every CI run and nightly so that a
+# break in any generated code path shows up even when no other test config exercises it.
+#
+# Not covered, because they exclude each other or need another radio setup: Thread / ICD and
+# the thread_border_router device type, whose Thread clusters need `openthread:` which excludes
+# `wifi:` (esp32-thread.yaml, esp32-*-icd.yaml), BLE only commissioning
+# (esp32-ble-commissioning.yaml), Ethernet (esp32-ethernet.yaml).
+esphome:
+  name: matter-ci-compile-all
+  friendly_name: Compile All
+  project:
+    name: example.matter-compile-all
+    version: "1.0.0"
+  on_boot:
+    priority: -100
+    then:
+      - matter.set_attribute:
+          path: 3.on_off.on_off
+          value: true
+      - matter.send_event:
+          path: generic_switch_manual.switch.initial_press
+          fields:
+            new_position: 1
+      - matter.send_event:
+          path: generic_switch_manual.switch.short_release
+          fields:
+            previous_position: 1
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  # A firmware with every cluster enabled does not fit the two 1.75 MB app slots of a 4 MB chip.
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+# Matter OTA lives next to ESPHome's own OTA (same ota_0/ota_1 partitions).
+ota:
+  - platform: esphome
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  # Node identity and Basic Information
+  vendor_name: ESPHome CI
+  vendor_id: 0xFFF1
+  product_name: Compile All
+  product_id: 0x8001
+  hardware_version: 2
+  hardware_version_string: "rev-c"
+  software_version: 3
+  software_version_string: "1.0.0-ci"
+  node_label: Compile All Node
+  serial_number: "SN-COMPILE-ALL"
+  unique_id: "compile-all-0001"
+  max_fabrics: 8
+  discriminator: 3841
+  passcode: 20202021
+  persist_passcode: true
+  # The chime endpoint needs a delegate that the component does not provide (components/matter/incomplete.py).
+  allow_incomplete_device_types: [chime]
+  debug: true
+
+  on_commissioned:
+    - logger.log: Commissioned
+  on_decommissioned:
+    - logger.log: Decommissioned
+  on_identify:
+    - then:
+        - logger.log:
+            format: "identify ep=%u active=%d time=%us effect=%u"
+            args: [endpoint_id, active, identify_time, effect]
+    - endpoint: 1
+      then:
+        - if:
+            condition:
+              lambda: "return active;"
+            then:
+              - light.turn_on:
+                  id: status_light
+                  effect: Identify
+            else:
+              - light.turn_off: status_light
+
+  ota:
+    query_interval: 12h
+    watchdog_timeout: 300s
+    on_state:
+      - text_sensor.template.publish:
+          id: matter_ota_state
+          state: !lambda return state;
+    on_download_started:
+      - logger.log: Matter OTA download started
+    on_download_complete:
+      - logger.log: Matter OTA download complete
+    on_download_failed:
+      - logger.log: Matter OTA download failed
+    on_apply_started:
+      - logger.log: Matter OTA apply started
+    on_apply_failed:
+      - logger.log: Matter OTA apply failed
+
+  # Commissioning state on an LED, button for the commissioning window and the factory reset
+  status_led:
+    output: status_led_out
+    commissioned: on
+  pairing:
+    binary_sensor: pair_button
+    open_window_hold: 3s
+    factory_reset_hold: 10s
+    timeout: 5min
+
+  # The `bridge:` block is lowered into an Aggregator and Bridged Nodes at hashed, stable endpoints
+  bridge:
+    devices:
+      # Several device types: Bridged Node endpoint plus one child endpoint each.
+      kitchen_thermometer:
+        name: Kitchen Thermometer
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        reachable: kitchen_seen
+        battery: kitchen_battery
+        temperature_sensor: kitchen_temp
+        humidity_sensor: kitchen_humidity
+      # One device type: it shares the endpoint with the Bridged Node.
+      relay_a:
+        name: Relay A
+        endpoint: 300 # pinned
+        on_off_plug_in_unit:
+          switch_id: bridge_relay_a
+      relay_b:
+        nested: true
+        on_off_plug_in_unit:
+          switch_id: bridge_relay_b
+      # primary: this device type shares the Bridged Node endpoint, the others get child endpoints.
+      heater:
+        name: Heater
+        primary: on_off_plug_in_unit
+        on_off_plug_in_unit:
+          switch_id: bridge_relay_c
+        temperature_sensor: heater_temp
+
+  endpoints:
+    # ---------------------------------------------------------------------------------------------
+    # Root node: node level battery with every option. Its EndpointList defaults to all endpoints.
+    # ---------------------------------------------------------------------------------------------
+    0:
+      battery:
+        percent: battery_percent
+        voltage: battery_voltage
+        replacement_needed: battery_replace
+        charging: battery_charging
+        charged: battery_full
+        replaceability: user_replaceable
+        replacement_description: CR123A
+        quantity: 2
+        warning_below: 25
+        critical_below: 8
+        description: Main battery
+        order: 1
+
+    # ---------------------------------------------------------------------------------------------
+    # Lights and plugs bound to ESPHome lights and switches
+    # ---------------------------------------------------------------------------------------------
+    1:
+      label: Binary light
+      on_off_light:
+        light_id: binary_light
+    2:
+      dimmable_light:
+        light_id: dimmable_light
+        min_level: 10%
+        max_level: 90%
+        on_off_transition_time: 2s
+    3:
+      color_temperature_light:
+        light_id: ct_light
+    4:
+      extended_color_light:
+        light_id: rgbww_light
+        with_features:
+          - Hue And Saturation
+          - EnhancedHue
+          - ColorLoop
+        color_loop_effect: Color loop
+    5:
+      # An RGB only light has no color temperature range.
+      extended_color_light:
+        light_id: rgb_light
+    6:
+      dimmable_plug_in_unit:
+        light_id: plug_dimmer
+        min_level: 5%
+        on_off_transition_time: 500ms
+    7:
+      mounted_dimmable_load_control:
+        light_id: mounted_dimmer
+    8:
+      on_off_plug_in_unit:
+        light_id: plug_relay_light
+    9:
+      mounted_on_off_control:
+        light_id: mounted_light
+        on_off_transition_time: 1s
+      clusters:
+        level_control:
+          with_features:
+            - OnOff
+            - Lighting
+    10:
+      on_off_plug_in_unit:
+        switch_id: plug_switch
+    11:
+      on_off_light:
+        switch_id: lamp_switch
+    12:
+      mounted_on_off_control:
+        switch_id: mounted_switch
+
+    # ---------------------------------------------------------------------------------------------
+    # Controller switches (bindings) and the Binding cluster
+    # ---------------------------------------------------------------------------------------------
+    20:
+      id: onoff_switch_endpoint
+      on_off_light_switch:
+    21:
+      id: dimmer_endpoint
+      dimmer_switch:
+    22:
+      id: color_dimmer_endpoint
+      color_dimmer_switch:
+    # A light with the Binding cluster added by hand.
+    13:
+      on_off_light:
+        light_id: binding_light
+      clusters:
+        binding:
+
+    # ---------------------------------------------------------------------------------------------
+    # Generic switch and doorbells
+    # ---------------------------------------------------------------------------------------------
+    23:
+      generic_switch:
+        binary_sensor_id: switch_button
+        long_press_time: 600ms
+        multi_press_window: 350ms
+        multi_press_max: 3
+    24:
+      id: generic_switch_manual
+      generic_switch:
+        with_features: [MomentarySwitchRelease, MomentarySwitchLongPress]
+    25:
+      generic_switch:
+        binary_sensor_id: toggle
+        with_features: [LatchingSwitch]
+    26:
+      generic_switch:
+        binary_sensor_id: action_button
+        with_features: [ActionSwitch, MomentarySwitchLongPress]
+        multi_press_max: 4
+    27:
+      generic_switch:
+        event_id: remote_event
+        multi_press_max: 3
+    28:
+      generic_switch:
+        event_id: held_event
+        event_map:
+          tap: 1
+          tap_twice: 2
+          hold: long_press
+          release: press_end
+    29:
+      doorbell:
+        event_id: bell_event
+        with_features: [MomentarySwitchRelease]
+    30:
+      doorbell:
+        binary_sensor_id: bell_button
+    31:
+      audio_doorbell:
+        with_features: [Audio]
+
+    # ---------------------------------------------------------------------------------------------
+    # Sensors
+    # ---------------------------------------------------------------------------------------------
+    40:
+      temperature_sensor: temperature
+    41:
+      pressure_sensor: pressure_kpa
+    42:
+      humidity_sensor: humidity
+    43:
+      light_sensor:
+        illuminance: illuminance
+      battery:
+        percent: battery_level
+        order: 2
+    44:
+      flow_sensor:
+        flow: flow_rate
+    45:
+      power_source:
+        battery: battery_level_2
+    46:
+      air_quality_sensor:
+        temperature: temperature
+        relative_humidity: humidity
+        carbon_dioxide: co2
+        total_voc: tvoc_ppb
+        formaldehyde: ch2o
+        pm_1: pm_1_0
+        pm_2_5: pm_2_5
+        pm_10: pm_10_0
+        radon: radon
+        measurement_units:
+          formaldehyde: ppb
+    47:
+      air_quality_sensor:
+        air_quality: air_quality_index
+        carbon_dioxide: co2
+    48:
+      air_quality_sensor:
+        air_quality:
+          sensor: pm_2_5
+        pm_2_5: pm_2_5
+    49:
+      air_quality_sensor:
+        air_quality:
+          sensor: tvoc_ppb
+          thresholds:
+            fair: 220
+            moderate: 660
+            poor: 2200
+    50:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: mains_current
+        active_power: mains_power
+        apparent_power: mains_apparent_power
+        frequency: mains_frequency
+        power_factor: mains_power_factor
+        energy_imported: mains_energy
+        energy_exported: mains_energy_exported
+    51:
+      electrical_sensor:
+        current_type: dc
+        voltage: dc_voltage
+        active_current: dc_current
+        active_power: dc_power
+    52:
+      soil_sensor:
+        temperature: temperature
+        soil_moisture: soil_moisture
+    # A sensor with its own wired power source that only powers itself.
+    53:
+      temperature_sensor: temperature
+      wired:
+        current_type: ac
+        present: mains_present
+        voltage: wired_voltage
+        frequency: wired_frequency
+        current: wired_current
+        powers: [53]
+        order: 6
+    # Battery thresholds from a percent sensor, and as binary sensors
+    54:
+      humidity_sensor: humidity
+      battery:
+        percent: battery_percent_2
+        order: 4
+    55:
+      contact_sensor:
+        boolean_state: door
+      battery:
+        low: battery_low
+        critical: battery_critical
+        description: Door battery
+        order: 5
+
+    # ---------------------------------------------------------------------------------------------
+    # Binary sensors: contact, occupancy, leak, freeze, rain, smoke / CO
+    # ---------------------------------------------------------------------------------------------
+    60:
+      contact_sensor:
+        boolean_state: front_door
+        alarms:
+          visual: true
+    61:
+      contact_sensor: window
+    62:
+      contact_sensor:
+        boolean_state: reed_switch
+        inverted: true
+    63:
+      contact_sensor:
+        boolean_state: closed_switch
+        inverted: false
+    64:
+      occupancy_sensor:
+        occupancy: hallway_motion
+        hold_time:
+          default: 45s
+          min: 5s
+          max: 10min
+          number: hallway_hold_time
+    65:
+      occupancy_sensor:
+        occupancy: office_presence
+        hold_time: 20s
+    66:
+      occupancy_sensor:
+        occupancy: desk_pressure_mat
+        with_features: [PhysicalContact]
+    67:
+      water_leak_detector:
+        boolean_state: basement_leak
+        alarms:
+          visual: true
+          audible: true
+          suppress: true
+          on_active:
+            - logger.log:
+                format: "Leak alarm: visual=%d audible=%d"
+                args: [visual, audible]
+          on_suppressed:
+            - logger.log:
+                format: "Leak alarm suppressed: visual=%d audible=%d"
+                args: [visual, audible]
+        sensitivity:
+          levels: 3
+          default: 1
+          number: leak_sensitivity
+    68:
+      water_freeze_detector: pipe_cold
+    69:
+      rain_sensor:
+        boolean_state: roof_rain
+        sensitivity:
+          levels: 5
+    70:
+      smoke_co_alarm:
+        smoke_state: kitchen_smoke
+        co_state: kitchen_co
+        hardware_fault: alarm_fault
+        end_of_service: alarm_expired
+        device_muted: alarm_muted
+        self_test_duration: 8s
+        on_self_test:
+          - logger.log: Smoke alarm self test requested
+    71:
+      smoke_co_alarm:
+        smoke_state: hall_smoke
+        test_in_progress: hall_testing
+        on_self_test:
+          - binary_sensor.template.publish:
+              id: hall_testing
+              state: true
+          - delay: 3s
+          - binary_sensor.template.publish:
+              id: hall_testing
+              state: false
+
+    # ---------------------------------------------------------------------------------------------
+    # Covers, closures and locks / valves
+    # ---------------------------------------------------------------------------------------------
+    80:
+      window_covering:
+        cover_id: living_room_shade
+    81:
+      window_covering:
+        cover_id: bedroom_blind
+        end_product_type: exterior_venetian_blind
+    82:
+      window_covering:
+        cover_id: open_close_awning
+    83:
+      label: Garage door
+      closure:
+        cover_id: garage_door
+    # Compatibility mode: advertised as Window Covering, what most controllers use today.
+    84:
+      window_covering:
+        cover_id: side_gate
+        closure_compat: true
+    85:
+      window_covering:
+        cover_id: garage_compat
+        closure_compat: true
+        end_product_type: roller_shutter
+    86:
+      closure_panel:
+        with_features: [Positioning, Translation]
+    87:
+      closure_controller: {}
+    88:
+      door_lock:
+        lock_id: front_lock
+        lock_type: DEAD_BOLT
+        with_features:
+          - DoorPositionSensor
+          - Unbolt
+          - WeekDayAccessSchedules
+          - CredentialsOverTheAirAccess
+    89:
+      water_valve:
+        valve_id: garden_valve
+        with_features:
+          - Level
+    90:
+      water_valve:
+        valve_id: simple_valve
+
+    # ---------------------------------------------------------------------------------------------
+    # Fans, filters, climate
+    # ---------------------------------------------------------------------------------------------
+    100:
+      fan:
+        fan_id: ceiling_fan
+    101:
+      # A fan with only on/off support
+      fan:
+        fan_id: relay_fan
+    102:
+      # Auto has no ESPHome equivalent, so it can't be combined with fan_id.
+      fan:
+        with_features:
+          - Auto
+    # Air purifier: fan with Wind (preset modes) and Step, HEPA + carbon filters.
+    103:
+      air_purifier:
+        fan_id: purifier_fan
+        wind_presets:
+          natural: Breeze
+          sleep: Sleep
+        with_features: [step]
+      clusters:
+        hepa_filter_monitoring:
+          condition: hepa_life
+          warning_level: 25%
+          critical_level: 10%
+          replace_needed: hepa_replace
+          reset_button: hepa_reset_button
+          on_reset:
+            - logger.log: HEPA filter replaced
+        activated_carbon_filter_monitoring:
+          replace_needed: carbon_replace
+          on_reset:
+            - logger.log: Carbon filter replaced
+    104:
+      extractor_hood:
+        fan_id: hood_fan
+        with_features: [step]
+    # Room air conditioner: Fan Control bound to the climate fan modes and swing.
+    105:
+      room_air_conditioner:
+        climate_id: ac
+      clusters:
+        fan_control:
+          climate_id: ac
+    106:
+      room_air_conditioner:
+        climate_id: ac2
+        fan_id: indoor_fan
+    # Heat pump with its thermostat on a child endpoint (the conforming layout).
+    107:
+      heat_pump: {}
+    108:
+      parent: 107
+      tags:
+        - {namespace: common_number, tag: one}
+      thermostat:
+        climate_id: boiler
+    109:
+      tags:
+        - {namespace: common_number, tag: two}
+      thermostat:
+        climate_id: hall_thermostat
+      clusters:
+        fan_control:
+          fan_id: stat_fan
+    110:
+      tags:
+        - {namespace: common_number, tag: three}
+      thermostat:
+        with_features: [Heating, Cooling, AutoMode]
+      clusters:
+        thermostat_user_interface_configuration:
+    111:
+      thermostat_controller: {}
+
+    # ---------------------------------------------------------------------------------------------
+    # Delegate clusters: Mode Base derived clusters, Operational State, Mode Select
+    # ---------------------------------------------------------------------------------------------
+    120:
+      robotic_vacuum_cleaner: {}
+      clusters:
+        rvc_run_mode:
+          modes:
+            - {label: Idle, mode: 0, tags: [idle]}
+            - {label: Cleaning, mode: 1, tags: [cleaning]}
+            - {label: Mapping, mode: 2, tags: [mapping]}
+          select: vacuum_run_mode
+          decide_in_automation: true
+          on_change_to_mode:
+            - if:
+                condition:
+                  lambda: 'return mode == 1 && id(vacuum_bin_full).state;'
+                then:
+                  - matter.mode.reject:
+                      status: dust_bin_full
+                      text: Empty the dust bin first
+        rvc_clean_mode:
+          modes:
+            - {label: Vacuum, tags: [vacuum]}
+            - {label: Mop, tags: [mop, quiet]}
+            - {label: Vacuum then mop, mode: 5, tags: [vacuum_then_mop]}
+          on_change_to_mode:
+            - logger.log:
+                format: "clean mode %d"
+                args: [mode]
+        rvc_operational_state:
+          phases: [Cleaning, Returning]
+          state: vacuum_state
+          decide_in_automation: true
+          decide_timeout: 300ms
+          phase: vacuum_phase
+          countdown_time: vacuum_eta
+          on_pause:
+            - logger.log: pause requested
+          on_resume:
+            - logger.log: resume requested
+          on_go_home:
+            - matter.operational_state.reject:
+                error: command_invalid_in_state
+    121:
+      laundry_washer: {}
+      clusters:
+        laundry_washer_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Delicate, tags: [delicate, quiet]}
+            - {label: Heavy, mode: 10, tags: [heavy, max]}
+          select: washer_program
+          accept: when_idle
+        laundry_washer_controls:
+          spin_speeds: ["Off", "400", "800", "1200"]
+          spin_speed: washer_spin
+          rinses: [none, normal, extra]
+          number_of_rinses: washer_rinses
+        operational_state:
+          phases: [Pre-wash, Wash, Rinse, Spin]
+          states:
+            - {id: 0x80, label: Soaking}
+          state: washer_state
+          idle_states: [stopped, paused]
+          allowed_states:
+            start: [stopped]
+            stop: [running, paused]
+          state_map:
+            Idle: stopped
+            Washing: running
+          countdown_time: washer_remaining
+          on_start:
+            - switch.turn_on: washer_start
+          on_stop:
+            - switch.turn_off: washer_start
+          on_pause:
+            - logger.log: pause
+          on_resume:
+            - logger.log: resume
+    122:
+      mode_select: {}
+      clusters:
+        mode_select:
+          description: Fan speed preset
+          modes:
+            - {label: Low, tags: [{mfg_code: 0xFFF1, value: 1}]}
+            - {label: High}
+          select: fan_preset
+          on_change_to_mode:
+            - logger.log:
+                format: "preset %d"
+                args: [mode]
+    123:
+      water_heater:
+        with_features: [heating]
+      clusters:
+        water_heater_mode:
+          modes:
+            - {label: "Off", tags: [off]}
+            - {label: Manual, tags: [manual]}
+            - {label: Timed, tags: [timed, vacation]}
+    124:
+      dishwasher: {}
+      clusters:
+        dishwasher_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Heavy, tags: [heavy]}
+            - {label: Light, tags: [light, quick]}
+        operational_state:
+          state: dishwasher_state
+    125:
+      refrigerator:
+        door_open: fridge_door
+      clusters:
+        refrigerator_and_temperature_controlled_cabinet_mode:
+          modes:
+            - label: Normal
+              tags: [auto]
+            - label: Rapid cool
+              tags: [rapid_cool]
+            - label: Vacation
+              tags: [vacation, low_energy]
+              option: Away
+          select: fridge_mode
+    126:
+      temperature_controlled_cabinet:
+        with_features: [TemperatureNumber]
+    127:
+      laundry_dryer: {}
+    128:
+      oven: {}
+    129:
+      cook_surface: {}
+    130:
+      microwave_oven:
+        with_features: [PowerAsNumber]
+      clusters:
+        # Without a delegate esp-matter creates no ChangeToMode commands (the validator warns).
+        microwave_oven_mode:
+          modes:
+            - {label: Normal, tags: [normal]}
+            - {label: Defrost, tags: [defrost]}
+    131:
+      cooktop: {}
+
+    # ---------------------------------------------------------------------------------------------
+    # Electrical Sensor topologies
+    # ---------------------------------------------------------------------------------------------
+    140:
+      electrical_sensor:
+        topology: node
+        voltage: topo_voltage
+        active_power: topo_total_power
+        energy_imported: topo_total_energy
+    # A power strip: the total on endpoint 141 measures its two outlets below it.
+    141:
+      electrical_sensor:
+        topology: tree
+        active_power: strip_power
+    142:
+      parent: 141
+      on_off_plug_in_unit:
+        switch_id: outlet_1
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_1_power
+        energy_exported: outlet_1_energy
+    143:
+      parent: 141
+      on_off_plug_in_unit:
+        switch_id: outlet_2
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_2_power
+    144:
+      window_covering:
+        cover_id: shade
+      electrical_sensor:
+        topology: tree
+        active_power: motor_power
+    145:
+      electrical_sensor:
+        topology: set
+        available_endpoints: [142, 143]
+        active_endpoints: [142]
+        active_power: set_power
+
+    # ---------------------------------------------------------------------------------------------
+    # Hand-written bridge: one Aggregator, Bridged Nodes below it get their parent automatically.
+    # ---------------------------------------------------------------------------------------------
+    150:
+      aggregator: {}
+    151:
+      parent: 150
+      bridged_node: Relay 1 # shorthand for {name: Relay 1}
+      on_off_plug_in_unit:
+        switch_id: relay1
+    152:
+      parent: 150
+      bridged_node:
+        name: Relay 2
+        unique_id: relay-two
+        vendor_name: ACME
+        product_name: Relay board
+        serial_number: R2-0001
+      on_off_light:
+        switch_id: relay2
+    # Composed bridged device: the Bridged Node endpoint and one child endpoint per sensor.
+    153:
+      parent: 150
+      bridged_node:
+        name: Garage Sensor
+        reachable: garage_online
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        hardware_version: 1
+        software_version: 2
+        software_version_string: "1.0.0_0130"
+        manufacturing_date: "20250131"
+        product_url: https://example.com/sensor
+      battery:
+        percent: garage_battery
+        powers: [153, 154, 155]
+    154:
+      parent: 153
+      temperature_sensor: garage_temp
+    155:
+      parent: 153
+      humidity_sensor: garage_humidity
+
+    # ---------------------------------------------------------------------------------------------
+    # Device types that need no entity: created bare so that other Matter devices can address them
+    # ---------------------------------------------------------------------------------------------
+    160:
+      camera:
+        with_features: [Video]
+    161:
+      chime: {}
+    162:
+      video_doorbell: {}
+    163:
+      pump:
+        with_features: [ConstantSpeed]
+    164:
+      pump_controller: {}
+    165:
+      evse: {}
+    166:
+      device_energy_management:
+        with_features: [PowerAdjustment, PowerForecastReporting]
+    167:
+      electrical_utility_meter: {}
+    168:
+      electrical_energy_tariff: {}
+    169:
+      electrical_meter:
+        with_features: [AlternatingCurrent, ImportedEnergy, CumulativeEnergy]
+    170:
+      control_bridge: {}
+    171:
+      solar_power: {}
+    172:
+      battery_storage: {}
+    174:
+      ota_provider: {}
+    175:
+      ota_requestor: {}
+    176:
+      on_off_plug_in_unit: {}
+    177:
+      dimmable_plug_in_unit: {}
+
+# -------------------------------------------------------------------------------------------------
+# Entities
+# -------------------------------------------------------------------------------------------------
+output:
+  - platform: template
+    id: status_led_out
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_binary
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_binding_light
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_plug_relay
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_lock
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: motor_open
+    type: binary
+    write_action:
+      - logger.log: motor open
+  - platform: template
+    id: motor_close
+    type: binary
+    write_action:
+      - logger.log: motor close
+  - platform: template
+    id: relay_pulse
+    type: binary
+    write_action:
+      - logger.log: relay pulse
+  - platform: template
+    id: out_dimmable
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_plug_dimmer
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_mounted_dimmer
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_mounted_light
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_ct_cold
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_ct_warm
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgbww_red
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgbww_green
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgbww_blue
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgbww_cold
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgbww_warm
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgb_red
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgb_green
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_rgb_blue
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_pwm_ceiling
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_pwm_purifier
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_pwm_hood
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_pwm_indoor
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_pwm_stat
+    type: float
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_oscillation
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_direction
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: fan_relay
+    type: binary
+    write_action:
+      - lambda: (void) state;
+  - platform: template
+    id: out_status
+    type: binary
+    write_action:
+      - lambda: (void) state;
+
+light:
+  - platform: binary
+    id: binary_light
+    name: Binary light
+    output: out_binary
+    restore_mode: ALWAYS_OFF
+  - platform: binary
+    id: binding_light
+    name: Binding light
+    output: out_binding_light
+    restore_mode: ALWAYS_OFF
+  - platform: binary
+    id: plug_relay_light
+    name: Plug relay light
+    output: out_plug_relay
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: dimmable_light
+    name: Dimmable light
+    output: out_dimmable
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: plug_dimmer
+    name: Plug dimmer
+    output: out_plug_dimmer
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: mounted_dimmer
+    name: Mounted dimmer
+    output: out_mounted_dimmer
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: mounted_light
+    name: Mounted light
+    output: out_mounted_light
+    restore_mode: ALWAYS_OFF
+  - platform: cwww
+    id: ct_light
+    name: Color temperature light
+    cold_white: out_ct_cold
+    warm_white: out_ct_warm
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+    restore_mode: ALWAYS_OFF
+  - platform: rgbww
+    id: rgbww_light
+    name: RGBWW light
+    red: out_rgbww_red
+    green: out_rgbww_green
+    blue: out_rgbww_blue
+    cold_white: out_rgbww_cold
+    warm_white: out_rgbww_warm
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 3000 K
+    color_interlock: false
+    restore_mode: ALWAYS_OFF
+    effects:
+      - lambda:
+          name: Color loop
+          update_interval: 200ms
+          lambda: |-
+            static int hue = 0;
+            hue = (hue + 10) % 360;
+            float r, g, b;
+            hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
+            auto call = id(rgbww_light).turn_on();
+            call.set_rgb(r, g, b);
+            call.set_white_if_supported(0);
+            call.set_cold_white_if_supported(0);
+            call.set_warm_white_if_supported(0);
+            call.set_transition_length(0);
+            call.perform();
+  - platform: rgb
+    id: rgb_light
+    name: RGB light
+    red: out_rgb_red
+    green: out_rgb_green
+    blue: out_rgb_blue
+    restore_mode: ALWAYS_OFF
+  # Status LED of the identify action
+  - platform: binary
+    id: status_light
+    output: out_status
+    internal: true
+    effects:
+      - strobe:
+          name: Identify
+          colors:
+            - state: true
+              duration: 250ms
+            - state: false
+              duration: 250ms
+
+switch:
+  - platform: template
+    id: plug_switch
+    name: Plug switch
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: lamp_switch
+    name: Lamp switch
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: mounted_switch
+    name: Mounted switch
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: outlet_1
+    name: Outlet 1
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: outlet_2
+    name: Outlet 2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay1
+    name: Relay 1
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay2
+    name: Relay 2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: bridge_relay_a
+    name: Bridge relay A
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: bridge_relay_b
+    name: Bridge relay B
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: bridge_relay_c
+    name: Bridge relay C
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: washer_start
+    optimistic: true
+
+lock:
+  - platform: output
+    id: front_lock
+    name: Front lock
+    output: out_lock
+
+valve:
+  - platform: template
+    id: garden_valve
+    name: Garden valve
+    optimistic: true
+    has_position: true
+  - platform: template
+    id: simple_valve
+    name: Simple valve
+    optimistic: true
+
+cover:
+  - platform: time_based
+    id: living_room_shade
+    name: Living Room Shade
+    device_class: shade
+    open_action:
+      - output.turn_on: motor_open
+    open_duration: 30s
+    close_action:
+      - output.turn_on: motor_close
+    close_duration: 30s
+    stop_action:
+      - output.turn_off: motor_open
+      - output.turn_off: motor_close
+  - platform: template
+    id: bedroom_blind
+    name: Bedroom Blind
+    device_class: blind
+    has_position: true
+    optimistic: true
+    tilt_action:
+      - logger.log: tilt
+    position_action:
+      - logger.log: position
+    stop_action:
+      - logger.log: stop
+  - platform: template
+    id: open_close_awning
+    name: Awning
+    device_class: awning
+    assumed_state: true
+    optimistic: true
+    open_action:
+      - logger.log: open
+    close_action:
+      - logger.log: close
+    stop_action:
+      - logger.log: stop
+  - platform: template
+    id: garage_door
+    name: Garage Door
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay_pulse
+    close_action:
+      - output.turn_on: relay_pulse
+    stop_action:
+      - output.turn_on: relay_pulse
+  - platform: template
+    id: side_gate
+    name: Side Gate
+    device_class: gate
+    assumed_state: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay_pulse
+    close_action:
+      - output.turn_on: relay_pulse
+    stop_action:
+      - output.turn_on: relay_pulse
+  - platform: template
+    id: garage_compat
+    name: Garage Compat
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay_pulse
+    close_action:
+      - output.turn_on: relay_pulse
+    stop_action:
+      - output.turn_on: relay_pulse
+  - platform: template
+    id: shade
+    name: Motor shade
+    optimistic: true
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm_ceiling
+    speed_count: 3
+    oscillation_output: fan_oscillation
+    direction_output: fan_direction
+    restore_mode: ALWAYS_OFF
+  - platform: binary
+    id: relay_fan
+    name: Relay fan
+    output: fan_relay
+    restore_mode: ALWAYS_OFF
+  - platform: speed
+    id: purifier_fan
+    name: Purifier fan
+    output: fan_pwm_purifier
+    speed_count: 4
+    restore_mode: ALWAYS_OFF
+    preset_modes:
+      - Breeze
+      - Sleep
+  - platform: speed
+    id: hood_fan
+    name: Hood fan
+    output: fan_pwm_hood
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+  - platform: speed
+    id: indoor_fan
+    name: Indoor unit fan
+    output: fan_pwm_indoor
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+  - platform: speed
+    id: stat_fan
+    name: Thermostat fan
+    output: fan_pwm_stat
+    speed_count: 2
+    restore_mode: ALWAYS_OFF
+
+climate:
+  - platform: thermostat
+    id: ac
+    name: Room AC
+    sensor: room_temperature
+    min_cooling_off_time: 20s
+    min_cooling_run_time: 20s
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s
+    min_fanning_off_time: 20s
+    min_fanning_run_time: 20s
+    cool_action: []
+    heat_action: []
+    idle_action: []
+    fan_only_action: []
+    fan_mode_auto_action: []
+    fan_mode_low_action: []
+    fan_mode_medium_action: []
+    fan_mode_high_action: []
+    min_fan_mode_switching_time: 5s
+    swing_both_action: []
+    swing_off_action: []
+    swing_horizontal_action: []
+    swing_vertical_action: []
+  - platform: thermostat
+    id: ac2
+    name: Indoor unit
+    sensor: room_temperature
+    cool_action: []
+    idle_action: []
+    min_cooling_off_time: 20s
+    min_cooling_run_time: 20s
+    min_idle_time: 20s
+  - platform: thermostat
+    id: boiler
+    name: Boiler
+    sensor: room_temperature
+    heat_action: []
+    idle_action: []
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s
+  - platform: thermostat
+    id: hall_thermostat
+    name: Thermostat
+    sensor: room_temperature
+    heat_action: []
+    idle_action: []
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s
+
+event:
+  - platform: template
+    id: remote_event
+    name: Remote
+    device_class: button
+    event_types: [single, double, triple, hold]
+  - platform: template
+    id: held_event
+    name: Held
+    event_types: [tap, tap_twice, hold, release]
+  - platform: template
+    id: bell_event
+    name: Bell
+    device_class: doorbell
+    event_types: [ring]
+
+button:
+  - platform: template
+    id: hepa_reset_button
+    name: Reset HEPA filter
+    on_press:
+      - sensor.template.publish:
+          id: hepa_life
+          state: 100
+  - platform: template
+    name: Remove first controller
+    on_press:
+      - matter.remove_fabric:
+          fabric_index: 1
+
+number:
+  - platform: template
+    id: hallway_hold_time
+    optimistic: true
+    min_value: 5
+    max_value: 600
+    step: 1
+    restore_value: true
+    initial_value: 45
+    unit_of_measurement: s
+  - platform: template
+    id: leak_sensitivity
+    optimistic: true
+    min_value: 0
+    max_value: 2
+    step: 1
+    restore_value: true
+    initial_value: 1
+
+select:
+  - platform: template
+    id: fridge_mode
+    options: [Normal, Rapid cool, Away]
+    optimistic: true
+    initial_option: Normal
+  - platform: template
+    id: vacuum_run_mode
+    optimistic: true
+    options: [Idle, Cleaning, Mapping]
+  - platform: template
+    id: vacuum_state
+    optimistic: true
+    options: [stopped, running, paused, error, seeking_charger, charging, docked]
+    initial_option: docked
+  - platform: template
+    id: washer_program
+    optimistic: true
+    options: [Normal, Delicate, Heavy]
+  - platform: template
+    id: washer_state
+    optimistic: true
+    options: [Idle, Washing, paused, Soaking]
+  - platform: template
+    id: washer_spin
+    optimistic: true
+    options: ["Off", "400", "800", "1200"]
+  - platform: template
+    id: washer_rinses
+    optimistic: true
+    options: [none, normal, extra]
+  - platform: template
+    id: dishwasher_state
+    optimistic: true
+    options: [stopped, running, paused]
+  - platform: template
+    id: fan_preset
+    optimistic: true
+    options: [Low, High]
+
+text_sensor:
+  - platform: template
+    id: matter_ota_state
+    name: Matter OTA state
+  - platform: template
+    id: vacuum_phase
+    lambda: return std::string("Cleaning");
+  - platform: matter
+    commissioning_state:
+      name: Matter state
+    controllers:
+      name: Matter controllers
+    fabric_count:
+      name: Matter fabrics
+    manual_pairing_code:
+      name: Matter pairing code
+    qr_code:
+      name: Matter QR code
+    fabric_1:
+      label:
+        name: Matter fabric 1 label
+      node_id:
+        name: Matter fabric 1 node id
+
+binary_sensor:
+  # Controller buttons sending commands to bound devices
+  - id: button_up
+    platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command: dimmer_endpoint.on_off.on
+    on_press:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move_with_on_off
+        arguments:
+          move_mode: 0
+          rate: 50
+    on_release:
+      matter.send_command: dimmer_endpoint.level_control.stop_with_on_off
+  - id: button_down
+    platform: gpio
+    pin:
+      number: GPIO1
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_click:
+      matter.send_command: dimmer_endpoint.on_off.off
+    on_press:
+      matter.send_command:
+        path: dimmer_endpoint.level_control.move_with_on_off
+        arguments:
+          move_mode: 1
+          rate: 50
+    on_release:
+      matter.send_command: dimmer_endpoint.level_control.stop_with_on_off
+  - id: toggle_button
+    platform: gpio
+    pin: GPIO10
+    on_click:
+      matter.send_command: onoff_switch_endpoint.on_off.toggle
+    on_double_click:
+      matter.send_command:
+        endpoint: color_dimmer_endpoint
+        cluster: color_control
+        command: move_to_color_temperature
+        arguments:
+          color_temperature_mireds: 370
+          transition_time: 1s
+  # Generic switch sources
+  - id: switch_button
+    platform: gpio
+    pin:
+      number: GPIO2
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+  - id: toggle
+    platform: gpio
+    pin:
+      number: GPIO3
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+  - id: action_button
+    platform: gpio
+    pin: GPIO19
+  - id: bell_button
+    platform: gpio
+    pin: GPIO18
+  - id: manual_button
+    platform: gpio
+    pin:
+      number: GPIO6
+      mode:
+        pullup: true
+        input: true
+      inverted: true
+    on_press:
+      - matter.send_switch_event:
+          endpoint: generic_switch_manual
+          event: initial_press
+    on_release:
+      - matter.send_switch_event:
+          endpoint: generic_switch_manual
+          event: short_release
+    on_multi_click:
+      - timing:
+          - ON for at least 1s
+        then:
+          - matter.send_switch_event:
+              endpoint: 24
+              event: long_press
+              position: 1
+  # Commissioning
+  - platform: gpio
+    id: pair_button
+    pin:
+      number: GPIO7
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 30ms
+    on_double_click:
+      matter.open_commissioning_window:
+        timeout: 5min
+    on_multi_click:
+      - timing:
+          - ON for at least 15s
+        then:
+          - matter.reset_identity:
+          - matter.factory_reset:
+  # Matter inputs
+  - platform: template
+    id: front_door
+    device_class: door
+  - platform: template
+    id: window
+    device_class: window
+  - platform: template
+    id: reed_switch
+  - platform: template
+    id: closed_switch
+  - platform: template
+    id: door
+    device_class: door
+  - platform: template
+    id: hallway_motion
+    device_class: motion
+  - platform: template
+    id: office_presence
+    device_class: presence
+  - platform: template
+    id: desk_pressure_mat
+  - platform: template
+    id: basement_leak
+    device_class: moisture
+  - platform: template
+    id: pipe_cold
+    device_class: cold
+  - platform: template
+    id: roof_rain
+    device_class: moisture
+  - platform: template
+    id: kitchen_smoke
+    device_class: smoke
+  - platform: template
+    id: kitchen_co
+    device_class: carbon_monoxide
+  - platform: template
+    id: alarm_fault
+    device_class: problem
+  - platform: template
+    id: alarm_expired
+    device_class: problem
+  - platform: template
+    id: alarm_muted
+  - platform: template
+    id: hall_smoke
+    device_class: smoke
+  - platform: template
+    id: hall_testing
+  - platform: template
+    id: fridge_door
+    device_class: door
+  - platform: template
+    id: vacuum_bin_full
+    lambda: return false;
+  - platform: template
+    id: hepa_replace
+    name: HEPA replace
+  - platform: template
+    id: carbon_replace
+    name: Carbon replace
+  - platform: template
+    id: battery_replace
+  - platform: template
+    id: battery_charging
+  - platform: template
+    id: battery_full
+  - platform: template
+    id: battery_low
+    device_class: battery
+  - platform: template
+    id: battery_critical
+  - platform: template
+    id: mains_present
+    device_class: power
+  - platform: template
+    id: kitchen_seen
+    name: Kitchen thermometer seen
+  - platform: template
+    id: garage_online
+    name: Garage sensor online
+
+sensor:
+  - platform: template
+    id: room_temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    update_interval: never
+  - platform: template
+    id: hepa_life
+    name: HEPA filter life
+    unit_of_measurement: "%"
+    update_interval: never
+  - platform: template
+    id: temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: return 21.5;
+  - platform: template
+    id: pressure_kpa
+    unit_of_measurement: "kPa"
+    device_class: pressure
+    lambda: return 101.3;
+  - platform: template
+    id: humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+    lambda: return 45.0;
+  - platform: template
+    id: illuminance
+    unit_of_measurement: "lx"
+    device_class: illuminance
+    lambda: return 300.0;
+  - platform: template
+    id: flow_rate
+    unit_of_measurement: "L/min"
+    lambda: return 4.5;
+  - platform: template
+    id: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 87.0;
+  - platform: template
+    id: battery_level_2
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 42.0;
+  - platform: template
+    id: battery_percent
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 87.0;
+  - platform: template
+    id: battery_percent_2
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 42.0;
+  - platform: template
+    id: battery_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 3.12;
+  - platform: template
+    id: air_quality_index
+    lambda: return 1;
+  - platform: template
+    id: co2
+    unit_of_measurement: "ppm"
+    device_class: carbon_dioxide
+    lambda: return 612.0;
+  - platform: template
+    id: tvoc_ppb
+    unit_of_measurement: "ppb"
+    device_class: volatile_organic_compounds_parts
+    lambda: return 120.0;
+  - platform: template
+    id: ch2o
+    unit_of_measurement: "ppm"
+    lambda: return 0.02;
+  - platform: template
+    id: pm_1_0
+    unit_of_measurement: "µg/m³"
+    device_class: pm1
+    lambda: return 3.0;
+  - platform: template
+    id: pm_2_5
+    unit_of_measurement: "µg/m³"
+    device_class: pm25
+    lambda: return 6.0;
+  - platform: template
+    id: pm_10_0
+    unit_of_measurement: "µg/m³"
+    device_class: pm10
+    lambda: return 9.0;
+  - platform: template
+    id: radon
+    unit_of_measurement: "pCi/L"
+    lambda: return 1.5;
+  - platform: template
+    id: mains_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.1;
+  - platform: template
+    id: mains_current
+    unit_of_measurement: "A"
+    device_class: current
+    lambda: return 0.43;
+  - platform: template
+    id: mains_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 98.0;
+  - platform: template
+    id: mains_apparent_power
+    unit_of_measurement: "VA"
+    device_class: apparent_power
+    lambda: return 99.0;
+  - platform: template
+    id: mains_frequency
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    lambda: return 50.0;
+  - platform: template
+    id: mains_power_factor
+    unit_of_measurement: "%"
+    device_class: power_factor
+    lambda: return 98.0;
+  - platform: template
+    id: mains_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 1234.567;
+  - platform: template
+    id: mains_energy_exported
+    unit_of_measurement: "Wh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 4000.0;
+  - platform: template
+    id: dc_voltage
+    unit_of_measurement: "mV"
+    device_class: voltage
+    lambda: return 12000.0;
+  - platform: template
+    id: dc_current
+    unit_of_measurement: "mA"
+    device_class: current
+    lambda: return 250.0;
+  - platform: template
+    id: dc_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 3.0;
+  - platform: template
+    id: soil_moisture
+    unit_of_measurement: "%"
+    device_class: moisture
+    lambda: return 33.4;
+  - platform: template
+    id: wired_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.1;
+  - platform: template
+    id: wired_frequency
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    lambda: return 50.0;
+  - platform: template
+    id: wired_current
+    unit_of_measurement: "mA"
+    device_class: current
+    lambda: return 130.0;
+  # Delegates and topologies
+  - platform: template
+    id: vacuum_eta
+    unit_of_measurement: s
+    lambda: return 120;
+  - platform: template
+    id: washer_remaining
+    unit_of_measurement: s
+    lambda: return 600;
+  - platform: template
+    id: topo_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.0;
+  - platform: template
+    id: topo_total_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 120.0;
+  - platform: template
+    id: topo_total_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 12.5;
+  - platform: template
+    id: strip_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 80.0;
+  - platform: template
+    id: outlet_1_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 50.0;
+  - platform: template
+    id: outlet_1_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 3.0;
+  - platform: template
+    id: outlet_2_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 30.0;
+  - platform: template
+    id: motor_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 20.0;
+  - platform: template
+    id: set_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 50.0;
+  # Bridge
+  - platform: template
+    id: kitchen_temp
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: kitchen_humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+  - platform: template
+    id: kitchen_battery
+    unit_of_measurement: "%"
+    device_class: battery
+  - platform: template
+    id: heater_temp
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: garage_temp
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: garage_humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+  - platform: template
+    id: garage_battery
+    unit_of_measurement: "%"
+    device_class: battery
+
+# Matter actions that run on a schedule
+interval:
+  - interval: 10min
+    then:
+      - matter.operational_state.set:
+          endpoint: 121
+          state: running
+          phase: Wash
+      - matter.operational_state.error:
+          endpoint: 120
+          cluster: rvc_operational_state
+          error: stuck
+          label: Wheels stuck
+      - matter.operational_state.completed:
+          endpoint: 121
+          total_operational_time: 3600
+      - matter.mode.set:
+          endpoint: 121
+          cluster: laundry_washer_mode
+          mode: 10
+      - matter.set_attribute:
+          path: 3.on_off.on_off
+          value: false
+  - interval: 60s
+    then:
+      - matter.remove_fabric:
+          fabric_index: !lambda "return 2;"

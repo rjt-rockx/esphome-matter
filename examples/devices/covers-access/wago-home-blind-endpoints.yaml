@@ -1,0 +1,70 @@
+# mirrors: wago-home-blind-control
+# Real device: WAGO Home Blind Control (VID 5428 / PID 4357), Wi-Fi, DIN rail blind actuator.
+# Source: HA fixture wago_home_blind_control.json (evidence=dump).
+# Real shape: EP1 window_covering (rev 2), features LF+TL+PA_LF+PA_TL, Type 8 (TiltBlindLiftAndTilt); EP2 and EP3 are
+# two generic_switch endpoints (Switch MS+MSR+MSL+MSM, NumberOfPositions 2, MultiPressMax 2) with NO TagList.
+# Mirrors: template cover with position and tilt driven by an external controller, two GPIO push buttons.
+# Differs: the real device has no tags on the duplicated switches (a Matter conformance error in the device),
+# we add them automatically.
+#
+# Variant (b): explicit endpoints.
+esphome:
+  name: matter-wago-blind
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      window_covering:
+        cover_id: venetian
+        end_product_type: interior_venetian_blind
+    2:
+      label: Up
+      generic_switch:
+        binary_sensor_id: btn_up
+        multi_press_max: 2
+    3:
+      label: Down
+      generic_switch:
+        binary_sensor_id: btn_down
+        multi_press_max: 2
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+  - platform: gpio
+    id: btn_down
+    pin: {number: GPIO7, mode: INPUT_PULLUP, inverted: true}
+
+cover:
+  - platform: template
+    id: venetian
+    name: Venetian blind
+    device_class: blind
+    has_position: true
+    optimistic: true
+    position_action:
+      - logger.log: {format: "lift to %.2f", args: [pos]}
+    tilt_action:
+      - logger.log: {format: "tilt to %.2f", args: [tilt]}
+    stop_action:
+      - logger.log: "stop"

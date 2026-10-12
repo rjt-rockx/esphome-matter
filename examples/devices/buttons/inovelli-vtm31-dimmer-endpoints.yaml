@@ -1,0 +1,137 @@
+# mirrors: inovelli-vtm31
+# Inovelli VTM31-SN style "2-in-1" smart dimmer: load + Matter client dimmer switch + 3 buttons + LED bar.
+# VARIANT (a): explicit `endpoints:`, endpoint numbers pinned like the real device.
+#
+# Mirrors: HA fixture inovelli_vtm31.json (evidence=dump, Thread). Real layout:
+#   EP1 dimmable_light (Identify, Groups, Scenes, OnOff[LT], LevelControl[OO,LT], FixedLabel, ModeSelect)
+#   EP2 dimmer_switch  (Binding server; Identify/OnOff/LevelControl CLIENT clusters; FixedLabel, ModeSelect)
+#   EP3-5 generic_switch up/down/config (Switch MS+MSR+MSL+MSM, MultiPressMax 5, FixedLabel Button=Up/Down/Config)
+#   EP6 extended_color_light (RGB LED bar, ColorControl HS+XY+CT)
+#   duplicates (EP3-5) in the dump have NO TagList (device is non-conformant to the Duplicate rule; it uses FixedLabel).
+# Matches: all six endpoints and device types, feature maps (switch MS/MSR/MSL/MSM, MultiPressMax 5), client clusters of
+#   the dimmer switch and Binding server, FixedLabel names (label "name" instead of the Inovelli "Button" key).
+# Differs:
+#   - REAL-DEVICE-NONCONFORMANT: the dump has no TagList on the three sibling generic switches; we add Common Number
+#     tags 1..3 (with labels Up/Down/Config), which is what the spec asks for.
+#   - GAP-COMPONENT: ModeSelect clusters (LED behaviour, vendor modes) and the manufacturer cluster 0x122FFC31 are
+#     not generated; the load endpoint EP1 exposes Identify/Groups/Scenes but not ModeSelect.
+#   - GAP-COMPONENT: the EP2 client has no OnOff/LevelControl *client* cluster declared in YAML, they are created by
+#     the device type; the binding is driven only by matter.send_command (no command from the Switch events).
+#   - The same three physical buttons drive both the generic switches (events) and the dimmer client (commands).
+esphome:
+  name: dimmer-2in1
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../../components
+
+logger:
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: !secret thread_tlv
+
+matter:
+  endpoints:
+    1:
+      label: "Load"
+      dimmable_light:
+        light_id: load
+    2:
+      id: dimmer_client
+      label: "Dimmer"
+      dimmer_switch:
+    3:
+      label: "Up"
+      generic_switch:
+        binary_sensor_id: btn_up
+        multi_press_max: 5
+    4:
+      label: "Down"
+      generic_switch:
+        binary_sensor_id: btn_down
+        multi_press_max: 5
+    5:
+      label: "Config"
+      generic_switch:
+        binary_sensor_id: btn_config
+        multi_press_max: 5
+    6:
+      label: "LED bar"
+      extended_color_light:
+        light_id: led_bar
+        with_features:
+          - color_temperature
+
+output:
+  - platform: ledc
+    id: load_pwm
+    pin: GPIO4
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    id: load
+    name: Load
+    output: load_pwm
+    default_transition_length: 300ms
+  - platform: esp32_rmt_led_strip
+    id: led_bar
+    name: LED bar
+    pin: GPIO5
+    num_leds: 7
+    rgb_order: GRB
+    chipset: WS2812
+    default_transition_length: 0s
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    name: "Button up"
+    pin: {number: GPIO0, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      then:
+        - matter.send_command: dimmer_client.on_off.on
+    on_press:
+      then:
+        - matter.send_command:
+            path: dimmer_client.level_control.move_with_on_off
+            arguments:
+              move_mode: up
+              rate: 40%/s
+    on_release:
+      then:
+        - matter.send_command: dimmer_client.level_control.stop_with_on_off
+  - platform: gpio
+    id: btn_down
+    name: "Button down"
+    pin: {number: GPIO1, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      then:
+        - matter.send_command: dimmer_client.on_off.off
+    on_press:
+      then:
+        - matter.send_command:
+            path: dimmer_client.level_control.move_with_on_off
+            arguments:
+              move_mode: down
+              rate: 40%/s
+    on_release:
+      then:
+        - matter.send_command: dimmer_client.level_control.stop_with_on_off
+  - platform: gpio
+    id: btn_config
+    name: "Button config"
+    pin: {number: GPIO2, mode: INPUT_PULLUP, inverted: true}
+    filters:
+      - delayed_on_off: 20ms
