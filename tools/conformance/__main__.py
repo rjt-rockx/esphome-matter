@@ -3,6 +3,10 @@
 Checks whether an esphome-matter configuration (or a runtime wildcard-read dump)
 yields a Matter data model that conforms to the specification. Exit status 1 on
 errors (or on warnings with --strict), 0 otherwise.
+
+Subcommands: ``diff <ours> <reference>`` (structural diff against a real device dump or
+catalog id) and ``gallery <dir>`` (diff every YAML with a ``# mirrors: <id>`` header);
+see ``diff.py`` and docs/conformance.md.
 """
 
 from __future__ import annotations
@@ -16,21 +20,11 @@ from . import baseline as baseline_mod
 from .checks import ERROR, INFO, WARNING, Report, check_node
 from .compat import check_compat
 from .espm import Profile
+from .inputs import classify
 from .model import from_dump, from_layout, to_dump
 from .spec import DEFAULT_VERSION, Spec
 
 KNOWN = baseline_mod.KNOWN
-
-
-def classify(path: Path) -> str:
-    if path.suffix in (".yaml", ".yml"):
-        return "yaml"
-    data = json.loads(path.read_text())
-    if isinstance(data, dict) and data.get("format") == 1 and "endpoints" in data:
-        first = next(iter(data["endpoints"].values()), {})
-        if isinstance(first, dict) and "device_types" in first:
-            return "layout"
-    return "dump"
 
 
 def run_one(
@@ -77,6 +71,11 @@ def render(rep: Report, verbose: bool) -> str:
 
 
 def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("diff", "gallery"):
+        from . import diff as diff_mod
+
+        return diff_mod.main(argv)
     ap = argparse.ArgumentParser(
         prog="python -m tools.conformance", description=__doc__
     )

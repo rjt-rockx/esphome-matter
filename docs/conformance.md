@@ -152,10 +152,63 @@ include the global attributes (`0xFFFC` FeatureMap, `0xFFFB` AttributeList,
 `0xFFF9` AcceptedCommandList, `0xFFF8` GeneratedCommandList, `0xFFFA` EventList,
 `0xFFFD` ClusterRevision) and the Descriptor cluster (`0x1D`: DeviceTypeList as a list of
 `{"deviceType": id, "revision": n}`, ServerList, ClientList, PartsList). Keys may be
-decimal or `0x` hex strings. A flat `{"1/6/0": value}` map (python-matter-server
-`node.attributes`) is also accepted. `python -m tools.conformance <yaml>
+decimal or `0x` hex strings. Accepted flavours: the nested form above; a flat
+`{"1/6/0": value}` map; a raw python-matter-server / Home Assistant node dump
+(`{"node_id": .., "attributes": {"ep/cluster/attr": v}}`, also under `result` or
+`node`); and a matter.js harness dump (`tools/harness dump`:
+`{"nodeId": .., "data": {"1": {"0x0006": {"0x0000": v}}}}`, where FeatureMap may be an
+object of named booleans). `python -m tools.conformance <yaml>
 --emit-dump predicted.json` writes the predicted model in the same format, so a real
 capture can be diffed against the prediction.
+
+## Diffing against a real device
+
+```
+python -m tools.conformance diff <ours> <reference> [--ignore-root] [--ignore-noise] [--json out.json]
+```
+
+* `ours`: an ESPHome YAML (layout generated through `esphome`), a `MATTER_LAYOUT_JSON`
+  layout, or any dump flavour above.
+* `reference`: a dump / layout / YAML file, or a **catalog id**. Ids resolve through
+  `*.jsonl` files in `$MATTER_DEVICE_CATALOG` (default `/home/user/research/devices`);
+  the entry's `local_dump` is loaded, or, if there is none, the entry's endpoint summary
+  (device types, cluster features, parents; attribute lists and tags are then not compared).
+
+Endpoints are matched by device type set (then by best overlap) and order, never by
+endpoint number. Per matched pair the diff covers device types and revisions,
+server/client clusters, ClusterRevision, FeatureMap bits (decoded to feature names),
+AttributeList / AcceptedCommandList / GeneratedCommandList / EventList (spec names),
+Descriptor tags, FixedLabel and the parent endpoint (from the layout's configured
+parent, or from PartsList in a dump). Lists that one side does not know (clusters the
+esp-matter profile cannot predict, a trimmed interview without EventList) are skipped on
+both sides, and the sub-items of a cluster present on one side only are folded into the
+cluster line. Output is a table (`-` only in the reference, `+` only in ours, `~`
+differs), a gap count by class and a 0-100 % match score
+(`2 * common facts / (ours + reference facts)`); `--json` writes everything,
+including per-endpoint scores. Gaps are what the reference has that ours lacks or has
+differently; extras are what only ours has.
+
+* `--ignore-root` skips endpoint 0 (the infrastructure clusters).
+* `--ignore-noise` also drops cluster / device type revisions, vendor-specific clusters
+  and attributes, and runtime diagnostics clusters on application endpoints.
+* `--fail-on-gap` exits 1 when there is any gap. Exit code 2: input or reference not found.
+
+```
+python -m tools.conformance gallery examples/devices [--layout-cache DIR] [-j N] [--markdown] [--json out.json]
+```
+
+For every YAML below the directory whose first 60 lines contain
+`# mirrors: <catalog-id>` (several ids may be comma separated) the layout is generated
+and diffed against the reference. The summary matrix lists device (catalog id), variant
+(file name without the id prefix), match score, total gaps and gaps per class: `EP`
+unmatched endpoints, `DT` device types, `CL` clusters, `FEAT` features, `ATTR`, `CMD`,
+`EVT`, `COMP` composition (tags, labels, parent); `extra` counts what only ours has.
+`--layout-cache DIR` keeps `<stem>.layout.json` so reruns skip code generation
+(`--refresh` regenerates). A YAML that fails to generate or has an unknown id becomes an
+`ERROR` row and the exit code is 1.
+
+The layout export (`MATTER_LAYOUT_JSON`) carries `parent`, `label` and `tags` per endpoint
+for this; older layouts lack them and are compared without composition.
 
 ## CI
 
@@ -182,7 +235,7 @@ Add a job next to `unit-tests` (the integrator edits `ci.yml`):
           python -m venv .venv
           .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev" pytest
       - name: Conformance unit tests
-        run: .venv/bin/python -m pytest tests/unit/test_conformance.py
+        run: .venv/bin/python -m pytest tests/unit/test_conformance_checker.py
       - name: Check every test config
         run: .venv/bin/python -m tools.conformance tests/configs/*.yaml --json conformance.json
       - uses: actions/upload-artifact@v4
@@ -192,5 +245,5 @@ Add a job next to `unit-tests` (the integrator edits `ci.yml`):
           path: conformance.json
 ```
 
-The existing `unit-tests` job also picks up `tests/unit/test_conformance.py`; the rule
+The existing `unit-tests` job also picks up `tests/unit/test_conformance_checker.py`; the rule
 tests skip when `MATTER_DATA_MODEL` is unset (the evaluator tests always run).

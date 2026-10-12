@@ -57,6 +57,14 @@ class EndpointInst:
     parts: list[int] | None = None  # Descriptor.PartsList (dump mode)
     parent: int | None = None  # None = flat (child of the root node)
     tag_list_known: bool = False
+    # composition details for tools/conformance diff
+    declared_parent: int | None = None  # layout mode: configured parent (0 = root)
+    tags: list[tuple[int, int, str | None]] = field(
+        default_factory=list
+    )  # (namespace, tag, label)
+    labels: list[tuple[str, str]] = field(
+        default_factory=list
+    )  # FixedLabel (label, value)
 
 
 @dataclass
@@ -331,9 +339,23 @@ def from_layout(
     for key, e in sorted(layout["endpoints"].items(), key=lambda kv: int(kv[0])):
         ep_id = int(key)
         names = [d["name"] for d in e["device_types"]]
-        model.endpoints[ep_id] = build_endpoint(
+        ep = build_endpoint(
             ep_id, names, e["clusters"], set(e.get("dynamic_features", []))
         )
+        model.endpoints[ep_id] = ep
+        if "parent" in e:
+            ep.declared_parent = e["parent"]
+        ep.tags = [
+            (t["namespace"], t["tag"], t.get("label") or None)
+            for t in e.get("tags", [])
+        ]
+        if e.get("label"):
+            ep.labels = [("name", e["label"])]
+        desc = ep.servers.get(DESCRIPTOR)
+        if ep.tags and desc is not None:
+            desc.features.add("TAGLIST")
+            if desc.attributes is not None:
+                desc.attributes.add(4)
     return model
 
 
@@ -357,10 +379,33 @@ def _as_dt(entry) -> tuple[int, int | None]:
     return _to_int(entry), None
 
 
-def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
-    if not isinstance(dump, dict):
-        dump = json.loads(Path(dump).read_text())
-    if "endpoints" in dump and isinstance(dump["endpoints"], dict):
+def _norm_name(text: str) -> str:
+    return "".join(ch for ch in str(text).lower() if ch.isalnum())
+
+
+def normalise_dump(dump: dict) -> dict:
+    """Reduce the supported dump flavours to ``{endpoint: {cluster: {attribute: value}}}``.
+
+    * our own / generic: ``{"0": {"29": {"0": ...}}}`` (optionally under ``endpoints``)
+    * python-matter-server / Home Assistant: ``{"node_id": .., "attributes": {"ep/cluster/attr": v}}``
+      (also wrapped in ``{"result": ..}`` or ``{"node": ..}``)
+    * matter.js harness (tools/harness ``dump``): ``{"nodeId": .., "data": {ep: {"0x0006": {"0x0000": v}}}}``
+    * a bare flat map ``{"ep/cluster/attr": v}``
+    """
+    for wrapper in ("result", "node"):
+        if (
+            isinstance(dump.get(wrapper), dict)
+            and "attributes" not in dump
+            and "data" not in dump
+        ):
+            dump = dump[wrapper]
+    if isinstance(dump.get("attributes"), dict):
+        dump = dump["attributes"]
+    elif isinstance(dump.get("data"), dict) and (
+        "nodeId" in dump or "names" in dump or "node_id" in dump
+    ):
+        dump = dump["data"]
+    elif isinstance(dump.get("endpoints"), dict):
         dump = dump["endpoints"]
     if dump and all("/" in str(k) for k in dump):
         # python-matter-server style flat map: {"<endpoint>/<cluster>/<attribute>": value}
@@ -369,6 +414,78 @@ def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
             ep_id, cluster_id, attr_id = str(path).split("/")
             nested.setdefault(ep_id, {}).setdefault(cluster_id, {})[attr_id] = value
         dump = nested
+    return dump
+
+
+def _feature_map_bits(fm, cspec: ClusterSpec | None) -> tuple[set[str], list[int]]:
+    """FeatureMap as an integer, or as matter.js' ``{featureName: bool}`` object."""
+    feats: set[str] = set()
+    unknown: list[int] = []
+    if isinstance(fm, dict):
+        for name, on in fm.items():
+            if not on:
+                continue
+            f = cspec.feature_by_name(name) if cspec else None
+            if f is None and cspec:
+                f = next(
+                    (
+                        x
+                        for x in cspec.features.values()
+                        if _norm_name(x.name) == _norm_name(name)
+                    ),
+                    None,
+                )
+            if f:
+                feats.add(f.code)
+            else:
+                unknown.append(-1)
+        return feats, unknown
+    if isinstance(fm, int):
+        for bit in range(32):
+            if fm & (1 << bit):
+                f = cspec.feature_by_bit(bit) if cspec else None
+                if f:
+                    feats.add(f.code)
+                else:
+                    unknown.append(bit)
+    return feats, unknown
+
+
+def _field(entry, *names):
+    """Struct member by tag number string or by (camel-case) name."""
+    if isinstance(entry, dict):
+        for n in names:
+            if n in entry:
+                return entry[n]
+    return None
+
+
+def _parse_tags(value) -> list[tuple[int, int, str | None]]:
+    out = []
+    for e in value or []:
+        ns = _field(e, "1", "namespaceId", "namespaceID", "namespace")
+        tag = _field(e, "2", "tag")
+        label = _field(e, "3", "label")
+        if ns is None or tag is None:
+            continue
+        out.append((_to_int(ns), _to_int(tag), label or None))
+    return out
+
+
+def _parse_labels(value) -> list[tuple[str, str]]:
+    out = []
+    for e in value or []:
+        lab = _field(e, "0", "label")
+        val = _field(e, "1", "value")
+        if lab is not None:
+            out.append((str(lab), "" if val is None else str(val)))
+    return out
+
+
+def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
+    if not isinstance(dump, dict):
+        dump = json.loads(Path(dump).read_text())
+    dump = normalise_dump(dump)
     notes: list[str] = []
     model = NodeModel("dump", notes=notes)
     for ep_key, clusters in dump.items():
@@ -380,14 +497,7 @@ def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
             inst.values = attrs
             fm = attrs.get(ATTR_FEATURE_MAP)
             cspec = spec.clusters.get(cid)
-            if isinstance(fm, int):
-                for bit in range(32):
-                    if fm & (1 << bit):
-                        f = cspec.feature_by_bit(bit) if cspec else None
-                        if f:
-                            inst.features.add(f.code)
-                        else:
-                            inst.unknown_feature_bits.append(bit)
+            inst.features, inst.unknown_feature_bits = _feature_map_bits(fm, cspec)
             if ATTR_ATTRIBUTE_LIST in attrs:
                 inst.attributes = {_to_int(a) for a in attrs[ATTR_ATTRIBUTE_LIST]}
             else:
@@ -406,6 +516,9 @@ def from_dump(dump: dict | str | Path, spec: Spec) -> NodeModel:
                 ep.parts = [_to_int(p) for p in (attrs.get(3) or [])]
                 for c in attrs.get(2) or []:
                     ep.clients[_to_int(c)] = ClusterInst(_to_int(c), "client")
+                ep.tags = _parse_tags(attrs.get(4))
+            elif cid == 0x40:
+                ep.labels = _parse_labels(attrs.get(0))
         model.endpoints[ep.id] = ep
     # radios present on the root node -> network capabilities
     root = model.endpoints.get(0)

@@ -207,7 +207,9 @@ def check_cluster(
             ERROR,
             "CL-FEATURE-UNDEFINED",
             where,
-            f"FeatureMap bit {bit} is not defined for this cluster",
+            f"FeatureMap bit {bit} is not defined for this cluster"
+            if bit >= 0
+            else "FeatureMap contains a feature name that is not defined for this cluster",
         )
     groups: dict[str, list[tuple[str, str, bool, Outcome]]] = {}
 

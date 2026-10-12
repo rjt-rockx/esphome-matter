@@ -92,4 +92,11 @@ def _endpoint_layout(endpoint) -> dict:
         ],
         "clusters": clusters,
         "dynamic_features": sorted(set(dynamic)),
+        # composition (conformance.EndpointPlan): parent 0 = child of the root node
+        "parent": endpoint.plan.parent,
+        "label": endpoint.plan.label,
+        "tags": [
+            {"namespace": tag.namespace, "tag": tag.tag, "label": tag.label}
+            for tag in endpoint.plan.tags
+        ],
     }
