@@ -4,7 +4,7 @@
 bindings. It replaces five hand-rolled echo mechanisms and the per-change heap
 allocations in the push paths. Migrated so far: switch, valve, sensors, binary
 sensors, the power-source flag enums, fan, climate fan, climate, filter monitoring, lock, cover, closure, modes, Mode Select, operational state,
-laundry controls and the sensor-extras delegates; see [Migration order](#migration-order). Thread names follow
+laundry controls, the sensor-extras delegates and lights; see [Migration order](#migration-order). Thread names follow
 [threading.md](threading.md): "main" is the ESPHome main loop, "CHIP" is the CHIP
 task.
 
@@ -237,6 +237,50 @@ and completes through an idempotent state push; the air quality level is a
 only nullability differs, so nullable attributes can be written with a plain
 value.
 
+### Lights
+
+`matter_light_binding.h` (host-tested in `tests/cpp/test_light_binding.cpp`) is the
+state machine of `MatterLightMapping`, which keeps the entity hooks, the TLV
+decoding of the transition commands and the CHIP cluster calls
+(`matter_lights.cpp`). `MatterBinding<LightOutbound, LightInbound>`, boot sync
+`NONE`, no settle, `reconcile_after_apply = false` (a skipped push still reconciles).
+
+- **Inbound** is an ordered list (newest 8 kept; if items had to be dropped the
+  apply ends the color loop effect, closes the windows and settles on CHIP's state,
+  so a dropped stop or loop end is never lost): attribute updates (OnOff, CurrentLevel,
+  the colour read) and decoded commands. Neighbouring attribute updates merge into
+  one. The main loop walks the list in order (`queue_update_` for updates,
+  `apply_command_` for commands) and then makes one light call from what is left,
+  so OnOff, level and colour of a burst are a single call.
+- **Colour reads** (CHIP): every ColorControl attribute change schedules one
+  coalesced read of the attributes of the active (Enhanced)ColorMode, after the
+  current work item, so CurrentX and CurrentY are never mixed old and new.
+- **Boot**: `BootSync::NONE` plus one read of OnOff, level and colour on CHIP,
+  applied as one call (the light must not flash at its old brightness).
+  StartUpOnOff / StartUpCurrentLevel / StartUpColorTemperature are applied by the
+  cluster servers; the boot read sees their result.
+- **Windows**: a command with a transition (MoveToLevel, On/Off/Toggle with
+  transition times, MoveTo*Color/Hue/Saturation) moves the ESPHome light once with
+  the real transition and opens a window (transition + 500 ms) in which CHIP's
+  intermediate steps are ignored. At the end the binding waits until RemainingTime
+  is 0 (CHIP thread, `check_chip_idle_`) and settles the light on the attribute
+  values (a forced, instant apply). Stop commands settle at once. A change from
+  the ESPHome side ends the windows and CHIP's transitions are stopped by a
+  work item requested at once (the control slot, ahead of the push, so a skipped
+  push cannot make the stop outlive a newer command).
+- **Echo**: the changes that came from a Matter command are remembered
+  (`remember_applied_entity_`); the light's later publishes (transition steps)
+  that equal them are not pushed. Pushes themselves are `report()`s inside the
+  `PushScope`.
+- **Push**: the whole state is captured on every publish and coalesces. The colour
+  report is only repeated when the colour changed (so a controller's HS ColorMode
+  is not switched back to XY); a colour change is a counter (`color_report.epoch`)
+  so a coalesced push never loses it. While a command window owns the light group
+  the push leaves OnOff / CurrentLevel alone.
+- **Color loop**: ColorLoopSet runs the ESPHome effect; CHIP's own hue steps are
+  ignored while it runs, and CHIP's loop is deactivated (CHIP thread, through the
+  same work slot) when the effect ends.
+
 ## Migration order
 
 Each step is one change; codegen snapshots stay unchanged.
@@ -250,7 +294,7 @@ Each step is one change; codegen snapshots stay unchanged.
 6. Climate (done), filter monitoring (done).
 7. Modes, operational state, Mode Select (`pending_echoes_` dropped), laundry
    controls and the sensor-extras delegates (done).
-8. Lights, last, behind the runtime golden test.
+8. Lights (done; `matter_light_binding.h`, behind the runtime golden test).
 9. Retire `MatterPushGuard` as a public API and `MatterAttributeDispatchGuard`;
    `test_attribute_writes.py` then checks "writes only inside PushScope".
 
