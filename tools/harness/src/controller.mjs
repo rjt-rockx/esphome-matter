@@ -27,6 +27,7 @@ Logger.level = process.env.HARNESS_LOG ?? "error";
  */
 export async function pinOperationalAddress(ip, port = 5540) {
     const { ObservablePeerDescriptor } = await import("@matter/protocol");
+    const { IpService, Abort } = await import("@matter/general");
     const pinned = { type: "udp", ip, port: Number(port) };
     const desc = Object.getOwnPropertyDescriptor(ObservablePeerDescriptor.prototype, "operationalAddress");
     Object.defineProperty(ObservablePeerDescriptor.prototype, "operationalAddress", {
@@ -38,6 +39,15 @@ export async function pinOperationalAddress(ip, port = 5540) {
             desc.set.call(this, v);
         },
     });
+    // operationalAddress above is only a fallback used when DNS-SD knows no address at all. When the guest's
+    // mDNS announcements leak out of slirp (GitHub Actions runners) the advertised 10.0.2.15 / fe80:: / fec0::
+    // addresses are known but unreachable from the host, and the pinned one is never tried. So replace the
+    // service's address stream with the single pinned address.
+    IpService.prototype.addressChanges = async function* ({ abort } = {}) {
+        yield { kind: "add", address: { ip, port: Number(port) } };
+        // The stream must stay open until the caller aborts: ending it aborts the connection attempt.
+        await Abort.race(abort, new Promise(() => {}));
+    };
 }
 
 export const DEFAULT_STATE_DIR = process.env.HARNESS_STATE ?? resolve(process.cwd(), ".harness-state");

@@ -314,7 +314,7 @@ class Matter:
         self._reader.start()
         with self._cond:
             if not self._cond.wait_for(lambda: self._ready, timeout=60):
-                raise MatterError("harness serve did not become ready")
+                raise MatterError(f"harness serve did not become ready{self._stderr_tail()}")
 
     _ready = False
     _warm = False
@@ -358,6 +358,16 @@ class Matter:
         if self._stderr:
             self._stderr.close()
 
+    def _stderr_tail(self, chars: int = 4000) -> str:
+        """Tail of the serve process's stderr (harness.log), so a CI failure shows it in the job log."""
+        try:
+            if self._stderr:
+                self._stderr.flush()
+            text = ANSI.sub("", (ARTIFACTS / "harness.log").read_text(errors="replace"))
+        except OSError:
+            return ""
+        return f"\n--- harness serve stderr (last {chars} chars) ---\n{text[-chars:]}" if text.strip() else ""
+
     # -- requests ----------------------------------------------------------------------------------------------
     def request(self, op: str, timeout: float = 90, **fields: Any) -> Any:
         assert self.proc and self.proc.stdin, "call start() first"
@@ -378,9 +388,9 @@ class Matter:
             ok = self._cond.wait_for(lambda: slot.get("done"), timeout=timeout)
             self._pending.pop(rid, None)
         if not ok:
-            raise MatterError(f"{op} {fields}: no response within {timeout} s")
+            raise MatterError(f"{op} {fields}: no response within {timeout} s{self._stderr_tail()}")
         if "error" in slot:
-            raise MatterError(f"{op} {fields}: {slot['error']}")
+            raise MatterError(f"{op} {fields}: {slot['error']}{self._stderr_tail()}")
         return slot["result"]
 
     def read(self, ep: int, cluster: str, attribute: str) -> Any:
