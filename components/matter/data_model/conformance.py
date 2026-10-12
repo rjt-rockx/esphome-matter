@@ -301,8 +301,11 @@ def _select_requirement(
         for requirement in compatible
         if requirement.required_features <= enabled_features
     ]
-    if len(satisfied) == 1:
-        return satisfied[0]
+    if satisfied:
+        # Already satisfied by the enabled features: nothing needs to be added,
+        # whichever satisfied alternative is picked (e.g. `PIN | RID | ...` with
+        # both PIN and RID enabled).
+        return min(satisfied, key=lambda r: sorted(r.required_features))
 
     best_score = max(
         len(requirement.required_features & enabled_features)

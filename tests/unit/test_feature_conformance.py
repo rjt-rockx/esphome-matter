@@ -134,3 +134,11 @@ def test_optional_cluster_feature_error_is_actionable() -> None:
     assert "required by: )" not in message and "required by: ." not in message
     assert "with_features" in message and "room_air_conditioner" in message
     assert "clusters:" in message
+
+
+def test_satisfied_alternatives_do_not_need_a_choice() -> None:
+    """Door Lock User (USR) is mandatory if PIN|RID|...; with several enabled nothing is added."""
+    c = CLUSTERS_BY_ID[0x0101]
+    conf = {f.code: f.conformance for f in c.features}
+    assert resolve_feature_requirements([], conf, {"PIN", "RID", "USR"}) == set()
+    assert resolve_feature_requirements([], conf, {"PIN", "USR", "COTA"}) == set()
