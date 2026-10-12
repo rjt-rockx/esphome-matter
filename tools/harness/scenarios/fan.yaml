@@ -1,0 +1,15 @@
+# fan device type bound to an ESPHome fan. FanMode: 0 Off, 1 Low, 2 Medium, 3 High, 5 Auto
+name: fan percent and mode
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: FanControl }]
+steps:
+  - write: { ep: "${ep}", cluster: FanControl, attribute: PercentSetting, value: 100 }
+  - expect: { ep: "${ep}", cluster: FanControl, attribute: PercentSetting, equals: 100, within: 3s }
+  - expect: { ep: "${ep}", cluster: FanControl, attribute: FanMode, equals: 3, within: 3s }
+  - write: { ep: "${ep}", cluster: FanControl, attribute: FanMode, value: 1 }
+  - expect: { ep: "${ep}", cluster: FanControl, attribute: FanMode, equals: 1, within: 3s }
+  - expect: { ep: "${ep}", cluster: FanControl, attribute: PercentSetting, gt: 0, within: 3s }
+  - write: { ep: "${ep}", cluster: FanControl, attribute: FanMode, value: 0 }
+  - expect: { ep: "${ep}", cluster: FanControl, attribute: PercentSetting, equals: 0, within: 3s }
+cleanup:
+  - write: { ep: "${ep}", cluster: FanControl, attribute: FanMode, value: 0 }

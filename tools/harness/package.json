@@ -1,0 +1,19 @@
+{
+  "name": "esphome-matter-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scriptable Matter controller harness for testing esphome-matter devices",
+  "engines": { "node": ">=22" },
+  "bin": { "matter-harness": "./src/cli.mjs" },
+  "scripts": {
+    "selftest": "node src/cli.mjs selftest",
+    "scenario": "node src/cli.mjs scenario"
+  },
+  "dependencies": {
+    "@matter/main": "0.17.9",
+    "@matter/nodejs": "0.17.9",
+    "@project-chip/matter.js": "0.17.9",
+    "yaml": "2.8.1"
+  }
+}
