@@ -59,8 +59,9 @@ protected:
 #ifdef USE_BINARY_SENSOR
 // Turns the presses of a binary sensor into Switch cluster events. Only events
 // of the features enabled on the endpoint are generated:
-//   first press      -> InitialPress (MultiPressOngoing for presses 2..max,
-//                       not for action switches)
+//   every press      -> InitialPress, then MultiPressOngoing for presses
+//                       2..max. An action switch sends InitialPress only for
+//                       the first press and never MultiPressOngoing.
 //   held first press -> LongPress, then LongRelease on release
 //   release          -> ShortRelease (not after a long press)
 //   window expires   -> MultiPressComplete(count, 0 when aborted)
