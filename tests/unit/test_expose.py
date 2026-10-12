@@ -311,7 +311,7 @@ def test_as_features_options(raw):
     inv = {e.id: e for e in build_inventory(raw)}
     out = infer(inv["relay"], Overrides(as_="on_off_light", features=["Lighting"], options={"x": 1}))
     assert out.device_types == {
-        "on_off_light": {"switch_id": "relay", "features": ["Lighting"], "x": 1}
+        "on_off_light": {"switch_id": "relay", "with_features": ["Lighting"], "x": 1}
     }
     with pytest.raises(cv.Invalid, match="unknown device type 'on_of_light'.*on_off_light"):
         infer(inv["relay"], Overrides(as_="on_of_light"))

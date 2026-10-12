@@ -17,19 +17,14 @@ from typing import Any
 
 import esphome.config_validation as cv
 
-from ..const import CONF_FEATURES
+from ..const import CONF_WITH_FEATURES
 from ..data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .inventory import Entity
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_LABEL = "label"
-# Key the base uses for the extra features of a device type block. Upstream renames it to
-# `with_features`; the alias is picked up automatically when the constant exists.
-try:
-    from ..const import CONF_WITH_FEATURES as FEATURES_KEY  # type: ignore[attr-defined]
-except ImportError:
-    FEATURES_KEY = CONF_FEATURES
+FEATURES_KEY = CONF_WITH_FEATURES  # key of the extra features of a device type block
 
 
 @dataclass
