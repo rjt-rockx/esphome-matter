@@ -8,6 +8,7 @@
 #include <platform/CHIPDeviceLayer.h>
 
 #include <cinttypes>
+#include <vector>
 
 static const char *const TAG = "matter";
 
@@ -34,6 +35,14 @@ bool is_attribute_update_echo(uint16_t endpoint_id, uint32_t cluster_id,
          active_attribute_dispatch.endpoint_id == endpoint_id &&
          active_attribute_dispatch.cluster_id == cluster_id &&
          active_attribute_dispatch.attribute_id == attribute_id;
+}
+
+// Guards MatterComponent::attribute_callbacks_, which is appended to by the
+// main loop (mapping initialize(), after esp_matter::start()) and read by the
+// CHIP task. Function-local static: constructed on first use.
+Mutex &attribute_callbacks_mutex() {
+  static Mutex mutex;
+  return mutex;
 }
 
 std::string format_attribute_value(const esp_matter_attr_val_t &value) {
@@ -239,6 +248,8 @@ void set_attribute_value(uint16_t endpoint_id, uint32_t cluster_id,
 void MatterComponent::register_attribute_callback(
     uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id,
     MatterAttributeCallback callback) {
+  // May be called from the main loop while the CHIP task is dispatching.
+  LockGuard guard(attribute_callbacks_mutex());
   this->attribute_callbacks_.push_back(
       {endpoint_id, cluster_id, attribute_id, std::move(callback)});
 }
@@ -248,11 +259,19 @@ void MatterComponent::dispatch_attribute_update(
     const esp_matter_attr_val_t &value) {
   if (value.is_null())
     return;
-  for (const auto &registration : this->attribute_callbacks_) {
-    if (!registration.matches(endpoint_id, cluster_id, attribute_id))
-      continue;
-    registration.callback(value);
+  // Copy the matching callbacks under the lock and invoke them outside it, so
+  // a concurrent register_attribute_callback() cannot invalidate iterators and
+  // a callback may itself register callbacks without deadlocking.
+  std::vector<MatterAttributeCallback> matching;
+  {
+    LockGuard guard(attribute_callbacks_mutex());
+    for (const auto &registration : this->attribute_callbacks_) {
+      if (registration.matches(endpoint_id, cluster_id, attribute_id))
+        matching.push_back(registration.callback);
+    }
   }
+  for (const auto &callback : matching)
+    callback(value);
 }
 
 // Can be used to trigger an attribute callback manually. Particularly useful
