@@ -67,6 +67,7 @@ RAW = {
         sensor("voc", "volatile_organic_compounds", "µg/m³"),
         sensor("batt", "battery", "%"),
         sensor("batt2", "battery", "%"),
+        sensor("door_batt", "battery", "%"),
         sensor("temp", "temperature", "°C"),
         sensor("hum", "humidity", "%"),
         sensor("power", "power", "W"),
@@ -174,11 +175,28 @@ def test_inferred_device_type(raw, eid, device_type):
     assert primary(eid) == device_type
 
 
-def test_garage_cover_uses_closure_compat(raw):
+def test_garage_cover_uses_closure_compat_when_the_schema_has_it(raw, monkeypatch):
+    from components.matter.expose import inference
+
+    monkeypatch.setattr(inference, "closure_compat_supported", lambda: True)
     out = infer(entity("garage"), Overrides())
     assert out.device_types == {"window_covering": {"cover_id": "garage", "closure_compat": True}}
     plain = infer(entity("blind"), Overrides())
     assert "closure_compat" not in plain.device_types["window_covering"]
+
+
+def test_garage_cover_falls_back_to_plain_window_covering(raw, monkeypatch, caplog):
+    from components.matter.expose import inference
+
+    monkeypatch.setattr(inference, "closure_compat_supported", lambda: False)
+    inference._WARNED.clear()
+    with caplog.at_level("WARNING"):
+        cfg = run(["garage"])
+    with pytest.raises(NoMapping, match="closure_compat"):
+        infer(entity("garage"), Overrides(via_glob=True))
+    assert ep_of_unbound(cfg)["window_covering"]["cover_id"].id == "garage"
+    assert "closure_compat" not in ep_of_unbound(cfg)["window_covering"]
+    assert "plain Window Covering" in caplog.text and "garage" in caplog.text
 
 
 def test_bare_binary_sensor_hint_names_the_fix(raw):
@@ -263,11 +281,17 @@ def test_nested_sub_sensor_hints_map(raw):
 # --- battery -------------------------------------------------------------------------------
 
 
-def test_battery_attaches_to_the_only_application_endpoint(raw):
+def test_unrelated_battery_gets_its_own_endpoint_even_with_one_device(raw):
     cfg = run(["door", "batt"])
+    assert len(cfg["endpoints"]) == 2
+    assert types_of(ep_of(cfg, "batt")) == ["power_source"]
+
+
+def test_related_battery_attaches(raw):
+    cfg = run(["door", "door_batt"])
     (ep,) = cfg["endpoints"].values()
     assert types_of(ep) == ["contact_sensor"]
-    assert getattr(ep["battery"], "id", ep["battery"]) == "batt"
+    assert getattr(ep["battery"], "id", ep["battery"]) == "door_batt"
 
 
 def test_battery_with_several_endpoints_gets_its_own_endpoint(raw):
@@ -343,9 +367,10 @@ def test_meter_without_any_load_is_standalone(raw):
     assert list(cfg["endpoints"]) == [endpoint_for_key("group:electrical")]
 
 
-def test_two_power_sensors_without_a_load_explain_meters(raw):
-    with pytest.raises(cv.Invalid, match="meters: <switch id>"):
-        run(["relay_1", "relay_2", "power", "grid_power"], raw_override=_with_extra_power())
+def test_two_unmatched_power_sensors_spill_into_separate_endpoints(raw):
+    cfg = run(["relay_1", "relay_2", "power", "grid_power"], raw_override=_with_extra_power())
+    meters = [ep for ep in cfg["endpoints"].values() if types_of(ep) == ["electrical_sensor"]]
+    assert len(meters) == 2
 
 
 def _with_extra_power():
@@ -415,8 +440,8 @@ def test_explicit_number_tags_are_not_reused(raw):
         raw_override=raw2,
     )
     got = {eid: ep_of(cfg, eid)["tags"][0]["tag"] for eid in ("zz", "fan_1", "fan_2")}
-    # fan_1 would take Number 1 by its trailing integer, which zz uses: ordinals skip it
-    assert got == {"zz": 1, "fan_1": 2, "fan_2": 3}
+    # fan_1 would take Number 1, which zz uses: it gets a free number, fan_2 keeps its own
+    assert got == {"zz": 1, "fan_2": 2, "fan_1": 3}
 
 
 def test_tag_validation_names_unknown_tags(raw):

@@ -470,15 +470,15 @@ def test_plan_logged(raw, caplog):
 # --- bare matter: (section 5 text) ----------------------------------------------------------------
 
 
-def test_bare_matter_error_text(raw):
-    with pytest.raises(cv.Invalid) as exc:
-        lower_expose({"endpoints": {}})
-    text = exc.value.msg
-    assert text.startswith("matter: nothing to expose. Add one of:\n")
+def test_bare_matter_is_valid_and_hints(raw, caplog):
+    cfg = {"endpoints": {}}
+    with caplog.at_level("INFO"):
+        assert lower_expose(cfg) is cfg
+    text = caplog.text
+    assert "no entities are exposed (root node only)" in text
     assert "  expose: [relay, relay_1, relay_2, relay_10, desk, lamp, t, h, scd_t, scd_h]" in text
     assert "# inferred from your config; edit as needed" in text
     assert "\n  expose: all\n" in text
-    assert text.endswith("expose: []                       # root node only")
     assert "hidden" not in text and "strip" not in text and "btn" not in text
 
 

@@ -25,13 +25,12 @@ sensor:
 """
 
 
-def test_bare_matter_is_an_error(run_config):
+def test_bare_matter_is_valid_and_hints(run_config):
     result = run_config("matter:\n" + ENTITIES)
-    assert not result.ok
-    assert "matter: nothing to expose. Add one of:" in result.output
+    assert result.ok, result.output[-2000:]
+    assert "no entities are exposed (root node only)" in result.output
     assert "expose: [relay, lamp, room_temp]" in result.output
     assert "expose: all" in result.output
-    assert "expose: []" in result.output
 
 
 def test_expose_empty_is_root_only(run_config):

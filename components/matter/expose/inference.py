@@ -159,8 +159,9 @@ NO_RULE_HINTS = {
     "sensor": (
         "supported device_class values: temperature, humidity, pressure, illuminance, "
         "volume_flow_rate, carbon_dioxide, carbon_monoxide, pm1, pm25, pm10, "
-        "volatile_organic_compounds, nitrogen_dioxide, ozone, power, energy, voltage, current, "
-        "apparent_power, frequency, power_factor, battery; or use `as:`"
+        "volatile_organic_compounds, volatile_organic_compounds_parts, nitrogen_dioxide, ozone, "
+        "power, energy, voltage, current, apparent_power, reactive_power, frequency, "
+        "power_factor, battery; or use `as:`"
     ),
 }
 
@@ -188,6 +189,16 @@ def bind(device_type: str, entity: Entity) -> dict:
         return {TYPE_ID_KEYS[(device_type, entity.domain)]: entity.id}
     if len(dt.sensor_attributes) == 1:
         return {dt.sensor_attributes[0].conf_key: entity.id}
+    table = MULTI_ATTRIBUTE_TYPES.get(device_type, {}).get(entity.domain)
+    if table is not None:
+        attr = table.get(_hint(entity))
+        if attr is None:
+            raise NoMapping(
+                f"`as: {device_type}` needs to know which of its attributes this {entity.domain} "
+                f"is: set a `device_class:` of {', '.join(sorted(set(table)))}, or use "
+                "`endpoints:` for this one"
+            )
+        return {attr: entity.id}
     if entity.domain in DOMAIN_ID_KEYS:
         return {DOMAIN_ID_KEYS[entity.domain]: entity.id}
     raise NoMapping(
@@ -318,7 +329,7 @@ _ELECTRICAL_ATTRS = {
 
 @rule("sensor")
 def _sensor(entity: Entity, overrides: Overrides) -> LoweredEndpoint | None:
-    hint = _HINT_ALIASES.get(entity.hint, entity.hint)
+    hint = _hint(entity)
     if (
         hint == "temperature"
         or entity.platform in _TEMPERATURE_PLATFORMS
@@ -364,6 +375,29 @@ _BINARY_SENSOR_TYPES = {
     "cold": "water_freeze_detector",
 }
 _SMOKE_CO_KEYS = {"smoke": "smoke_state", "carbon_monoxide": "co_state"}
+
+
+def _hint(entity: Entity) -> str | None:
+    """The device class of an entity, with the nested sub-sensor aliases resolved."""
+    return _HINT_ALIASES.get(entity.hint, entity.hint)
+
+
+# `as:` on a device type with many sensor attributes: device_type -> domain -> hint -> attribute.
+# The same tables drive the inference rules, so `as:` and the rule always agree.
+MULTI_ATTRIBUTE_TYPES = {
+    "electrical_sensor": {"sensor": _ELECTRICAL_ATTRS},
+    "air_quality_sensor": {
+        "sensor": {**_AIR_QUALITY_ATTRS, "temperature": "temperature", "humidity": "relative_humidity"}
+    },
+    "smoke_co_alarm": {
+        "binary_sensor": _SMOKE_CO_KEYS,
+        "sensor": {
+            "temperature": "temperature",
+            "humidity": "relative_humidity",
+            "carbon_monoxide": "carbon_monoxide",
+        },
+    },
+}
 
 
 @rule("binary_sensor")
@@ -415,11 +449,37 @@ _AC_CLIMATE_PLATFORMS = frozenset(
 )  # fmt: skip
 
 
+_WARNED: set[str] = set()  # one warning per entity per process
+
+
+def closure_compat_supported() -> bool:
+    """Whether the Window Covering schema of the base has `closure_compat` (Closure support)."""
+    from .. import covers
+
+    return hasattr(covers, "CONF_CLOSURE_COMPAT")
+
+
 @rule("cover")
 def _cover(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
     block = bind("window_covering", entity)
     if entity.device_class in _NON_BLIND_COVERS:
-        block["closure_compat"] = True
+        if closure_compat_supported():
+            block["closure_compat"] = True
+        elif overrides.via_glob:
+            raise NoMapping(
+                f"a cover with device_class '{entity.device_class}' needs `closure_compat`, "
+                "which this build does not have; list its id in `expose:` to try a plain "
+                "Window Covering"
+            )
+        elif entity.id not in _WARNED:
+            _WARNED.add(entity.id)
+            _LOGGER.warning(
+                "matter.expose: cover '%s' (device_class %s) is exposed as a plain Window "
+                "Covering because this build has no `closure_compat` option; controllers show "
+                "it as a shutter or blind",
+                entity.id,
+                entity.device_class,
+            )
     return LoweredEndpoint({"window_covering": block})
 
 

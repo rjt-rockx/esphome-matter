@@ -13,11 +13,11 @@ matter:
   expose: [relay]   # endpoint 38775, on_off_plug_in_unit "Plug"
 ```
 
-`matter:` with neither `expose:` nor `endpoints:` is an error, because nothing is exposed by accident. The
-error prints a list you can paste:
+`matter:` with neither `expose:` nor `endpoints:` stays valid: it is a root node only, and nothing is exposed
+by accident. An INFO line prints a list you can paste:
 
 ```
-matter: nothing to expose. Add one of:
+matter: no entities are exposed (root node only). To expose some, add one of:
   expose: [relay, desk, t, h]      # inferred from your config; edit as needed
   expose: all
   expose: []                       # root node only
@@ -72,7 +72,7 @@ Every row can be overridden with `as:`. Nothing is guessed from a missing `devic
 |---|---|
 | `switch` | `on_off_plug_in_unit` (`as: on_off_light` for a lamp) |
 | `light` | by platform: `binary` on_off_light, `monochromatic` dimmable_light, `cwww`/`color_temperature` color_temperature_light, `rgb`/`rgbw`/`rgbww`/`rgbct` extended_color_light. Other platforms need `as:`. |
-| `cover` | `window_covering`. `garage`, `gate` and `door` classes also get `closure_compat: true` (needs the Closure support branch); the native `closure` type is only ever chosen with `as:`. |
+| `cover` | `window_covering`. `garage`, `gate` and `door` classes also get `closure_compat: true` (only when this build has `closure_compat`; otherwise a glob skips the cover and an explicit id exposes it as a plain Window Covering with a warning); the native `closure` type is only ever chosen with `as:`. |
 | `fan` | `fan` |
 | `lock` | `door_lock` |
 | `valve` | `water_valve` (Apple Home does not show it; the plan says so) |
@@ -100,20 +100,38 @@ A meter belongs to the endpoint of a switch, light, cover or fan. It is attached
 endpoint gets the Electrical Sensor device type next to its own) when:
 
 1. the item has `meters: <load id>` (or `attach_to:`), or
-2. only one load is exposed, or
-3. the sensor id or name starts with the load's (`relay_1_power` for `relay_1`), or ends with the same
-   number (`power_2` for `relay_2`), and exactly one load matches.
+2. the sensor is *related* to exactly one load: its id starts with the load's id (`relay_1_power` for
+   `relay_1`), then its name starts with the load's name (`Relay 1 Power` for `Relay 1`), then its id ends
+   with the load's number (`power_2` for `relay_2`). Prefixes match on a word boundary, so `Relay 12 Power`
+   does not belong to `Relay 1`, or
+3. the sensor is listed by its own id (not picked by a glob or `all`) and only one load is exposed.
 
-Otherwise the meters share one standalone endpoint `group:electrical`. Two sensors of the same kind there
-are an error that points at `meters:`. To force a standalone endpoint use `as: electrical_sensor` (one
-endpoint per sensor), and `options: {current_type: dc}` for DC.
+An unrelated sensor under a glob or `all` (an ADC "Battery voltage" next to a lamp) is not attached. Meters
+that are not attached share one standalone endpoint `group:electrical`. A second sensor for an attribute the
+group already has (two power sensors) gets an endpoint of its own instead of an error. To force a standalone
+endpoint use `as: electrical_sensor`, and `options: {current_type: dc}` for DC.
+
+TODO (wave-power owns Power Topology): every `electrical_sensor` endpoint is created with NodeTopology, so
+several metered endpoints on one node each advertise it. Revisit when wave-power decides how a node with
+several meters declares its topology.
 
 ### Battery
 
 A battery sensor puts a Power Source on an application endpoint (`battery:` of the endpoint), like most real
-devices. It goes to the only application endpoint, or to the one named with `attach_to:`. With several
-endpoints and no `attach_to:` it gets its own `power_source` endpoint. (Power Source on endpoint 0 is not
-available yet.)
+devices. It goes to the endpoint named with `attach_to:`, or to the one it is related to by id, name or
+trailing number (same rules as meters, without the lone-candidate shortcut). Otherwise it gets its own
+`power_source` endpoint. An endpoint that already has a battery is not a candidate: a second battery gets its
+own endpoint. (Power Source on endpoint 0 is not available yet.)
+
+A Smoke CO Alarm without any Power Source in the plan logs a warning that suggests exposing the battery with
+`attach_to:`. The esp-matter device type does not require one; whether the Matter device library text does
+is not verified here.
+
+### `as:` for devices with many attributes
+
+`as: electrical_sensor`, `as: air_quality_sensor` and `as: smoke_co_alarm` pick the attribute from the
+entity's `device_class`, with the same tables as the rules. Without a usable class the error lists the
+classes. Such an item is never merged: it gets its own endpoint.
 
 ### Tags and labels
 
@@ -122,12 +140,16 @@ TagList. For such endpoints expose writes a Common Number tag itself and also se
 endpoint label. The number comes from the id, not from the hashed endpoint number:
 
 - if every id of the set ends in a distinct number (`relay_1`, `relay_2`, `relay_10`), that number;
-- otherwise the position in natural id order (`One`, `Two`, ...), skipping numbers used by explicit
-  `tags:`. Adding an entity before the others renumbers them; the log says so. End ids with numbers or
-  give `tags:` to avoid it.
+- Every id that ends in a number keeps it (if it is free and at most 30), whatever the other ids are, so
+  adding or removing an unrelated entity never moves it. The other ids take the lowest free numbers in
+  natural id order (`One`, `Two`, ...), skipping numbers used by `tags:` of exposed or hand-written
+  endpoints. Those positional numbers can move when entities are added before them; the log says so. Give
+  `tags:` to pin them.
+
+Hand-written `endpoints:` count as siblings, and `parent:` by id and by number are the same parent.
 
 Endpoints that are alone get neither tag nor label, unless the item has `tags:` or `label:`. A derived label
-longer than 16 bytes is truncated (with a warning); an explicit `label:` that long is an error. Utility device
+longer than 16 bytes is truncated (with a warning); if truncation makes labels of one set identical, a number (the trailing number of the id, else the position) is appended and a warning says so; an explicit `label:` that long is an error. Utility device
 types (Power Source, Electrical Sensor) never count as duplicates.
 
 ### Skipped unnamed entities
@@ -182,5 +204,5 @@ skipped relay_3: excluded
 
 ## Migration from a bare `matter:`
 
-Configs that only set node options (`node_label`, `on_commissioned`, `ble_commissioning`, ...) now need
-`expose: []` (or a list), because a bare `matter:` is an error.
+Configs that only set node options (`node_label`, `on_commissioned`, `ble_commissioning`, ...) keep working
+unchanged: a bare `matter:` is a root node, and `esphome config` logs the `expose:` list it would infer.

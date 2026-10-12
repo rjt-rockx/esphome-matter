@@ -15,7 +15,7 @@ from esphome.core import CORE
 
 from ..conformance import application_device_type_ids
 from ..const import CONF_ENDPOINTS, CONF_MATTER, CONF_VENDOR_ID
-from .inference import CONF_LABEL, NoMapping, Overrides, infer
+from .inference import CONF_LABEL, LoweredEndpoint, NoMapping, Overrides, infer
 from .inventory import Entity, build_inventory
 from .numbering import group_key, natural_key, resolve_numbers
 from .plan import (
@@ -28,13 +28,13 @@ from .plan import (
 )
 from .schema import CONF_CLUSTERS, CONF_EXCLUDE, CONF_EXPOSE, CONF_PARENT, CONF_TAGS
 from .selectors import ALL, EXPLICIT, Selection, parse_items, select
-from .tags import assign_duplicate_tags
+from .tags import assign_duplicate_tags, warn_smoke_power
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def bare_matter_error(inventory: list[Entity]) -> str:
-    """The ready-to-paste message for `matter:` without `expose:` or `endpoints:`."""
+def bare_matter_hint(inventory: list[Entity]) -> str:
+    """The ready-to-paste hint for `matter:` without `expose:` or `endpoints:` (a root node)."""
     inferred = []
     for entity in inventory:
         if not entity.exposable or entity.skipped_by_glob:
@@ -46,7 +46,7 @@ def bare_matter_error(inventory: list[Entity]) -> str:
         inferred.append(entity.id)
     listing = ", ".join(inferred) if inferred else "<entity id>"
     return (
-        "matter: nothing to expose. Add one of:\n"
+        "matter: no entities are exposed (root node only). To expose some, add one of:\n"
         f"  expose: [{listing}]      # inferred from your config; edit as needed\n"
         "  expose: all\n"
         "  expose: []                       # root node only"
@@ -87,11 +87,19 @@ def _apply_item_keys(ep: PlannedEndpoint, o: Overrides) -> None:
                 f"matter.expose: conflicting endpoint pins for {key}: {ep.pin} and {o.endpoint}"
             )
         ep.pin = o.endpoint
-    if o.label and CONF_LABEL not in ep.extra:
+    if o.label:
+        if ep.extra.get(CONF_LABEL, o.label) != o.label:
+            raise cv.Invalid(
+                f"matter.expose: conflicting `label:` for {key}: "
+                f"'{ep.extra[CONF_LABEL]}' and '{o.label}'"
+            )
         ep.extra[CONF_LABEL] = o.label
     if o.tags is not None:
         if CONF_TAGS in ep.extra and ep.extra[CONF_TAGS] != o.tags:
-            raise cv.Invalid(f"matter.expose: conflicting `tags:` for {key}")
+            raise cv.Invalid(
+                f"matter.expose: conflicting `tags:` for {key}: "
+                f"{ep.extra[CONF_TAGS]} and {o.tags}"
+            )
         ep.extra[CONF_TAGS] = list(o.tags)
     if o.clusters is not None:
         _merge_dicts(ep.extra.setdefault(CONF_CLUSTERS, {}), o.clusters, f"{key} clusters")
@@ -103,7 +111,31 @@ def _apply_item_keys(ep: PlannedEndpoint, o: Overrides) -> None:
         ep.parent = o.parent
 
 
+def _collides(ep: PlannedEndpoint | None, device_types: dict[str, dict]) -> bool:
+    """Whether adding `device_types` to `ep` would bind an attribute to a second entity."""
+    if ep is None:
+        return False
+    return any(
+        existing.get(attr, value) != value
+        for name, block in device_types.items()
+        for attr, value in block.items()
+        for existing in [ep.device_types.get(name, {})]
+    )
+
+
 def _add_standalone(planned, key_of, entity, o, lowered, explicit) -> None:
+    if lowered.merge_group and _collides(
+        planned.get(group_key(lowered.merge_group)), lowered.device_types
+    ):
+        # Two sensors for the same attribute (two CO2 sensors): the later one gets an endpoint
+        # of its own instead of an error.
+        _LOGGER.info(
+            "matter.expose: '%s' binds an attribute that %s already has; it gets its own "
+            "endpoint",
+            entity.id,
+            group_key(lowered.merge_group),
+        )
+        lowered = replace(lowered, merge_group=None)
     if lowered.merge_group:
         if o.was:
             raise cv.Invalid(
@@ -160,45 +192,80 @@ def _trailing(text: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _auto_target(entity: Entity, kind: str, planned: dict[str, PlannedEndpoint]) -> str | None:
-    """The endpoint a meter or battery belongs to, or None when that is not unambiguous.
+def _word_prefix(text: str, prefix: str) -> bool:
+    """`text` equals `prefix` or continues it after a non-alphanumeric character.
 
-    A single candidate wins. Among several, an id or name that starts with the candidate's
-    (`relay_1_power` for `relay_1`), then the same trailing number (`power_2` for `relay_2`),
-    must pick exactly one.
+    `relay_1_power` and `Relay 1 Power` start with `relay_1` / `Relay 1`, `relay_12_power` does not.
+    """
+    text, prefix = text.lower(), prefix.lower()
+    if not prefix or not text.startswith(prefix):
+        return False
+    return len(text) == len(prefix) or not text[len(prefix)].isalnum()
+
+
+def _unique_best(scores: dict[str, int]) -> str | None:
+    """The key with the single highest positive score, else None."""
+    top = max(scores.values(), default=0)
+    if top and list(scores.values()).count(top) == 1:
+        return next(k for k, v in scores.items() if v == top)
+    return None
+
+
+def _auto_target(
+    entity: Entity,
+    kind: str,
+    planned: dict[str, PlannedEndpoint],
+    lowered: LoweredEndpoint,
+    explicit: bool,
+) -> str | None:
+    """The endpoint a meter or battery belongs to, or None when that is not clear.
+
+    A relation is needed: the id or the name starts with the candidate's (on a word boundary:
+    `relay_1_power` and `Relay 1 Power` belong to `relay_1`, `relay_12_power` does not), or the id
+    ends with the same number (`power_2` for `relay_2`). Ids are scored first, then names, then
+    numbers; each must single out one candidate. Without a relation a meter that was listed by
+    its own id attaches to the only load (an unrelated ADC voltage under `all` does not); a
+    battery never does. A target that cannot take the entity (it already has a battery, or the
+    attribute is bound to another sensor) is not a candidate.
     """
     if kind == "meter":
         cands = [
             ep for ep in planned.values() if any(m.entity.domain in LOAD_DOMAINS for m in ep.members)
         ]
     else:
-        cands = [ep for ep in planned.values() if application_device_type_ids(ep.device_types)]
-    if len(cands) == 1:
-        return cands[0].key
+        cands = [
+            ep
+            for ep in planned.values()
+            if application_device_type_ids(ep.device_types) and "battery" not in ep.extra
+        ]
+    if kind == "meter":
+        cands = [ep for ep in cands if not _collides(ep, lowered.device_types)]
     if not cands:
         return None
 
-    def prefix_score(ep: PlannedEndpoint) -> int:
-        best = 0
-        for m in ep.members:
-            other = m.entity
-            if entity.id and other.id and (
-                entity.id == other.id or entity.id.startswith(other.id + "_")
-            ):
-                best = max(best, len(other.id))
-            if entity.name and other.name and entity.name.lower().startswith(other.name.lower()):
-                best = max(best, len(other.name))
-        return best
+    def best(attr: str) -> str | None:
+        if not getattr(entity, attr):
+            return None
+        scores = {}
+        for ep in cands:
+            hits = [
+                len(getattr(m.entity, attr))
+                for m in ep.members
+                if getattr(m.entity, attr) and _word_prefix(getattr(entity, attr), getattr(m.entity, attr))
+            ]
+            scores[ep.key] = max(hits, default=0)
+        return _unique_best(scores)
 
-    scores = {ep.key: prefix_score(ep) for ep in cands}
-    top = max(scores.values())
-    if top and list(scores.values()).count(top) == 1:
-        return next(k for k, v in scores.items() if v == top)
+    for attr in ("id", "name"):
+        if found := best(attr):
+            return found
     number = _trailing(entity.id)
     if number is not None:
         same = [ep.key for ep in cands if _trailing(ep.key) == number]
         if len(same) == 1:
             return same[0]
+    if kind == "meter" and explicit and len(cands) == 1:
+        return cands[0].key
     return None
 
 
@@ -247,7 +314,7 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
     # Meters before batteries: a standalone electrical endpoint is no host for a Power Source.
     for kind in ("meter", "battery"):
         for entity, o, lowered, explicit in (a for a in autos if a[2].auto_attach == kind):
-            target = _auto_target(entity, kind, planned)
+            target = _auto_target(entity, kind, planned, lowered, explicit)
             if target is not None:
                 _attach(planned, key_of, entity, o, lowered, target)
             else:
@@ -282,8 +349,10 @@ def lower_expose(config: dict) -> dict:
     inventory = build_inventory(CORE.raw_config)
     CORE.data.get(CONF_MATTER, {}).pop(KEY_EXPOSE_PLAN, None)  # no stale plan across validations
     if CONF_EXPOSE not in config:
+        # A bare `matter:` (or one with only `endpoints:`) stays valid: a root node, or the
+        # hand-written endpoints. The hint shows what `expose:` would add.
         if not _has_endpoints(config):
-            raise cv.Invalid(bare_matter_error(inventory))
+            _LOGGER.info(bare_matter_hint(inventory))
         return config
 
     items = parse_items(config[CONF_EXPOSE])
@@ -291,7 +360,6 @@ def lower_expose(config: dict) -> dict:
     if warning := unnamed_warning(selection):
         _LOGGER.warning(warning)
     planned, _ = _plan(selection)
-    assign_duplicate_tags(planned)
 
     from ..endpoints import ENDPOINT_SCHEMA  # avoid an import cycle at module import
 
@@ -301,6 +369,9 @@ def lower_expose(config: dict) -> dict:
         {k: ep.pin for k, ep in planned.items() if ep.pin is not None},
         set(explicit),
     )
+    # Tags and labels depend on who shares a parent, so they need the final numbers.
+    assign_duplicate_tags(planned, numbers, explicit)
+    warn_smoke_power(planned)
     endpoints = dict(explicit)
     for key, ep in planned.items():
         ep.number = numbers[key]
@@ -311,9 +382,13 @@ def lower_expose(config: dict) -> dict:
         try:
             endpoints[ep.number] = ENDPOINT_SCHEMA(value)
         except cv.Invalid as exc:
+            where = ".".join(str(p) for p in exc.path)
+            what = exc.msg.replace("extra keys not allowed", "is not an option of this device type")
             raise cv.Invalid(
-                f"matter.expose: endpoint {ep.number} ({key}): {exc.msg}",
-                path=[CONF_EXPOSE, *exc.path],
+                f"matter.expose: '{key}' ({', '.join([*ep.entities, *ep.attached])}) lowered to "
+                f"endpoint {ep.number}, which failed validation"
+                f"{f' at {where}' if where else ''}: {what}",
+                path=[CONF_EXPOSE],
             ) from None
 
     plan = ExposePlan(
@@ -329,4 +404,6 @@ def lower_expose(config: dict) -> dict:
     return config
 
 
-__all__ = ["ALL", "bare_matter_error", "lower_expose"]
+bare_matter_error = bare_matter_hint  # old name
+
+__all__ = ["ALL", "bare_matter_hint", "bare_matter_error", "lower_expose"]
