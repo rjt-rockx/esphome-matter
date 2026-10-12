@@ -1203,5 +1203,5 @@ async def register_endpoints(var, config: ConfigType):
             sdkconfig_option, sdkconfig_option in enabled_sdkconfig_clusters
         )
 
-    for global_include in global_includes:
+    for global_include in sorted(global_includes):
         cg.add_global(cg.RawStatement(global_include), prepend=True)
