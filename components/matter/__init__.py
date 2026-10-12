@@ -9,6 +9,7 @@ from esphome.components.esp32 import (
     require_vfs_select,
 )
 from esphome.const import (
+    CONF_DEBUG,
     CONF_ENABLE_IPV6,
     CONF_ID,
     Framework,
@@ -27,6 +28,7 @@ from .endpoints import (
     light_restore_warning,
     register_endpoints,
 )
+from .network_config import configure_network
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -136,6 +138,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_HARDWARE_VERSION_STRING): cv.All(
                 cv.string_strict, cv.Length(min=0, max=64)
             ),
+            # Log reconnect timing milestones (IP up, DNS-SD, SRP, CASE, subscription)
+            cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             # Endpoints
             cv.Optional(CONF_ENDPOINTS, default={}): cv.Schema(
                 {
@@ -296,5 +300,7 @@ async def to_code(config: ConfigType):
         add_idf_sdkconfig_option("CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT", False)
         # TODO: set USE_BLE_ONLY_FOR_COMMISSIONING to false if other esphome components need it?
         # TODO: stop api from restarting device in commissioning mode?
+
+    configure_network(debug=config[CONF_DEBUG])
 
     await register_endpoints(var, config)

@@ -8,6 +8,7 @@
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"
 #include "matter_component.h"
+#include "matter_network.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -151,6 +152,7 @@ MatterComponent *global_matter_component =
     nullptr; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
+  network_on_device_event(event);
   switch (event->Type) {
   case chip::DeviceLayer::DeviceEventType::kInterfaceIpAddressChanged:
     ESP_LOGD(TAG_EVENT, "Interface IP Address changed");
