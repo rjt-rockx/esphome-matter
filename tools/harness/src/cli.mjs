@@ -8,6 +8,7 @@ const USAGE = `matter-harness <command> [options]
 Global: --state <dir>  controller state dir (default $HARNESS_STATE or ./.harness-state)
 
   commission --code <manual code|MT:...> [--ip <addr> [--port 5540]] [--node-id N] [--timeout 120]
+  (any command) --operational-ip <addr> [--operational-port 5540]   pin the CASE address when mDNS cannot reach the device (QEMU slirp)
   list                                     show commissioned nodes
   dump --node <id> [--out file.json]       wildcard read of every attribute -> JSON
   read --node <id> --ep <n> --cluster <name|id> --attribute <name|id>
@@ -72,7 +73,9 @@ async function main() {
         await selftest({ transport: args.transport, restart: !!args.restart });
         return;
     }
-    const { openController } = await import("./controller.mjs");
+    const { openController, pinOperationalAddress } = await import("./controller.mjs");
+    const opIp = args["operational-ip"] ?? process.env.HARNESS_OPERATIONAL_IP;
+    if (opIp) await pinOperationalAddress(String(opIp), args["operational-port"] ?? args.port ?? 5540);
     const h = await openController({ stateDir: args.state });
     let exitCode = 0;
     try {
