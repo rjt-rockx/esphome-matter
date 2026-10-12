@@ -117,14 +117,11 @@ The IKEA Home smart app (DIRIGERA hub) accepts esphome-matter devices: open the 
 
 ## Multi-admin: sharing a device with more than one ecosystem
 
-A Matter device can belong to several ecosystems (fabrics) at once. The device supports up to **5 fabrics** by default. You can raise this with the `CONFIG_MAX_FABRICS` sdkconfig option (5 to 255):
+A Matter device can belong to several ecosystems (fabrics) at once. The device supports up to **5 fabrics** by default. You can raise this with the `max_fabrics` option (5 to 254, see [device-info.md](device-info.md#fabric-limit)):
 
 ```yaml
-esp32:
-  framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_MAX_FABRICS: "8"
+matter:
+  max_fabrics: 8
 ```
 
 Once a device has joined its first fabric, its commissioning window is **closed** on restarts. To add another ecosystem:
@@ -134,7 +131,7 @@ Once a device has joined its first fabric, its commissioning window is **closed*
 
 Fabric data is stored in the dedicated NVS partition and survives OTA updates. It is independent of the transport, so you can commission over Wi-Fi and later swap in `openthread` without re-commissioning (if the hardware supports both).
 
-If you lose access to every controller, use the `matter.factory_reset` action (see the README's example config) to wipe all fabrics and re-open the commissioning window.
+If you lose access to every controller, use the `matter.factory_reset` action (see [commissioning.md](commissioning.md#actions)) to wipe all fabrics and re-open the commissioning window.
 
 Each ecosystem can have its own friendly name for the device (Matter NodeLabel is per fabric).
 

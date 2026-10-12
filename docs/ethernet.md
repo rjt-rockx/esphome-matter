@@ -10,6 +10,8 @@ ESP32-P4 (Waveshare ESP32-P4-Module-DEV-KIT, IP101) with Apple Home. Upstream
 
 ## Usage
 
+The LAN8720 example below needs a classic ESP32 or an ESP32-P4 (RMII); it is rejected on the ESP32-C6. Use an SPI PHY such as `type: W5500` on chips without RMII.
+
 ```yaml
 network:
   enable_ipv6: true # required by Matter

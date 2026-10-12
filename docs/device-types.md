@@ -12,8 +12,8 @@ The Matter light device types are `on_off_light`, `dimmable_light`, `color_tempe
 |---|---|---|
 | `on_off_light` | On/Off | `light_id` |
 | `dimmable_light` | Level Control (brightness) | `light_id`, `min_level`, `max_level` |
-| `color_temperature_light` | Color Control: color temperature (mireds) | `light_id` |
-| `extended_color_light` | Color Control: XY color | `light_id`, `color_loop_effect` |
+| `color_temperature_light` | Color Control: color temperature (mireds) | `light_id`, `min_level`, `max_level` |
+| `extended_color_light` | Color Control: XY color (hue/saturation optional) | `light_id`, `min_level`, `max_level`, `color_loop_effect` |
 
 The plug-in unit and mounted load device types can be backed by a light as well, with the same binding:
 
@@ -23,7 +23,7 @@ The plug-in unit and mounted load device types can be backed by a light as well,
 | `mounted_dimmable_load_control` | Level Control (brightness) | `light_id`, `min_level`, `max_level`, `on_off_transition_time` |
 | `on_off_plug_in_unit`, `mounted_on_off_control` | On/Off only, or Level Control when added with `clusters: level_control:` | `light_id`, `on_off_transition_time` |
 
-Level, color temperature and color (XY, hue/saturation, enhanced hue) are supported, and state is synchronized both ways between the ESPHome light and Matter. See [lights.md](lights.md) for details, startup behaviour and the FAQ, and [examples/extended-color-light.yaml](../examples/extended-color-light.yaml) for a full example.
+Level, color temperature and color are supported, and state is synchronized both ways between the ESPHome light and Matter. XY color is always available on `extended_color_light`; hue/saturation, enhanced hue and color loop are optional features (`with_features`). See [lights.md](lights.md) for details, startup behaviour and the FAQ, and [examples/extended-color-light.yaml](../examples/extended-color-light.yaml) for a full example.
 
 ```yaml
 matter:
@@ -109,31 +109,27 @@ The `generic_switch` is different: it does not bind to other devices but emits M
 
 # Covers
 
-> **Placeholder.** ESPHome `cover:` to Matter Window Covering is documented in [cover.md](cover.md).
-
-See [cover.md](cover.md).
+ESPHome `cover:` to Matter Window Covering (`cover_id`) is documented in [cover.md](cover.md).
 
 # Fans
 
-> **Placeholder.** ESPHome `fan:` to Matter Fan Control is documented in [fan.md](fan.md).
-
-See [fan.md](fan.md).
+ESPHome `fan:` to Matter Fan Control (`fan_id`) is documented in [fan.md](fan.md).
 
 # Locks & valves
 
-> **Placeholder.** ESPHome `lock:` and `valve:` to Matter Door Lock and Water Valve are documented in [lock-valve.md](lock-valve.md).
+ESPHome `lock:` and `valve:` to Matter Door Lock (`lock_id`, required) and Water Valve (`valve_id`) are documented in [lock-valve.md](lock-valve.md).
 
-See [lock-valve.md](lock-valve.md).
+# Climate
+
+ESPHome `climate:` to Matter Thermostat or Room Air Conditioner (`climate_id`) is documented in [climate.md](climate.md).
 
 # Binary sensors
 
-> **Placeholder.** ESPHome `binary_sensor:` to Matter Contact, Occupancy, Water Leak/Freeze, Rain and Smoke/CO sensors is documented in [binary-sensors.md](binary-sensors.md).
-
-See [binary-sensors.md](binary-sensors.md).
+ESPHome `binary_sensor:` to Matter Contact, Occupancy, Water Leak/Freeze, Rain and Smoke/CO sensors is documented in [binary-sensors.md](binary-sensors.md).
 
 # Sensors
 
-> **Placeholder.** The authoritative per-sensor reference (units, scaling, `device_class`, battery, energy) is in [sensors.md](sensors.md). The summary below reflects the current code.
+The authoritative per-sensor reference (units, scaling, `device_class`, battery, energy) is in [sensors.md](sensors.md). The summary below reflects the current code.
 
 ### Simple measurement sensors
 
@@ -144,21 +140,21 @@ matter:
   endpoints:
     1:
       temperature_sensor:
-        temperature: sensor_id
+        temperature: temperature_id
     2:
       humidity_sensor:
-        relative_humidity: sensor_id
+        relative_humidity: humidity_id
     3:
       # The LightSensorType attribute is not settable yet.
       light_sensor:
-        illuminance: sensor_id
+        illuminance: illuminance_id
     4:
       # The pressure_sensor `Extended` feature is not supported yet.
       pressure_sensor:
-        pressure: sensor_id
+        pressure: pressure_id
     5:
       flow_sensor:
-        flow: sensor_id
+        flow: flow_id
 ```
 
 Sensor values are converted from the `unit_of_measurement` of the ESPHome sensor to the unit Matter uses (for example Pa or kPa to Matter's 0.1 kPa). See [sensors.md](sensors.md#units).
@@ -228,7 +224,7 @@ The `generic_switch` is a stateless programmable button that emits Matter events
 
 # Untested / unsupported
 
-The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Several of them (`on_off_plug_in_unit`, `window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`) are being given entity bindings; see the placeholder sections above and [ROADMAP.md](ROADMAP.md). Treat everything in this list as untested.
+The device types below can usually be created (add the key under an endpoint), but nothing binds an ESPHome entity to them, so besides sensor attributes and `on_attribute` triggers little interaction is possible. Some of them have entity bindings (`window_covering`, `fan`, `door_lock`, `water_valve`, `thermostat`, `room_air_conditioner`, `closure`, `water_leak_detector`, `water_freeze_detector`, `smoke_co_alarm`, `power_source`); those are described in the sections above and are listed here only because the list is generated from the device type table. Treat everything else in this list as untested.
 
 - door_lock
 - aggregator

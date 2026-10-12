@@ -39,8 +39,10 @@ matter:
         # min_level: 1
         # max_level: 254
 
-lights:
-  - id: some_light
+light:
+  - platform: monochromatic
+    id: some_light
+    output: some_output
 ```
 
 State is synchronized both ways between the ESPHome light entity and Matter. So if you set the brightness via Home Assistant, the Matter brightness attribute will be updated accordingly. The other way around is also true.
