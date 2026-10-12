@@ -2,11 +2,11 @@
 
 Most Matter devices are commissioned over Bluetooth LE: the phone finds the device by BLE, sets up an encrypted
 session (PASE) with the QR/manual code, and hands over Wi-Fi or Thread credentials. esphome-matter supports this as a
-build mode for devices that have **no `wifi:` and no `openthread:` block**.
+build mode for devices that have **no `wifi:`, `openthread:` or `ethernet:` block**.
 
 ## Usage
 
-There is nothing to enable. If neither `wifi` nor `openthread` is configured, the firmware is built for BLE
+There is nothing to enable. If none of `wifi`, `openthread` and `ethernet` is configured, the firmware is built for BLE
 commissioning and the QR code advertises BLE rendezvous:
 
 ```yaml
@@ -25,10 +25,10 @@ instead of silently building a different firmware:
 
 | YAML | Result |
 | --- | --- |
-| no wifi/openthread, key omitted or `true` | BLE commissioning build |
-| no wifi/openthread, `ble_commissioning: false` | config error (there would be no way to commission) |
-| wifi or openthread, key omitted or `false` | on-network commissioning (see [commissioning.md](commissioning.md)) |
-| wifi or openthread, `ble_commissioning: true` | config error |
+| no wifi/openthread/ethernet, key omitted or `true` | BLE commissioning build |
+| no wifi/openthread/ethernet, `ble_commissioning: false` | config error (there would be no way to commission) |
+| wifi, openthread or ethernet, key omitted or `false` | on-network commissioning (see [commissioning.md](commissioning.md)) |
+| wifi, openthread or ethernet, `ble_commissioning: true` | config error |
 
 Commission with the SetupQRCode printed in the log (the same code is shown in [commissioning.md](commissioning.md)),
 using any Matter commissioner. The commissioner provisions Wi-Fi or Thread credentials; CHIP's NetworkCommissioning
@@ -36,17 +36,18 @@ cluster applies them and the device then continues on-network.
 
 ## What is different in this mode
 
-- **Matter owns the radio.** ESPHome has no network interface (`wifi`/`openthread` absent), so ESPHome's
+- **Matter owns the radio.** ESPHome has no network interface (`wifi`/`openthread`/`ethernet` absent), so ESPHome's
   `network::is_connected()` is always false. `api`, `ota`, `web_server` and mDNS-based ESPHome features are **not
   reachable** even after the device has joined a network through Matter. The config validator warns about this. If you
   need them, configure `wifi:` or `openthread:` and commission on-network instead.
 - **No reboot loop.** `api` (and `mqtt`) reboot the device when no client is connected for `reboot_timeout` (15 min by
   default), which would restart a BLE-mode device forever. The validator sets `reboot_timeout: 0s` for these
   components automatically and logs an INFO line when it does.
-- **BLE is released after commissioning.** `CONFIG_USE_BLE_ONLY_FOR_COMMISSIONING=y` is set: once the device holds a
-  fabric, CHIP shuts down the BLE stack, and on later boots it does not start BLE while the device already has a
-  fabric. After a factory reset (`matter.factory_reset`) BLE advertising comes back.
-- **Diagnostics.** `[matter.ble]` log lines show BLE advertising start/stop and connection events.
+- **BLE is released after commissioning.** `CONFIG_USE_BLE_ONLY_FOR_COMMISSIONING=y` is set: after a successful
+  commissioning CHIP deinitializes the BLE stack and reclaims its memory (`esp_bt_mem_release`, so BLE cannot be
+  restarted until the next reboot), and on later boots it does not start BLE while Wi-Fi/Thread credentials are
+  provisioned. After a factory reset (`matter.factory_reset`) BLE advertising comes back.
+- **Diagnostics.** `[matter.event]` log lines show BLE advertising start/stop, connection events and BLE deinit.
 
 ## Coexistence with ESPHome BLE components (not supported)
 
@@ -61,7 +62,7 @@ A shim that forwards these into `esp32_ble`'s `add_gap_event_handler`/`add_gatts
 `--wrap`, as `matter_wifi_stack.cpp` does for Wi-Fi) is feasible on paper but was judged too risky without hardware
 testing, so it is not implemented.
 
-With `wifi:` or `openthread:` configured, the CHIP BLE stack is not built (`CONFIG_ENABLE_CHIPOBLE=n`) and ESPHome BLE
+With `wifi:`, `openthread:` or `ethernet:` configured, the CHIP BLE stack is not built (`CONFIG_ENABLE_CHIPOBLE=n`) and ESPHome BLE
 components are not blocked by this component. That combination has not been build-tested here.
 
 ## Matter-provisioned Wi-Fi in ESPHome
