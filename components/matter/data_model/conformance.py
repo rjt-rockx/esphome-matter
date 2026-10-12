@@ -266,7 +266,9 @@ def _select_requirement(
         for requirement in compatible
         if requirement.required_features <= enabled_features
     ]
-    if len(satisfied) == 1:
+    if satisfied:
+        # Every satisfied alternative is already met by the enabled features (e.g. "VIS or AUD" with both
+        # enabled), so picking any of them adds nothing.
         return satisfied[0]
 
     best_score = max(

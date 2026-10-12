@@ -759,7 +759,15 @@ matter.send_command:
 
 # RefrigeratorAndTemperatureControlledCabinetMode
 
-> This cluster is not supported by esp-matter.
+Attributes and commands for selecting a mode from a list of supported options.
+
+```yaml
+# This command is used to change device modes.
+matter.send_command:
+  path: some_endpoint.refrigerator_and_temperature_controlled_cabinet_mode.change_to_mode
+  arguments:
+    new_mode:
+```
 
 # RVCRunMode
 

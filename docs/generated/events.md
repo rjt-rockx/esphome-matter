@@ -401,10 +401,6 @@ matter.send_event:
 
 > This cluster is not supported by esp-matter.
 
-# RefrigeratorAndTemperatureControlledCabinetMode
-
-> This cluster is not supported by esp-matter.
-
 # RefrigeratorAlarm
 
 Attributes and commands for configuring the Refrigerator alarm.

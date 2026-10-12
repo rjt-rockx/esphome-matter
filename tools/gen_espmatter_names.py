@@ -60,6 +60,7 @@ CLUSTER_ALIASES: dict[str, str] = {
     # "switch" is a C++ keyword.
     "Switch": "switch_cluster",
     "Smoke CO Alarm": "smoke_co_alarm",
+    "Refrigerator And Temperature Controlled Cabinet Mode": "refrigerator_and_tcc_mode",
 }
 
 # (spec cluster name, spec feature name) -> esp-matter feature namespace.

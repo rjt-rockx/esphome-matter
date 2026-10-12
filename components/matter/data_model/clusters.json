@@ -7709,6 +7709,40 @@
       }
     }
   },
+  "82": {
+    "name": "Refrigerator And Temperature Controlled Cabinet Mode",
+    "revision": 3,
+    "attributes": {
+      "0": {
+        "define": "SUPPORTED_MODES",
+        "name": "SupportedModes",
+        "type": "array",
+        "server": true,
+        "writable": false,
+        "optional": false
+      },
+      "1": {
+        "define": "CURRENT_MODE",
+        "name": "CurrentMode",
+        "type": "int8u",
+        "server": true,
+        "writable": false,
+        "optional": false
+      }
+    },
+    "commands": {
+      "ChangeToMode": {
+        "id": 0,
+        "args": [
+          {
+            "id": 0,
+            "name": "NewMode",
+            "type": "int8u"
+          }
+        ]
+      }
+    }
+  },
   "83": {
     "name": "Laundry Washer Controls",
     "revision": 2,

@@ -139,8 +139,16 @@ matter:
     1:
       contact_sensor:
         with_features:
+          - visual # Supports visual alarms
+          - audible # Supports audible alarms
+          - alarm_suppress # Supports ability to suppress or acknowledge alarms
+          - sensitivity_level # Supports ability to set sensor sensitivity
+          - fault_events # Supports reporting fault events
           # - tag_list # The TagList attribute is present
           # - change_event # Supports reporting change events
+      clusters:
+        # The following server clusters are optional to contact_sensor;
+        boolean_state_configuration: # This cluster is used to configure a boolean sensor.
 ```
 
 # root_node
@@ -464,6 +472,7 @@ matter:
       clusters:
         # The following server clusters are optional to refrigerator;
         identify: # Attributes and commands for putting a device into Identification mode (e.g. flashing a light).
+        refrigerator_and_temperature_controlled_cabinet_mode: # Attributes and commands for selecting a mode from a list of supported options.
         refrigerator_alarm: # Attributes and commands for configuring the Refrigerator alarm.
 ```
 
@@ -482,6 +491,7 @@ matter:
           # - temperature_step # Use step control with temperature numbers
       clusters:
         # The following server clusters are optional to temperature_controlled_cabinet;
+        refrigerator_and_temperature_controlled_cabinet_mode: # Attributes and commands for selecting a mode from a list of supported options.
         temperature_measurement: # Attributes and commands for configuring the measurement of temperature, and reporting temperature measurements.
 ```
 
@@ -877,6 +887,11 @@ matter:
     1:
       occupancy_sensor:
         with_features:
+          - visual # Supports visual alarms
+          - audible # Supports audible alarms
+          - alarm_suppress # Supports ability to suppress or acknowledge alarms
+          - sensitivity_level # Supports ability to set sensor sensitivity
+          - fault_events # Supports reporting fault events
           # At least one of other, passive_infrared, ultrasonic, physical_contact, active_infrared, radar, rf_sensing, vision, prediction must be enabled.
           - other # Supports sensing using a modality not listed in the other bits
           - passive_infrared # Supports sensing using PIR (Passive InfraRed)
@@ -892,6 +907,7 @@ matter:
       clusters:
         # The following server clusters are optional to occupancy_sensor;
         binding: # The Binding Cluster is meant to replace the support from the Zigbee Device Object (ZDO) for supporting the binding table.
+        boolean_state_configuration: # This cluster is used to configure a boolean sensor.
 ```
 
 # on_off_plug_in_unit

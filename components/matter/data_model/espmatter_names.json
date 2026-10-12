@@ -751,6 +751,14 @@
         "CurrentMode": null
       }
     },
+    "RefrigeratorAndTemperatureControlledCabinetMode": {
+      "namespace": "refrigerator_and_tcc_mode",
+      "features": {},
+      "attributes": {
+        "SupportedModes": null,
+        "CurrentMode": null
+      }
+    },
     "LaundryWasherControls": {
       "namespace": "laundry_washer_controls",
       "features": {
