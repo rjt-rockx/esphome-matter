@@ -41,11 +41,14 @@ def event_number(data, key: str):
 
 def event_names(records: list[dict], ep: int) -> list[str]:
     """Names of the events in the records, in order (one record may carry several events)."""
-    names: list[str] = []
+    # Reports of events that are emitted close together can reach the controller out of order (seen: a MultiPressOngoing
+    # report before the ShortRelease that has a lower eventNumber), so order by the device's event number.
+    found: list[tuple[int, str]] = []
     for r in records:
         if r["kind"] == "event" and r["endpoint"] == ep:
-            names += [r["event"]] * (len(r["data"]) if isinstance(r["data"], list) and r["data"] else 1)
-    return names
+            for ev in r["data"] if isinstance(r["data"], list) else [r["data"]]:
+                found.append((ev.get("eventNumber", 0), r["event"]))
+    return [name for _, name in sorted(found)]
 
 
 # -- 1. light ------------------------------------------------------------------------------------------------------
@@ -191,12 +194,6 @@ def test_fan_mode_both_directions(node, api, device):
 
 
 # -- 5. reconcile and consistency ----------------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="component bug: MatterSwitchMapping::apply_on_off_ (matter_switch.cpp) calls switch_->control(true) and relies on "
-    "the switch's state callback to push the result back. A switch that refuses turn_on never publishes a state, so no "
-    "callback fires and the Matter OnOff attribute stays true while the ESPHome switch is off (no reconcile after apply)",
-)
 def test_reconcile_refused_turn_on(node, api, device):
     m = node
     api.switch("golden_switch", False)
