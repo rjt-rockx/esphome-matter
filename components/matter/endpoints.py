@@ -633,6 +633,15 @@ class Endpoint:
                     # the device type requires it so it must always be forcibly created when a device type needs it.
                     self._cluster_configs["Binding"].created = False
 
+        # esp_matter's endpoint::<device_type>::add() also creates clusters on its own (and
+        # calls the add() of other device types, e.g. heat_pump -> power_source, electrical_sensor,
+        # device_energy_management). Their server code has to be compiled in or the link fails.
+        for cluster_name in espmatter_names.device_type_implied_clusters(
+            device_type.name
+        ):
+            if implied := CLUSTERS_BY_NAME.get(cluster_name):
+                self.enabled_sdkconfig_options.add(implied.sdkconfig_option)
+
         # Register sensor attributes
         for sensor_attr in device_type.sensor_attributes:
             if sensor_id := device_config.get(sensor_attr.conf_key):

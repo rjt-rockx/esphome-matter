@@ -119,6 +119,9 @@ class Headers:
         self._parse_attributes(legacy / "esp_matter_attribute_impl.h")
         self._apply_aliases()
         self._parse_endpoints(legacy / "esp_matter_endpoint_impl.h")
+        # endpoint namespace -> (server cluster namespaces, nested endpoint namespaces)
+        self.implied: dict[str, tuple[set[str], set[str]]] = {}
+        self._parse_implied(legacy / "esp_matter_endpoint.cpp")
 
     @staticmethod
     def _walk(path: Path):
@@ -299,6 +302,52 @@ class Headers:
             self.endpoints[device_type] = resolve(device_type, "config_t")
 
 
+    def _parse_implied(self, path: Path) -> None:
+        """Clusters that ``endpoint::<x>::add()`` creates on its own.
+
+        esp-matter's add() creates clusters (``identify::create(endpoint, ...,
+        CLUSTER_FLAG_SERVER)``, ``cluster::thermostat::create(...)``) and calls
+        the add() of other device types (``electrical_sensor::add(endpoint,
+        ...)``, ``endpoint::power_source::add(endpoint, ...)``) regardless of
+        what we configure. Their server sources must be compiled in, or the
+        link fails. Client-only clusters are ignored.
+        """
+        bodies: dict[str, list[str]] = {}
+        for _stack, ns, line in self._walk(path):
+            if len(ns) == 3 and ns[:2] == ["esp_matter", "endpoint"]:
+                bodies.setdefault(ns[2], []).append(line)
+        for device_type, lines in bodies.items():
+            text = "\n".join(lines)
+            clusters: set[str] = set()
+            nested: set[str] = set()
+            for stmt in text.split(";"):
+                created = re.search(r"\b(\w+)::create\(\s*endpoint\b", stmt)
+                if (
+                    created
+                    and created.group(1) in self.clusters
+                    and "CLUSTER_FLAG_SERVER" in stmt
+                ):
+                    clusters.add(created.group(1))
+                added = re.search(r"\b(\w+)::add\(\s*endpoint\b", stmt)
+                if added and added.group(1) in self.endpoints:
+                    nested.add(added.group(1))
+            self.implied[device_type] = (clusters, nested)
+
+    def implied_clusters(self, device_type: str) -> set[str]:
+        """Transitive closure of ``_parse_implied`` (cluster namespaces)."""
+        result: set[str] = set()
+        todo, seen = [device_type], set()
+        while todo:
+            current = todo.pop()
+            if current in seen or current not in self.implied:
+                continue
+            seen.add(current)
+            clusters, nested = self.implied[current]
+            result |= clusters
+            todo.extend(nested)
+        return result
+
+
 # --------------------------------------------------------------------------- #
 # Table generation
 # --------------------------------------------------------------------------- #
@@ -406,6 +455,10 @@ def build_table(headers: Headers) -> dict:
             entry["attributes"][aname] = f"create_{suffix}" if suffix else None
         table_clusters[key] = entry
 
+    # esp-matter cluster namespace -> CamelCase cluster key
+    key_by_namespace = {
+        e["namespace"]: key for key, e in table_clusters.items() if e["namespace"]
+    }
     table_device_types: dict[str, dict] = {}
     for device_type in device_types_json.values():
         name = device_type["name"]
@@ -413,6 +466,13 @@ def build_table(headers: Headers) -> dict:
         table_device_types[name] = {
             "namespace": ns,
             "config_members": dict(sorted(headers.endpoints[ns].items())) if ns else {},
+            # Server clusters esp-matter creates in add() (also via nested
+            # device types), as keys of "clusters". Must be compiled in.
+            "implied_clusters": sorted(
+                key_by_namespace[c]
+                for c in (headers.implied_clusters(ns) if ns else ())
+                if c in key_by_namespace
+            ),
         }
 
     return {
