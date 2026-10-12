@@ -22,8 +22,7 @@ YAML (see docs/power.md)::
       current_type: ac
       present: mains_present
 
-Only the root node and application endpoints that already host a device type can carry
-one of them; a second source needs another endpoint.
+One Power Source cluster per endpoint; a second source needs another endpoint.
 """
 
 from __future__ import annotations
@@ -78,8 +77,9 @@ ROOT_ENDPOINT = 0
 DESCRIPTION_MAX = 60
 # PowerSourceStatusEnum: 1 = Active
 STATUS_ACTIVE = 1
-# EndpointList holds at most 20 entries in the Matter specification.
-ENDPOINT_LIST_MAX = 20
+STATUS_STANDBY = 2
+STATUS_UNAVAILABLE = 3
+# (The Power Source XML has no maxCount for EndpointList, so `powers` is not capped.)
 
 # BatReplaceabilityEnum
 REPLACEABILITY = {
@@ -118,7 +118,7 @@ def _endpoint_no(value):
 _ORDER = cv.int_range(min=0, max=254)
 _POWERS = cv.All(
     cv.ensure_list(_endpoint_no),
-    cv.Length(min=1, max=ENDPOINT_LIST_MAX),
+    cv.Length(min=1),
 )
 
 
@@ -193,12 +193,16 @@ def _validate_battery(value):
             raise cv.Invalid(
                 f"'{CONF_WARNING_BELOW}' / '{CONF_CRITICAL_BELOW}' need a '{CONF_PERCENT}' sensor"
             )
-    warning = value.get(CONF_WARNING_BELOW)
-    critical = value.get(CONF_CRITICAL_BELOW)
-    if warning is not None and critical is not None and critical > warning:
-        raise cv.Invalid(
-            f"'{CONF_CRITICAL_BELOW}' ({critical}) must not be above '{CONF_WARNING_BELOW}' ({warning})"
-        )
+    if has_thresholds:
+        warning = value.get(CONF_WARNING_BELOW, DEFAULT_WARNING_BELOW)
+        critical = value.get(CONF_CRITICAL_BELOW, DEFAULT_CRITICAL_BELOW)
+        if critical > warning:
+            raise cv.Invalid(
+                f"'{CONF_CRITICAL_BELOW}' ({critical}"
+                f"{'' if CONF_CRITICAL_BELOW in value else ', default'}) must not be above "
+                f"'{CONF_WARNING_BELOW}' ({warning}"
+                f"{'' if CONF_WARNING_BELOW in value else ', default'}). Set both thresholds"
+            )
 
     rechargeable = bool(
         value.get(CONF_RECHARGEABLE)
@@ -518,13 +522,9 @@ def config_lines(target: str, config: dict) -> list[str]:
             f"{target}.features.rechargeable.bat_functional_while_charging = "
             f"{str(options.get(CONF_FUNCTIONAL_WHILE_CHARGING, True)).lower()};"
         )
-        initial = (
-            CHARGE_STATE_NOT_CHARGING
-            if CONF_CHARGING in options or CONF_CHARGED in options
-            else CHARGE_STATE_UNKNOWN
-        )
+        # Unknown until a charging / charged sensor has a state.
         lines.append(
-            f"{target}.features.rechargeable.bat_charge_state = {initial};"
+            f"{target}.features.rechargeable.bat_charge_state = {CHARGE_STATE_UNKNOWN};"
         )
     if "Replaceable" in features(config):
         lines.append(
@@ -544,11 +544,21 @@ def device_type_lines(target: str, device_config: dict) -> list[str]:
     ``target`` is the cluster config member, e.g. ``device_config_0.power_source``.
     """
     wired = "Wired" in (device_config.get(CONF_WITH_FEATURES) or ())
+    default = "Mains" if wired else "Battery"
     return [
         f"{target}.status = {STATUS_ACTIVE};",
+        f"{target}.order = {device_config.get(CONF_ORDER, 0)};",
         f"snprintf({target}.description, sizeof({target}.description), \"%s\", "
-        f"{_c_string('Mains' if wired else 'Battery')});",
+        f"{_c_string(device_config.get(CONF_DESCRIPTION, default))});",
     ]
+
+
+def device_type_schema_options() -> dict:
+    """`order` and `description` of the power_source device type."""
+    return {
+        cv.Optional(CONF_ORDER): _ORDER,
+        cv.Optional(CONF_DESCRIPTION): _description_text,
+    }
 
 
 def root_device_type_lines() -> list[str]:
@@ -639,6 +649,7 @@ async def register(endpoint, var) -> None:
     includes.add('#include "esphome/components/matter/matter_conversions.h"')
     if which == CONF_BATTERY:
         await _register_flag_enums(endpoint, var, options, cluster)
+    await _register_status(endpoint, var, cluster, config)
 
     endpoints = endpoint_list(endpoint_id, config, endpoint.all_endpoint_ids)
     if endpoints:
@@ -655,36 +666,122 @@ async def register(endpoint, var) -> None:
 
 async def _register_flag_enums(endpoint, var, options: dict, cluster) -> None:
     """BatChargeLevel (low / critical) and BatChargeState (charging / charged) from binary sensors."""
+    # (attribute, value when no flag is ON, value while no sensor has a state or -1 to keep the
+    # initial value, [(option, value)])
     groups = (
-        ("BatChargeLevel", 0, ((CONF_CRITICAL, CHARGE_LEVEL_CRITICAL), (CONF_LOW, CHARGE_LEVEL_WARNING))),
+        (
+            "BatChargeLevel",
+            0,
+            -1,  # the enum has no "unknown": keep OK until a sensor reports
+            ((CONF_CRITICAL, CHARGE_LEVEL_CRITICAL), (CONF_LOW, CHARGE_LEVEL_WARNING)),
+        ),
         (
             "BatChargeState",
             CHARGE_STATE_NOT_CHARGING,
+            CHARGE_STATE_UNKNOWN,
             ((CONF_CHARGING, CHARGE_STATE_CHARGING), (CONF_CHARGED, CHARGE_STATE_FULL)),
         ),
     )
-    for attribute_name, default, flags in groups:
+    for attribute_name, default, unknown, flags in groups:
         selected = [(key, value) for key, value in flags if key in options]
         if not selected:
             continue
-        attribute = cluster.get_attribute(attribute_name)
-        entries = []
-        for key, value in selected:
-            sensor = await cg.get_variable(options[key])
-            entries.append(f"{{{sensor}, {value}}}")
-        endpoint.global_includes.add(MATTER_POWER_INCLUDE)
-        endpoint.global_includes.add(
-            '#include "esphome/components/binary_sensor/binary_sensor.h"'
+        sensors = [(options[key], value) for key, value in selected]
+        await _register_flag_mapping(
+            endpoint, var, cluster, attribute_name, default, unknown, sensors
         )
-        cg.add(
-            var.register_mapping(
-                cg.RawExpression(
-                    "new esphome::matter::MatterFlagEnumMapping("
-                    f"{endpoint.endpoint_id}, {cluster.id}, {attribute.id}, {default}, "
-                    f"{{{', '.join(entries)}}})"
-                )
+
+
+async def _register_flag_mapping(
+    endpoint, var, cluster, attribute_name, default, unknown, sensors
+) -> None:
+    attribute = cluster.get_attribute(attribute_name)
+    entries = []
+    for sensor_id, value in sensors:
+        sensor = await cg.get_variable(sensor_id)
+        entries.append(f"{{{sensor}, {value}}}")
+    endpoint.global_includes.add(MATTER_POWER_INCLUDE)
+    endpoint.global_includes.add(
+        '#include "esphome/components/binary_sensor/binary_sensor.h"'
+    )
+    cg.add(
+        var.register_mapping(
+            cg.RawExpression(
+                "new esphome::matter::MatterFlagEnumMapping("
+                f"{endpoint.endpoint_id}, {cluster.id}, {attribute.id}, {default}, {unknown}, "
+                f"{{{', '.join(entries)}}})"
             )
         )
+    )
+
+
+async def _register_status(endpoint, var, cluster, config: dict) -> None:
+    """Status follows `wired.present` (Active / Unavailable); a lower-preference source is
+    Standby while a preferred wired source with a `present` sensor is present."""
+    which = kind(config)
+    options = config[which]
+    sources = endpoint.all_power_sources
+    if which == CONF_WIRED:
+        if CONF_PRESENT in options:
+            await _register_flag_mapping(
+                endpoint,
+                var,
+                cluster,
+                "Status",
+                STATUS_UNAVAILABLE,
+                -1,
+                [(options[CONF_PRESENT], STATUS_ACTIVE)],
+            )
+        return
+    preferred = [
+        present
+        for other_id, other_kind, order, present in sources
+        if other_id != endpoint.endpoint_id
+        and other_kind == CONF_WIRED
+        and present is not None
+        and order < options[CONF_ORDER]
+    ]
+    if preferred:
+        await _register_flag_mapping(
+            endpoint,
+            var,
+            cluster,
+            "Status",
+            STATUS_ACTIVE,
+            -1,
+            [(sensor_id, STATUS_STANDBY) for sensor_id in preferred],
+        )
+
+
+def power_sources(endpoints: dict) -> list[tuple]:
+    """(endpoint, "battery" | "wired", order, `present` binary sensor id or None) of every
+    Power Source on the node: `battery:` / `wired:` and the power_source device type."""
+    sources = []
+    for endpoint_id, config in endpoints.items():
+        which = kind(config)
+        if which is not None:
+            options = config[which]
+            sources.append(
+                (
+                    endpoint_id,
+                    which,
+                    options[CONF_ORDER],
+                    options.get(CONF_PRESENT) if which == CONF_WIRED else None,
+                )
+            )
+            continue
+        device = config.get("power_source")
+        if isinstance(device, dict):
+            wired = "Wired" in (device.get(CONF_WITH_FEATURES) or ())
+            sources.append(
+                (
+                    endpoint_id,
+                    CONF_WIRED if wired else CONF_BATTERY,
+                    device.get(CONF_ORDER, 0),
+                    None,
+                )
+            )
+    return sources
 
 
 # --------------------------------------------------------------------------- #
@@ -693,9 +790,9 @@ async def _register_flag_enums(endpoint, var, options: dict, cluster) -> None:
 
 # Keys of the root node endpoint (endpoint 0) that are allowed. The root node and its mandatory clusters are created by
 # esp-matter; only utility device types can be added to it.
-ROOT_ALLOWED_KEYS = frozenset(
-    {"id", CONF_BATTERY, CONF_WIRED, "electrical_sensor", "on_attribute", CONF_CLUSTERS}
-)
+# The Electrical Sensor device type has endpoint scope in the device library, so it cannot be
+# on the root node; the Power Source device type has node scope.
+ROOT_ALLOWED_KEYS = frozenset({"id", CONF_BATTERY, CONF_WIRED, "on_attribute", CONF_CLUSTERS})
 
 
 def validate_root_endpoint(matter_config: dict) -> None:
@@ -706,6 +803,13 @@ def validate_root_endpoint(matter_config: dict) -> None:
     for key, value in root.items():
         if key in ROOT_ALLOWED_KEYS:
             continue
+        if key == "electrical_sensor":
+            raise cv.Invalid(
+                "The Electrical Sensor device type has endpoint scope and cannot be on the root node "
+                "(endpoint 0). Put it on its own endpoint with 'topology: node' to measure the "
+                "entire node",
+                path=[*path, key],
+            )
         if key in ("parent", "label", "tags"):
             raise cv.Invalid(
                 f"'{key}' is not available on endpoint 0 (the root node)", path=[*path, key]
@@ -724,10 +828,10 @@ def validate_root_endpoint(matter_config: dict) -> None:
         )
     if CONF_WITH_FEATURES in root:
         raise cv.Invalid("'with_features' is not available on endpoint 0", path=path)
-    if kind(root) is None and "electrical_sensor" not in root:
+    if kind(root) is None:
         raise cv.Invalid(
             "Endpoint 0 is the root node, which is created automatically. Configure "
-            "'battery', 'wired' or 'electrical_sensor' on it, or remove it",
+            "'battery' or 'wired' on it, or remove it",
             path=path,
         )
 
@@ -755,3 +859,16 @@ def validate_powers(matter_config: dict) -> None:
 def validate_power_configuration(matter_config: dict) -> None:
     validate_root_endpoint(matter_config)
     validate_powers(matter_config)
+    sources = power_sources(matter_config.get(CONF_ENDPOINTS, {}))
+    by_order: dict[int, list[int]] = {}
+    for endpoint_id, _kind, order, _present in sources:
+        by_order.setdefault(order, []).append(endpoint_id)
+    for order, endpoint_ids in by_order.items():
+        if len(endpoint_ids) > 1:
+            _LOGGER.warning(
+                "Matter endpoints %s have Power Sources with the same order (%s). The order says "
+                "which source a node prefers (the lowest is used first); set 'order:' to tell "
+                "them apart, for example 0 for mains and 1 for the battery backup",
+                ", ".join(map(str, endpoint_ids)),
+                order,
+            )

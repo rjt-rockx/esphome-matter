@@ -344,6 +344,10 @@ class DeviceType:
             schema[cv.Optional(CONF_MAX_LEVEL, default=254)] = level
 
         extend_device_type_schema(self.name, schema)
+        if self.name == "power_source":
+            from ..power_source import device_type_schema_options
+
+            schema.update(device_type_schema_options())
 
         # If a device type is a simple sensor with only a single sensor attribute the config may be simplified from;
         #   temperature_sensor:

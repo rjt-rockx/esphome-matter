@@ -40,6 +40,7 @@ matter:
         warning_below: 25
         critical_below: 8
         description: Main battery
+        order: 1
     # A sensor with its own wired source on the same endpoint, only powering itself.
     1:
       temperature_sensor: temperature
@@ -50,6 +51,7 @@ matter:
         frequency: mains_frequency
         current: mains_current
         powers: [1]
+        order: 0
     # Battery with binary sensors for the charge level on an application endpoint.
     2:
       contact_sensor:

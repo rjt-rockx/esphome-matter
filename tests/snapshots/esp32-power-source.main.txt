@@ -7,7 +7,8 @@
   matter_mattercomponent_id->register_sensor_attribute(battery_percent, 0, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 25.0f, 8.0f); });
   matter_mattercomponent_id->register_sensor_attribute(battery_voltage, 0, 47, 11, esphome::matter::conversion::millivolts);
   matter_mattercomponent_id->register_binary_sensor_attribute(battery_replace, 0, 47, 15, esphome::matter::conversion::boolean_state);
-  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(0, 47, 26, 3, {{battery_charging, 1}, {battery_full, 2}}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(0, 47, 26, 3, 0, {{battery_charging, 1}, {battery_full, 2}}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(0, 47, 0, 1, -1, {{mains_present, 2}}));
   matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(0, {1, 2, 3}));
   matter_mattercomponent_id->register_endpoint(0, [](esp_matter::endpoint_t *endpoint) -> bool {
     if (esp_matter::endpoint::add_device_type(endpoint, esp_matter::endpoint::power_source::get_device_type_id(), esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)
@@ -15,11 +16,11 @@
     esp_matter::cluster::power_source::config_t power_source_config{};
     power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id() | esp_matter::cluster::power_source::feature::rechargeable::get_id() | esp_matter::cluster::power_source::feature::replaceable::get_id();
     power_source_config.status = 1;
-    power_source_config.order = 0;
+    power_source_config.order = 1;
     snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Main battery");
     power_source_config.features.battery.bat_replaceability = 2;
     power_source_config.features.rechargeable.bat_functional_while_charging = true;
-    power_source_config.features.rechargeable.bat_charge_state = 3;
+    power_source_config.features.rechargeable.bat_charge_state = 0;
     snprintf(power_source_config.features.replaceable.bat_replacement_description, sizeof(power_source_config.features.replaceable.bat_replacement_description), "%s", "CR123A");
     power_source_config.features.replaceable.bat_quantity = 2;
     if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
@@ -41,6 +42,7 @@
   matter_mattercomponent_id->register_sensor_attribute(mains_frequency, 1, 47, 4, esphome::matter::conversion::hertz);
   matter_mattercomponent_id->register_sensor_attribute(mains_current, 1, 47, 6, [](float v) { return esphome::matter::conversion::milliamps(v * 0.001f); });
   matter_mattercomponent_id->register_binary_sensor_attribute(mains_present, 1, 47, 9, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(1, 47, 0, 3, -1, {{mains_present, 1}}));
   matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(1, {1}));
   matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
@@ -78,7 +80,7 @@
     return true;
   });
   matter_mattercomponent_id->register_binary_sensor_attribute(door, 2, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
-  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(2, 47, 14, 0, {{battery_critical, 2}, {battery_low, 1}}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(2, 47, 14, 0, -1, {{battery_critical, 2}, {battery_low, 1}}));
   matter_mattercomponent_id->register_endpoint_parent(2, 0);
   matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::contact_sensor::config_t device_config_0{};

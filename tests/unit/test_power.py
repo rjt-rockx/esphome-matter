@@ -264,6 +264,21 @@ def test_root_node_rejects_composition_options(run_config):
     )
 
 
+def test_root_node_rejects_the_electrical_sensor(run_config):
+    assert_invalid(
+        run_config,
+        matter(
+            """
+    0:
+      wired: {}
+      electrical_sensor:
+        active_power: watts
+"""
+        ),
+        "endpoint scope",
+    )
+
+
 def test_empty_root_node_rejected(run_config):
     assert_invalid(
         run_config,
@@ -287,9 +302,6 @@ def test_topologies_validate(run_config):
     result = run_config(
         matter(
             """
-    0:
-      electrical_sensor:
-        active_power: watts
     1:
       parent: 2
       electrical_sensor:
@@ -385,7 +397,7 @@ def test_topology_features_are_not_selectable_by_hand(run_config):
         active_power: watts
 """
         ),
-        "'topology' option",
+        "'topology: tree'",
     )
 
 
@@ -465,7 +477,7 @@ def test_config_lines_battery():
     assert r'"Pack \"A\""' in lines
     assert "cfg.features.battery.bat_replaceability = 2;" in lines
     assert "cfg.features.rechargeable.bat_functional_while_charging = false;" in lines
-    assert "cfg.features.rechargeable.bat_charge_state = 3;" in lines
+    assert "cfg.features.rechargeable.bat_charge_state = 0;" in lines
     assert "cfg.features.replaceable.bat_quantity = 2;" in lines
     assert '"AAA"' in lines
 
@@ -491,8 +503,7 @@ def test_endpoint_list_defaults():
 
 def test_max_device_types_counts_the_root_node_additions():
     assert c.max_device_types({0: {"battery": {}}, 1: {"on_off_light": {}}}) == 2
-    assert c.max_device_types({0: {"battery": {}, "electrical_sensor": {}}}) == 3
-    assert c.max_device_types({0: {"electrical_sensor": {}}}) == 2
+    assert c.max_device_types({0: {"wired": {}}}) == 2
 
 
 def test_root_node_is_not_a_sibling():
@@ -582,3 +593,120 @@ def test_feature_dependencies_keep_their_conditional_attributes(profile):
         "ElectricalPowerMeasurement", ["Harmonics"]
     )
     assert "harmoniccurrents" not in attributes
+
+
+# --------------------------------------------------------------------------- #
+# Review fixes
+# --------------------------------------------------------------------------- #
+
+
+def test_single_threshold_is_checked_against_the_default(run_config):
+    assert_invalid(
+        run_config,
+        matter(
+            """
+    1:
+      on_off_plug_in_unit: {}
+      battery:
+        percent: pct
+        critical_below: 30
+"""
+        ),
+        "must not be above",
+        "default",
+    )
+
+
+def test_powers_is_not_capped(run_config):
+    many = ", ".join(str(n) for n in range(1, 25))
+    endpoints = "\n".join(f"    {n}:\n      on_off_plug_in_unit: {{}}" for n in range(1, 25))
+    result = run_config(
+        matter(f"    0:\n      wired:\n        powers: [{many}]\n{endpoints}")
+    )
+    assert result.ok, result.output[-2000:]
+
+
+def test_empty_active_endpoints_is_allowed(run_config):
+    result = run_config(
+        matter(
+            """
+    1:
+      on_off_plug_in_unit: {}
+    2:
+      electrical_sensor:
+        topology: set
+        available_endpoints: [1]
+        active_endpoints: []
+        active_power: watts
+"""
+        )
+    )
+    assert result.ok, result.output[-2000:]
+
+
+def test_equal_orders_warn(run_config):
+    result = run_config(
+        matter(
+            """
+    0:
+      wired: {}
+    1:
+      on_off_plug_in_unit: {}
+      battery: pct
+"""
+        )
+    )
+    assert result.ok, result.output[-2000:]
+    assert "same order" in result.output
+
+
+def test_distinct_orders_do_not_warn(run_config):
+    result = run_config(
+        matter(
+            """
+    0:
+      wired:
+        order: 0
+    1:
+      on_off_plug_in_unit: {}
+      battery:
+        percent: pct
+        order: 1
+    2:
+      power_source:
+        battery: pct
+        order: 2
+"""
+        )
+    )
+    assert result.ok, result.output[-2000:]
+    assert "same order" not in result.output
+
+
+def test_power_sources_listing():
+    endpoints = {
+        0: {"wired": {"order": 0, "present": "mains"}},
+        1: {"battery": {"order": 1}},
+        2: {"power_source": {"order": 3, "with_features": ["Wired"]}},
+        3: {"on_off_light": {}},
+    }
+    assert ps.power_sources(endpoints) == [
+        (0, "wired", 0, "mains"),
+        (1, "battery", 1, None),
+        (2, "wired", 3, None),
+    ]
+
+
+def test_device_type_lines_use_order_and_description():
+    lines = "\n".join(ps.device_type_lines("t", {"order": 2, "description": "Pack"}))
+    assert "t.order = 2;" in lines and '"Pack"' in lines
+
+
+def test_charge_state_starts_unknown():
+    lines = "\n".join(
+        ps.config_lines(
+            "t",
+            {"battery": {"order": 0, "description": "B", "charging": "x"}},
+        )
+    )
+    assert "bat_charge_state = 0;" in lines

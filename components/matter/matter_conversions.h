@@ -21,7 +21,7 @@ esp_matter_attr_val_t ampere(float value);
 // PowerSource::BatPercentRemaining. Input in percent, output in half percent.
 esp_matter_attr_val_t battery_percent(float value);
 // PowerSource::BatChargeLevel (enum8: 0 OK, 1 Warning, 2 Critical) from a
-// level in percent. Not finite values are reported as OK.
+// level in percent. Not finite values return an invalid value (no update).
 esp_matter_attr_val_t battery_charge_level(float percent, float warning_below,
                                            float critical_below);
 // PowerSource::BatVoltage and WiredAssessedInputVoltage. Input in V, output

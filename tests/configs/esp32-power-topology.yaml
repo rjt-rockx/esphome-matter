@@ -25,11 +25,13 @@ wifi:
 
 matter:
   endpoints:
-    # Mains source and a node level electrical sensor on the root node (topology node: the
-    # whole node is measured).
+    # Mains supply on the root node (endpoint 0).
     0:
       wired:
         present: mains_present
+    # The Electrical Sensor has endpoint scope, so the whole-node measurement sits on its own
+    # endpoint with topology node.
+    1:
       electrical_sensor:
         topology: node
         voltage: mains_voltage

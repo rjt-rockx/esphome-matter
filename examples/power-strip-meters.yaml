@@ -40,8 +40,8 @@ wifi:
 
 matter:
   endpoints:
-    # The mains supply, shared by every endpoint. Endpoint 0 is the root node; only Power Source
-    # and Electrical Sensor can be added to it.
+    # The mains supply, shared by every endpoint. Endpoint 0 is the root node; only a Power Source
+    # can be added to it.
     0:
       wired:
         voltage: mains_voltage

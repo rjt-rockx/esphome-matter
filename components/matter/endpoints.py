@@ -189,6 +189,8 @@ class Endpoint:
         self._config = config
         # Every configured endpoint (for the EndpointList of a root node Power Source).
         self.all_endpoint_ids = tuple(all_endpoint_ids)
+        # (endpoint, kind, order, present sensor) of every Power Source; set by build_endpoints.
+        self.all_power_sources: list[tuple] = []
         self.usages: list[tuple[Cluster, Attribute | Event]] = []
         self.plan = plan or conformance.EndpointPlan()
 
@@ -959,7 +961,9 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
             cluster, attribute = get_attribute_from_config(action)
             endpoint.register_usage(cluster, attribute)
 
+    power_sources = power_source.power_sources(matter_config[CONF_ENDPOINTS])
     for endpoint in endpoints:
+        endpoint.all_power_sources = power_sources
         endpoint.resolve()
 
     CORE.data.setdefault(CONF_MATTER, {})[CONF_ENDPOINTS] = endpoints

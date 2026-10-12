@@ -47,10 +47,10 @@ ENDPOINT_LIST_MAX = 20
 _ALL_FEATURES = {*TOPOLOGY_FEATURES.values(), DYNAMIC_POWER_FLOW}
 
 
-def _endpoint_list():
+def _endpoint_list(min_length: int = 1):
     return cv.All(
         cv.ensure_list(cv.int_range(min=0, max=65534)),
-        cv.Length(min=1, max=ENDPOINT_LIST_MAX),
+        cv.Length(min=min_length, max=ENDPOINT_LIST_MAX),
     )
 
 
@@ -60,7 +60,8 @@ def schema_options() -> dict:
             *TOPOLOGY_FEATURES, lower=True
         ),
         cv.Optional(CONF_AVAILABLE_ENDPOINTS): _endpoint_list(),
-        cv.Optional(CONF_ACTIVE_ENDPOINTS): _endpoint_list(),
+        # The XML has no minimum for ActiveEndpoints: an empty list means nothing is measured now.
+        cv.Optional(CONF_ACTIVE_ENDPOINTS): _endpoint_list(0),
     }
 
 
@@ -83,9 +84,16 @@ def apply_topology(config: dict) -> dict:
         name for name in config.get(CONF_WITH_FEATURES, ()) if name in _ALL_FEATURES
     ]
     if manual:
+        hints = ", ".join(
+            f"{name} -> '{CONF_TOPOLOGY}: {topology_name}'"
+            for name in manual
+            for topology_name, feature in TOPOLOGY_FEATURES.items()
+            if feature == name
+        )
         raise cv.Invalid(
-            f"Select the Power Topology with the '{CONF_TOPOLOGY}' option "
-            f"(node, tree or set) instead of with_features: {', '.join(manual)}",
+            "Power Topology features are no longer selected with with_features. Use the "
+            f"'{CONF_TOPOLOGY}' option instead"
+            + (f" ({hints})" if hints else " ('topology: set' plus 'active_endpoints' enables DynamicPowerFlow)"),
             path=[CONF_WITH_FEATURES],
         )
     if topology == "set":

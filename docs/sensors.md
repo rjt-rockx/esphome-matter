@@ -120,7 +120,7 @@ matter:
 * `ElectricalEnergyMeasurement` is created when `energy_imported` (cumulative energy consumed) or `energy_exported` (cumulative energy produced) is mapped, and only the attribute of the mapped direction exists (`CumulativeEnergyImported` or `CumulativeEnergyExported`). kWh sensors are converted to the mWh of the `EnergyMeasurementStruct`. Use a sensor with `state_class: total_increasing`. Float sensors have about 7 significant digits, so a sensor with a large total (say 12345.678 kWh) can't report every Wh.
 * `current_type` selects the electrical type: `ac` (default) or `dc`. DC only supports `voltage`, `active_current` and `active_power`. Mapping a sensor that requires AC (reactive/apparent/rms values, frequency, power factor) with `current_type: dc` is an error. `neutral_current` enables the PolyphasePower feature.
 
-`topology` selects which endpoints the sensor measures (`node`, the default, `tree` or `set`), and the sensor can sit on the root node or next to an application device type on the same endpoint. See [power.md](power.md#power-topology).
+`topology` selects which endpoints the sensor measures (`node`, the default, `tree` or `set`), and the sensor can sit next to an application device type on the same endpoint (not on the root node). See [power.md](power.md#power-topology).
 
 The accuracy that is reported for the measurements is a nominal one (10 % over the whole range) because esphome-matter doesn't know the accuracy of the measuring hardware.
 

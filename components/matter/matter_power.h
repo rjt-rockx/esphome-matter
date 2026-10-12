@@ -59,7 +59,9 @@ protected:
 #ifdef USE_BINARY_SENSOR
 // Publishes an enum8 attribute that is derived from binary_sensors: the value
 // of the first sensor (in the given order) that is ON, else the default value.
-// Used for BatChargeLevel (low / critical) and BatChargeState (charging / full).
+// As long as no sensor has a state, `unknown_value` is published (or nothing
+// for -1, which keeps the initial value). Used for BatChargeLevel (low /
+// critical), BatChargeState (charging / full) and the Power Source Status.
 class MatterFlagEnumMapping : public MatterEndpointMappingBase {
 public:
   struct Flag {
@@ -69,10 +71,10 @@ public:
 
   MatterFlagEnumMapping(uint16_t endpoint_id, uint32_t cluster_id,
                         uint32_t attribute_id, uint8_t default_value,
-                        std::vector<Flag> flags)
+                        int unknown_value, std::vector<Flag> flags)
       : MatterEndpointMappingBase(endpoint_id), cluster_id_(cluster_id),
         attribute_id_(attribute_id), default_value_(default_value),
-        flags_(std::move(flags)) {}
+        unknown_value_(unknown_value), flags_(std::move(flags)) {}
 
   void initialize() override {
     for (const auto &flag : this->flags_) {
@@ -86,12 +88,21 @@ public:
 protected:
   void publish_() {
     uint8_t value = this->default_value_;
+    bool any_state = false;
+    bool matched = false;
     for (const auto &flag : this->flags_) {
-      if (flag.sensor != nullptr && flag.sensor->has_state() &&
-          flag.sensor->state) {
+      if (flag.sensor == nullptr || !flag.sensor->has_state())
+        continue;
+      any_state = true;
+      if (!matched && flag.sensor->state) {
         value = flag.value;
-        break;
+        matched = true;
       }
+    }
+    if (!any_state) {
+      if (this->unknown_value_ < 0)
+        return;
+      value = static_cast<uint8_t>(this->unknown_value_);
     }
     uint16_t endpoint_id = this->endpoint_id_;
     uint32_t cluster_id = this->cluster_id_;
@@ -112,6 +123,7 @@ protected:
   uint32_t cluster_id_;
   uint32_t attribute_id_;
   uint8_t default_value_;
+  int unknown_value_;
   std::vector<Flag> flags_;
 };
 #endif // USE_BINARY_SENSOR

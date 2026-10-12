@@ -27,6 +27,10 @@ EXPECTED = {
         "create_wired_present",
         "esp_matter::endpoint::add_device_type(endpoint",
         "wired_current_type",
+        "MatterFlagEnumMapping(1, 47, 0, 3, -1, {{mains_present, 1}})",
+        "MatterFlagEnumMapping(2, 47, 14, 0, -1,",
+        "MatterFlagEnumMapping(0, 47, 0, 1, -1, {{mains_present, 2}})",
+        "MatterFlagEnumMapping(0, 47, 26, 3, 0,",
     ],
     "esp32-power-topology": [
         "tree_topology::get_id()",

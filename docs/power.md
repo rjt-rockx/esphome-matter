@@ -29,7 +29,7 @@ matter:
       battery: door_battery_percent
 ```
 
-* **Root node (endpoint 0).** The root node exists already; a configured endpoint 0 only adds a Power Source (`battery:` / `wired:`) and/or an `electrical_sensor` to it. Nothing else can be configured there (no application device types, `parent`, `label`, `tags` or `clusters`). The `EndpointList` attribute defaults to every other configured endpoint; `powers: [1, 2]` lists specific endpoints. Use it when the whole node runs on one source, like a battery sensor with several sensor endpoints.
+* **Root node (endpoint 0).** The root node exists already; a configured endpoint 0 only adds a Power Source (`battery:` / `wired:`) to it. Nothing else can be configured there (no application device types, no `electrical_sensor`, no `parent`, `label`, `tags` or `clusters`). The `EndpointList` attribute defaults to every other configured endpoint; `powers: [1, 2]` lists specific endpoints. Use it when the whole node runs on one source, like a battery sensor with several sensor endpoints.
 * **Application endpoint.** The cluster is created next to the device type clusters, without the Power Source device type, and the `EndpointList` stays empty unless `powers:` is set. This is the shape of many real battery devices. Use it when a controller should associate the battery with that endpoint.
 * **Dedicated endpoint.** The `power_source` device type (`power_source: {battery: sensor_id}`) creates an endpoint of its own.
 
@@ -46,16 +46,16 @@ An endpoint has one Power Source cluster, so `battery` and `wired` cannot be on 
 | `percent` | `BatPercentRemaining` | A sensor in `%`, converted to Matter's half percent steps. Also drives `BatChargeLevel` (see below). |
 | `voltage` | `BatVoltage` | A voltage sensor (`V`, `mV`), reported in mV. |
 | `low`, `critical` | `BatChargeLevel` | Binary sensors. `critical` ON gives `Critical`, else `low` ON gives `Warning`, else `OK`. Cannot be combined with `percent`. |
-| `warning_below`, `critical_below` | `BatChargeLevel` | Percent thresholds for a `percent` sensor (defaults 20 and 10). Without `low` / `critical` the charge level follows the percent sensor. |
+| `warning_below`, `critical_below` | `BatChargeLevel` | Percent thresholds for a `percent` sensor (defaults 20 and 10; a single one is checked against the other's default). The charge level follows the percent sensor. A reading that is not a number does not update it, and without any reading it stays `OK` (the enum has no unknown value). |
 | `replacement_needed` | `BatReplacementNeeded` | Binary sensor, ON = the battery needs replacing. |
 | `replaceability` | `BatReplaceability` | `unspecified` (default), `not_replaceable`, `user_replaceable`, `factory_replaceable`. |
 | `replacement_description`, `quantity` | `BatReplacementDescription`, `BatQuantity` | `user_replaceable` enables the **Replaceable** (REPLC) feature, which makes both mandatory: give a description such as `CR2032` (a description alone implies `user_replaceable`); `quantity` defaults to 1. |
-| `charging`, `charged` | `BatChargeState` | Binary sensors. Either one enables the **Rechargeable** (RECHG) feature (or set `rechargeable: true`). `charging` ON gives `IsCharging`, else `charged` ON gives `IsAtFullCharge`, else `IsNotCharging`. Without a sensor the state stays `Unknown`. |
+| `charging`, `charged` | `BatChargeState` | Binary sensors. Either one enables the **Rechargeable** (RECHG) feature (or set `rechargeable: true`). `charging` ON gives `IsCharging`, else `charged` ON gives `IsAtFullCharge`, else `IsNotCharging`. The state is `Unknown` until a sensor has a state. |
 | `functional_while_charging` | `BatFunctionalWhileCharging` | Rechargeable batteries only, default `true`. |
-| `order`, `description` | `Order`, `Description` | Preference order of the source (0 is the most preferred) and a description (default `Battery`, at most 60 bytes). |
-| `powers` | `EndpointList` | Endpoints that run on this battery. |
+| `order`, `description` | `Order`, `Description` | Preference order of the source (the lowest is used first) and a description (default `Battery`, at most 60 bytes). `order` is also available on the `power_source` device type. Sources that share an order give a build warning: set it, for example 0 for mains and 1 for the battery backup. |
+| `powers` | `EndpointList` | Endpoints that run on this battery (no length limit; the 1.6 XML sets none). |
 
-`Status` is set to `Active`. Not supported yet: `BatTimeRemaining`, `BatPresent`, `BatCapacity`, `BatChargingCurrent`, the fault lists and battery chemistry/designation attributes. Matter has no battery level from a voltage; use a template sensor to convert a voltage to a percentage.
+`Status` is `Active`, except that a battery with a higher `order` than a wired source that has a `present` sensor reports `Standby` while that source is present. Not supported yet: `BatTimeRemaining`, `BatPresent`, `BatCapacity`, `BatChargingCurrent`, the fault lists and battery chemistry/designation attributes. Matter has no battery level from a voltage; use a template sensor to convert a voltage to a percentage.
 
 ```yaml
 matter:
@@ -87,7 +87,7 @@ matter:
         current: mains_current    # sensor -> WiredAssessedCurrent (mA)
 ```
 
-`description` defaults to `Mains`; `order` and `powers` work as for the battery. `Status` is always `Active`; it does not follow `present`.
+`description` defaults to `Mains`; `order` and `powers` work as for the battery. With `present` bound, `Status` is `Active` while present and `Unavailable` otherwise (it stays `Active` until the sensor has a state).
 
 ## Power Topology
 
@@ -121,18 +121,18 @@ matter:
         active_power: set_power
 ```
 
-The two lists of the `set` topology are fixed at build time (at most 20 entries); `active_endpoints` is advertised as given and does not change at runtime. `with_features: [tree_topology]` and the other topology features are rejected: use `topology`.
+The two lists of the `set` topology are static: fixed at build time (at most 20 entries) and never updated at runtime, even with Dynamic Power Flow. `active_endpoints: []` is allowed (nothing is measured right now). `with_features: [tree_topology]` and the other topology features used to be accepted and produced a node with both NODE and TREE, which is not conformant; they are now rejected with a hint to use `topology` (`tree_topology` becomes `topology: tree`).
 
-A node topology means the whole node. Several endpoints with `topology: node` give a warning at build time; use `tree` with `parent:` for sub-meters instead.
+A node topology means the whole node. The Power Topology XML does not say that only one endpoint may use it, and real multi-meter devices do advertise several, so several endpoints with `topology: node` only give a warning at build time; use `tree` with `parent:` for sub-meters instead.
 
 ## Electrical sensors on other endpoints
 
-`electrical_sensor` is a regular device type key, so it can be combined with an application device type on the same endpoint, on the root node, or on its own endpoint:
+The Electrical Sensor device type has endpoint scope in the device library, so it cannot be put on the root node (endpoint 0); a whole-node measurement uses its own endpoint with `topology: node`. `electrical_sensor` is a regular device type key, so it can be combined with an application device type on the same endpoint, or sit on its own endpoint:
 
 ```yaml
 matter:
   endpoints:
-    0:                           # whole-node measurement on the root node
+    10:                          # whole-node measurement on a dedicated endpoint
       electrical_sensor:
         topology: node
         active_power: total_power
@@ -150,7 +150,7 @@ matter:
         active_power: relay_power
 ```
 
-There is no separate `meters:` option. The root node endpoint counts against esp-matter's device type limit; the build sets `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` accordingly.
+There is no separate `meters:` option. The root node's Power Source device type counts against esp-matter's device type limit; the build sets `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` accordingly.
 
 ## Energy attributes
 

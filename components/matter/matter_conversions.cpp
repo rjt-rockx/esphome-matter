@@ -107,13 +107,14 @@ esp_matter_attr_val_t battery_percent(float value) {
 
 esp_matter_attr_val_t battery_charge_level(float percent, float warning_below,
                                            float critical_below) {
+  // BatChargeLevel has no "unknown" value: no reading means no update.
+  if (!std::isfinite(percent))
+    return esp_matter_invalid(nullptr);
   uint8_t level = 0; // OK
-  if (std::isfinite(percent)) {
-    if (percent < critical_below)
-      level = 2; // Critical
-    else if (percent < warning_below)
-      level = 1; // Warning
-  }
+  if (percent < critical_below)
+    level = 2; // Critical
+  else if (percent < warning_below)
+    level = 1; // Warning
   return esp_matter_enum8(level);
 }
 
