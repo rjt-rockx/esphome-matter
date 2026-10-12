@@ -72,3 +72,6 @@ dmypy.json
 tempCodeRunnerFile.py
 .claude/worktrees/
 .esphome/
+
+# Temporary copies written by .github/scripts/ci_prepare.py
+ci_tmp_*.yaml

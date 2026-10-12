@@ -15,6 +15,7 @@
 #include "matter_lights.h"
 #include "matter_lock.h"
 #include "matter_sensors.h"
+#include "matter_generic_switch.h"
 #include "matter_switch.h"
 #include "matter_valve.h"
 

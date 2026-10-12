@@ -59,15 +59,6 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
 # config_t::feature_flags (instead of only the choice features), so all of their
 # features, including per-feature config like MultiPressMax, are set through the
 # feature flags.
-# Clusters whose features are set by an entity binding when the given option is
-# configured; the mandatory choice check does not apply to them.
-BINDING_MANAGED_CLUSTERS = {
-    "WindowCovering": ("cover_id",),
-    "Thermostat": ("climate_id",),
-    # The sensor type follows the device_class of the bound binary_sensor.
-    "OccupancySensing": ("occupancy",),
-}
-
 FLAG_DRIVEN_CLUSTERS = frozenset({"Switch"})
 
 
@@ -182,6 +173,12 @@ class DeviceType:
     #             features.update(sensor_attribute.features)
     #     return features
 
+    def _has_feature_binding(self, config: dict) -> bool:
+        """True if an entity binding in the config selects feature choices later."""
+        keys = {sensor_attribute.conf_key for sensor_attribute in self.sensor_attributes}
+        keys.update(("cover_id", "climate_id"))
+        return any(config.get(key) is not None for key in keys)
+
     def _validate_features(self, config: dict) -> dict:
         """Resolve mandatory feature choices and feature dependencies.
 
@@ -190,8 +187,9 @@ class DeviceType:
         cluster requires exactly one of LatchingSwitch/MomentarySwitch).
         esp-matter silently refuses to create such a cluster when the choice
         is missing, so it is resolved here: a default from
-        DEFAULT_CHOICE_FEATURES is applied when the user made no selection,
-        and an error is raised when there is no sensible default.
+        DEFAULT_CHOICE_FEATURES is applied when the user made no selection.
+        Choices without a default are left alone because bindings such as
+        climate_id, cover_id or a bound binary sensor select them later.
         """
         if (
             self.name == "window_covering"
@@ -202,9 +200,6 @@ class DeviceType:
         if self.has_required_cluster("Switch"):
             config = apply_switch_defaults(config)
         enabled = list(config.get(CONF_FEATURES, ()))
-        for sensor_attribute in self.sensor_attributes:
-            if config.get(sensor_attribute.conf_key) is not None:
-                enabled.extend(sensor_attribute.features)
 
         # Add the features that other enabled features depend on.
         for name in list(enabled):
@@ -214,14 +209,6 @@ class DeviceType:
 
         for cluster in self.server_clusters:
             if not cluster.required:
-                continue
-            if any(
-                config.get(key) is not None
-                for key in BINDING_MANAGED_CLUSTERS.get(cluster.name, ())
-            ):
-                # The feature set of this cluster is derived from the bound
-                # ESPHome entity (cover/climate/binary_sensor) at code generation
-                # time or in final validation.
                 continue
             for choice in cluster.choice_features:
                 names = [feature.name for feature in choice.features]
@@ -238,13 +225,19 @@ class DeviceType:
                 default = DEFAULT_CHOICE_FEATURES.get((self.name, cluster.name))
                 default = default or DEFAULT_CHOICE_FEATURES.get(cluster.name)
                 if default not in names:
-                    raise cv.Invalid(
-                        f"{self.name}: cluster {cluster.name} requires "
-                        f"{'exactly' if choice.max == choice.min else 'at least'} "
-                        f"{choice.min} of these features to be enabled: "
-                        f"{', '.join(names)}. Select one with `features: [...]`.",
-                        path=[CONF_FEATURES],
-                    )
+                    # No sensible default: a binding (climate_id, cover_id, a bound
+                    # binary sensor, ...) picks the feature while generating code.
+                    # Without a binding esp-matter would refuse to create the cluster.
+                    if not self._has_feature_binding(config):
+                        raise cv.Invalid(
+                            f"{self.name}: cluster {cluster.name} requires "
+                            f"{'exactly' if choice.max == choice.min else 'at least'} "
+                            f"{choice.min} of these features to be enabled: "
+                            f"{', '.join(names)}. Select one with `features: [...]` "
+                            "or bind an ESPHome entity.",
+                            path=[CONF_FEATURES],
+                        )
+                    continue
                 enabled.append(default)
 
         if enabled:

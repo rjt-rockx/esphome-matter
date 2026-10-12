@@ -46,6 +46,18 @@ matter:
     # Bare config: MomentarySwitch and MomentarySwitchRelease.
     4:
       generic_switch:
+    # Action switch: multi press is implied, multi_press_max still applies.
+    5:
+      generic_switch:
+        binary_sensor_id: action_button
+        features: [ActionSwitch, MomentarySwitchLongPress]
+        multi_press_max: 4
+    # Other device types with a Switch cluster.
+    6:
+      doorbell:
+    7:
+      audio_doorbell:
+        features: [Audio]
 
 binary_sensor:
   - id: button
@@ -56,6 +68,9 @@ binary_sensor:
         pullup: true
         input: true
       inverted: true
+  - id: action_button
+    platform: gpio
+    pin: GPIO3
   - id: toggle
     platform: gpio
     pin:

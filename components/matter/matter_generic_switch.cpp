@@ -81,6 +81,14 @@ void send_on_matter_thread(uint16_t endpoint_id, MatterSwitchEvent event,
 
 } // namespace
 
+void set_switch_position(uint16_t endpoint_id, uint8_t position) {
+  CHIP_ERROR err = chip::DeviceLayer::SystemLayer().ScheduleLambda(
+      [endpoint_id, position]() { set_current_position(endpoint_id, position); });
+  if (err != CHIP_NO_ERROR)
+    ESP_LOGE(TAG, "Failed to schedule switch position: %" CHIP_ERROR_FORMAT,
+             err.Format());
+}
+
 void send_switch_event(uint16_t endpoint_id, MatterSwitchEvent event,
                        uint8_t position, uint8_t count) {
   ESP_LOGD(TAG, "Switch event %u: endpoint=%u position=%u count=%u",
@@ -170,33 +178,31 @@ void MatterGenericSwitchMapping::on_press_() {
     this->press_count_ = 0;
   if (this->press_count_ < UINT8_MAX)
     this->press_count_++;
+  if (this->press_count_ > this->multi_press_max_)
+    this->multi_press_overflow_ = true;
 
-  if (this->multi_press_ && !this->action_switch_ &&
-      this->press_count_ >= 2) {
-    // MultiPressOngoing reports 2..MultiPressMax presses. More presses abort
-    // the sequence, which is reported as 0 presses on completion.
-    if (this->press_count_ <= this->multi_press_max_)
-      send_switch_event(this->endpoint_id(),
-                        MatterSwitchEvent::MULTI_PRESS_ONGOING, 1,
-                        this->press_count_);
-    else
-      this->multi_press_overflow_ = true;
-  } else {
+  // Only the first press of a sequence is an InitialPress. The next presses are
+  // MultiPressOngoing (2..MultiPressMax), which an action switch never sends.
+  // More than MultiPressMax presses abort the sequence: no event is sent and the
+  // sequence completes with 0 presses.
+  if (this->press_count_ == 1) {
     send_switch_event(this->endpoint_id(), MatterSwitchEvent::INITIAL_PRESS);
+  } else if (!this->action_switch_ && !this->multi_press_overflow_) {
+    send_switch_event(this->endpoint_id(),
+                      MatterSwitchEvent::MULTI_PRESS_ONGOING, 1,
+                      this->press_count_);
+  } else {
+    // No event moves CurrentPosition for this press.
+    set_switch_position(this->endpoint_id(), 1);
   }
 
-  if (this->long_press_) {
+  // A press that continues a multi-press sequence is never a long press.
+  if (this->long_press_ && this->press_count_ == 1) {
     this->set_timeout("long_press", this->long_press_ms_, [this]() {
       this->long_press_sent_ = true;
-      send_switch_event(this->endpoint_id(), MatterSwitchEvent::LONG_PRESS);
-      if (this->multi_press_ && this->press_count_ >= 2) {
-        // A long press ends a multi-press sequence that was already announced
-        // with MultiPressOngoing. Report it as aborted.
-        send_switch_event(this->endpoint_id(),
-                          MatterSwitchEvent::MULTI_PRESS_COMPLETE, 1, 0);
-      }
       this->press_count_ = 0;
       this->multi_press_overflow_ = false;
+      send_switch_event(this->endpoint_id(), MatterSwitchEvent::LONG_PRESS);
     });
   }
 }
@@ -215,6 +221,8 @@ void MatterGenericSwitchMapping::on_release_() {
 
   if (this->release_)
     send_switch_event(this->endpoint_id(), MatterSwitchEvent::SHORT_RELEASE);
+  else
+    set_switch_position(this->endpoint_id(), 0);
 
   if (this->multi_press_) {
     this->set_timeout("multi_press", this->multi_press_window_ms_,

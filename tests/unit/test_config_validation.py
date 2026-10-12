@@ -465,3 +465,18 @@ def test_generic_switch_bare_defaults_to_momentary(run_config):
         """
     )
     assert result.ok, result.output
+
+
+@pytest.mark.parametrize("device_type", ["occupancy_sensor", "smoke_co_alarm"])
+def test_unbound_choice_feature_device_types_rejected(run_config, device_type):
+    # Without a bound sensor and without features esp-matter cannot create the cluster.
+    result = run_config(
+        f"""
+        matter:
+          endpoints:
+            1:
+              {device_type}: {{}}
+        """
+    )
+    assert not result.ok
+    assert "features" in result.output.lower()

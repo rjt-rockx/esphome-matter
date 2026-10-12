@@ -8,13 +8,12 @@ esphome:
   friendly_name: Matter Button
 
 esp32:
-  board: esp32-c6-devkitm-1
   variant: ESP32C6
   framework:
     type: esp-idf
 
 external_components:
-  - source: github://DavidvtWout/esphome-matter@main
+  - source: github://rjt-rockx/esphome-matter@main
 
 logger:
 

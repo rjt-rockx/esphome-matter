@@ -32,6 +32,10 @@ enum class MatterSwitchEvent : uint8_t {
 void send_switch_event(uint16_t endpoint_id, MatterSwitchEvent event,
                        uint8_t position = 1, uint8_t count = 1);
 
+// Schedules a CurrentPosition update on the Matter thread without an event, for
+// the press and release of switches whose features have no event for it.
+void set_switch_position(uint16_t endpoint_id, uint8_t position);
+
 template <typename... Ts>
 class MatterSendSwitchEventAction : public Action<Ts...> {
 public:
@@ -55,10 +59,11 @@ protected:
 #ifdef USE_BINARY_SENSOR
 // Turns the presses of a binary sensor into Switch cluster events. Only events
 // of the features enabled on the endpoint are generated:
-//   press            -> InitialPress (MultiPressOngoing for presses 2..max)
-//   held long_press  -> LongPress, then LongRelease on release
-//   release          -> ShortRelease
-//   window expires   -> MultiPressComplete(count)
+//   first press      -> InitialPress (MultiPressOngoing for presses 2..max,
+//                       not for action switches)
+//   held first press -> LongPress, then LongRelease on release
+//   release          -> ShortRelease (not after a long press)
+//   window expires   -> MultiPressComplete(count, 0 when aborted)
 // A LatchingSwitch emits SwitchLatched for every state change instead.
 class MatterGenericSwitchMapping : public MatterEndpointMappingBase,
                             public Component {
