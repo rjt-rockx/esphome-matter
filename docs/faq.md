@@ -40,7 +40,7 @@ Add a button with the `matter.factory_reset` action (see the README example conf
 
 ### How do I update the firmware?
 
-Use ESPHome's normal OTA (`ota:` platform `esphome`). Matter OTA is not implemented. Fabrics survive OTA updates.
+Use ESPHome's normal OTA (`ota:` platform `esphome`). Matter OTA (controller driven updates) is opt-in, see [matter-ota.md](matter-ota.md). Fabrics survive OTA updates.
 
 ### The device takes a long time to come back after a reboot.
 

@@ -308,6 +308,7 @@ void MatterCoverMapping::push_state_to_matter_() {
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
       [eid, has_tilt, lift_known, lift, lift_target, tilt_known, tilt, tilt_target, operational_status]() {
+        MatterPushGuard push_guard;  // see MatterPushGuard
         auto report_position = [eid](uint32_t attribute_id, bool known, uint16_t value) {
           esp_matter_attr_val_t val =
               esp_matter_nullable_uint16(known ? nullable<uint16_t>(value) : nullable<uint16_t>());

@@ -5,8 +5,10 @@
 #include "matter_attributes.h"
 #include "matter_component.h"
 
+#include <data_model_provider/esp_matter_data_model_provider.h>
 #include <platform/CHIPDeviceLayer.h>
 
+#include <atomic>
 #include <cinttypes>
 #include <memory>
 #include <vector>
@@ -44,6 +46,10 @@ struct ActiveAttributeDispatch {
 };
 
 ActiveAttributeDispatch active_attribute_dispatch;
+
+// Number of live MatterPushGuards. Atomic only so a stray read from another
+// task cannot tear; the guards themselves are used on the Matter thread.
+std::atomic<uint8_t> push_guard_depth{0};
 
 bool is_attribute_update_echo(uint16_t endpoint_id, uint32_t cluster_id,
                               uint32_t attribute_id) {
@@ -210,6 +216,18 @@ void set_attribute_value_on_matter_thread(uint16_t endpoint_id,
     return;
   }
 
+  // Code driven clusters answer reads from the cluster object, never from the
+  // attribute store that attribute::update() writes.
+  if (esp_matter::data_model::provider::get_instance().registry().Get(
+          {endpoint_id, cluster_id}) != nullptr) {
+    ESP_LOGW(TAG,
+             "Cluster 0x%08" PRIx32
+             " on endpoint %u is code driven: setting attribute 0x%08" PRIx32
+             " only changes the esp-matter attribute store, controllers will "
+             "not see the new value",
+             cluster_id, endpoint_id, attribute_id);
+  }
+
   esp_err_t err = esp_matter::attribute::update(endpoint_id, cluster_id,
                                                 attribute_id, &attribute_value);
   if (err != ESP_OK) {
@@ -228,6 +246,12 @@ void update_attribute_action_on_matter_thread(intptr_t context) {
 }
 
 } // namespace
+
+MatterPushGuard::MatterPushGuard() { push_guard_depth.fetch_add(1); }
+
+MatterPushGuard::~MatterPushGuard() { push_guard_depth.fetch_sub(1); }
+
+bool MatterPushGuard::active() { return push_guard_depth.load() != 0; }
 
 MatterAttributeDispatchGuard::MatterAttributeDispatchGuard(
     uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id)
@@ -322,6 +346,9 @@ endpoint_attribute_update_cb(esp_matter::attribute::callback_type_t type,
                              void *priv_data) {
   if (type != esp_matter::attribute::POST_UPDATE ||
       global_matter_component == nullptr || val == nullptr)
+    return ESP_OK;
+  // An ESPHome -> Matter push (see MatterPushGuard) is not a controller change.
+  if (MatterPushGuard::active())
     return ESP_OK;
 
   const std::string value = format_attribute_value(*val);

@@ -75,7 +75,7 @@ Priorities weigh community demand, maintainer direction, effort, and risk. P0 it
 ### P3: bigger bets
 
 - **BLE commissioning** (needs coexistence with other networking; currently broken).
-- **Matter OTA** (requestor) for devices that want it; ESPHome OTA remains the recommended update path.
+- **Matter OTA**: an opt-in requestor is implemented ([matter-ota.md](matter-ota.md)); ESPHome OTA remains the recommended update path.
 - **Custom DAC / production credentials** workflow and CSA VID guidance.
 - **Ethernet** transport.
 - **Matter 1.4/1.5 types**: solar, battery storage, heat pump, EVSE, closures, cameras. Mostly untestable by hobbyists today.

@@ -274,8 +274,6 @@ void MatterClimateMapping::initialize() {
       this->endpoint_id(), Thermostat::Id,
       Thermostat::Attributes::SystemMode::Id,
       [this](const esp_matter_attr_val_t &value) {
-        if (this->pushing_)
-          return;
         uint8_t mode = value.val.u8;
         global_matter_component->defer_to_main_loop(
             [this, mode]() { this->apply_system_mode_(mode); });
@@ -285,8 +283,6 @@ void MatterClimateMapping::initialize() {
         this->endpoint_id(), Thermostat::Id,
         Thermostat::Attributes::OccupiedHeatingSetpoint::Id,
         [this](const esp_matter_attr_val_t &value) {
-          if (this->pushing_)
-            return;
           int16_t centi = value.val.i16;
           global_matter_component->defer_to_main_loop(
               [this, centi]() { this->apply_setpoint_(true, centi); });
@@ -297,8 +293,6 @@ void MatterClimateMapping::initialize() {
         this->endpoint_id(), Thermostat::Id,
         Thermostat::Attributes::OccupiedCoolingSetpoint::Id,
         [this](const esp_matter_attr_val_t &value) {
-          if (this->pushing_)
-            return;
           int16_t centi = value.val.i16;
           global_matter_component->defer_to_main_loop(
               [this, centi]() { this->apply_setpoint_(false, centi); });
@@ -392,7 +386,11 @@ void MatterClimateMapping::push_state_to_matter() {
       [this, eid, system_mode, local_temperature, write_heating, write_cooling,
        heating, cooling, has_running_state, running_state, has_on_off, on]() {
         using namespace chip::app::Clusters;
-        this->pushing_ = true;
+        // The Thermostat setpoints and SystemMode are writable: esp-matter runs
+        // the attribute callbacks for these reports (and the cluster may shift the
+        // other setpoint to keep the dead band). None of that is a controller
+        // request.
+        MatterPushGuard push_guard;
         auto mode_val = esp_matter_enum8(system_mode);
         esp_matter::attribute::report(
             eid, Thermostat::Id, Thermostat::Attributes::SystemMode::Id,
@@ -424,7 +422,6 @@ void MatterClimateMapping::push_state_to_matter() {
           esp_matter::attribute::report(eid, OnOff::Id,
                                         OnOff::Attributes::OnOff::Id, &val);
         }
-        this->pushing_ = false;
       });
 }
 
