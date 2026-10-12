@@ -130,13 +130,16 @@ matter:
 
 This device type exposes clusters and attributes for power and energy measurements. However, this device type currently can't successfully be created in esphome-matter yet.
 
+# generic_switch
+
+The `generic_switch` is a stateless programmable button that emits Matter events (press, long press, multi press). See [generic-switch.md](./generic-switch.md).
+
 # Untested / unsupported
 
 The following device types are untested. Many of them can still successfully be created, but besides sensor attributes, little interaction can be done with these.
 
 - door_lock
 - aggregator
-- generic_switch
 - power_source
 - ota_requestor
 - bridged_node
