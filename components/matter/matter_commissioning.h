@@ -39,7 +39,7 @@ public:
   bool init(bool persist_passcode);
 
   // CHIP task: called from the Matter device event callback.
-  void handle_event(const ChipDeviceEvent *event);
+  void handle_event(const chip::DeviceLayer::ChipDeviceEvent *event);
 
   // Main loop: logs the QR/manual code (only while a window is open and the
   // code is known) and the window/fabric summary.
