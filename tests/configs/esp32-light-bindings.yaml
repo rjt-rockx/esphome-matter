@@ -137,7 +137,7 @@ light:
             hue = (hue + 10) % 360;
             float r, g, b;
             hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
-            auto call = state->turn_on();
+            auto call = id(rgb_strip).turn_on();
             call.set_rgb(r, g, b);
             call.set_transition_length(0);
             call.perform();

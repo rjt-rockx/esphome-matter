@@ -84,8 +84,12 @@
     if (esp_matter::endpoint::mounted_on_off_control::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     esp_matter::cluster::level_control::config_t level_control_config{};
-    level_control_config.feature_flags = esp_matter::cluster::level_control::feature::on_off::get_id() | esp_matter::cluster::level_control::feature::lighting::get_id();
-    if (esp_matter::cluster::level_control::create(endpoint, &level_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+    auto *level_control_cluster = esp_matter::cluster::level_control::create(endpoint, &level_control_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (level_control_cluster == nullptr)
+      return false;
+    if (esphome::matter::add_feature(level_control_cluster, esp_matter::cluster::level_control::feature::on_off::add) != ESP_OK)
+      return false;
+    if (esphome::matter::add_feature(level_control_cluster, esp_matter::cluster::level_control::feature::lighting::add) != ESP_OK)
       return false;
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);

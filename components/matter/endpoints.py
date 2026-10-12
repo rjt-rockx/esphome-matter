@@ -168,6 +168,11 @@ ENDPOINT_SCHEMA = cv.All(
 )
 
 
+# Clusters whose esp-matter config_t has no feature_flags. Their features are
+# added to the cluster after it was created.
+NO_FEATURE_FLAGS_CLUSTERS = frozenset({"OnOff", "LevelControl", "ColorControl"})
+
+
 @dataclass
 class _ClusterConfig:
     # Whether or not the cluster is already created by a device type config.
@@ -849,8 +854,10 @@ class Endpoint:
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
         config_var = f"{cluster.espm_namespace}_config"
+        cluster_var = f"{cluster.espm_namespace}_cluster"
         lines = [f"{cluster_ns}::config_t {config_var}{{}};"]
         feature_flags = []
+        features = []
         features_by_name = {feature.name: feature for feature in cluster.features}
         cluster_config = self._cluster_configs[cluster.name]
         for feature_name, enabled in cluster_config.enabled_features.items():
@@ -861,9 +868,28 @@ class Endpoint:
                 raise cv.Invalid(
                     f"Cluster {cluster.name} has no feature {feature_name}"
                 )
+            features.append(feature)
             feature_flags.append(
                 f"{cluster_ns}::feature::{feature.namespace}::get_id()"
             )
+        if cluster.name in NO_FEATURE_FLAGS_CLUSTERS:
+            # The config has no feature_flags: the features are added to the
+            # created cluster (in bit order, enhanced features need the base one).
+            lines.extend(
+                (
+                    f"auto *{cluster_var} = {cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER);",
+                    f"if ({cluster_var} == nullptr)",
+                    "  return false;",
+                )
+            )
+            for feature in sorted(features, key=lambda f: f.bit):
+                lines.extend(
+                    (
+                        f"if (esphome::matter::add_feature({cluster_var}, {cluster_ns}::feature::{feature.namespace}::add) != ESP_OK)",
+                        "  return false;",
+                    )
+                )
+            return lines
         if feature_flags:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
         lines.extend(

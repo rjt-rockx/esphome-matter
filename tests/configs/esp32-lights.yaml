@@ -122,11 +122,11 @@ light:
           name: Color loop
           update_interval: 200ms
           lambda: |-
-            static float hue = 0;
-            hue = fmodf(hue + 10.0f, 360.0f);
+            static int hue = 0;
+            hue = (hue + 10) % 360;
             float r, g, b;
             hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
-            auto call = state->turn_on();
+            auto call = id(rgbww_light).turn_on();
             call.set_rgb(r, g, b);
             call.set_white_if_supported(0);
             call.set_cold_white_if_supported(0);

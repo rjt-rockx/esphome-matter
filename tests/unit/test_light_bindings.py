@@ -300,3 +300,8 @@ def test_light_binding_config_generates_expected_code(tmp_path):
     # the RGB only light adds the ColorTemperature feature by its traits
     assert "add_extended_color_light(endpoint, &device_config_0, rgb_strip)" in code
     assert 'register_light(rgb_strip, 6, "Color loop")' in code
+    # LevelControl added with `clusters:` has no feature_flags in esp-matter's
+    # config; its features are added after the cluster is created.
+    assert "level_control_config.feature_flags" not in code
+    assert "level_control::feature::on_off::add" in code
+    assert "level_control::feature::lighting::add" in code
