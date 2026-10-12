@@ -1,0 +1,646 @@
+diff --git a/esphome/components/binary_sensor/__init__.py b/esphome/components/binary_sensor/__init__.py
+--- a/esphome/components/binary_sensor/__init__.py
++++ b/esphome/components/binary_sensor/__init__.py
+@@ -3,7 +3,7 @@
+ from esphome import automation, core
+ from esphome.automation import maybe_simple_id
+ import esphome.codegen as cg
+-from esphome.components import mqtt, web_server, zigbee
++from esphome.components import mqtt, web_server
+ from esphome.components.const import CONF_ON_STATE_CHANGE
+ from esphome.config_helpers import filter_source_files_from_defines
+ import esphome.config_validation as cv
+@@ -62,6 +62,7 @@
+     DEVICE_CLASS_WINDOW,
+ )
+ from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
++from esphome.core.entity_extensions import setup_entity_extensions
+ from esphome.core.entity_helpers import (
+     SubEntities,
+     entity_duplicate_validator,
+@@ -432,7 +433,6 @@
+ _BINARY_SENSOR_SCHEMA = (
+     cv.ENTITY_BASE_SCHEMA.extend(web_server.WEBSERVER_SORTING_SCHEMA)
+     .extend(cv.MQTT_COMPONENT_SCHEMA)
+-    .extend(zigbee.BINARY_SENSOR_SCHEMA)
+     .extend(
+         {
+             cv.GenerateID(): cv.declare_id(BinarySensor),
+@@ -504,7 +504,7 @@
+ 
+ 
+ _BINARY_SENSOR_SCHEMA.add_extra(entity_duplicate_validator("binary_sensor"))
+-_BINARY_SENSOR_SCHEMA.add_extra(zigbee.validate_binary_sensor)
++_BINARY_SENSOR_SCHEMA.add_entity_extensions("binary_sensor")
+ 
+ 
+ def binary_sensor_schema(
+@@ -619,7 +619,7 @@
+     if web_server_config := config.get(CONF_WEB_SERVER):
+         await web_server.add_entity_config(var, web_server_config)
+ 
+-    await zigbee.setup_binary_sensor(var, config)
++    await setup_entity_extensions("binary_sensor", var, config)
+ 
+ 
+ async def register_binary_sensor(var, config):
+diff --git a/esphome/components/number/__init__.py b/esphome/components/number/__init__.py
+--- a/esphome/components/number/__init__.py
++++ b/esphome/components/number/__init__.py
+@@ -1,6 +1,6 @@
+ from esphome import automation
+ import esphome.codegen as cg
+-from esphome.components import mqtt, web_server, zigbee
++from esphome.components import mqtt, web_server
+ import esphome.config_validation as cv
+ from esphome.const import (
+     CONF_ABOVE,
+@@ -81,6 +81,7 @@
+ )
+ from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
+ from esphome.core.config import UNIT_OF_MEASUREMENT_MAX_LENGTH
++from esphome.core.entity_extensions import setup_entity_extensions
+ from esphome.core.entity_helpers import (
+     SubEntities,
+     entity_duplicate_validator,
+@@ -202,7 +203,6 @@
+ _NUMBER_SCHEMA = (
+     cv.ENTITY_BASE_SCHEMA.extend(web_server.WEBSERVER_SORTING_SCHEMA)
+     .extend(cv.MQTT_COMMAND_COMPONENT_SCHEMA)
+-    .extend(zigbee.NUMBER_SCHEMA)
+     .extend(
+         {
+             cv.OnlyWith(CONF_MQTT_ID, "mqtt"): cv.declare_id(mqtt.MQTTNumberComponent),
+@@ -230,7 +230,7 @@
+ 
+ 
+ _NUMBER_SCHEMA.add_extra(entity_duplicate_validator("number"))
+-_NUMBER_SCHEMA.add_extra(zigbee.validate_number)
++_NUMBER_SCHEMA.add_entity_extensions("number")
+ 
+ 
+ def number_schema(
+@@ -305,7 +305,9 @@
+     if web_server_config := config.get(CONF_WEB_SERVER):
+         await web_server.add_entity_config(var, web_server_config)
+ 
+-    await zigbee.setup_number(var, config, min_value, max_value, step)
++    await setup_entity_extensions(
++        "number", var, config, min_value=min_value, max_value=max_value, step=step
++    )
+ 
+ 
+ async def register_number(
+diff --git a/esphome/components/sensor/__init__.py b/esphome/components/sensor/__init__.py
+--- a/esphome/components/sensor/__init__.py
++++ b/esphome/components/sensor/__init__.py
+@@ -4,7 +4,7 @@
+ 
+ from esphome import automation
+ import esphome.codegen as cg
+-from esphome.components import mqtt, web_server, zigbee
++from esphome.components import mqtt, web_server
+ from esphome.components.const import CONF_B_CONSTANT
+ from esphome.config_helpers import filter_source_files_from_defines
+ import esphome.config_validation as cv
+@@ -115,6 +115,7 @@
+ )
+ from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
+ from esphome.core.config import UNIT_OF_MEASUREMENT_MAX_LENGTH
++from esphome.core.entity_extensions import setup_entity_extensions
+ from esphome.core.entity_helpers import (
+     SubEntities,
+     entity_duplicate_validator,
+@@ -329,7 +330,6 @@
+ _SENSOR_SCHEMA = (
+     cv.ENTITY_BASE_SCHEMA.extend(web_server.WEBSERVER_SORTING_SCHEMA)
+     .extend(cv.MQTT_COMPONENT_SCHEMA)
+-    .extend(zigbee.SENSOR_SCHEMA)
+     .extend(
+         {
+             cv.OnlyWith(CONF_MQTT_ID, "mqtt"): cv.declare_id(mqtt.MQTTSensorComponent),
+@@ -374,7 +374,7 @@
+ )
+ 
+ _SENSOR_SCHEMA.add_extra(entity_duplicate_validator("sensor"))
+-_SENSOR_SCHEMA.add_extra(zigbee.validate_sensor)
++_SENSOR_SCHEMA.add_entity_extensions("sensor")
+ 
+ 
+ def sensor_schema(
+@@ -1053,7 +1053,7 @@
+     if web_server_config := config.get(CONF_WEB_SERVER):
+         await web_server.add_entity_config(var, web_server_config)
+ 
+-    await zigbee.setup_sensor(var, config)
++    await setup_entity_extensions("sensor", var, config)
+ 
+ 
+ async def register_sensor(var, config):
+diff --git a/esphome/components/switch/__init__.py b/esphome/components/switch/__init__.py
+--- a/esphome/components/switch/__init__.py
++++ b/esphome/components/switch/__init__.py
+@@ -1,7 +1,7 @@
+ from esphome import automation
+ from esphome.automation import maybe_simple_id
+ import esphome.codegen as cg
+-from esphome.components import mqtt, web_server, zigbee
++from esphome.components import mqtt, web_server
+ import esphome.config_validation as cv
+ from esphome.const import (
+     CONF_DEVICE_CLASS,
+@@ -21,6 +21,7 @@
+     DEVICE_CLASS_SWITCH,
+ )
+ from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
++from esphome.core.entity_extensions import setup_entity_extensions
+ from esphome.core.entity_helpers import (
+     SubEntities,
+     entity_duplicate_validator,
+@@ -63,7 +64,6 @@
+ _SWITCH_SCHEMA = (
+     cv.ENTITY_BASE_SCHEMA.extend(web_server.WEBSERVER_SORTING_SCHEMA)
+     .extend(cv.MQTT_COMMAND_COMPONENT_SCHEMA)
+-    .extend(zigbee.SWITCH_SCHEMA)
+     .extend(
+         {
+             cv.OnlyWith(CONF_MQTT_ID, "mqtt"): cv.declare_id(mqtt.MQTTSwitchComponent),
+@@ -83,7 +83,7 @@
+ 
+ 
+ _SWITCH_SCHEMA.add_extra(entity_duplicate_validator("switch"))
+-_SWITCH_SCHEMA.add_extra(zigbee.validate_switch)
++_SWITCH_SCHEMA.add_entity_extensions("switch")
+ 
+ 
+ def switch_schema(
+@@ -159,7 +159,7 @@
+     setup_device_class(config)
+ 
+     cg.add(var.set_restore_mode(config[CONF_RESTORE_MODE]))
+-    await zigbee.setup_switch(var, config)
++    await setup_entity_extensions("switch", var, config)
+ 
+ 
+ async def register_switch(var, config):
+diff --git a/esphome/components/zigbee/__init__.py b/esphome/components/zigbee/__init__.py
+--- a/esphome/components/zigbee/__init__.py
++++ b/esphome/components/zigbee/__init__.py
+@@ -27,6 +27,7 @@
+     __version__ as ESPHOME_VERSION,
+ )
+ from esphome.core import CORE, CoroPriority, coroutine_with_priority
++from esphome.core.entity_extensions import EntityExtension
+ import esphome.final_validate as fv
+ from esphome.types import ConfigType
+ 
+@@ -412,6 +413,27 @@
+     return consume_endpoint(config)
+ 
+ 
++# Zigbee's entity options predate the registry and stay flat (key=None) so
++# existing configs keep working.
++ENTITY_EXTENSIONS = [
++    EntityExtension(
++        "binary_sensor",
++        BINARY_SENSOR_SCHEMA,
++        validate=validate_binary_sensor,
++        setup=setup_binary_sensor,
++    ),
++    EntityExtension(
++        "sensor", SENSOR_SCHEMA, validate=validate_sensor, setup=setup_sensor
++    ),
++    EntityExtension(
++        "switch", SWITCH_SCHEMA, validate=validate_switch, setup=setup_switch
++    ),
++    EntityExtension(
++        "number", NUMBER_SCHEMA, validate=validate_number, setup=setup_number
++    ),
++]
++
++
+ ZIGBEE_ACTION_SCHEMA = automation.maybe_simple_id(
+     cv.Schema(
+         {
+diff --git a/esphome/core/entity_extensions.py b/esphome/core/entity_extensions.py
+new file mode 100644
+--- /dev/null
++++ b/esphome/core/entity_extensions.py
+@@ -0,0 +1,168 @@
++"""Entity extensions: options a component contributes to core entity schemas.
++
++A component that wants per-entity options (``zigbee: endpoint``, a nested
++``matter:`` block, ...) declares them in its module instead of being imported
++by every entity domain::
++
++    ENTITY_EXTENSIONS = [
++        EntityExtension(
++            "switch",
++            MY_SWITCH_SCHEMA,
++            key="my_component",  # nested: ``switch: [{..., my_component: {...}}]``
++            validate=validate_switch,  # optional, sees the whole entity config
++            setup=setup_switch,  # optional, ``await setup(var, config, **kwargs)``
++        ),
++    ]
++
++An extension is only active while its owning component is loaded
++(``CORE.loaded_integrations``), so a config without that component keeps
++rejecting the option as an unknown key. Entity domains opt in with one line
++(``_SWITCH_SCHEMA.add_entity_extensions("switch")``) and one call in their
++setup coroutine (``await setup_entity_extensions("switch", var, config)``).
++
++Because the hook lives on the domain base schema and is copied by
++``Schema.extend()``, it reaches every platform schema built from it, including
++nested sub-entities (``sensor_schema()`` used as a value in a platform schema).
++"""
++
++from __future__ import annotations
++
++from collections.abc import Awaitable, Callable
++import copy
++from dataclasses import dataclass
++from typing import Any
++
++import voluptuous as vol
++
++from esphome.core import CORE
++from esphome.types import ConfigType
++
++
++@dataclass(frozen=True)
++class EntityExtension:
++    """Options one component adds to the entities of one domain.
++
++    ``key`` names a nested mapping (recommended). ``key=None`` merges the
++    schema's options into the entity itself; it exists so integrations that
++    predate this registry (zigbee) keep their YAML, and new users should not
++    use it because flat options collide easily (``endpoint:``).
++    Options the platform schema itself defines always win over an extension.
++    """
++
++    domain: str
++    schema: Any
++    key: str | None = None
++    validate: Callable[[ConfigType], ConfigType] | None = None
++    setup: Callable[..., Awaitable[None]] | None = None
++
++
++def get_entity_extensions(domain: str) -> list[tuple[str, EntityExtension]]:
++    """Return ``(owner, extension)`` for every loaded component extending ``domain``."""
++    from esphome.loader import get_component
++
++    result: list[tuple[str, EntityExtension]] = []
++    for name in sorted(CORE.loaded_integrations):
++        if "." in name or (manifest := get_component(name)) is None:
++            continue
++        result.extend(
++            (name, ext) for ext in manifest.entity_extensions if ext.domain == domain
++        )
++    return result
++
++
++def _schema_keys(schema: Any) -> set[str]:
++    mapping = getattr(schema, "schema", schema)
++    if not isinstance(mapping, dict):
++        raise TypeError("a flat entity extension needs a mapping schema")
++    return {str(key) for key in mapping}
++
++
++def _errors(err: vol.Invalid, path: list[Any]) -> list[vol.Invalid]:
++    err.prepend(path)
++    return list(err.errors) if isinstance(err, vol.MultipleInvalid) else [err]
++
++
++def validate_with_extensions(
++    domain: str,
++    own_keys: set[str],
++    data: ConfigType,
++    validate_entity: Callable[[ConfigType], ConfigType],
++) -> ConfigType:
++    """Validate one entity config of ``domain`` plus the active extensions.
++
++    The extension options are split off first so the entity's own mapping
++    validation never sees them, validated by their owner's schema (errors keep
++    the entity path), and merged back into the validated entity config. Each
++    extension's ``validate`` then runs on the merged config.
++    """
++    active = get_entity_extensions(domain)
++    if not active:
++        return validate_entity(data)
++
++    data = copy.copy(data)
++    errors: list[vol.Invalid] = []
++    validated: list[tuple[EntityExtension, Any]] = []
++    claimed: dict[str, str] = {}
++    for owner, ext in active:
++        if ext.key is not None:
++            keys = {ext.key} - own_keys
++        else:
++            keys = _schema_keys(ext.schema) - own_keys
++        errors.extend(
++            vol.Invalid(
++                f"Option '{key}' is added to {domain} by both "
++                f"'{claimed[key]}' and '{owner}'",
++                [key],
++            )
++            for key in sorted(keys & claimed.keys())
++        )
++        keys -= claimed.keys()
++        claimed.update(dict.fromkeys(keys, owner))
++        if not keys:
++            continue
++        try:
++            if ext.key is not None:
++                if ext.key not in data:
++                    continue
++                validated.append((ext, ext.schema(data.pop(ext.key))))
++            else:
++                raw = {key: data.pop(key) for key in list(data) if key in keys}
++                validated.append((ext, ext.schema(raw)))
++        except vol.Invalid as err:
++            errors.extend(_errors(err, [ext.key] if ext.key is not None else []))
++
++    try:
++        config = validate_entity(data)
++    except vol.MultipleInvalid as err:
++        raise vol.MultipleInvalid(errors + list(err.errors)) from err
++    if errors:
++        raise vol.MultipleInvalid(errors)
++
++    for ext, value in validated:
++        if ext.key is not None:
++            config[ext.key] = value
++        else:
++            # Never let an extension default overwrite a platform-owned option.
++            config.update((k, v) for k, v in value.items() if k not in own_keys)
++    for _, ext in active:
++        if ext.validate is not None:
++            try:
++                config = ext.validate(config)
++            except vol.Invalid as err:
++                raise vol.MultipleInvalid(_errors(err, [])) from err
++    return config
++
++
++async def setup_entity_extensions(
++    domain: str, var: Any, config: ConfigType, **kwargs: Any
++) -> None:
++    """Run the ``setup`` coroutine of every active extension of ``domain``.
++
++    Nested extensions are only set up for entities that carry their key.
++    ``kwargs`` carries domain-specific values (``number`` passes ``min_value``,
++    ``max_value`` and ``step``).
++    """
++    for _, ext in get_entity_extensions(domain):
++        if ext.setup is None or (ext.key is not None and ext.key not in config):
++            continue
++        await ext.setup(var, config, **kwargs)
+diff --git a/esphome/loader.py b/esphome/loader.py
+--- a/esphome/loader.py
++++ b/esphome/loader.py
+@@ -15,6 +15,7 @@
+ from esphome.types import ConfigType
+ 
+ if TYPE_CHECKING:
++    from esphome.core.entity_extensions import EntityExtension
+     from esphome.cpp_generator import MockObjClass
+     from esphome.external_files import RemoteFile
+ 
+@@ -135,6 +136,15 @@
+         Note that the function can't mutate the configuration - no changes are saved
+         """
+         return getattr(self.module, "FINAL_VALIDATE_SCHEMA", None)
++
++    @property
++    def entity_extensions(self) -> "list[EntityExtension]":
++        """Optional `ENTITY_EXTENSIONS`: options this component adds to core entities.
++
++        A list of ``esphome.core.entity_extensions.EntityExtension``. Each one is
++        applied to the entities of its domain while this component is loaded.
++        """
++        return getattr(self.module, "ENTITY_EXTENSIONS", [])
+ 
+     @property
+     def prefetch_files(
+diff --git a/esphome/voluptuous_schema.py b/esphome/voluptuous_schema.py
+--- a/esphome/voluptuous_schema.py
++++ b/esphome/voluptuous_schema.py
+@@ -36,8 +36,21 @@
+         # Should be used sparingly, as it's not a very voluptuous-way/clean way of
+         # doing things.
+         self._extra_schemas = extra_schemas or []
++        # Entity domain whose registered entity extensions this schema accepts
++        # (see esphome/core/entity_extensions.py); copied by extend().
++        self._entity_domain = None
+ 
+     def __call__(self, data):
++        if self._entity_domain is not None and isinstance(data, dict):
++            from esphome.core.entity_extensions import validate_with_extensions
++
++            own_keys = {str(key) for key in self.schema}
++            return validate_with_extensions(
++                self._entity_domain, own_keys, data, self._validate
++            )
++        return self._validate(data)
++
++    def _validate(self, data):
+         res = super().__call__(data)
+         for extra in self._extra_schemas:
+             try:
+@@ -220,6 +233,11 @@
+         self._extra_schemas.insert(0, validator)
+         return self
+ 
++    def add_entity_extensions(self, domain: str):
++        """Accept the entity extensions that loaded components register for domain."""
++        self._entity_domain = domain
++        return self
++
+     @schema_extractor_extended
+     def extend(self, *schemas, **kwargs):
+         extra = kwargs.pop("extra", None)
+@@ -237,7 +255,10 @@
+         extra_schemas = self._extra_schemas.copy()
+         if isinstance(schema, _Schema):
+             extra_schemas.extend(schema._extra_schemas)
++        entity_domain = self._entity_domain or getattr(schema, "_entity_domain", None)
+         if isinstance(schema, vol.Schema):
+             schema = schema.schema
+         ret = super().extend(schema, extra=extra)
+-        return _Schema(ret.schema, extra=ret.extra, extra_schemas=extra_schemas)
++        ret = _Schema(ret.schema, extra=ret.extra, extra_schemas=extra_schemas)
++        ret._entity_domain = entity_domain
++        return ret
+diff --git a/tests/unit_tests/core/test_entity_extensions.py b/tests/unit_tests/core/test_entity_extensions.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit_tests/core/test_entity_extensions.py
+@@ -0,0 +1,168 @@
++"""Tests for esphome/core/entity_extensions.py."""
++
++import asyncio
++from types import SimpleNamespace
++from typing import Any
++
++import pytest
++import voluptuous as vol
++
++from esphome import loader
++import esphome.config_validation as cv
++from esphome.core import CORE
++from esphome.core.entity_extensions import (
++    EntityExtension,
++    get_entity_extensions,
++    setup_entity_extensions,
++)
++
++NESTED = cv.Schema(
++    {
++        cv.Optional("endpoint"): cv.int_range(1, 10),
++        cv.Optional("label", default="x"): cv.string,
++    }
++)
++FLAT = cv.Schema(
++    {
++        cv.Optional("report"): cv.boolean,
++        cv.Optional("cluster", default="generic"): cv.string,
++    }
++)
++
++
++def _base() -> cv.Schema:
++    schema = cv.Schema({cv.Optional("name"): cv.string})
++    schema.add_extra(lambda config: {**config, "extra_ran": True})
++    return schema.add_entity_extensions("demo")
++
++
++@pytest.fixture
++def components(monkeypatch: pytest.MonkeyPatch):
++    """Register fake components; returns a function that loads one."""
++    registry: dict[str, list[EntityExtension]] = {}
++    orig = loader.get_component
++
++    def get_component(domain: str, exception: bool = False):
++        if domain in registry:
++            return SimpleNamespace(entity_extensions=registry[domain])
++        return orig(domain, exception)
++
++    monkeypatch.setattr(loader, "get_component", get_component)
++    CORE.loaded_integrations = set()
++
++    def load(name: str, *extensions: EntityExtension) -> None:
++        registry[name] = list(extensions)
++        CORE.loaded_integrations.add(name)
++
++    return load
++
++
++def test_key_rejected_while_owner_not_loaded(components) -> None:
++    components("other")
++    with pytest.raises(vol.MultipleInvalid, match="extra keys not allowed"):
++        _base()({"name": "a", "ext": {"endpoint": 1}})
++
++
++def test_nested_key_validated_and_attached(components) -> None:
++    components("ext", EntityExtension("demo", NESTED, key="ext"))
++    result = _base()({"name": "a", "ext": {"endpoint": 3}})
++    assert result == {
++        "name": "a",
++        "extra_ran": True,
++        "ext": {"endpoint": 3, "label": "x"},
++    }
++    # Absent nested key: the extension stays out of the entity.
++    assert _base()({"name": "a"}) == {"name": "a", "extra_ran": True}
++
++
++def test_only_matching_domain(components) -> None:
++    components("ext", EntityExtension("other_domain", NESTED, key="ext"))
++    assert get_entity_extensions("demo") == []
++    with pytest.raises(vol.MultipleInvalid, match="extra keys not allowed"):
++        _base()({"ext": {}})
++
++
++def test_errors_keep_entity_path_and_combine(components) -> None:
++    components("ext", EntityExtension("demo", NESTED, key="ext"))
++    with pytest.raises(vol.MultipleInvalid) as err:
++        _base()({"name": ["not", "a", "string"], "ext": {"endpoint": 99}})
++    paths = sorted(str(e.path) for e in err.value.errors)
++    assert paths == ["['ext', 'endpoint']", "['name']"]
++
++
++def test_extend_and_nested_sub_entities(components) -> None:
++    components("ext", EntityExtension("demo", NESTED, key="ext"))
++    platform = _base().extend({cv.Optional("speed"): cv.int_})
++    hub = cv.Schema({cv.Optional("child"): platform})
++    result = hub({"child": {"speed": 2, "ext": {"endpoint": 1}}})
++    assert result["child"]["ext"] == {"endpoint": 1, "label": "x"}
++    # Extending a plain schema with the entity schema keeps the hook too.
++    wrapped = cv.Schema({cv.Optional("speed"): cv.int_}).extend(_base())
++    assert wrapped({"ext": {}})["ext"] == {"label": "x"}
++
++
++def test_platform_key_wins(components) -> None:
++    components("ext", EntityExtension("demo", NESTED, key="ext"))
++    platform = _base().extend({cv.Optional("ext"): cv.string})
++    assert platform({"ext": "own"})["ext"] == "own"
++
++
++def test_flat_extension_merges_options_and_defaults(components) -> None:
++    components("flat", EntityExtension("demo", FLAT))
++    result = _base()({"name": "a", "report": "yes"})
++    assert result == {
++        "name": "a",
++        "extra_ran": True,
++        "report": True,
++        "cluster": "generic",
++    }
++
++
++def test_flat_extension_defaults_never_override_platform_options(components) -> None:
++    components("flat", EntityExtension("demo", FLAT))
++    platform = _base().extend({cv.Optional("cluster", default="own"): cv.string})
++    assert platform({"report": True})["cluster"] == "own"
++
++
++def test_flat_collision_between_owners_is_an_error(components) -> None:
++    components("flat_a", EntityExtension("demo", FLAT))
++    components("flat_b", EntityExtension("demo", FLAT))
++    with pytest.raises(vol.MultipleInvalid, match="by both 'flat_a' and 'flat_b'"):
++        _base()({"report": True})
++
++
++def test_validate_sees_merged_config(components) -> None:
++    seen: list[dict[str, Any]] = []
++
++    def validate(config):
++        seen.append(dict(config))
++        if config["ext"].get("endpoint") == 7:
++            raise cv.Invalid("seven is taken", ["ext", "endpoint"])
++        return config
++
++    components("ext", EntityExtension("demo", NESTED, key="ext", validate=validate))
++    _base()({"name": "a", "ext": {"endpoint": 1}})
++    assert seen[0]["extra_ran"] is True
++    assert seen[0]["ext"]["endpoint"] == 1
++    with pytest.raises(vol.MultipleInvalid, match="seven is taken"):
++        _base()({"ext": {"endpoint": 7}})
++
++
++def test_setup_runs_for_configured_entities(components) -> None:
++    calls: list[tuple[Any, ...]] = []
++
++    async def setup(var, config, **kwargs):
++        calls.append((var, config.get("ext"), kwargs))
++
++    components("ext", EntityExtension("demo", NESTED, key="ext", setup=setup))
++    asyncio.run(setup_entity_extensions("demo", "v1", {"ext": {}}, step=2))
++    asyncio.run(setup_entity_extensions("demo", "v2", {}))
++    assert calls == [("v1", {}, {"step": 2})]
++
++
++def test_core_domains_have_no_zigbee_options_without_zigbee(components) -> None:
++    from esphome.components import sensor
++
++    components("other")
++    with pytest.raises(vol.MultipleInvalid, match="extra keys not allowed"):
++        sensor.sensor_schema()({"name": "a", "endpoint": 1})
