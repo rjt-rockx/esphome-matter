@@ -314,7 +314,9 @@ class Matter:
         self._reader.start()
         with self._cond:
             if not self._cond.wait_for(lambda: self._ready, timeout=60):
-                raise MatterError(f"harness serve did not become ready{self._stderr_tail()}")
+                raise MatterError(
+                    f"harness serve did not become ready{self._stderr_tail()}"
+                )
 
     _ready = False
     _warm = False
@@ -366,7 +368,11 @@ class Matter:
             text = ANSI.sub("", (ARTIFACTS / "harness.log").read_text(errors="replace"))
         except OSError:
             return ""
-        return f"\n--- harness serve stderr (last {chars} chars) ---\n{text[-chars:]}" if text.strip() else ""
+        return (
+            f"\n--- harness serve stderr (last {chars} chars) ---\n{text[-chars:]}"
+            if text.strip()
+            else ""
+        )
 
     # -- requests ----------------------------------------------------------------------------------------------
     def request(self, op: str, timeout: float = 90, **fields: Any) -> Any:
@@ -388,7 +394,9 @@ class Matter:
             ok = self._cond.wait_for(lambda: slot.get("done"), timeout=timeout)
             self._pending.pop(rid, None)
         if not ok:
-            raise MatterError(f"{op} {fields}: no response within {timeout} s{self._stderr_tail()}")
+            raise MatterError(
+                f"{op} {fields}: no response within {timeout} s{self._stderr_tail()}"
+            )
         if "error" in slot:
             raise MatterError(f"{op} {fields}: {slot['error']}{self._stderr_tail()}")
         return slot["result"]
