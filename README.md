@@ -4,81 +4,118 @@
 ![GitHub forks](https://img.shields.io/github/forks/rjt-rockx/esphome-matter)
 ![GitHub watchers](https://img.shields.io/github/watchers/rjt-rockx/esphome-matter)
 
-ESPHome external component adding Matter 1.6 support.
+ESPHome external component adding native Matter support (Matter 1.6, via Espressif's esp-matter) to ESP32 devices. Add a `matter:` block, map ESPHome entities to Matter device types, and pair the device with Apple Home, Google Home, Alexa, SmartThings, IKEA or Home Assistant. No bridge required.
 
-Derived from [DavidvtWout/esphome-matter](https://github.com/DavidvtWout/esphome-matter) (Apache-2.0), with modifications. See NOTICE.
+Derived from [DavidvtWout/esphome-matter](https://github.com/DavidvtWout/esphome-matter) (Apache-2.0), with modifications. See [NOTICE](NOTICE). Credit for the original component, the Wi-Fi and Thread support, the ZAP-generated data model and the lights implementation goes to [DavidvtWout](https://github.com/DavidvtWout) and the upstream contributors.
 
-> This project is still in early-development so don't expect a perfectly working setup. Both
-> matter-over-wifi and matter-over-thread are now working. It's possible to commission a
-> device to a matter controller, and lights, switches and sensors are mostly working.
-> Many other device types can also be created and interacted with using on_attribute triggers
-> and set_attribute actions.
->
-> However, there are still some stability issues, mainly with reconnection after a restart which
-> may take up to a minute.
->
-> Also, keep in mind that the config schema may still change and break existing configurations.
+> **Status: early development.** Matter over Wi-Fi and over Thread work, devices can be commissioned, and lights, sensors and binary sensors are working. Many other device types can be created and driven with `on_attribute` triggers and `set_attribute` actions. Known issues: reconnection after a restart can take up to a minute, and the YAML schema may still change and break existing configurations. Anything marked "untested" in the docs has not been verified on hardware.
 
-That being said, esphome-matter is usable now, so give it a try!
+# Quickstart
 
-# Supported Hardware
+Minimal config: a Wi-Fi dimmable light on an ESP32-C6.
 
-The component only supports `ESP32` targets built with the **ESP-IDF** framework. The Arduino framework is not
-supported.
+```yaml
+esphome:
+  name: matter-light
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+logger:
+network:
+  enable_ipv6: true
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+output:
+  - platform: ledc
+    id: led_out
+    pin: GPIO15
+light:
+  - platform: monochromatic
+    id: my_light
+    name: "Light"
+    output: led_out
+    restore_mode: ALWAYS_OFF  # Matter restores the power-on state
+matter:
+  endpoints:
+    1:
+      dimmable_light:
+        light_id: my_light
+```
 
-Connectivity depends on which ESPHome networking components are configured:
+1. Flash it (`esphome run matter-light.yaml`). On ESPHome versions before 2026.9.0, add `toolchain: platformio` under `esp32:`.
+2. Watch the log. On every boot the device prints a setup code:
 
-- **Matter-over-Wi-Fi**: If `wifi` is configured, Matter announces itself over mDNS and can be commissioned
-  on the network.
-- **Matter-over-Thread**: Requires the `openthread` component and ESPHome **2026.6.0** or newer.
-- **Matter-over-Ethernet**: Isn't supported yet and isn't actively being worked on. Feel free to implement it ;)
-- **BLE commissioning**: Currently broken, but this is something that I want to work on. The idea is that esphome-matter falls back to BLE commissioning (the default for most matter devices) when no `wifi`, `openthread`, or `ethernet` component is configured.
+   ```
+   [C][matter]:   SetupQRCode: MT:Y.K904QI14-O992WI00
+   [C][matter]:   QR URL: https://project-chip.github.io/connectedhomeip/qrcode.html?data=MT:Y.K904QI14-O992WI00
+   [C][matter]:   Manual pairing code: 32552014321
+   [C][matter]:   Commissioning window: open
+   ```
 
-Binding (for example, a button to a light) is working but still has some stability issues. Sometimes it takes a few
-seconds before a command is successfully sent.
+3. Open the QR URL and scan the code in your controller, or enter the manual pairing code. The commissioning window is open for 15 minutes after boot, and only while the device is not part of a fabric.
+4. Check the [ecosystem guide](docs/ecosystems.md) for the extra step your controller needs (the device uses a test vendor ID, so it shows up as uncertified).
 
-So far, `ESP32-C3`, `ESP32-C5`, `ESP32-C6`, `ESP32-S3` and `ESP32-H2` have been tested and confirmed to work!
+For Thread, replace `wifi:` with `openthread:` (needs ESPHome 2026.6.0 or newer and a Thread border router).
+
+# Feature matrix
+
+How each ESPHome domain maps to a Matter device type. Status: **Supported** (bound to an ESPHome entity and working), **Partial** (works with known gaps or untested corners), **In progress** (being implemented, a documentation page exists or is being written), **Planned**, **Not planned** (no good Matter equivalent). Anything other than Supported should be treated as untested on real controllers.
+
+| ESPHome domain | Matter device type(s) | Status | Docs |
+|---|---|---|---|
+| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (hue/saturation commands and transition times not implemented) | [lights.md](docs/lights.md) |
+| `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
+| `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (scaling to be verified) | [device-types.md](docs/device-types.md#sensors) |
+| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (measurement unit not set per sensor) | [device-types.md](docs/device-types.md#sensors) |
+| `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
+| `sensor`: power, energy, voltage, current | Electrical Sensor | Planned (device type cannot be created yet) | [ROADMAP.md](docs/ROADMAP.md) |
+| `sensor`: battery | Power Source | Planned | [ROADMAP.md](docs/ROADMAP.md) |
+| `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
+| `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
+| `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |
+| `switch` | On/Off Plug-in Unit | In progress | [switch.md](docs/switch.md) |
+| `cover` | Window Covering | In progress | [cover.md](docs/cover.md) |
+| `fan` | Fan | In progress | [fan.md](docs/fan.md) |
+| `lock` | Door Lock | In progress | [lock-valve.md](docs/lock-valve.md) |
+| `valve` | Water Valve | In progress | [lock-valve.md](docs/lock-valve.md) |
+| `button`, `event` | Generic Switch | Planned | [ROADMAP.md](docs/ROADMAP.md) |
+| `climate` | Thermostat / Room Air Conditioner | Planned | [ROADMAP.md](docs/ROADMAP.md) |
+| Physical buttons controlling other Matter devices | On/Off Light Switch, Dimmer Switch, Color Dimmer Switch (bindings) | Supported (a command can take a few seconds) | [binding.md](docs/binding.md), [actions.md](docs/actions.md) |
+| `select` | Mode Select | Planned (weak mapping) | [ROADMAP.md](docs/ROADMAP.md) |
+| `number`, `text_sensor`, `alarm_control_panel` | none | Not planned (no good mapping) | [ROADMAP.md](docs/ROADMAP.md) |
+
+Other Matter device types can be created under an endpoint but have no entity binding. See [device-types.md](docs/device-types.md#untested--unsupported).
+
+# Supported hardware
+
+Only `ESP32` targets built with the **ESP-IDF** framework are supported. The Arduino framework is not.
+
+- **Matter-over-Wi-Fi**: configure `wifi`. The device announces itself over mDNS and is commissioned on the network.
+- **Matter-over-Thread**: configure `openthread`. Needs ESPHome **2026.6.0** or newer and a Thread border router.
+- **Matter-over-Ethernet**: not supported yet.
+- **BLE commissioning**: currently broken. Commissioning happens over the network because ESPHome already has your Wi-Fi or Thread credentials.
+
+`ESP32-C3`, `ESP32-C5`, `ESP32-C6`, `ESP32-S3` and `ESP32-H2` have been reported to work. Classic `ESP32` is Wi-Fi only and not validated. Flash is tight on 4 MB boards, see [troubleshooting](docs/troubleshooting.md#flash-size-especially-on-4-mb-boards).
 
 # Commissioning
 
-Because ESPHome devices already have their Wi-Fi or Thread credentials from your YAML configuration, commissioning
-works differently than with most other Matter devices. You still need to commission the device to a Matter fabric, but
-this does not happen over BLE (bluetooth) like with most matter devices.
+Once a device has joined a fabric, the commissioning window is not opened on restarts anymore. Use "Share" / "pairing mode" in your first controller to get a temporary code for a second one (multi-admin, up to 5 fabrics by default). The `matter.factory_reset` action wipes all fabrics and reopens the window.
 
-After flashing, the device prints a setup code (`SetupQRCode`) to the logs on every boot:
+Ecosystem specific steps, in short:
 
-```
-[C][matter]: Matter:
-[C][matter]:   SetupQRCode: MT:Y.K904QI14-O992WI00
-[C][matter]:   QR URL: https://project-chip.github.io/connectedhomeip/qrcode.html?data=MT:Y.K904QI14-O992WI00
-[C][matter]:   Manual pairing code: 32552014321
-[C][matter]:   Commissioning window: open
-[C][matter]:   Fabrics: none
-```
+- **Home Assistant**: enable test-net DCL (`matterjs-server --enable-test-net-dcl=true`, or the "Enable test-net DCL usage" box in the Matter Server app) and use "Commission existing device".
+- **Apple Home**: "Uncertified Accessory" warning, tap "Add Anyway".
+- **Google Home**: needs a Google Developer Console project for the test vendor ID (follow the [Tasmota guide](https://tasmota.github.io/docs/Matter-with-Google/); untested here).
+- **Alexa**, **IKEA Home smart**: no special steps reported. IKEA only supports a few device types.
 
-Copy the `SetupQRCode` or open the link and scan the QR-code to commission the device. Keep in mind that the
-commissioning window remains open for only 15 minutes. A restart of the device will re-open the window if it hasn't
-joined any fabrics yet.
+Details and known quirks: [docs/ecosystems.md](docs/ecosystems.md) and [docs/commissioning.md](docs/commissioning.md). Please report compatibility results in the [upstream discussion](https://github.com/DavidvtWout/esphome-matter/discussions/44) or on this repository.
 
-Once the device has joined a fabric, the commissioning window won't be opened on restarts anymore. Matter controllers
-should be able to share the device. This generates a temporary commissioning code and re-opens the commissioning window.
-If you lose access to the Matter controller, you can do a Matter factory reset (see [Example config](#example-config)).
-
-### Ecosystem specific settings
-
-- **Home Assistant / matterjs server**: Start the matterjs-server with: `matterjs-server --enable-test-net-dcl=true`. Commission the device with the `Commission existing device` option.
-- **Home Assistant Matter app (HA-OS only)**: Check the "Enable test-net DCL usage" box under Settings -> Apps -> Matter Server -> Configuration. If you do not do this, pairing will fail.
-- **Google Home**: Doesn't automatically accept devices with the "test" vendor ID. Follow the [Tasmota guide](https://tasmota.github.io/docs/Matter-with-Google/) to add esphome-matter devices.
-
-So far, **IKEA Home Smart**, **Apple Home**, and **Amazon Alexa** have been confirmed to accept esphome-matter devices
-without any special configuration steps. Keep in mind that "accepting" a device doesn't mean supporting it properly. For
-example, IKEA Home Smart only supports a very limited subset of Matter device types. To get most out of the device, share
-it with a fabric that is controlled by Home Assistant.
-
-Please [report](https://github.com/DavidvtWout/esphome-matter/discussions/44) any outdated or newly discovered information
-on compatible ecosystems, devices, and device types or issues.
-
-# Example config
+<details>
+<summary>Larger example config (dimmer buttons, temperature sensor, light, factory reset)</summary>
 
 ```yaml
 esphome:
@@ -205,83 +242,39 @@ button:
 
 More information about endpoints and a full list of supported device types can be found in [docs/endpoints.md](./docs/endpoints.md)
 
-# Lights
+</details>
 
-All four Matter lights are now fully supported by esphome-matter! See [docs/lights.md](./docs/lights.md) for more information.
-Also check out [examples/extended-color-light.yaml](./examples/extended-color-light.yaml) for an example of how to configure a light in esphome-matter.
+# Documentation
 
-# Sensors
+- [docs/ecosystems.md](docs/ecosystems.md): pairing guide per ecosystem, multi-admin, quirks
+- [docs/commissioning.md](docs/commissioning.md): commissioning, persistence, fabrics
+- [docs/device-types.md](docs/device-types.md): device types and entity mapping
+- [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
+- [docs/lights.md](docs/lights.md): lights
+- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
+- [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/commands-full.md](docs/commands-full.md): actions, binding, cluster and command reference
+- [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
+- [docs/faq.md](docs/faq.md): frequently asked questions
+- [docs/ROADMAP.md](docs/ROADMAP.md): community demand, maintainer direction, upstreaming, priorities
+- [docs/dev/thread-debugging.md](docs/dev/thread-debugging.md): debugging Thread
+- Examples: [examples/](examples/), for example [extended-color-light.yaml](examples/extended-color-light.yaml) and [all-sensors.yaml](examples/all-sensors.yaml)
 
-Matter can expose many ESPHome sensor values. To expose a sensor, first create a device type that supports it and then map sensor ids to it. The supported sensor device types include `temperature_sensor`, `humidity_sensor`, `light_sensor`, `pressure_sensor`, `flow_sensor`, `contact_sensor`, `occupancy_sensor`, and `air_quality_sensor`. See [docs/device-types.md](docs/device-types.md) for a more complete overview of how to configure these sensors.
+# Current limitations
 
-The [all-sensors example](examples/all-sensors.yaml) also shows how to expose all supported sensors.
+- Based on [Espressif's SDK for Matter (esp-matter)](https://components.espressif.com/components/espressif/esp_matter/): features not supported there cannot be supported here.
+- BLE commissioning is currently broken, and could not be combined with the `api` component anyway because of limitations in ESPHome's `network` component.
+- The device uses test credentials by default (vendor ID `0xFFF1`, product ID `0x8000`). It is not Matter-certified; production devices need a CSA vendor ID and their own attestation certificates.
+- The YAML schema may still change.
 
-# Actions
-
-See [docs/actions.md](./docs/actions.md) for a more complete overview of available actions.
-
-### OnOff
-
-[OnOff commands](./docs/actions.md#onoff-cluster) are used for simple binary devices such as lights, plugs and relays.
-
-```yaml
-# Turn off, turn on, or toggle a bound device.
-matter.send_command: some_endpoint.on_off.on
-matter.send_command: some_endpoint.on_off.on
-matter.send_command: some_endpoint.on_off.toggle
-
-# Intended for motion sensors temporarily turning on a light.
-matter.send_command:
-  path: some_endpoint.on_off.on_with_timed_off
-  arguments:
-    on_time: # s - How long to turn on the light.
-    # off_wait_time: 0s  # Time before accepting another on_with_timed_off command.
-    # on_off_control: 0
-```
-
-### LevelControl
-
-[LevelControl commands](./docs/actions.md#levelcontrol-cluster) are used for dimming. YAML values can be percentages or raw Matter brightness levels, normally `0` to `254`.
-
-The following commands also have a version without `_with_on_off`. These commands don't turn on or off the light.
-
-```yaml
-# Move directly to a brightness level.
-matter.send_command:
-  path: some_endpoint.level_control.move_to_level_with_on_off
-  arguments:
-    level: # %
-    # transition_time: 0s
-
-# Move continuously up or down.
-matter.send_command:
-  path: some_endpoint.level_control.move_with_on_off
-  arguments:
-    move_mode: # either "up" or "down"
-    rate: # %/s
-
-# Step once by a fixed amount.
-matter.send_command:
-  path: some_endpoint.level_control.step_with_on_off
-  arguments:
-    step_mode: # either "up" or "down"
-    step_size: # %
-    # transition_time: 0s
-
-# Stop a previous move command.
-matter.send_command: some_endpoint.level_control.stop_with_on_off
-```
-
-# Current Limitations
-
-- As this is based on [Espressif's SDK for Matter (esp-matter)](https://components.espressif.com/components/espressif/esp_matter/) any features/functions not supported there in upstream first can not be supported in this project.
-- BLE commissioning is currently broken and if it wasn't, it cannot be combined with the `api` component because of limitations in the ESPHome `network` component.
-
-# See Also
+# See also
 
 - [Espressif's SDK for Matter (esp-matter) GitHub repo](https://github.com/espressif/esp-matter)
-  - [Espressif's SDK for Matter (esp-matter) page on ESP Component Registry](https://components.espressif.com/components/espressif/esp_matter/)
-  - [Espressif's SDK for Matter (esp-matter) Programming Guide / Documentation](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/)
+  - [esp-matter on the ESP Component Registry](https://components.espressif.com/components/espressif/esp_matter/)
+  - [esp-matter programming guide](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/)
 - [connectedhomeip](https://github.com/DavidvtWout/connectedhomeip)
 - [Matter specification (CSA)](https://csa-iot.org/developer-resource/specifications-download-request/)
 - [CSA source code implementations for the Matter project](https://github.com/project-chip)
+
+# License
+
+MIT for original content, Apache-2.0 for the code derived from DavidvtWout/esphome-matter. See [LICENSE](LICENSE), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE).
