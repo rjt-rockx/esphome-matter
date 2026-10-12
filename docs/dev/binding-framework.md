@@ -245,7 +245,9 @@ decoding of the transition commands and the CHIP cluster calls
 (`matter_lights.cpp`). `MatterBinding<LightOutbound, LightInbound>`, boot sync
 `NONE`, no settle, `reconcile_after_apply = false` (a skipped push still reconciles).
 
-- **Inbound** is an ordered list (newest 8 kept): attribute updates (OnOff, CurrentLevel,
+- **Inbound** is an ordered list (newest 8 kept; if items had to be dropped the
+  apply ends the color loop effect, closes the windows and settles on CHIP's state,
+  so a dropped stop or loop end is never lost): attribute updates (OnOff, CurrentLevel,
   the colour read) and decoded commands. Neighbouring attribute updates merge into
   one. The main loop walks the list in order (`queue_update_` for updates,
   `apply_command_` for commands) and then makes one light call from what is left,
@@ -263,8 +265,9 @@ decoding of the transition commands and the CHIP cluster calls
   intermediate steps are ignored. At the end the binding waits until RemainingTime
   is 0 (CHIP thread, `check_chip_idle_`) and settles the light on the attribute
   values (a forced, instant apply). Stop commands settle at once. A change from
-  the ESPHome side ends the windows and CHIP's transitions are stopped
-  (`stop_*_epoch` carried by the next push, run first on CHIP inside the scope).
+  the ESPHome side ends the windows and CHIP's transitions are stopped by a
+  work item requested at once (the control slot, ahead of the push, so a skipped
+  push cannot make the stop outlive a newer command).
 - **Echo**: the changes that came from a Matter command are remembered
   (`remember_applied_entity_`); the light's later publishes (transition steps)
   that equal them are not pushed. Pushes themselves are `report()`s inside the

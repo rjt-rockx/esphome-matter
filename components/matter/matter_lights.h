@@ -67,7 +67,7 @@ protected:
   bool color_loop_effect_running_() override;
   void remember_applied_entity_() override;
   bool remote_matches_applied_() override;
-  void probe_capabilities_() override;
+  bool probe_capabilities_() override;
   void listen_entity_() override;
   void register_commands_() override;
   // CHIP task.

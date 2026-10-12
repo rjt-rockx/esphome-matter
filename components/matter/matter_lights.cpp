@@ -251,9 +251,9 @@ bool MatterLightMapping::has_attribute_(uint32_t cluster_id,
 }
 
 // Main loop, from setup_(): what the endpoint has.
-void MatterLightMapping::probe_capabilities_() {
+bool MatterLightMapping::probe_capabilities_() {
   if (this->light_ == nullptr)
-    return;
+    return false;
 
   using namespace chip::app::Clusters;
 
@@ -289,6 +289,7 @@ void MatterLightMapping::probe_capabilities_() {
   }
   this->capabilities_.has_color =
       this->capabilities_.has_xy || this->capabilities_.has_hs;
+  return true;
 }
 
 void MatterLightMapping::listen_entity_() {

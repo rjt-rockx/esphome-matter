@@ -91,6 +91,8 @@ class TestLight : public MatterLightBinding {
     as_chip([&] { submit_command(c); });
   }
 
+  void clear_loop_requested() { color_loop_requested_ = false; }
+  void force_push() { request_push(); }
   bool window_light() const { return light_window_active(); }
   bool window_color() const { return color_window_active(); }
 
@@ -129,7 +131,10 @@ class TestLight : public MatterLightBinding {
            applied.red == view.red && applied.green == view.green && applied.blue == view.blue &&
            applied.color_temperature == view.color_temperature;
   }
-  void probe_capabilities_() override { capabilities_ = caps; }
+  bool probe_capabilities_() override {
+    capabilities_ = caps;
+    return true;
+  }
   void listen_entity_() override {}
   void register_commands_() override {}
   void chip_stop_light_transition_(uint8_t level) override {
@@ -698,7 +703,7 @@ TEST(light_many_commands_in_one_burst_keep_the_newest) {
   s.r.p.settle();
   // The oldest were dropped with a warning; the newest command was applied.
   CHECK(!s.l.requests.empty());
-  CHECK_NEAR(*s.l.requests.back().brightness, (20 + 11 * 10) / 254.0, 0.001);
+  CHECK_NEAR(s.l.view.brightness, (20 + 11 * 10) / 254.0, 0.001);
   bool warned = false;
   for (auto &line : host_stub::log_lines())
     if (line.level == 'W' && line.text.find("queue full") != std::string::npos)
@@ -724,10 +729,325 @@ TEST(light_change_that_ends_the_color_loop_reports_the_colour_at_once) {
   CHECK_EQ(s.l.chip_calls.size(), (size_t) 1);
   CHECK(s.l.chip_calls[0].what == "deactivate_loop");
   CHECK_EQ(s.l.chip_calls[0].writes_before, (size_t) 0);  // CHIP's hue is restored before the report
-  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 1);
+  // Reported at once, and again after CHIP's restore of the hue (the work items may run in any order).
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 2);
   // CHIP's restore of the hue within the window is ignored.
   s.l.requests.clear();
   matter_writes(s.r.p, COLOR_CLUSTER, CURRENT_HUE, u8_val(10));
   s.r.p.settle();
   CHECK(s.l.requests.empty());
+}
+
+// ---------------------------------------------------------------------------
+// Review fixes
+// ---------------------------------------------------------------------------
+
+TEST(light_overflow_never_loses_the_end_of_a_color_loop) {
+  Started s;
+  MatterLightCommand start;
+  start.color_loop = MatterLightCommand::ColorLoop::START;
+  s.l.submit_cmd(start);
+  s.r.p.settle();
+  CHECK(s.l.color_loop_active());
+  s.l.requests.clear();
+
+  // A colour command ends the loop (as handle_command decodes it), followed by many commands and CHIP's
+  // attribute writes in the same main loop iteration: the oldest items are dropped.
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(12000);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_Y}] = u16_val(30000);
+  s.l.clear_loop_requested();
+  as_chip([&] {
+    MatterLightCommand c;
+    c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 12000, 30000};
+    c.color_loop = MatterLightCommand::ColorLoop::STOP;
+    c.color_group = true;
+    c.transition_ms = 0;
+    s.l.submit_command(c);
+    for (int i = 0; i < 5; i++) {
+      s.l.submit_command(level_command(static_cast<uint8_t>(30 + i * 20), 0));
+      s.r.p.fire_attribute(EP, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(static_cast<uint8_t>(30 + i * 20)));
+    }
+  });
+  s.r.p.settle();
+  CHECK(!s.l.color_loop_active());
+  CHECK(s.l.effect_stops_count >= 1);
+  CHECK(!s.l.effect_running);
+  // The light is settled on the state CHIP ended up with, colour included.
+  bool colour_applied = false;
+  for (auto &r : s.l.requests)
+    if (r.color == LightRequest::Color::RGB)
+      colour_applied = true;
+  CHECK(colour_applied);
+}
+
+TEST(light_dropped_stop_command_still_settles) {
+  Started s;
+  s.l.submit_cmd(level_command(250, 5000));
+  s.r.p.settle();
+  CHECK(s.l.window_light());
+  s.r.p.store[{EP, LEVEL_CLUSTER, CURRENT_LEVEL}] = level_val(90);
+  size_t before = s.l.requests.size();
+  // Stop first, then enough colour commands and CHIP writes to push it out of the queue.
+  as_chip([&] {
+    MatterLightCommand stop;
+    stop.stop_light = true;
+    s.l.submit_command(stop);
+    for (int i = 0; i < 5; i++) {
+      MatterLightCommand c;
+      c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, static_cast<uint16_t>(10000 + i * 1000), 30000};
+      c.color_group = true;
+      s.l.submit_command(c);
+      s.r.p.fire_attribute(EP, ON_OFF_CLUSTER, ON_OFF, esp_matter_bool(true));
+    }
+  });
+  s.r.p.settle();
+  CHECK(!s.l.window_light());
+  CHECK(s.l.requests.size() > before);
+  // Settled on the stored level, not left at the target of the interrupted command.
+  CHECK_NEAR(s.l.view.brightness, 90 / 254.0, 0.001);
+}
+
+TEST(light_stop_of_a_local_change_does_not_outlive_a_newer_command) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 5000));
+  s.r.p.settle();
+  CHECK(s.l.window_light());
+  s.r.p.attribute_writes.clear();
+
+  // A local brightness change ends window A; the stop for CHIP is queued at once.
+  s.l.view.brightness = 0.2f;
+  s.l.entity_changed();
+  CHECK(!s.l.window_light());
+  // An Off with a transition arrives before CHIP ran any of it (so the push is skipped).
+  MatterLightCommand off;
+  off.on = false;
+  off.transition_ms = 1000;
+  off.chip_transition_ms = 1000;
+  off.light_group = true;
+  s.l.submit_cmd(off);
+  s.r.p.settle();
+
+  // The stop ran ahead of the Off (once), the Off was applied and its window is open: nothing replaces it.
+  CHECK_EQ(s.l.chip_calls.size(), (size_t) 1);
+  CHECK(s.l.chip_calls[0].what == "stop_light");
+  CHECK(!s.l.view.on);
+  CHECK(s.l.window_light());
+  CHECK_EQ(writes_to(s.r.p, ON_OFF_CLUSTER, ON_OFF), (size_t) 0);
+  s.r.p.advance(1200);
+  s.r.p.settle();
+  CHECK_EQ(s.l.chip_calls.size(), (size_t) 1);
+}
+
+TEST(light_stop_of_a_local_colour_change_does_not_outlive_a_newer_command) {
+  Started s;
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 10000, 40000};
+  c.transition_ms = 5000;
+  c.color_group = true;
+  s.l.submit_cmd(c);
+  s.r.p.settle();
+  CHECK(s.l.window_color());
+  s.l.set_rgb(0.0f, 1.0f, 0.0f);
+  s.l.entity_changed();
+  CHECK(!s.l.window_color());
+  MatterLightCommand c2;
+  c2.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 20000, 20000};
+  c2.transition_ms = 1000;
+  c2.color_group = true;
+  s.l.submit_cmd(c2);
+  s.r.p.settle();
+  CHECK_EQ(s.l.chip_calls.size(), (size_t) 1);
+  CHECK(s.l.chip_calls[0].what == "stop_color");
+  CHECK(s.l.window_color());
+  // The colour of the light is not reported over the running command.
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 0);
+}
+
+TEST(light_stop_move_step_settles_on_chips_colour) {
+  Started s;
+  s.l.requests.clear();
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 10000, 40000};
+  c.transition_ms = 5000;
+  c.color_group = true;
+  s.l.submit_cmd(c);
+  s.r.p.settle();
+  CHECK(s.l.window_color());
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_X}] = u16_val(20000);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_Y}] = u16_val(25000);
+  MatterLightCommand stop;
+  stop.stop_color = true;
+  s.l.submit_cmd(stop);
+  s.r.p.settle();
+  CHECK(!s.l.window_color());
+  CHECK_EQ(s.l.requests.size(), (size_t) 2);
+  float r, g, b;
+  CHECK(esphome::matter::conversion::from_matter::color(20000, 25000, r, g, b));
+  CHECK(s.l.requests[1].color == LightRequest::Color::RGB);
+  CHECK_NEAR(s.l.requests[1].red, r, 0.001);
+  CHECK_NEAR(s.l.requests[1].green, g, 0.001);
+  CHECK_EQ(s.l.requests[1].transition_ms, (uint32_t) 0);
+}
+
+TEST(light_color_loop_deactivate_settles_on_chips_hue) {
+  Started s;
+  MatterLightCommand start;
+  start.color_loop = MatterLightCommand::ColorLoop::START;
+  s.l.submit_cmd(start);
+  s.r.p.settle();
+  CHECK(s.l.color_loop_active());
+  s.l.requests.clear();
+  // ColorLoopSet(deactivate): CHIP restored the hue it had before the loop (HS mode).
+  s.r.p.store[{EP, COLOR_CLUSTER, COLOR_MODE}] = esp_matter_enum8(0);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_HUE}] = u8_val(30);
+  s.r.p.store[{EP, COLOR_CLUSTER, CURRENT_SATURATION}] = u8_val(254);
+  s.l.clear_loop_requested();
+  MatterLightCommand stop;
+  stop.color_loop = MatterLightCommand::ColorLoop::STOP;
+  s.l.submit_cmd(stop);
+  s.r.p.settle();
+  CHECK(!s.l.color_loop_active());
+  CHECK_EQ(s.l.effect_stops_count, 1);
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  float r, g, b;
+  CHECK(esphome::matter::conversion::from_matter::hue_saturation(30, 254, r, g, b));
+  CHECK(s.l.requests[0].color == LightRequest::Color::RGB);
+  CHECK_NEAR(s.l.requests[0].red, r, 0.001);
+  CHECK_NEAR(s.l.requests[0].green, g, 0.001);
+}
+
+TEST(light_color_command_ends_the_loop_and_moves_the_colour) {
+  Started s;
+  MatterLightCommand start;
+  start.color_loop = MatterLightCommand::ColorLoop::START;
+  s.l.submit_cmd(start);
+  s.r.p.settle();
+  s.l.requests.clear();
+  s.l.clear_loop_requested();
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 10000, 40000};
+  c.color_loop = MatterLightCommand::ColorLoop::STOP;
+  c.transition_ms = 1000;
+  c.color_group = true;
+  s.l.submit_cmd(c);
+  s.r.p.settle();
+  CHECK(!s.l.color_loop_active());
+  CHECK_EQ(s.l.effect_stops_count, 1);
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  CHECK(s.l.requests[0].color == LightRequest::Color::RGB);
+  CHECK_EQ(s.l.requests[0].transition_ms, (uint32_t) 1000);
+  CHECK(s.l.window_color());
+}
+
+TEST(light_move_to_level_with_on_off_to_the_minimum_turns_off_without_brightness) {
+  Started s;
+  s.l.requests.clear();
+  s.l.view.on = true;
+  s.l.view.brightness = 0.5f;
+  s.l.applied = s.l.view;
+  MatterLightCommand c;
+  c.on = false;
+  c.level = 1;  // MinLevel
+  c.transition_ms = 500;
+  c.light_group = true;
+  s.l.submit_cmd(c);
+  s.r.p.settle();
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  CHECK(s.l.requests[0].state.has_value() && !*s.l.requests[0].state);
+  CHECK(!s.l.requests[0].brightness.has_value());  // the light fades out at its brightness
+  CHECK_EQ(s.l.requests[0].transition_ms, (uint32_t) 500);
+}
+
+TEST(light_enhanced_hue_and_saturation_commands) {
+  Rig r;
+  TestLight l(EP);
+  l.caps.has_enhanced_hue = true;
+  l.caps.has_enhanced_color_mode = true;
+  seed_store(r.p);
+  r.p.store[{EP, COLOR_CLUSTER, ENHANCED_COLOR_MODE}] = esp_matter_enum8(3);
+  r.p.store[{EP, COLOR_CLUSTER, ENHANCED_CURRENT_HUE}] = u16_val(21845);
+  r.p.store[{EP, COLOR_CLUSTER, CURRENT_SATURATION}] = u8_val(200);
+  l.platform = &r.p;
+  l.initialize();
+  r.p.settle();
+  // Boot read in enhanced HS mode.
+  CHECK_EQ(l.requests.size(), (size_t) 1);
+  float er, eg, eb;
+  CHECK(esphome::matter::conversion::from_matter::enhanced_hue_saturation(21845, 200, er, eg, eb));
+  CHECK(l.requests[0].color == LightRequest::Color::RGB);
+  CHECK_NEAR(l.requests[0].green, eg, 0.001);
+
+  // MoveToSaturation keeps the hue: decoded as ENHANCED_HS with the new saturation.
+  l.requests.clear();
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::ENHANCED_HS, 21845, 100};
+  c.transition_ms = 200;
+  c.color_group = true;
+  l.submit_cmd(c);
+  r.p.settle();
+  CHECK_EQ(l.requests.size(), (size_t) 1);
+  CHECK(esphome::matter::conversion::from_matter::enhanced_hue_saturation(21845, 100, er, eg, eb));
+  CHECK_NEAR(l.requests[0].green, eg, 0.001);
+  CHECK_NEAR(l.requests[0].red, er, 0.001);
+  CHECK_EQ(l.requests[0].transition_ms, (uint32_t) 200);
+
+  // An attribute change in that mode is read as enhanced HS too.
+  l.requests.clear();
+  r.p.store[{EP, COLOR_CLUSTER, CURRENT_SATURATION}] = u8_val(254);
+  matter_writes(r.p, COLOR_CLUSTER, ENHANCED_CURRENT_HUE, u16_val(40000));
+  r.p.settle();
+  // The window of the command is over by now? No: it is still open, so the step is ignored.
+  CHECK(l.requests.empty());
+  r.p.advance(1000);
+  r.p.settle();
+  CHECK(!l.requests.empty());
+}
+
+TEST(light_window_gives_up_waiting_for_chip_after_the_retry_limit) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 0));
+  s.r.p.settle();
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(1);  // never done
+  s.r.p.advance(MatterLightBinding::COMMAND_MARGIN_MS);
+  s.r.p.settle();
+  for (uint32_t i = 0; i < MatterLightBinding::SETTLE_MAX_RETRIES; i++) {
+    CHECK(s.l.window_light());
+    s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS);
+    s.r.p.settle();
+    if (!s.l.window_light())
+      break;
+  }
+  CHECK(!s.l.window_light());
+  CHECK_EQ(s.l.requests.size(), (size_t) 2);  // the command, then the forced settle
+}
+
+TEST(light_push_leaves_the_colour_alone_while_a_colour_command_runs) {
+  Started s;
+  MatterLightCommand c;
+  c.color = MatterLightColorUpdate{MatterLightColorUpdate::Kind::XY, 10000, 40000};
+  c.transition_ms = 5000;
+  c.color_group = true;
+  s.l.submit_cmd(c);
+  s.r.p.settle();
+  CHECK(s.l.window_color());
+  s.r.p.attribute_writes.clear();
+
+  // A push while the window is open (a reconcile): OnOff and level follow the light, the colour is CHIP's.
+  s.l.view.brightness = 0.4f;
+  s.l.view.red = 0.0f;
+  s.l.view.green = 0.0f;
+  s.l.view.blue = 1.0f;
+  s.l.force_push();
+  s.r.p.settle();
+  CHECK_EQ(writes_to(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL), (size_t) 1);
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 0);
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, CURRENT_X), (size_t) 0);
+
+  // At the end of the window the light is settled on CHIP's colour, which Matter already has.
+  s.r.p.advance(6000);
+  s.r.p.settle();
+  CHECK(!s.l.window_color());
+  CHECK_EQ(writes_to(s.r.p, COLOR_CLUSTER, COLOR_MODE), (size_t) 0);
 }

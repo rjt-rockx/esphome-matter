@@ -149,11 +149,9 @@ struct LightOutbound {
   bool write_light{true};
   bool has_level{false};
   uint8_t level{1};
+  // False while a Matter command owns the colour attributes.
+  bool write_color{true};
   LightColorReport color;
-  // A change from the ESPHome side ended the window of a Matter command: CHIP
-  // stops its transition where it is. Counters, so a coalesced push keeps them.
-  uint32_t stop_light_epoch{0};
-  uint32_t stop_color_epoch{0};
 };
 
 // ---------------------------------------------------------------------------
@@ -171,6 +169,10 @@ struct LightInbound {
   static constexpr size_t MAX_ITEMS = 8;
   std::array<LightInboundItem, MAX_ITEMS> items{};
   uint8_t count{0};
+  // Items were dropped (too many within one main loop iteration). Whatever they
+  // did (a stop, the end of a color loop) is recovered by a settle on the state
+  // CHIP ended up with.
+  bool overflowed{false};
 };
 
 namespace light_ids {
@@ -280,7 +282,8 @@ protected:
   // ---- Endpoint side
   // Main loop, from setup_(): fill capabilities_ from the endpoint, register
   // the entity listener and the command callbacks.
-  virtual void probe_capabilities_() = 0;
+  // Returns false when there is no entity: the binding stays inert.
+  virtual bool probe_capabilities_() = 0;
   virtual void listen_entity_() = 0;
   virtual void register_commands_() = 0;
   // CHIP: CHIP's own transitions are stopped where they are.
@@ -316,7 +319,7 @@ public:
     // own, which must stay open to ignore the hue that CHIP restores.
     this->end_windows_for_local_change_();
     if (this->color_loop_active_)
-      this->check_color_loop_();
+      this->check_color_loop_(true);
     this->request_push();
   }
 
@@ -336,14 +339,13 @@ protected:
     s.level = conversion::to_matter::brightness(v.brightness);
     // The transition of a Matter command is CHIP's business until it ends.
     s.write_light = !this->light_group_suppressed_(now);
-    s.stop_light_epoch = this->stop_light_epoch_;
-    s.stop_color_epoch = this->stop_color_epoch_;
     // The colour steps of a Matter command are CHIP's business until its window
     // ends. The window after a color loop is not: the light's own colour is
     // reported at once, CHIP's restore of the hue is already ordered before it.
     bool chip_owns_color =
         this->color_window_open_(now) &&
         this->color_window_generation_ != this->loop_end_generation_;
+    s.write_color = !chip_owns_color;
     if (!chip_owns_color)
       this->update_color_report_(v);
     s.color = this->color_report_;
@@ -353,14 +355,6 @@ protected:
   void write_matter_(const LightOutbound &s) final {
     if (!s.valid)
       return;
-    if (s.stop_color_epoch != this->chip_stop_color_epoch_) {
-      this->chip_stop_color_epoch_ = s.stop_color_epoch;
-      this->chip_stop_color_transitions_();
-    }
-    if (s.stop_light_epoch != this->chip_stop_light_epoch_) {
-      this->chip_stop_light_epoch_ = s.stop_light_epoch;
-      this->chip_stop_light_transition_(s.level);
-    }
     if (s.write_light) {
       esp_matter_attr_val_t on_val = esp_matter_bool(s.on);
       this->report_(light_ids::ON_OFF_CLUSTER, light_ids::ON_OFF, on_val);
@@ -379,7 +373,7 @@ protected:
                       level_val);
       }
     }
-    if (s.color.epoch == this->chip_color_epoch_)
+    if (!s.write_color || s.color.epoch == this->chip_color_epoch_)
       return;
     this->chip_color_epoch_ = s.color.epoch;
     this->write_color_(s.color);
@@ -389,7 +383,8 @@ protected:
   // Matter -> ESPHome
   // ----------------------------------------------------------------------
   void setup_() final {
-    this->probe_capabilities_();
+    if (!this->probe_capabilities_())
+      return;
     const bool has_ct = this->capabilities_.color_temperature_range.has_value();
 
     this->watch_attribute(light_ids::ON_OFF_CLUSTER, light_ids::ON_OFF);
@@ -461,8 +456,10 @@ protected:
         continue;
       }
       if (acc.count == LightInbound::MAX_ITEMS) {
-        // Many commands within one main loop iteration: drop the oldest.
+        // Many commands within one main loop iteration: drop the oldest. The
+        // apply recovers what it did by a settle (see LightInbound).
         ESP_LOGW("matter.light", "Light inbound queue full, dropped oldest");
+        acc.overflowed = true;
         for (size_t k = 1; k < LightInbound::MAX_ITEMS; k++)
           acc.items[k - 1] = acc.items[k];
         acc.count--;
@@ -474,6 +471,16 @@ protected:
   // Main loop. Processes attribute updates and commands in the order in which
   // they arrived, then applies what is left as one light call.
   void apply_inbound_(const LightInbound &in) final {
+    if (in.overflowed) {
+      // A dropped command may have been a stop or the end of a color loop. The
+      // loop effect ends unless a retained ColorLoopSet starts it again (the
+      // items below run after this), and the light settles on CHIP's state.
+      if (!this->color_loop_requested_.load())
+        this->stop_color_loop_effect_();
+      this->light_window_active_ = false;
+      this->color_window_active_ = false;
+      this->request_state_read_(true, true, true);
+    }
     for (uint8_t i = 0; i < in.count; i++) {
       const LightInboundItem &item = in.items[i];
       if (item.type == LightInboundItem::Type::UPDATE)
@@ -660,6 +667,8 @@ protected:
     CTL_IDLE_LIGHT = 1u << 3,
     CTL_IDLE_COLOR = 1u << 4,
     CTL_DEACTIVATE_LOOP = 1u << 5,
+    CTL_STOP_LIGHT = 1u << 6,
+    CTL_STOP_COLOR = 1u << 7,
   };
 
   void request_ctl_(uint8_t bits) {
@@ -691,8 +700,25 @@ protected:
   void run_ctl_on_chip_() {
     MATTER_ASSERT_CHIP_THREAD();
     uint8_t bits = this->ctl_bits_.exchange(0);
-    if (bits & CTL_DEACTIVATE_LOOP)
+    // A change from the ESPHome side ended the windows: CHIP stops its
+    // transitions where they are. Ahead of everything else, and not in the push:
+    // a push can be skipped and then outlive a newer command's transition.
+    if (bits & CTL_STOP_COLOR)
+      this->chip_stop_color_transitions_();
+    if (bits & CTL_STOP_LIGHT)
+      this->chip_stop_light_transition_(this->stop_level_.load());
+    if (bits & CTL_DEACTIVATE_LOOP) {
       this->deactivate_chip_color_loop_();
+      // CHIP restores the hue from before the loop. The report of the light's
+      // own colour has to come after that, whatever the order in which the work
+      // items ran: report again.
+      if (this->rereport_after_deactivate_.exchange(false)) {
+        binding_platform()->defer_main([this]() {
+          this->reported_color_valid_ = false;
+          this->request_push();
+        });
+      }
+    }
     if (bits & (CTL_IDLE_LIGHT | CTL_IDLE_COLOR))
       this->check_chip_idle_(bits & CTL_IDLE_LIGHT, bits & CTL_IDLE_COLOR);
     if (bits & (CTL_READ_LIGHT | CTL_READ_COLOR)) {
@@ -1078,11 +1104,16 @@ protected:
     this->light_window_active_ = false;
     this->color_window_active_ = false;
     this->pending_ = MatterLightPendingUpdate{};
-    // Carried by the push that follows, ahead of its reports.
+    // CHIP stops first, then the push that follows reports.
+    uint8_t bits = 0;
     if (color)
-      this->stop_color_epoch_++;
-    if (light)
-      this->stop_light_epoch_++;
+      bits |= CTL_STOP_COLOR;
+    if (light) {
+      bits |= CTL_STOP_LIGHT;
+      this->stop_level_.store(
+          conversion::to_matter::brightness(this->entity_view_().brightness));
+    }
+    this->request_ctl_(bits);
   }
 
   // ---- Color loop -----------------------------------------------------------
@@ -1101,7 +1132,7 @@ protected:
     binding_platform()->main_after(COLOR_LOOP_WATCH_MS, [this]() {
       if (!this->color_loop_active_)
         return;
-      this->check_color_loop_();
+      this->check_color_loop_(false);
       if (this->color_loop_active_)
         this->watch_color_loop_();
     });
@@ -1110,7 +1141,10 @@ protected:
   // The effect can end without Matter: another effect was picked, the light was
   // turned off (also by a Matter Off command). Then CHIP's loop is deactivated
   // so ColorLoopActive goes back to 0.
-  void check_color_loop_() {
+  // `push_follows`: the caller pushes the state right away. Then the push may
+  // run before CHIP restored the hue, and the colour is reported once more
+  // after the restore. (Otherwise the timer below reports it, well after.)
+  void check_color_loop_(bool push_follows) {
     if (!this->color_loop_active_ || this->color_loop_effect_running_())
       return;
     this->color_loop_active_ = false;
@@ -1124,6 +1158,7 @@ protected:
     uint32_t generation = ++this->color_window_generation_;
     this->loop_end_generation_ = generation;
     this->reported_color_valid_ = false;
+    this->rereport_after_deactivate_.store(push_follows);
     this->request_ctl_(CTL_DEACTIVATE_LOOP);
     binding_platform()->main_after(
         COMMAND_MARGIN_MS + 50, [this, generation]() {
@@ -1268,17 +1303,15 @@ protected:
   float reported_blue_{0.0f};
   float reported_color_temperature_{0.0f};
   LightColorReport color_report_;
-  uint32_t stop_light_epoch_{0};
-  uint32_t stop_color_epoch_{0};
 
   // CHIP task only.
   uint32_t chip_color_epoch_{0};
-  uint32_t chip_stop_light_epoch_{0};
-  uint32_t chip_stop_color_epoch_{0};
 
 private:
   ChipWorkSlot ctl_slot_;
   std::atomic<uint8_t> ctl_bits_{0};
+  std::atomic<uint8_t> stop_level_{1};
+  std::atomic<bool> rereport_after_deactivate_{false};
   std::atomic<bool> color_read_pending_{false};
 };
 
