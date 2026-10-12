@@ -43,6 +43,20 @@ CONF_INTERNAL = "internal"
 CONF_ENTITY_CATEGORY = "entity_category"
 CONF_UNIT = "unit_of_measurement"
 NON_TRAIT_KEYS = {CONF_ID, CONF_NAME, CONF_PLATFORM}
+# Top-level platforms whose schema defaults `entity_category: diagnostic`. The raw config does
+# not show that, so globs and `all` skip them up front (final_check.py catches the rest).
+DIAGNOSTIC_DEFAULT_PLATFORMS = frozenset(
+    {
+        "debug",
+        "internal_temperature",
+        "openthread_info",
+        "packet_transport",
+        "status",
+        "uptime",
+        "wifi_signal",
+        "wireguard",
+    }
+)
 
 
 @dataclass
@@ -80,6 +94,8 @@ class Entity:
             return "internal: true" if self.name else "no name (internal)"
         if self.entity_category in ("config", "diagnostic"):
             return f"entity_category: {self.entity_category}"
+        if self.entity_category is None and self.platform in DIAGNOSTIC_DEFAULT_PLATFORMS:
+            return "entity_category: diagnostic (platform default)"
         return None
 
     @property
@@ -92,7 +108,7 @@ def _text(value) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def _make(domain, platform, node: dict, sub_key, path) -> Entity:
+def make_entity(domain, platform, node: dict, sub_key, path) -> Entity:
     name = node.get(CONF_NAME)
     return Entity(
         domain=domain,
@@ -115,7 +131,7 @@ def _visit(domain, platform, node, sub_key, path, depth, out: list[Entity]) -> N
     if not isinstance(node, dict):
         return
     if sub_key is None or CONF_ID in node or CONF_NAME in node:
-        out.append(_make(domain, platform, node, sub_key, path))
+        out.append(make_entity(domain, platform, node, sub_key, path))
     if domain not in NESTED_DOMAINS or depth >= MAX_NESTING:
         return
     for key, value in node.items():

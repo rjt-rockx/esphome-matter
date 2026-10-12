@@ -44,7 +44,9 @@ from .expose import (
     CONF_EXPOSE,
     EXCLUDE_SCHEMA,
     EXPOSE_SCHEMA,
+    check_expose,
     lower_expose,
+    plan_to_code,
 )
 from .fan_binding import fan_restore_warning
 from .matter_ble import (
@@ -216,6 +218,7 @@ def _final_validate(config: dict):
     validate_cover_bindings(config, full_config)
     validate_sensor_bindings(config, full_config)
     final_validate_ota(config, full_config)
+    check_expose(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -353,3 +356,4 @@ async def to_code(config: ConfigType):
     await to_code_ota(config)
 
     await register_endpoints(var, config)
+    plan_to_code()

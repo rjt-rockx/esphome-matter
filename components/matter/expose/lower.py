@@ -11,13 +11,20 @@ import logging
 import esphome.config_validation as cv
 from esphome.core import CORE
 
-from ..const import CONF_ENDPOINTS, CONF_MATTER
+from ..const import CONF_ENDPOINTS, CONF_MATTER, CONF_VENDOR_ID
 from .inference import CONF_LABEL, NoMapping, Overrides, infer
 from .inventory import Entity, build_inventory
 from .numbering import group_key, natural_key, resolve_numbers
-from .plan import PlannedEndpoint, log_plan
+from .plan import (
+    KEY_EXPOSE_PLAN,
+    TEST_VENDOR_IDS,
+    ExposePlan,
+    Member,
+    PlannedEndpoint,
+    log_plan,
+)
 from .schema import CONF_EXCLUDE, CONF_EXPOSE
-from .selectors import ALL, Selection, parse_items, select
+from .selectors import ALL, EXPLICIT, Selection, parse_items, select
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,6 +114,7 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
             _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{key} {name}")
         _merge_dicts(ep.extra, lowered.extra, f"{key}")
         ep.entities.append(entity.id)
+        ep.members.append(Member(entity, o, lowered, sel.level == EXPLICIT))
         key_of[entity.id] = key
         if o.endpoint is not None:
             if ep.pin is not None and ep.pin != o.endpoint:
@@ -135,12 +143,14 @@ def _plan(selection: Selection) -> tuple[dict[str, PlannedEndpoint], dict[str, s
             _merge_dicts(ep.device_types.setdefault(name, {}), block, f"{target} {name}")
         _merge_dicts(ep.extra, lowered.extra, target)
         ep.attached.append(entity.id)
+        ep.members.append(Member(entity, o, lowered, True))
         key_of[entity.id] = target
     return planned, key_of
 
 
 def lower_expose(config: dict) -> dict:
     inventory = build_inventory(CORE.raw_config)
+    CORE.data.get(CONF_MATTER, {}).pop(KEY_EXPOSE_PLAN, None)  # no stale plan across validations
     if CONF_EXPOSE not in config:
         if not _has_endpoints(config):
             raise cv.Invalid(bare_matter_error(inventory))
@@ -171,7 +181,14 @@ def lower_expose(config: dict) -> dict:
                 path=[CONF_EXPOSE, *exc.path],
             ) from None
 
-    log_plan(list(planned.values()), selection.skipped, sorted(explicit))
+    plan = ExposePlan(
+        list(planned.values()),
+        selection.skipped,
+        sorted(explicit),
+        config.get(CONF_VENDOR_ID, 0xFFF1) in TEST_VENDOR_IDS,
+    )
+    CORE.data.setdefault(CONF_MATTER, {})[KEY_EXPOSE_PLAN] = plan
+    log_plan(plan)
     config = dict(config)
     config[CONF_ENDPOINTS] = dict(sorted(endpoints.items()))
     return config

@@ -106,6 +106,13 @@ def test_expose_codegen_equals_handwritten(tmp_path):
 def matter_codegen(code: str) -> str:
     """main.cpp without the config echo comment block and #line pragmas."""
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+    # The expose plan table (matter_plan.h) only exists for the expose form.
+    code = re.sub(
+        r"static constexpr esphome::matter::PlanRow MATTER_PLAN\[\].*?\};", "", code, flags=re.S
+    )
+    code = re.sub(r".*(matter_plan\.h|set_plan\().*", "", code)
     return "\n".join(
-        line for line in code.splitlines() if not line.lstrip().startswith(("#line", "//"))
+        line
+        for line in code.splitlines()
+        if line.strip() and not line.lstrip().startswith(("#line", "//"))
     )
