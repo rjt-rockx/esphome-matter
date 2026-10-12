@@ -33,6 +33,7 @@ from .matter_climate import (
     config_lines as climate_config_lines,
     post_create_lines as climate_post_create_lines,
 )
+from .lock_valve import device_config_lines, register_entity
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -265,6 +266,9 @@ class Endpoint:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
             cg.add(var.register_light(light_, self._endpoint_id))
+        await register_entity(
+            var, self._endpoint_id, device_type.name, device_config
+        )
 
         if CONF_SWITCH_ID in device_config:
             switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
@@ -339,6 +343,15 @@ class Endpoint:
             cover_lines = cover_config_lines(
                 config_var, self._endpoint_id, device_config
             )
+
+        lines.extend(
+            device_config_lines(
+                device_type.name,
+                config_var,
+                self._endpoint_id,
+                device_config,
+            )
+        )
 
         # Configure cluster features
         for cluster in device_type.server_clusters:

@@ -1,0 +1,63 @@
+esphome:
+  name: matter-ci-lock-valve
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      door_lock:
+        lock_id: front_door
+        lock_type: DEAD_BOLT
+        features:
+          - DoorPositionSensor
+    2:
+      water_valve:
+        valve_id: garden_valve
+        features:
+          - Level
+    3:
+      water_valve:
+        valve_id: simple_valve
+
+output:
+  - platform: gpio
+    id: lock_relay
+    pin: GPIO4
+
+lock:
+  - platform: output
+    id: front_door
+    name: Front door
+    output: lock_relay
+
+valve:
+  - platform: template
+    id: garden_valve
+    name: Garden valve
+    optimistic: true
+    has_position: true
+  - platform: template
+    id: simple_valve
+    name: Simple valve
+    optimistic: true

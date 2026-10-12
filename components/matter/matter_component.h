@@ -12,8 +12,10 @@
 #include "matter_endpoints.h"
 #include "matter_fan.h"
 #include "matter_lights.h"
+#include "matter_lock.h"
 #include "matter_sensors.h"
 #include "matter_switch.h"
+#include "matter_valve.h"
 
 #include <functional>
 #include <vector>
@@ -78,6 +80,12 @@ public:
   void register_climate(climate::Climate *climate, uint16_t endpoint_id,
                         bool prefer_cooling);
 #endif // USE_CLIMATE
+#ifdef USE_LOCK
+  void register_lock(lock::Lock *lock, uint16_t endpoint_id);
+#endif // USE_LOCK
+#ifdef USE_VALVE
+  void register_valve(valve::Valve *valve, uint16_t endpoint_id);
+#endif // USE_VALVE
 #ifdef USE_SENSOR
   void register_sensor_attribute(sensor::Sensor *sensor, uint16_t endpoint_id,
                                  uint32_t cluster_id, uint32_t attribute_id,
