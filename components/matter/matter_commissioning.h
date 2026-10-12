@@ -29,6 +29,13 @@ struct CommissioningState {
   std::string manual_code;
 };
 
+// persist_passcode: false / true / until_commissioned.
+enum class PersistPasscode : uint8_t {
+  NEVER = 0,             // RAM only, new code on every boot of a fresh device
+  ALWAYS = 1,            // plaintext passcode stays in flash
+  UNTIL_COMMISSIONED = 2 // in flash while the fabric count is 0
+};
+
 class MatterCommissioning {
 public:
   static MatterCommissioning &instance();
@@ -36,7 +43,8 @@ public:
   // Main loop, before esp_matter::start(): loads or creates the commissioning
   // identity, migrates legacy NVS data and installs the custom
   // CommissionableDataProvider. Returns false on fatal errors.
-  bool init(bool persist_passcode);
+  // persist_passcode_mode is the MATTER_PERSIST_PASSCODE_MODE define.
+  bool init(int persist_passcode_mode);
 
   // CHIP task: called from the Matter device event callback.
   void handle_event(const ChipDeviceEvent *event);
@@ -95,9 +103,11 @@ protected:
   bool build_codes_(uint32_t passcode, uint16_t discriminator, bool ecm,
                     std::string &qr, std::string &manual) const;
   void erase_identity_keys_();
+  void erase_passcode_key_();
+  bool regenerate_identity_();
 
   Identity identity_;
-  bool persist_passcode_{false};
+  PersistPasscode persist_passcode_{PersistPasscode::NEVER};
   bool fixed_passcode_{false};
   // Set (main loop) once a factory reset was requested. The CHIP task then
   // leaves the identity alone: the fabric removal events of the reset must not

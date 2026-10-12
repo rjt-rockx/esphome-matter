@@ -1,6 +1,6 @@
 Because ESPHome already provides Wi-Fi or Thread credentials, commissioning works differently from most Matter devices.
 
-After flashing the device, a commission code is generated and shown (SetupQRCode) while the commissioning window is open. Copy this code or click the link and scan the QR-code. The code is only logged when a window opens, not on every boot (see [Persistence](#persistence)).
+After flashing the device, a commission code is generated and shown (SetupQRCode) while the commissioning window is open. Copy this code or click the link and scan the QR-code. Until the device is commissioned the same code is shown on every boot, so it survives power cycles (see [Passcode storage](#passcode-storage)).
 
 ```
 [I][matter.commissioning]: Commissioning window open. SetupQRCode: MT:Y.K904QI14-O992WI00
@@ -8,7 +8,7 @@ After flashing the device, a commission code is generated and shown (SetupQRCode
 [I][matter.commissioning]: Manual pairing code: 32552014321
 ```
 
-If you missed it, reboot the device while it is not commissioned: it generates and shows a new code.
+If you missed it, reboot the device while it is not commissioned: it shows the same code again.
 
 # Commissioners
 
@@ -40,33 +40,41 @@ The fabric data is stored on flash (nvs partition) and survives OTA updates. The
 
 ## Passcode storage
 
-By default only the SPAKE2+ verifier, salt, iteration count and discriminator are stored in flash (`chip-factory` NVS namespace). The plaintext passcode is **not** stored, and CHIP is given a custom `CommissionableDataProvider` that never returns it (so it does not show up in CHIP's own boot logs either). Someone who dumps the flash can no longer read the passcode directly (the verifier can still be brute-forced offline, as the passcode only has about 27 bits of entropy; physical access to the flash is out of scope for Matter's threat model).
+`persist_passcode` controls where the plaintext passcode lives. The SPAKE2+ verifier, salt, iteration count and discriminator are always stored in flash (`chip-factory` NVS namespace). CHIP is given a custom `CommissionableDataProvider` that never returns the passcode, so it does not show up in CHIP's own boot logs.
 
-The tradeoff is that the device can not show its original passcode later. This is how it works in practice:
-
-| Situation | Behaviour |
+| `persist_passcode` | Meaning |
 | --- | --- |
-| First boot | A random passcode is generated, kept in RAM, and printed to the log and published to the optional text sensors **while the commissioning window is open**. |
-| Reboot before commissioning | The passcode is gone (RAM only), but nothing is paired yet, so a new passcode is generated and shown again. The device is never stuck. |
-| Commissioned | The passcode is forgotten. Only the verifier remains. Nothing is printed on later boots. |
-| Add another ecosystem | Use the "share"/"link" feature of the first ecosystem, or the `matter.open_commissioning_window` action. Both open a window with a fresh one-time passcode that is shown while the window is open. |
-| Last fabric removed | The device becomes commissionable again with a freshly generated passcode (shown in the log / text sensors). |
-| `passcode:` set in YAML | The passcode is fixed, compiled into the firmware and shared by every device built from that YAML. It is always known, but still only printed while the window is open. Prefer the random passcode. |
-
-If you want the old behaviour (a sticker on the device that stays valid forever), set `persist_passcode: true`. The plaintext passcode is then kept in flash (`pin-code` key), so the same code is shown whenever a window opens. It is still only logged while a window is open: the provider never hands the passcode to CHIP.
+| `until_commissioned` (default) | The passcode is stored in flash (`pin-code` key) only while the device has no fabric. The same QR/manual code is printed on every boot until the first commissioning. Then the key is erased and only the verifier remains. |
+| `true` | The plaintext passcode stays in flash forever (a sticker that stays valid for the life of the device). |
+| `false` | The passcode is only kept in RAM. Every boot of an uncommissioned device generates and shows a new code. |
 
 ```yaml
 matter:
-  persist_passcode: true
+  persist_passcode: until_commissioned   # default; or true / false
 ```
+
+This is how `until_commissioned` works in practice:
+
+| Situation | Behaviour |
+| --- | --- |
+| First boot | A random passcode, discriminator, salt and verifier are generated and stored in flash. The code is printed to the log and published to the optional text sensors **while the commissioning window is open**, which on an uncommissioned device is on every boot. |
+| Power cycle before commissioning | The stored passcode is loaded. The same code is shown again, so the one you copied still works. |
+| First commissioning | When commissioning completes the plaintext passcode is erased from flash and RAM. Only the verifier remains. Nothing is printed on later boots. |
+| Add another ecosystem | Use the "share"/"link" feature of the first ecosystem, or the `matter.open_commissioning_window` action. Both open a window with a fresh one-time passcode that is shown while the window is open. |
+| Last fabric removed | The device becomes commissionable again with a freshly generated passcode, salt and discriminator, stored in flash until it is commissioned again. |
+| Factory reset | A commissioned device creates a fresh identity on the next boot (the passcode was already erased). A device that was never commissioned keeps its stored code, as nothing was paired. `matter.reset_identity` always creates a new one. |
+| Failed commissioning attempt | The code stays valid. You can retry with the same code. |
+| `passcode:` set in YAML | The passcode is fixed, compiled into the firmware and shared by every device built from that YAML. It is always known, never written to flash, and printed whenever the window is open. Prefer the random passcode. |
+
+Someone who dumps the flash of an uncommissioned device can read the passcode; once the device is commissioned they can only brute-force the verifier offline (the passcode has about 27 bits of entropy; physical access to the flash is out of scope for Matter's threat model).
 
 ### Upgrading from older firmware
 
-Devices that already store a plaintext `pin-code` keep working: the salt, verifier and discriminator are reused, so existing fabrics and printed codes stay valid. On the first boot of the new firmware the `pin-code` key is erased from flash (unless `persist_passcode: true`). For that single boot the old passcode is still known in RAM, so it is shown if the commissioning window is open (uncommissioned devices). On a commissioned device it is simply forgotten.
+Devices that already store a plaintext `pin-code` keep working: the salt, verifier and discriminator are reused, so existing fabrics and printed codes stay valid. On the first boot of the new firmware the `pin-code` key is erased from flash (with `persist_passcode: false`). With `until_commissioned` the key is kept while the device is uncommissioned and erased on boot if it already has a fabric. With `true` it is kept.
 
 ## Pairing info in logs, ESPHome and Home Assistant
 
-The QR code and manual pairing code are logged when a commissioning window opens, not on every boot:
+The QR code and manual pairing code are logged when a commissioning window opens (on every boot while the device is uncommissioned, see above):
 
 ```
 [I][matter.commissioning:...]: Commissioning window open. SetupQRCode: MT:Y.K904QI14-O992WI00
@@ -121,7 +129,7 @@ button:
 ```
 
 - `matter.open_commissioning_window` opens a commissioning window for 3 to 15 minutes with a new random passcode, and logs/publishes it. On an uncommissioned device it re-opens the normal window instead.
-- `matter.factory_reset` removes all fabrics: it clears the esp-matter data and the CHIP configuration, counters and key-value store (fabrics, ACLs, groups, ...) via the CHIP task and reboots. The discriminator is kept and after the reboot the device is commissionable again. Unless the passcode is persisted or fixed in the YAML the device no longer knows it, so a fresh passcode is generated on that boot and shown in the log.
+- `matter.factory_reset` removes all fabrics: it clears the esp-matter data and the CHIP configuration, counters and key-value store (fabrics, ACLs, groups, ...) via the CHIP task and reboots. The discriminator is kept and after the reboot the device is commissionable again. Unless `persist_passcode: true` or a `passcode:` in the YAML is set, a commissioned device no longer knows its passcode, so a fresh passcode is generated on that boot and shown in the log.
 - `matter.reset_identity` does the same and additionally erases the commissioning identity: a new passcode and discriminator are generated on the next boot. Previously printed codes become invalid. If `passcode:` or `discriminator:` are set in the YAML, those values are used again.
 
 Neither action asks for confirmation. Put them behind something deliberate (a long button press, a config-category button).
