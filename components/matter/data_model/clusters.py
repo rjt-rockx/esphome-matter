@@ -25,7 +25,9 @@ class Feature:
         """Feature name in esp_matter::cluster::<cluster>::feature::<feature> namespace."""
         # "Hue And Saturation" is esp_matter's "hue_saturation"; other names
         # contain spaces ("CO Alarm").
-        return snake_case(self.name.replace(" And ", "").replace(" ", ""))
+        name = snake_case(self.name.replace(" And ", "").replace(" ", ""))
+        # "auto" is a C++ keyword; esp_matter calls the Fan Control feature "fan_auto".
+        return "fan_auto" if name == "auto" else name
 
 
 @dataclass(frozen=True, slots=True)

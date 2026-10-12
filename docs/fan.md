@@ -23,7 +23,7 @@ State is synchronized both ways between the ESPHome fan entity and Matter. If th
 
 ### Feature mapping
 
-The Matter features of the Fan Control cluster are selected from the traits of the ESPHome fan when the endpoint is created. The `features` option of the `fan` device type is not needed for these.
+The Matter features of the Fan Control cluster are selected from the traits of the ESPHome fan when the endpoint is created. These features can't be set with the `features` option when `fan_id` is used.
 
 | ESPHome fan            | Matter                                                                  |
 |------------------------|-------------------------------------------------------------------------|
@@ -40,12 +40,13 @@ A fan that doesn't support speed control (for example `platform: binary`) is exp
 
 Matter describes the fan speed as a percentage (`PercentSetting`) and, with `MultiSpeed`, also as a discrete step (`SpeedSetting`, 0 to `SpeedMax`). ESPHome uses the step (`1` to `speed_count`). A percentage `p` is converted to the step `ceil(p * speed_count / 100)`, which is the same rounding the Matter cluster uses. The Low, Medium and High fan modes map to the step 1, the middle step and the last step.
 
-The `PercentCurrent` and `SpeedCurrent` attributes follow the ESPHome fan state (`speed * 100 / speed_count` rounded down, and 0 when the fan is off).
+The `PercentCurrent` and `SpeedCurrent` attributes follow the ESPHome fan state (`speed * 100 / speed_count` rounded down, 100 for a fan without speed control, and 0 when the fan is off).
 
 ### Limitations
 
 * The `Auto` fan mode has no ESPHome equivalent and is ignored. Do not enable the `Auto` feature unless you handle it yourself.
-* The `Wind` and `Step` features are not mapped. They can be enabled with the `features` option and handled with `on_attribute` automations.
+* The `Wind` feature is not mapped. It can be enabled with the `features` option and handled with an `on_attribute` automation on `WindSetting`.
+* The `Step` feature is not supported: enabling it exposes the `Step` command, but it is always rejected.
 * ESPHome fan presets are not exposed.
 * Matter persists the fan mode (and so the speed). Use `restore_mode: ALWAYS_OFF` on the ESPHome fan so Matter restores the power-on state. A warning is logged when another restore mode is used.
 * The Fan device type has no OnOff cluster, so the on/off state is only available through the Fan Control cluster.

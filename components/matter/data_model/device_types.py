@@ -10,8 +10,7 @@ from esphome.const import CONF_LIGHT_ID
 
 from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_ID
-from ..fan_binding import CONF_FAN_ID, fan_id_schema
-from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
+from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
 from ..matter_climate import climate_schema, validate_climate_features
 from ..lock_valve import extend_device_type_schema
 from ..generic_switch import apply_switch_defaults, switch_schema_options
@@ -325,6 +324,7 @@ class DeviceType:
             maybe_empty(self._schema()),
             self._validate_features,
             self._validate_entity_ids,
+            validate_fan_features,
             validate_climate_features,
         )
 

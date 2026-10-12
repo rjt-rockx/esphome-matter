@@ -7,7 +7,7 @@ from esphome.components import fan
 from esphome.config import Config
 from esphome.const import CONF_RESTORE_MODE
 
-from .const import CONF_ENDPOINTS
+from .const import CONF_ENDPOINTS, CONF_FEATURES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +19,18 @@ TRAIT_FEATURES = ("MultiSpeed", "Rocking", "AirflowDirection")
 
 def fan_id_schema():
     return cv.use_id(fan.Fan)
+
+
+def validate_fan_features(config):
+    """The trait based features can't be selected for a bound fan."""
+    if CONF_FAN_ID in config:
+        trait_features = [f for f in config.get(CONF_FEATURES, ()) if f in TRAIT_FEATURES]
+        if trait_features:
+            raise cv.Invalid(
+                f"The features {', '.join(trait_features)} follow the capabilities of "
+                f"the fan and can't be set together with {CONF_FAN_ID}"
+            )
+    return config
 
 
 def config_lines(config_var: str, fan_var, enabled_features: dict[str, bool]):
