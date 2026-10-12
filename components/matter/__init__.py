@@ -28,6 +28,7 @@ from .conformance import validate_composition
 from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
 from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+from .closure import validate_closure_bindings, validate_unique_cover_bindings
 from .covers import validate_cover_bindings
 from .device_info import (
     DEVICE_INFO_SCHEMA,
@@ -207,6 +208,8 @@ def _final_validate(config: dict):
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
     validate_cover_bindings(config, full_config)
+    validate_closure_bindings(config, full_config)
+    validate_unique_cover_bindings(config)
     validate_sensor_bindings(config, full_config)
     final_validate_ota(config, full_config)
 

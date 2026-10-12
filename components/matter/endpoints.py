@@ -18,6 +18,7 @@ from . import binary_sensors
 from . import conformance
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
+from . import closure
 from .covers import WINDOW_COVERING
 from .covers import config_init as cover_config_init
 from .covers import config_lines as cover_config_lines
@@ -556,7 +557,8 @@ class Endpoint:
             )
             cg.add(var.register_fan(self._fan_variable, self._endpoint_id))
             self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
-        if CONF_COVER_ID in device_config:
+        await closure.register_entity(var, self._endpoint_id, device_type.name, device_config)
+        if CONF_COVER_ID in device_config and device_type.name == WINDOW_COVERING:
             cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
             cg.add(var.register_cover(cover_, self._endpoint_id))
         if CONF_CLIMATE_ID in device_config:
@@ -640,6 +642,14 @@ class Endpoint:
                 device_config,
             )
         )
+        closure_lines = closure.device_config_lines(
+            device_type.name, config_var, self._endpoint_id, device_config
+        )
+        if closure_lines:
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_closure.h"'
+            )
+            lines.extend(closure_lines)
 
         # Configure cluster features
         for cluster in device_type.server_clusters:

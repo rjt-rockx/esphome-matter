@@ -1,0 +1,69 @@
+# A garage door opener exposed to Matter as a Window Covering (compatibility
+# mode: works in today's controllers, shown as a shutter), plus the reed switch
+# as a contact sensor. The native, experimental Matter 1.5 `closure` device type
+# is an opt-in alternative. See docs/cover.md.
+
+esphome:
+  name: matter-garage
+  friendly_name: Matter Garage
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      label: Garage door
+      window_covering:
+        cover_id: garage_door
+        closure_compat: true
+        # Native Matter 1.5 closure instead (experimental):
+        # closure:
+        #   cover_id: garage_door
+    2:
+      label: Door sensor
+      contact_sensor:
+        boolean_state: door_reed
+
+output:
+  - platform: gpio
+    id: door_relay
+    pin: GPIO10
+
+binary_sensor:
+  - platform: gpio
+    id: door_reed
+    name: Garage door closed
+    device_class: garage_door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}
+
+cover:
+  - platform: template
+    id: garage_door
+    name: Garage door
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action: &pulse
+      - output.turn_on: door_relay
+      - delay: 300ms
+      - output.turn_off: door_relay
+    close_action: *pulse
+    stop_action: *pulse
