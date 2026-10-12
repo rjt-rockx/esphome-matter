@@ -24,7 +24,7 @@ Keep in mind that binding is fabric-specific. If a device has joined multiple fa
 
 # Groups
 
-Binding to multiple devices has a drawback. A command is sent to each individual node and in case of lights this can cause the well-known "popcorn effect" where there is a visible delay between lights turning on and off. Matter solves this by creating device groups. A new group ID is created and instead of binding to each individual NodeID, the button is bound to a single GroupID. In this case, esphome-matter sends out a multicast
+Binding to multiple devices has a drawback. A command is sent to each individual node and in case of lights this can cause the well-known "popcorn effect" where there is a visible delay between lights turning on and off. Matter solves this by creating device groups. A new group ID is created and instead of binding to each individual NodeID, the button is bound to a single GroupID. In this case, esphome-matter sends out a multicast message to the group.
 
 Binding an esphome-matter device to groups is supported but has not been tested yet. Grouping esphome-matter devices should also be supported but is also untested.
 

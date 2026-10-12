@@ -30,6 +30,10 @@ See [blinds.yaml](../examples/blinds.yaml) for a complete example.
   `roller_shade`, `interior_venetian_blind`, `exterior_venetian_blind`, `central_curtain` or `roller_shutter`. See
   the Matter `EndProductType` enum for all values. The default is derived from the cover's `device_class`.
 
+- **closure_compat** (*Optional*, boolean, default `false`): Acknowledges that a `garage`, `gate` or `door` cover is exposed
+  as a Window Covering instead of a native closure, see [below](#compatibility-mode-window-covering-default-works-today).
+  Only valid for those device classes.
+
 The `with_features` option must not be used together with `cover_id`. The features are selected from the cover.
 
 ## What gets exposed

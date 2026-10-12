@@ -9,6 +9,8 @@ matter:
       door_lock:
         lock_id: front_door
         # Optional, the Matter LockType attribute. Defaults to DEAD_BOLT.
+        # Other values: MAGNETIC, OTHER, MORTISE, RIM, LATCH_BOLT, CYLINDRICAL_LOCK, TUBULAR_LOCK,
+        # INTERCONNECTED_LOCK, DEAD_LATCH, DOOR_FURNITURE, EUROCYLINDER (and more, case insensitive).
         # lock_type: DEAD_BOLT
 
 lock:
@@ -65,7 +67,7 @@ matter:
       water_valve:
         valve_id: garden_valve
         # Optional, adds CurrentLevel and TargetLevel (see below).
-        # features:
+        # with_features:
         #   - Level
 
 valve:
