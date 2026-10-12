@@ -1,0 +1,107 @@
+esphome:
+  name: matter-ci-lights
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      on_off_light:
+        light_id: binary_light
+    2:
+      dimmable_light:
+        light_id: dimmable_light
+        min_level: 10%
+    3:
+      color_temperature_light:
+        light_id: ct_light
+    4:
+      extended_color_light:
+        light_id: rgbww_light
+        features:
+          - Hue And Saturation
+          - EnhancedHue
+          - ColorLoop
+    5:
+      extended_color_light:
+        light_id: rgb_light
+
+output:
+  - platform: ledc
+    id: output_1
+    pin: GPIO1
+  - platform: ledc
+    id: output_2
+    pin: GPIO2
+  - platform: ledc
+    id: output_3
+    pin: GPIO3
+  - platform: ledc
+    id: output_4
+    pin: GPIO4
+  - platform: ledc
+    id: output_5
+    pin: GPIO5
+  - platform: ledc
+    id: output_6
+    pin: GPIO6
+  - platform: ledc
+    id: output_7
+    pin: GPIO7
+  - platform: ledc
+    id: output_8
+    pin: GPIO8
+  - platform: ledc
+    id: output_9
+    pin: GPIO9
+  - platform: ledc
+    id: output_10
+    pin: GPIO10
+
+light:
+  - platform: binary
+    id: binary_light
+    output: output_1
+  - platform: monochromatic
+    id: dimmable_light
+    output: output_2
+  - platform: cwww
+    id: ct_light
+    cold_white: output_3
+    warm_white: output_4
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+  - platform: rgbww
+    id: rgbww_light
+    red: output_5
+    green: output_6
+    blue: output_7
+    cold_white: output_8
+    warm_white: output_9
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 3000 K
+    color_interlock: false
+  - platform: rgb
+    id: rgb_light
+    red: output_5
+    green: output_6
+    blue: output_10

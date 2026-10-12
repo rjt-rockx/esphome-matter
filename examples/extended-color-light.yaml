@@ -27,6 +27,8 @@ network:
   enable_ipv6: true
 
 wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 matter:
   endpoints:
@@ -34,6 +36,12 @@ matter:
       extended_color_light:
         light_id: rgbww_light
         min_level: 20%
+        # Besides XY and color temperature, also support controllers that set the colour using hue and saturation.
+        # ColorLoop is followed through the hue attributes. See docs/lights.md.
+        features:
+          - Hue And Saturation
+          - EnhancedHue
+          - ColorLoop
 
 button:
   - platform: restart

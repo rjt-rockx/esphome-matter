@@ -34,7 +34,12 @@ esp_matter_attr_val_t watts(float value);
 namespace to_matter {
 
 uint8_t brightness(float brightness);
+// Returns false for black (no chromaticity), in which case x and y are untouched.
 bool color(float red, float green, float blue, uint16_t &x, uint16_t &y);
+// Hue (CurrentHue, 0-254), saturation (0-254) and enhanced hue (0-65535).
+// Returns false for black.
+bool hue_saturation(float red, float green, float blue, uint8_t &hue,
+                    uint8_t &saturation, uint16_t &enhanced_hue);
 uint16_t color_temperature(float color_temperature);
 
 } // namespace to_matter
@@ -42,7 +47,15 @@ uint16_t color_temperature(float color_temperature);
 namespace from_matter {
 
 float brightness(uint8_t level);
+// The resulting RGB is normalized so the largest channel is 1.0; brightness is
+// carried by the LevelControl cluster.
 bool color(uint16_t x, uint16_t y, float &red, float &green, float &blue);
+// hue: CurrentHue (0-254), saturation: CurrentSaturation (0-254).
+bool hue_saturation(uint8_t hue, uint8_t saturation, float &red, float &green,
+                    float &blue);
+// enhanced_hue: EnhancedCurrentHue (0-65535 maps to 0-360 degrees).
+bool enhanced_hue_saturation(uint16_t enhanced_hue, uint8_t saturation,
+                             float &red, float &green, float &blue);
 
 } // namespace from_matter
 

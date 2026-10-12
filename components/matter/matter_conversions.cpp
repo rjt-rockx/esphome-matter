@@ -183,11 +183,8 @@ bool color(float red, float green, float blue, uint16_t &matter_x,
   float r = std::clamp(red, 0.0f, 1.0f);
   float g = std::clamp(green, 0.0f, 1.0f);
   float b = std::clamp(blue, 0.0f, 1.0f);
-  if (r + g + b == 0.0f) {
-    matter_x = 0;
-    matter_y = 0;
-    return true;
-  }
+  if (r + g + b == 0.0f)
+    return false; // Black has no chromaticity; (0, 0) is not a valid xy.
 
   auto gamma_decode = [](float channel) {
     return channel > 0.04045f ? std::pow((channel + 0.055f) / 1.055f, 2.4f)
@@ -209,6 +206,37 @@ bool color(float red, float green, float blue, uint16_t &matter_x,
       std::lroundf(std::clamp(x * 65536.0f, 0.0f, 65279.0f)));
   matter_y = static_cast<uint16_t>(
       std::lroundf(std::clamp(y * 65536.0f, 0.0f, 65279.0f)));
+  return true;
+}
+
+bool hue_saturation(float red, float green, float blue, uint8_t &hue,
+                    uint8_t &saturation, uint16_t &enhanced_hue) {
+  float r = std::clamp(red, 0.0f, 1.0f);
+  float g = std::clamp(green, 0.0f, 1.0f);
+  float b = std::clamp(blue, 0.0f, 1.0f);
+  float maximum = std::max({r, g, b});
+  float minimum = std::min({r, g, b});
+  if (maximum <= 0.0f)
+    return false;
+  float delta = maximum - minimum;
+  float degrees = 0.0f;
+  if (delta > 0.0f) {
+    if (maximum == r)
+      degrees = 60.0f * std::fmod((g - b) / delta, 6.0f);
+    else if (maximum == g)
+      degrees = 60.0f * ((b - r) / delta + 2.0f);
+    else
+      degrees = 60.0f * ((r - g) / delta + 4.0f);
+    if (degrees < 0.0f)
+      degrees += 360.0f;
+  }
+  hue = static_cast<uint8_t>(
+      std::lroundf(std::clamp(degrees / 360.0f * 254.0f, 0.0f, 254.0f)));
+  saturation = static_cast<uint8_t>(
+      std::lroundf(std::clamp(delta / maximum * 254.0f, 0.0f, 254.0f)));
+  enhanced_hue = static_cast<uint16_t>(
+      static_cast<uint32_t>(std::lroundf(degrees / 360.0f * 65536.0f)) &
+      0xFFFFu);
   return true;
 }
 
@@ -251,7 +279,7 @@ bool color(uint16_t matter_x, uint16_t matter_y, float &red, float &green,
   b = std::max(0.0f, gamma_encode(b));
 
   float maximum = std::max({r, g, b});
-  if (maximum > 1.0f) {
+  if (maximum > 0.0f) {
     r /= maximum;
     g /= maximum;
     b /= maximum;
@@ -260,6 +288,70 @@ bool color(uint16_t matter_x, uint16_t matter_y, float &red, float &green,
   red = r;
   green = g;
   blue = b;
+  return true;
+}
+
+namespace {
+
+// HSV to RGB with value fixed at 1.0. Brightness is handled separately.
+void hue_degrees_to_rgb(float degrees, float saturation, float &red,
+                        float &green, float &blue) {
+  float h = std::fmod(degrees, 360.0f);
+  if (h < 0.0f)
+    h += 360.0f;
+  float c = std::clamp(saturation, 0.0f, 1.0f);
+  float sector = h / 60.0f;
+  float x = c * (1.0f - std::fabs(std::fmod(sector, 2.0f) - 1.0f));
+  float m = 1.0f - c;
+  float r = 0.0f;
+  float g = 0.0f;
+  float b = 0.0f;
+  switch (static_cast<int>(sector)) {
+  case 0:
+    r = c;
+    g = x;
+    break;
+  case 1:
+    r = x;
+    g = c;
+    break;
+  case 2:
+    g = c;
+    b = x;
+    break;
+  case 3:
+    g = x;
+    b = c;
+    break;
+  case 4:
+    r = x;
+    b = c;
+    break;
+  default:
+    r = c;
+    b = x;
+    break;
+  }
+  red = r + m;
+  green = g + m;
+  blue = b + m;
+}
+
+} // namespace
+
+bool hue_saturation(uint8_t hue, uint8_t saturation, float &red, float &green,
+                    float &blue) {
+  hue_degrees_to_rgb(std::min<uint8_t>(hue, 254) * 360.0f / 254.0f,
+                     std::min<uint8_t>(saturation, 254) / 254.0f, red, green,
+                     blue);
+  return true;
+}
+
+bool enhanced_hue_saturation(uint16_t enhanced_hue, uint8_t saturation,
+                             float &red, float &green, float &blue) {
+  hue_degrees_to_rgb(enhanced_hue * 360.0f / 65536.0f,
+                     std::min<uint8_t>(saturation, 254) / 254.0f, red, green,
+                     blue);
   return true;
 }
 
