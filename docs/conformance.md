@@ -39,7 +39,10 @@ node model + Matter data model XML --> rules --> report (text / JSON / exit code
    `register_endpoints`): when `MATTER_LAYOUT_JSON` is set, the structure the
    component collected (device types per endpoint, clusters it creates itself,
    feature codes, optional attributes, which clusters have entity-trait-derived
-   features, compiled-in radios) is written as JSON. Unset = no effect.
+   features, compiled-in radios) is written as JSON. Attributes, commands and events
+   that the component creates with its own build code (hold time, self test, alarm
+   events, the refrigerator mode cluster; `components/matter/sensor_extras.py`) are
+   listed per cluster under `extra`. Unset = no effect.
 2. **esp-matter profile** (`tools/conformance/espm.py`): which attributes, commands and
    events esp-matter *actually creates* is decided in C++ (`esp_matter_cluster.cpp`,
    `esp_matter_feature.cpp`, `esp_matter_endpoint.cpp`). Those files are regular, so

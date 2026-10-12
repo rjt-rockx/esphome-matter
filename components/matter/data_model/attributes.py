@@ -292,4 +292,26 @@ SENSOR_ATTRIBUTES["SmokeCOAlarm"] = {  # 0x005C
     "COState": SensorAttribute(
         "co_state", "alarm_state", BinarySensor, features=("COAlarm",), code_driven=True
     ),
+    # Further attributes that follow a binary sensor (see docs/binary-sensors.md):
+    #   hardware_fault   HardwareFaultAlert (ON = fault)
+    #   end_of_service   EndOfServiceAlert (ON = expired)
+    #   test_in_progress TestInProgress (ON = a self test is running, OFF completes it)
+    #   device_muted     DeviceMuted (ON = muted; optional attribute, created when bound)
+    # ExpressedState is recomputed after each change.
+    "HardwareFaultAlert": SensorAttribute(
+        "hardware_fault", "boolean_state", BinarySensor, code_driven=True
+    ),
+    "EndOfServiceAlert": SensorAttribute(
+        "end_of_service", "end_of_service", BinarySensor, code_driven=True
+    ),
+    "TestInProgress": SensorAttribute(
+        "test_in_progress", "boolean_state", BinarySensor, code_driven=True
+    ),
+    "DeviceMuted": SensorAttribute(
+        "device_muted",
+        "mute_state",
+        BinarySensor,
+        code_driven=True,
+        create_attribute=True,
+    ),
 }

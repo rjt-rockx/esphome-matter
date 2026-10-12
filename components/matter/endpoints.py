@@ -16,6 +16,7 @@ from esphome.types import ConfigType
 
 from . import binary_sensors
 from . import conformance
+from . import sensor_extras
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
 from .covers import WINDOW_COVERING
@@ -168,6 +169,7 @@ ENDPOINT_SCHEMA = cv.All(
     ),
     _validate_on_attribute_forms,
     validate_battery_binding,
+    sensor_extras.validate_endpoint,
 )
 
 
@@ -203,6 +205,8 @@ class Endpoint:
         # (Cluster, Attribute) of sensor attributes that esp-matter does not create itself.
         self._optional_attributes: list[tuple[Cluster, Attribute]] = []
         self._electrical_power_features: list[str] = []
+        # Extra C++ for clusters configured by sensor_extras.py (evaluated lazily, see sensor_extras.Extra).
+        self.extras: list[sensor_extras.Extra] = []
 
     @property
     def endpoint_id(self) -> int:
@@ -243,6 +247,13 @@ class Endpoint:
                 feature = cluster.get_feature(feature_name)
                 if feature is not None:
                     enabled_codes.add(feature.code)
+                    # Selecting a feature of one of the device type's optional
+                    # server clusters (e.g. Boolean State Configuration on a leak
+                    # detector) creates that cluster.
+                    cluster_present |= any(
+                        device_cluster.name == cluster.name
+                        for device_cluster in device_type.server_clusters
+                    )
 
         # A mandatory feature can make another conditional feature mandatory, so
         # evaluate the composed cluster/device-type conformance to a fixed point.
@@ -449,7 +460,18 @@ class Endpoint:
             f"{cid}[{'+'.join(sorted(features))}]"
             for cid, features in sorted(clusters.items())
         )
-        return f"d{device_types}|c{cluster_text}"
+        signature = f"d{device_types}|c{cluster_text}"
+        # Attributes, commands and events created for the sensor and alarm clusters (hold time, ...).
+        extra_text = ",".join(
+            sorted(
+                f"{extra.cluster}.{kind}.{name}"
+                for extra in self.extras
+                for kind, name in extra.elements()
+            )
+        )
+        if extra_text:
+            signature += f"|e{extra_text}"
+        return signature
 
     async def _register_attribute_automations(self, var):
         configured_clusters = self._config.get(CONF_ON_ATTRIBUTE, {})
@@ -555,6 +577,9 @@ class Endpoint:
                 if feature := cluster.get_feature(enabled_feature):
                     cluster_config = self._cluster_configs[cluster.name]
                     cluster_config.enabled_features[feature.name] = True
+
+        # Optional cluster features of the sensor and alarm clusters (hold time, alarms, air quality, ...)
+        await sensor_extras.register(self, var, device_type, device_config)
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
         config_var = f"device_config_{index}"
@@ -793,6 +818,10 @@ class Endpoint:
 
     def _make_cluster_lines(self, cluster: Cluster):
         """Build lines for a cluster not created by a device type."""
+        for extra in self.extras:
+            if extra.creates_cluster and extra.cluster == cluster.name:
+                # Clusters whose creation needs more than the generic create call (see sensor_extras.py).
+                return extra.lines()
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
         config_var = f"{cluster.espm_namespace}_config"
@@ -876,6 +905,10 @@ class Endpoint:
 
         # Optional attributes can only be created once their cluster exists.
         lines.extend(optional_attribute_lines(self._optional_attributes))
+
+        for extra in self.extras:
+            if not extra.creates_cluster:
+                lines.extend(extra.lines())
 
         lines.extend(("return true;", "}"))
         return "\n".join(lines)

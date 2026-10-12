@@ -70,14 +70,14 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 | `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (untested on hardware) | [lights.md](docs/lights.md) |
 | `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
 | `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (unit conversion implemented, untested on controllers) | [sensors.md](docs/sensors.md#units) |
-| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |
+| `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor (incl. the AirQuality level) | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |
 | `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
 | `sensor`: power, energy, voltage, current | Electrical Sensor | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements) |
 | `sensor`: battery | Power Source | Partial (battery level only, untested on controllers) | [sensors.md](docs/sensors.md#battery) |
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
-| `binary_sensor`: occupancy | Occupancy Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
-| `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md) |
-| `binary_sensor`: smoke, carbon monoxide | Smoke CO Alarm | Partial (untested; ON = Critical alarm) | [binary-sensors.md](docs/binary-sensors.md) |
+| `binary_sensor`: occupancy | Occupancy Sensor (HoldTime) | Supported (hold time untested on controllers) | [binary-sensors.md](docs/binary-sensors.md#hold-time) |
+| `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector (alarms, sensitivity) | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md#alarms-and-sensitivity-boolean-state-configuration) |
+| `binary_sensor`: smoke, carbon monoxide | Smoke CO Alarm (fault, end of service, mute, self test) | Partial (untested; ON = Critical alarm) | [binary-sensors.md](docs/binary-sensors.md#smoke-and-co-alarm) |
 | `switch` | On/Off Plug-in Unit | Supported (untested on hardware) | [switch.md](docs/switch.md) |
 | `cover` | Window Covering | Supported (untested on hardware) | [cover.md](docs/cover.md) |
 | `fan` | Fan | Supported (untested on hardware) | [fan.md](docs/fan.md) |
@@ -86,6 +86,7 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 | `button`, `event` | Generic Switch | Supported (untested on hardware) | [generic-switch.md](docs/generic-switch.md) |
 | `climate` | Thermostat / Room Air Conditioner | Supported (untested on hardware) | [climate.md](docs/climate.md) |
 | Physical buttons controlling other Matter devices | On/Off Light Switch, Dimmer Switch, Color Dimmer Switch (bindings) | Supported (a command can take a few seconds) | [binding.md](docs/binding.md), [actions.md](docs/actions.md) |
+| `select` | Refrigerator / cabinet mode list | Partial (untested; other mode clusters planned) | [refrigerator.md](docs/refrigerator.md) |
 | `select` | Mode Select | Planned (weak mapping) | [ROADMAP.md](docs/ROADMAP.md) |
 | `number`, `text_sensor`, `alarm_control_panel` | none | Not planned (no good mapping) | [ROADMAP.md](docs/ROADMAP.md) |
 
@@ -253,7 +254,7 @@ More information about endpoints and a full list of supported device types can b
 - [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
 - [docs/lights.md](docs/lights.md): lights
 - [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
-- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
+- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md), [refrigerator](docs/refrigerator.md)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
 - [docs/faq.md](docs/faq.md): frequently asked questions

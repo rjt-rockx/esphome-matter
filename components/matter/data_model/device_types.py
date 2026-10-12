@@ -18,6 +18,7 @@ from ..const import (
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
+from .. import sensor_extras
 from ..matter_climate import climate_schema, validate_climate_features
 from ..sensor_mapping import (
     CONF_CURRENT_TYPE,
@@ -342,6 +343,7 @@ class DeviceType:
             schema[cv.Optional(CONF_MAX_LEVEL, default=254)] = level
 
         extend_device_type_schema(self.name, schema)
+        sensor_extras.extend_schema(self, schema)
 
         # If a device type is a simple sensor with only a single sensor attribute the config may be simplified from;
         #   temperature_sensor:
@@ -365,6 +367,7 @@ class DeviceType:
         # TODO: only maybe_empty if there are no clusters or features for which a mandatory choice must be made.
         return cv.All(
             maybe_empty(self._schema()),
+            lambda config: sensor_extras.validate_device_config(self, config),
             self._validate_features,
             self._validate_entity_ids,
             validate_fan_features,

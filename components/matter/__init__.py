@@ -50,6 +50,7 @@ from .matter_ble import (
 from .network_config import configure_network
 from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
 from .sensor_mapping import validate_sensor_bindings
+from . import sensor_extras
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -208,6 +209,7 @@ def _final_validate(config: dict):
     fan_restore_warning(config, full_config)
     validate_cover_bindings(config, full_config)
     validate_sensor_bindings(config, full_config)
+    sensor_extras.check_final(config, full_config)
     final_validate_ota(config, full_config)
 
     # Should be done during validation instead of codegen to make sure an invalid config fails early.

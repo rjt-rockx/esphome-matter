@@ -73,6 +73,16 @@ def _endpoint_layout(endpoint) -> dict:
             cluster.name, {"id": cluster.id, "source": "component", "features": []}
         )
         entry.setdefault("optional_attributes", []).append(attribute.name)
+    for extra in endpoint.extras:
+        # Attributes, commands and events that sensor_extras.py creates in the esp-matter data model.
+        entry = clusters.setdefault(
+            extra.cluster,
+            {"id": CLUSTERS_BY_NAME[extra.cluster].id, "source": "component", "features": []},
+        )
+        extra_elements = entry.setdefault("extra", {"attrs": [], "cmds": [], "events": []})
+        for kind, name in extra.elements():
+            if name not in extra_elements[kind]:
+                extra_elements[kind].append(name)
     for device_type in endpoint._device_types:
         # Required clusters of the device type that were never touched above.
         for cluster in device_type.server_clusters:

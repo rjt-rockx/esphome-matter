@@ -310,6 +310,16 @@ def from_layout(
         for (cid, side), cur in sdk_clusters.items():
             cspec = cur["cspec"]
             lname, lc = layout_by_id.get(cid, (None, {}))
+            layout_extra = lc.get("extra") if side == "server" else None
+            if layout_extra:
+                # attributes, commands and events that the component creates itself (sensor_extras.py)
+                cur = {
+                    **cur,
+                    **{
+                        k: list(cur.get(k, [])) + list(layout_extra.get(k, []))
+                        for k in ("attrs", "cmds", "events")
+                    },
+                }
             inst = _predict_cluster(
                 spec,
                 profile,

@@ -1,0 +1,211 @@
+esphome:
+  name: matter-ci-sensor-extras
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Occupancy hold time: the Occupancy attribute stays TRUE for HoldTime seconds after the sensor turns OFF.
+    # The number mirrors HoldTime in both directions.
+    1:
+      occupancy_sensor:
+        occupancy: hallway_motion
+        hold_time:
+          default: 45s
+          min: 5s
+          max: 10min
+          number: hallway_hold_time
+    # Short form: only the default; limits are 1s to 300s.
+    2:
+      occupancy_sensor:
+        occupancy: office_presence
+        hold_time: 20s
+    # Boolean State Configuration: visual and audible alarms, suppress, sensitivity levels.
+    3:
+      water_leak_detector:
+        boolean_state: basement_leak
+        alarms:
+          visual: true
+          audible: true
+          suppress: true
+          on_active:
+            - logger.log:
+                format: "Leak alarm: visual=%d audible=%d"
+                args: [visual, audible]
+        sensitivity:
+          levels: 3
+          default: 1
+          number: leak_sensitivity
+    4:
+      contact_sensor:
+        boolean_state: front_door
+        alarms:
+          visual: true
+    5:
+      rain_sensor:
+        boolean_state: roof_rain
+        sensitivity:
+          levels: 5
+    # Smoke/CO alarm with the optional bindings and the self test hook.
+    6:
+      smoke_co_alarm:
+        smoke_state: kitchen_smoke
+        co_state: kitchen_co
+        hardware_fault: alarm_fault
+        end_of_service: alarm_expired
+        device_muted: alarm_muted
+        self_test_duration: 8s
+        on_self_test:
+          - logger.log: Smoke alarm self test requested
+    # The application tracks the test itself.
+    7:
+      smoke_co_alarm:
+        smoke_state: hall_smoke
+        test_in_progress: hall_testing
+        on_self_test:
+          - binary_sensor.template.publish:
+              id: hall_testing
+              state: true
+          - delay: 3s
+          - binary_sensor.template.publish:
+              id: hall_testing
+              state: false
+    # Air quality: a 0-6 index sensor, derived from PM2.5 with the default thresholds, or from VOC with thresholds.
+    8:
+      air_quality_sensor:
+        air_quality: air_quality_index
+        carbon_dioxide: co2
+    9:
+      air_quality_sensor:
+        air_quality:
+          sensor: pm_2_5
+        pm_2_5: pm_2_5
+    10:
+      air_quality_sensor:
+        air_quality:
+          sensor: tvoc_ppb
+          thresholds:
+            fair: 220
+            moderate: 660
+            poor: 2200
+    # Refrigerator with a mode list bound to a select and a door alarm.
+    11:
+      refrigerator:
+        modes:
+          - label: Normal
+            tags: [auto]
+          - label: Rapid cool
+            tags: [rapid_cool]
+          - label: Vacation
+            tags: [vacation, low_energy]
+            option: Away
+        mode_select: fridge_mode
+        door_open: fridge_door
+
+binary_sensor:
+  - platform: template
+    id: hallway_motion
+    device_class: motion
+  - platform: template
+    id: office_presence
+    device_class: presence
+  - platform: template
+    id: basement_leak
+    device_class: moisture
+  - platform: template
+    id: front_door
+    device_class: door
+  - platform: template
+    id: roof_rain
+    device_class: moisture
+  - platform: template
+    id: kitchen_smoke
+    device_class: smoke
+  - platform: template
+    id: kitchen_co
+    device_class: carbon_monoxide
+  - platform: template
+    id: alarm_fault
+    device_class: problem
+  - platform: template
+    id: alarm_expired
+    device_class: problem
+  - platform: template
+    id: alarm_muted
+  - platform: template
+    id: hall_smoke
+    device_class: smoke
+  - platform: template
+    id: hall_testing
+  - platform: template
+    id: fridge_door
+    device_class: door
+
+number:
+  - platform: template
+    id: hallway_hold_time
+    optimistic: true
+    min_value: 5
+    max_value: 600
+    step: 1
+    restore_value: true
+    initial_value: 45
+    unit_of_measurement: s
+  - platform: template
+    id: leak_sensitivity
+    optimistic: true
+    min_value: 0
+    max_value: 2
+    step: 1
+    restore_value: true
+    initial_value: 1
+
+select:
+  - platform: template
+    id: fridge_mode
+    options:
+      - Normal
+      - Rapid cool
+      - Away
+    optimistic: true
+    initial_option: Normal
+
+sensor:
+  - platform: template
+    id: air_quality_index
+    lambda: return 1;
+  - platform: template
+    id: co2
+    unit_of_measurement: "ppm"
+    device_class: carbon_dioxide
+    lambda: return 612.0;
+  - platform: template
+    id: pm_2_5
+    unit_of_measurement: "µg/m³"
+    device_class: pm25
+    lambda: return 6.0;
+  - platform: template
+    id: tvoc_ppb
+    unit_of_measurement: "ppb"
+    device_class: volatile_organic_compounds_parts
+    lambda: return 120.0;

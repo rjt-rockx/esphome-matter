@@ -33,6 +33,8 @@ _ACCEPTED_DEVICE_CLASSES = {
     ("occupancy_sensor", "occupancy"): frozenset({"motion", "occupancy", "presence"}),
     ("smoke_co_alarm", "smoke_state"): frozenset({"smoke"}),
     ("smoke_co_alarm", "co_state"): frozenset({"carbon_monoxide"}),
+    ("smoke_co_alarm", "hardware_fault"): frozenset({"problem", "tamper"}),
+    ("smoke_co_alarm", "end_of_service"): frozenset({"problem"}),
 }
 
 # Device types that device classes are a natural fit for. Used to make the warnings actionable.
@@ -122,6 +124,17 @@ def resolve_inverted(device_type, sensor_attribute, device_config: dict, device_
     return device_type.name == "contact_sensor" and device_class in OPENING_DEVICE_CLASSES
 
 
+# Smoke CO Alarm attribute (conf key) -> (converter in matter_binary_sensors.h, updater in matter_binary_sensors.h)
+_SMOKE_CO_BINDINGS = {
+    "smoke_state": ("alarm_state", "update_smoke_state_attribute"),
+    "co_state": ("alarm_state", "update_co_state_attribute"),
+    "hardware_fault": ("boolean_state", "update_hardware_fault_attribute"),
+    "test_in_progress": ("boolean_state", "update_test_in_progress_attribute"),
+    "end_of_service": ("end_of_service", "update_end_of_service_attribute"),
+    "device_muted": ("mute_state", "update_device_muted_attribute"),
+}
+
+
 @dataclass(frozen=True)
 class BinaryBinding:
     converter: str  # esphome::matter::conversion::<converter>
@@ -149,11 +162,8 @@ def resolve_binding(device_type, sensor_attribute, device_config: dict, device_c
             inverted,
         )
     if cluster_name == "SmokeCOAlarm":
-        updater = {
-            "smoke_state": "update_smoke_state_attribute",
-            "co_state": "update_co_state_attribute",
-        }[sensor_attribute.conf_key]
-        return BinaryBinding(f"alarm_state{suffix}", updater, BINARY_SENSORS_INCLUDE, inverted)
+        converter, updater = _SMOKE_CO_BINDINGS[sensor_attribute.conf_key]
+        return BinaryBinding(f"{converter}{suffix}", updater, BINARY_SENSORS_INCLUDE, inverted)
     raise cv.Invalid(
         f"Binary sensors cannot be bound to the {cluster_name} cluster ({sensor_attribute.conf_key})"
     )
