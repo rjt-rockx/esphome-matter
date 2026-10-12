@@ -4,8 +4,7 @@
 #
 # Not covered, because they exclude each other or need another radio setup: Thread / ICD
 # (esp32-thread.yaml, esp32-*-icd.yaml), BLE only commissioning (esp32-ble-commissioning.yaml),
-# Ethernet (esp32-ethernet.yaml) and the cooktop device type (its OnOff conformance cannot
-# be resolved yet).
+# Ethernet (esp32-ethernet.yaml).
 esphome:
   name: matter-ci-compile-all
   friendly_name: Compile All
@@ -740,6 +739,8 @@ matter:
     130:
       microwave_oven:
         with_features: [PowerAsNumber]
+    131:
+      cooktop: {}
 
     # ---------------------------------------------------------------------------------------------
     # Electrical Sensor topologies

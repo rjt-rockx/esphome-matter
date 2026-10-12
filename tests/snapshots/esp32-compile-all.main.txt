@@ -228,7 +228,7 @@
   matter_mattercomponent_id->register_sensor_attribute(battery_voltage, 0, 47, 11, esphome::matter::conversion::millivolts);
   matter_mattercomponent_id->register_binary_sensor_attribute(battery_replace, 0, 47, 15, esphome::matter::conversion::boolean_state);
   matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(0, 47, 26, 3, 0, {{battery_charging, 1}, {battery_full, 2}}));
-  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(0, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 140, 141, 142, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(0, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 140, 141, 142, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177}));
   matter_mattercomponent_id->register_endpoint(0, [](esp_matter::endpoint_t *endpoint) -> bool {
     if (esp_matter::endpoint::add_device_type(endpoint, esp_matter::endpoint::power_source::get_device_type_id(), esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 0: device type power_source on the root node");
@@ -2011,6 +2011,13 @@
       return MATTER_BUILD_FAIL("endpoint 130: device type microwave_oven");
     return true;
   });
+  matter_mattercomponent_id->register_endpoint_parent(131, 0);
+  matter_mattercomponent_id->register_endpoint(131, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::cooktop::config_t device_config_0{};
+    if (esp_matter::endpoint::cooktop::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 131: device type cooktop");
+    return true;
+  });
   matter_mattercomponent_id->register_electrical_power_sensor(topo_voltage, 140, 4, esphome::matter::conversion::volts);
   matter_mattercomponent_id->register_electrical_power_sensor(topo_total_power, 140, 8, esphome::matter::conversion::watts);
   matter_mattercomponent_id->register_electrical_energy_sensor(topo_total_energy, 140, 1, esphome::matter::conversion::kilowatt_hours);
@@ -2500,4 +2507,4 @@
       return MATTER_BUILD_FAIL("endpoint 60585: device type aggregator");
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xBA3A6818);
+  matter_mattercomponent_id->set_structure_hash(0x13D53AC0);
