@@ -1,21 +1,32 @@
+# Hardware: ESP32-C6 or ESP32-H2 board (default esp32-c6-devkitc-1) with two push buttons to GND (GPIO0, GPIO1).
+# Demonstrates: a Matter dimmer switch (controller side). Short press toggles a bound light on/off, holding
+# dims it up/down via Matter binding commands (matter.send_command).
+#
 # This example involved a pre-configured openthread network. This way, the api is immediately available, even before
 # matter is commissioned.
 # After commissioning, the binding cluster (0x1e or 31) of the dimmer switch endpoint needs to be configured to point
 # to the node ID and cluster ID of a Matter light. Configure this through the Binding cluster in your Matter
 # controller. The controller must also grant this device access to the light through the light's ACL.
 
+substitutions:
+  name: matter-dimmer-button
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  button_up_pin: GPIO0
+  button_down_pin: GPIO1
+
 esphome:
-  name: matter-device
-  friendly_name: Matter Device
+  name: ${name}
+  friendly_name: Matter Dimmer Button
 
 esp32:
-  toolchain: platformio
-  variant: # Set to your variant
+  board: ${board}
+  variant: ${variant}
   framework:
     type: esp-idf
 
 external_components:
-  - source: github://DavidvtWout/esphome-matter@main
+  - source: github://rjt-rockx/esphome-matter@main
 
 logger:
 
@@ -38,7 +49,7 @@ binary_sensor:
   - name: "Button up"
     platform: gpio
     pin:
-      number: GPIO0
+      number: ${button_up_pin}
       mode:
         pullup: true
         input: true
@@ -57,7 +68,7 @@ binary_sensor:
     id: button_down
     platform: gpio
     pin:
-      number: GPIO1
+      number: ${button_down_pin}
       mode:
         pullup: true
         input: true

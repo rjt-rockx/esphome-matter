@@ -12,6 +12,11 @@ is written next to it (so relative paths keep working) with:
   ``toolchain: esp-idf`` so the native ESP-IDF toolchain is used. With
   ``--toolchain keep`` (default) the toolchain line is left untouched.
 
+* remote ``packages:`` entries pointing at an esphome-matter repository (the
+  ``url:``/``files:`` form, with optional ``vars``, or the
+  ``github://owner/esphome-matter/<path>@ref`` shorthand) rewritten to local
+  ``!include`` entries of the ``packages/`` directory in this checkout.
+
 A ``secrets.yaml`` with dummy values is created next to the config for every
 ``!secret <key>`` that is not defined yet (never overwrites existing keys).
 
@@ -45,6 +50,79 @@ GIT_SRC_RE = re.compile(
     r"source:[ \t]*\n(?P<i>[ \t]+)type:[ \t]*git[ \t]*\n"
     r"(?:(?P=i)(?:url|ref|path|username|password):[^\n]*\n)+"
 )
+
+
+PKG_URL_RE = re.compile(
+    r"^(?P<i>[ \t]*)url:[ \t]*https://github\.com/[^/\s]+/esphome-matter(?:\.git)?[ \t]*$"
+)
+PKG_SHORT_RE = re.compile(
+    r"^(?P<i>[ \t]*)(?P<k>[\w\-]+):[ \t]*github://[^/\s]+/esphome-matter/(?P<p>[^@\s]+?)(?:@\S+)?[ \t]*$"
+)
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def rewrite_packages(text: str, src_dir: Path) -> str:
+    """Rewrite remote esphome-matter ``packages:`` entries to local includes."""
+    root = os.path.relpath(REPO_ROOT, src_dir)
+    lines = text.split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = PKG_SHORT_RE.match(line)
+        if m:
+            out.append(f"{m['i']}{m['k']}: !include {root}/{m['p']}")
+            i += 1
+            continue
+        if PKG_URL_RE.match(line) and out:
+            u = _indent(line)
+            # the package key is the previous line (parent mapping key)
+            key_line = out.pop()
+            key = key_line.strip().rstrip(":")
+            key_ind = " " * _indent(key_line)
+            j = i + 1
+            block: list[str] = []
+            while j < len(lines) and (not lines[j].strip() or _indent(lines[j]) >= u):
+                block.append(lines[j])
+                j += 1
+            entries: list[tuple[str, list[str]]] = []
+            k = 0
+            while k < len(block):
+                b = block[k].strip()
+                if b.startswith("- path:") or (b.startswith("- ") and ":" not in b):
+                    path = b[2:].replace("path:", "", 1).strip()
+                    ind = _indent(block[k])
+                    k += 1
+                    vars_: list[str] = []
+                    while k < len(block) and (
+                        not block[k].strip() or _indent(block[k]) > ind
+                    ):
+                        vars_.append(block[k])
+                        k += 1
+                    entries.append((path, vars_))
+                else:
+                    k += 1
+            for n, (path, vars_) in enumerate(entries):
+                name = key if len(entries) == 1 else f"{key}_{n}"
+                vlines = [v for v in vars_ if v.strip() and v.strip() != "vars:"]
+                if vlines:
+                    base = min(_indent(v) for v in vlines)
+                    out.append(f"{key_ind}{name}: !include")
+                    out.append(f"{key_ind}  file: {root}/{path}")
+                    out.append(f"{key_ind}  vars:")
+                    out.extend(f"{key_ind}    {v[base:]}" for v in vlines)
+                else:
+                    out.append(f"{key_ind}{name}: !include {root}/{path}")
+            while j > i and not lines[j - 1].strip():
+                j -= 1  # keep trailing blank lines
+            i = j
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
 
 
 def ensure_secrets(directory: Path, text: str) -> None:
@@ -82,6 +160,7 @@ def main() -> None:
         rel = os.path.relpath(COMPONENTS, src.parent)
         text = GITHUB_SRC_RE.sub(f"source: {rel}", text)
         text = GIT_SRC_RE.sub(lambda m: f"source: {rel}\n", text)
+        text = rewrite_packages(text, src.parent)
     if args.toolchain == "esp-idf":
         text = re.sub(
             r"^(\s*toolchain:\s*)platformio\b", r"\1esp-idf", text, flags=re.MULTILINE
