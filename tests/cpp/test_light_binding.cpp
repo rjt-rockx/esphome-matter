@@ -1038,6 +1038,69 @@ TEST(light_window_gives_up_waiting_for_chip_after_the_retry_limit) {
   CHECK_EQ(s.l.requests.size(), (size_t) 2);  // the command, then the forced settle
 }
 
+TEST(light_chip_steps_do_not_leak_when_chip_outlasts_the_nominal_window) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 3000));
+  s.r.p.settle();
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  CHECK_EQ(s.l.requests[0].transition_ms, (uint32_t) 3000);
+
+  // CHIP is much slower than the 3 s it was given: it is at 21 and still has 30 deciseconds to go.
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(30);
+  uint8_t level = 21;
+  s.r.p.store[{EP, LEVEL_CLUSTER, CURRENT_LEVEL}] = level_val(level);
+
+  // The nominal time and the margin pass; the CHIP task is busy and has not answered the check yet. A step that
+  // arrives in between must not move the light.
+  s.r.p.advance(3600);
+  level += 4;
+  matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(level));
+  s.r.p.run_main();
+  CHECK_EQ(s.l.requests.size(), (size_t) 1);
+  CHECK(s.l.window_light());
+
+  // Then the check runs: CHIP is not done. The windows stay open across any number of rounds, each with a step.
+  for (int i = 0; i < 30; i++) {
+    s.r.p.settle();
+    level += 4;
+    matter_writes(s.r.p, LEVEL_CLUSTER, CURRENT_LEVEL, level_val(level));
+    s.r.p.run_main();
+    s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS + 10);
+    CHECK_EQ(s.l.requests.size(), (size_t) 1);
+    CHECK(s.l.window_light());
+  }
+  CHECK_NEAR(s.l.view.brightness, 200 / 254.0, 0.001);
+
+  // CHIP arrives: one settle, on the final value.
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(0);
+  s.r.p.store[{EP, LEVEL_CLUSTER, CURRENT_LEVEL}] = level_val(200);
+  s.r.p.advance(MatterLightBinding::SETTLE_RETRY_MS + 10);
+  s.r.p.settle();
+  CHECK(!s.l.window_light());
+  CHECK_EQ(s.l.requests.size(), (size_t) 2);
+  CHECK_NEAR(*s.l.requests[1].brightness, 200 / 254.0, 0.001);
+  CHECK_EQ(s.l.requests[1].transition_ms, (uint32_t) 0);
+}
+
+TEST(light_new_command_cancels_the_wait_for_the_old_one) {
+  Started s;
+  s.l.requests.clear();
+  s.l.submit_cmd(level_command(200, 1000));
+  s.r.p.settle();
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(30);
+  s.r.p.advance(1600);  // the idle check of the first command is requested, not served yet
+  // A second command arrives before the answer: the answer belongs to the old window and is dropped.
+  s.l.submit_cmd(level_command(50, 10000));
+  s.r.p.settle();
+  size_t n = s.l.requests.size();
+  s.r.p.store[{EP, LEVEL_CLUSTER, LEVEL_REMAINING_TIME}] = u16_val(0);
+  s.r.p.advance(500);
+  s.r.p.settle();
+  CHECK(s.l.window_light());  // the second command's window (10 s) is still open
+  CHECK_EQ(s.l.requests.size(), n);
+}
+
 TEST(light_push_leaves_the_colour_alone_while_a_colour_command_runs) {
   Started s;
   MatterLightCommand c;

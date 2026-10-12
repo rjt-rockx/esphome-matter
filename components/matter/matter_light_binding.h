@@ -480,6 +480,7 @@ protected:
       // items below run after this), and the light settles on CHIP's state.
       if (!this->color_loop_requested_.load())
         this->stop_color_loop_effect_();
+      this->cancel_idle_wait_();
       this->light_window_active_ = false;
       this->color_window_active_ = false;
       this->request_state_read_(true, true, true);
@@ -753,8 +754,9 @@ protected:
                         light_ids::COLOR_REMAINING_TIME, remaining) &&
         remaining != 0)
       busy = true;
-    binding_platform()->defer_main([this, light, color, busy]() {
-      this->window_end_checked_(light, color, busy);
+    uint32_t epoch = this->idle_epoch_.load();
+    binding_platform()->defer_main([this, light, color, busy, epoch]() {
+      this->window_end_checked_(light, color, busy, epoch);
     });
   }
 
@@ -768,14 +770,19 @@ protected:
     return std::fabs(a - b) < RGB_EPSILON;
   }
 
+  // The window of a command is open: its nominal time has not passed, or it has
+  // and the check whether CHIP is really done is still on its way (CHIP can be
+  // much slower than the nominal time, and its steps must not leak in between).
   bool light_group_suppressed_(uint32_t now) const {
     return this->light_window_active_ &&
-           is_before_(now, this->light_window_until_ms_);
+           (this->idle_light_wait_ ||
+            is_before_(now, this->light_window_until_ms_));
   }
   // A window of a command (or the end of a color loop) is open.
   bool color_window_open_(uint32_t now) const {
     return this->color_window_active_ &&
-           is_before_(now, this->color_window_until_ms_);
+           (this->idle_color_wait_ ||
+            is_before_(now, this->color_window_until_ms_));
   }
   // CHIP's colour attribute writes are ignored: a window is open or the effect
   // of a color loop runs (the steps of the loop belong to the effect).
@@ -958,6 +965,7 @@ protected:
     if (command.stop_light || command.stop_color) {
       // The values to settle on follow from the CHIP task: CHIP stops where it
       // is, so the light does as well.
+      this->cancel_idle_wait_();
       if (command.stop_light)
         this->light_window_active_ = false;
       if (command.stop_color)
@@ -1025,6 +1033,8 @@ protected:
     uint32_t window_ms =
         std::max(command.transition_ms, command.chip_transition_ms) +
         COMMAND_MARGIN_MS;
+    if (command.light_group || command.color_group)
+      this->cancel_idle_wait_();
     if (command.light_group) {
       this->light_window_active_ = true;
       this->light_window_until_ms_ = now + window_ms;
@@ -1053,8 +1063,9 @@ protected:
 
   void finish_command_windows_() {
     uint32_t now = binding_platform()->now_ms();
-    // A newer command extended a window; its own timer finishes it. A running
-    // color loop doesn't keep the windows open: it has no window.
+    // A newer command extended a window (or a check is on its way); its own
+    // timer finishes it. A running color loop doesn't keep the windows open: it
+    // has no window.
     if (this->light_group_suppressed_(now) || this->color_window_open_(now))
       return;
     bool light = this->light_window_active_;
@@ -1064,7 +1075,12 @@ protected:
     this->settle_when_idle_(light, color);
   }
 
+  // The nominal time is over. The windows stay open (idle_*_wait_) until the
+  // CHIP task reports that its transitions are done: they run behind the nominal
+  // time when CHIP is busy, and their steps are not the light's business.
   void settle_when_idle_(bool light, bool color) {
+    this->idle_light_wait_ = light;
+    this->idle_color_wait_ = color;
     uint8_t bits = 0;
     if (light)
       bits |= CTL_IDLE_LIGHT;
@@ -1073,24 +1089,31 @@ protected:
     this->request_ctl_(bits);
   }
 
+  // A command, a stop or a local change ends the wait for the idle check; its
+  // answer is dropped.
+  void cancel_idle_wait_() {
+    this->idle_light_wait_ = false;
+    this->idle_color_wait_ = false;
+    this->idle_epoch_.fetch_add(1);
+  }
+
   // Main loop: the CHIP task checked whether its transitions are done.
-  void window_end_checked_(bool light, bool color, bool busy) {
-    uint32_t now = binding_platform()->now_ms();
-    // A newer command has its own timer.
-    if (this->light_group_suppressed_(now) || this->color_window_open_(now))
+  void window_end_checked_(bool light, bool color, bool busy, uint32_t epoch) {
+    // Cancelled: a newer command has its own timer.
+    if (epoch != this->idle_epoch_.load())
       return;
     if (busy && this->settle_retries_ < SETTLE_MAX_RETRIES) {
       this->settle_retries_++;
-      if (light)
-        this->light_window_until_ms_ = now + SETTLE_RETRY_MS;
-      if (color)
-        this->color_window_until_ms_ = now + SETTLE_RETRY_MS;
-      binding_platform()->main_after(SETTLE_RETRY_MS, [this]() {
-        this->finish_command_windows_();
+      // The windows stay open; ask again later.
+      binding_platform()->main_after(SETTLE_RETRY_MS, [this, light, color,
+                                                       epoch]() {
+        if (epoch == this->idle_epoch_.load())
+          this->settle_when_idle_(light, color);
       });
       return;
     }
     this->settle_retries_ = 0;
+    this->cancel_idle_wait_();
     this->light_window_active_ = false;
     this->color_window_active_ = false;
     this->request_state_read_(true, light, color);
@@ -1104,6 +1127,7 @@ protected:
     bool color = this->color_window_active_;
     if (!light && !color)
       return;
+    this->cancel_idle_wait_();
     this->light_window_active_ = false;
     this->color_window_active_ = false;
     this->pending_ = MatterLightPendingUpdate{};
@@ -1295,6 +1319,10 @@ protected:
   // attribute values.
   bool light_window_active_{false};
   uint32_t light_window_until_ms_{0};
+  // The nominal time of the window is over and the check whether CHIP is done
+  // (RemainingTime 0) is on its way or must be repeated.
+  bool idle_light_wait_{false};
+  bool idle_color_wait_{false};
   bool color_window_active_{false};
   uint32_t color_window_until_ms_{0};
   // Last colour that was reported to Matter, to avoid needlessly rewriting
@@ -1314,6 +1342,7 @@ private:
   ChipWorkSlot ctl_slot_;
   std::atomic<uint8_t> ctl_bits_{0};
   std::atomic<uint8_t> stop_level_{1};
+  std::atomic<uint32_t> idle_epoch_{0};
   std::atomic<bool> rereport_after_deactivate_{false};
   std::atomic<bool> color_read_pending_{false};
 };
