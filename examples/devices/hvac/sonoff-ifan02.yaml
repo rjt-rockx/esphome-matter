@@ -1,0 +1,102 @@
+# mirrors: sonoff-ifan02
+# Mirrors: Sonoff iFan02-style ceiling fan controller (catalog sonoff-ifan02, evidence=inferred)
+#   EP1 fan: FanControl[MS,AU] (3 speeds, Off/Low/Med/High);  EP2 on_off_light (relay)
+# Natural build (community ESPHome config): three speed relays driven from one `speed` fan through a template output
+# plus a light relay.  Variant (c) "other": fan speed realised with relays, not PWM.
+#
+# Matches:  fan (SpeedMax 3) + on_off_light as siblings.
+# Differs:  Auto (AU) in the catalog is not available (no ESPHome auto fan mode): ACCEPTABLE.
+
+substitutions:
+  name: matter-ifan02
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: ifan
+    2:
+      on_off_light:
+        light_id: ifan_light
+
+switch:
+  - platform: gpio
+    id: relay_speed_1
+    pin: GPIO2
+    interlock: &speed_relays [relay_speed_1, relay_speed_2, relay_speed_3]
+  - platform: gpio
+    id: relay_speed_2
+    pin: GPIO3
+    interlock: *speed_relays
+  - platform: gpio
+    id: relay_speed_3
+    pin: GPIO6
+    interlock: *speed_relays
+
+output:
+  - platform: gpio
+    id: light_out
+    pin: GPIO7
+  - platform: template
+    id: fan_speed_output
+    type: float
+    write_action:
+      - if:
+          condition:
+            lambda: return state < 0.01f;
+          then:
+            - switch.turn_off: relay_speed_1
+            - switch.turn_off: relay_speed_2
+            - switch.turn_off: relay_speed_3
+          else:
+            - if:
+                condition:
+                  lambda: return state < 0.4f;
+                then:
+                  - switch.turn_on: relay_speed_1
+                else:
+                  - if:
+                      condition:
+                        lambda: return state < 0.7f;
+                      then:
+                        - switch.turn_on: relay_speed_2
+                      else:
+                        - switch.turn_on: relay_speed_3
+
+fan:
+  - platform: speed
+    id: ifan
+    name: Ceiling fan
+    output: fan_speed_output
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: binary
+    id: ifan_light
+    name: Ceiling light
+    output: light_out
+    restore_mode: ALWAYS_OFF

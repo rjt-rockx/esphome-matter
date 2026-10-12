@@ -1,0 +1,111 @@
+# mirrors: eve-thermo-v5
+# Mirrors: Eve Thermo (5th gen) radiator valve, HA fixture eve_thermo_v5.json (evidence=dump, Thread ICD)
+#   source: home-assistant/core tests/components/matter/fixtures/nodes/eve_thermo_v5.json
+#   EP0 root + device types OTA Requestor, Power Source (BAT,REPLC; EndpointList=[1]), ICD Management, vendor cluster
+#   EP1 thermostat (0x0301 rev 4): Thermostat[HEAT,PRES], ThermostatUserInterfaceConfiguration, Binding,
+#       vendor cluster 0x130AFC01; CLIENT Temperature Measurement (remote sensing through a binding)
+# Natural build: radiator valve = heat-only ESPHome `thermostat` climate with a gpio "valve open" switch, a local
+# NTC temperature sensor, and a battery level template sensor.  Variant (b) explicit `endpoints:`  <- this file.
+# See eve-thermo-v5-expose.yaml for the shorthand.
+#
+# Matches:  thermostat device type, Heating-only (derived from the climate: HEAT mode only), SystemMode,
+#           setpoints, LocalTemperature (from the local NTC), battery % in a Power Source cluster.
+# Differs:  * Power Source is on EP1 here (`battery:` on the endpoint), the dump has it on EP0 with an EndpointList of
+#             all application endpoints, which is what Apple/HA expect for a node battery: GAP-COMPONENT G4 (M3
+#             "node Power Source on EP0").  `battery:` on a thermostat is ACCEPTABLE for HA (it reads it by endpoint).
+#           * Presets (PRES), UI configuration and Binding cluster are not created for a bound climate: G7 (S/M).
+#           * Client TemperatureMeasurement + Binding for REMOTE temperature sensing is not expressible: G5 (L).
+#           * ICD Management (Thread SED) not available: out of category (KNOWLEDGE b10).
+
+substitutions:
+  name: matter-radiator-valve
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      thermostat:
+        climate_id: radiator
+      battery: battery_level
+
+sensor:
+  - platform: ntc
+    sensor: ntc_resistance
+    id: room_temperature
+    calibration:
+      - 10kOhm -> 25°C
+      - 27.219kOhm -> 0°C
+      - 14.085kOhm -> 15°C
+    unit_of_measurement: °C
+    device_class: temperature
+  - platform: resistance
+    id: ntc_resistance
+    sensor: ntc_adc
+    configuration: DOWNSTREAM
+    resistor: 10kOhm
+    internal: true
+  - platform: adc
+    id: ntc_adc
+    pin: GPIO0
+    attenuation: 12db
+    update_interval: 30s
+    internal: true
+  - platform: template
+    id: battery_level
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    accuracy_decimals: 0
+    update_interval: 5min
+    lambda: |-
+      return clamp((id(battery_voltage).state - 2.0f) / 1.0f * 100.0f, 0.0f, 100.0f);
+  - platform: adc
+    id: battery_voltage
+    pin: GPIO1
+    attenuation: 12db
+    update_interval: 5min
+    internal: true
+
+switch:
+  - platform: gpio
+    id: valve_motor
+    pin: GPIO10
+
+climate:
+  - platform: thermostat
+    id: radiator
+    name: Radiator
+    sensor: room_temperature
+    visual:
+      min_temperature: 5 °C
+      max_temperature: 30 °C
+      temperature_step: 0.5 °C
+    min_heating_off_time: 60s
+    min_heating_run_time: 60s
+    min_idle_time: 30s
+    heat_action:
+      - switch.turn_on: valve_motor
+    idle_action:
+      - switch.turn_off: valve_motor

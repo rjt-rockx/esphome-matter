@@ -1,0 +1,61 @@
+# mirrors: switchbot-circulator-fan-pid0802
+# Mirrors: SwitchBot Circulator Fan (DCL vid 5015 pid 0x0802, device type Fan 0x002B; evidence=doc).
+#   EP1 fan: FanControl.  Nothing else is known from the DCL.
+# Natural build: BLDC circulator fan on an H-bridge driver, 100 speed steps, no oscillation motor.
+# Variant (c) "other": hbridge fan platform with percentage steps (speed_count 100), the simplest Matter fan.
+#
+# Matches:  fan device type + MultiSpeed(SpeedMax=100), FanModeSequence Off/Low/Med/High.
+# Differs:  none known.  SpeedMax=100 is accepted; every percent is a discrete ESPHome speed so
+#           PercentSetting == SpeedSetting (ACCEPTABLE, controllers show a 0-100 % slider).
+# Note:     `restore_mode: ALWAYS_OFF` is required, otherwise the component logs a warning (docs/fan.md).
+
+substitutions:
+  name: matter-circulator-fan
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: circulator
+
+output:
+  - platform: ledc
+    id: motor_pwm_a
+    pin: GPIO2
+    frequency: 20kHz
+  - platform: ledc
+    id: motor_pwm_b
+    pin: GPIO3
+    frequency: 20kHz
+
+fan:
+  - platform: hbridge
+    id: circulator
+    name: Circulator
+    pin_a: motor_pwm_a
+    pin_b: motor_pwm_b
+    decay_mode: slow
+    restore_mode: ALWAYS_OFF

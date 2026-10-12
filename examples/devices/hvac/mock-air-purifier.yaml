@@ -1,0 +1,101 @@
+# mirrors: mock-air-purifier
+# Mirrors: HA fixture mock_air_purifier.json / chef air purifier (evidence=dump, SDK mock)
+#   EP1 air_purifier (0x002D): FanControl[SPD,AUT,RCK,WND,STEP,DIR], HEPAFilterMonitoring[CON,WRN,REP],
+#       ActivatedCarbonFilterMonitoring[CON,WRN,REP]
+#   EP2 air_quality_sensor (parent 1) with AirQuality + concentration clusters; EP3 temperature, EP4 humidity (parent 1)
+#   EP5 thermostat (SDK mock only, not built here)
+# Natural build: speed fan + PMS5003 (PM1/2.5/10) + SCD41 (CO2, T, RH).
+# Variant (b) explicit `endpoints:` <- this file.
+#
+# Matches:  air_purifier on EP1 (FanControl is a required cluster of the type, so it exists), air_quality_sensor on
+#           a child endpoint merging PM1/PM2.5/PM10/CO2 into one endpoint, temperature and humidity children.
+# Differs:  * The ESPHome fan is NOT bound to the purifier's FanControl (`fan_id` only exists on the `fan` type): the
+#             purifier fan is a dead cluster, G1/G8 (M).
+#           * HEPA/carbon filter monitoring needs `clusters:` (B1) and has no entity to feed Condition/ChangeIndication:
+#             see _gaps/air-purifier-filters.yaml, G11 (M).
+#           * AirQuality enum stays Unknown (no index to bind), G12 (S).
+#           * Concentration LevelIndication/Peak/Average features of the dump (MEA,LEV,MED,CRI,PEA,AVG) cannot be
+#             derived from a single sensor; only numeric measurement: ACCEPTABLE.
+
+substitutions:
+  name: matter-air-purifier
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      air_purifier:
+    2:
+      parent: 1
+      air_quality_sensor:
+        pm_1: pm1
+        pm_2_5: pm25
+        pm_10: pm10
+        carbon_dioxide: co2
+    3:
+      parent: 1
+      temperature_sensor: room_temperature
+    4:
+      parent: 1
+      humidity_sensor: room_humidity
+
+uart:
+  rx_pin: GPIO2
+  baud_rate: 9600
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: pmsx003
+    type: PMSX003
+    pm_1_0:
+      id: pm1
+    pm_2_5:
+      id: pm25
+    pm_10_0:
+      id: pm10
+  - platform: scd4x
+    co2:
+      id: co2
+    temperature:
+      id: room_temperature
+    humidity:
+      id: room_humidity
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO3
+    frequency: 25kHz
+
+fan:
+  - platform: speed
+    id: purifier_fan
+    name: Purifier fan
+    output: fan_pwm
+    speed_count: 3
+    restore_mode: ALWAYS_OFF

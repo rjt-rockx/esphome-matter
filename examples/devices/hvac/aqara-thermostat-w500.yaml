@@ -1,0 +1,106 @@
+# mirrors: aqara-thermostat-w500
+# Mirrors: Aqara Smart Thermostat W500 (floor heating), HA fixture aqara_thermostat_w500.json (evidence=dump)
+#   source: home-assistant/core tests/components/matter/fixtures/nodes/aqara_thermostat_w500.json
+#   EP0 root + device types Electrical Sensor (0x0510), OTA Requestor
+#   EP1 thermostat (0x0301): Thermostat[HEAT,SB] (heat only + setback), ThermostatUserInterfaceConfiguration
+#   EP2 humidity_sensor (0x0307); flat PartsList (EP1, EP2 both children of root)
+# Natural build: floor-heating relay + NTC floor probe + SHT4x room sensor + CT-clamp/HLW8012-style power meter.
+# Variant (b) explicit `endpoints:`.  Power/energy ride on the thermostat endpoint as a second device type
+# (DIRECTION s3 D11 "Electrical Sensor rides on the plug endpoint"; the dump uses EP0).
+#
+# Matches:  thermostat HEAT-only (from climate traits), separate humidity endpoint, electrical sensor, flat tree.
+# Differs:  * Electrical Sensor is on EP1 not EP0: ACCEPTABLE (controllers read per-endpoint; EP0 cannot take an
+#             application device type in this component anyway).
+#           * Setback (SB) feature and ThermostatUserInterfaceConfiguration (child lock, keypad lockout) are not
+#             derivable from a climate: GAP-COMPONENT G7 (`with_features: [setback]` is accepted but has no behaviour).
+#           * The Aqara has the room temperature from its own sensor and the NTC floor probe as a limit: our climate
+#             only has one `sensor:`.
+
+substitutions:
+  name: matter-floor-heating
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      thermostat:
+        climate_id: floor_heating
+      electrical_sensor:
+        active_power: heater_power
+        energy_imported: heater_energy
+    2:
+      humidity_sensor: room_humidity
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: room_temperature
+      name: Room temperature
+    humidity:
+      id: room_humidity
+      name: Room humidity
+    update_interval: 30s
+  - platform: hlw8012
+    sel_pin: GPIO2
+    cf_pin: GPIO3
+    cf1_pin: GPIO10
+    current_resistor: 0.001 ohm
+    voltage_divider: 770
+    power:
+      id: heater_power
+      name: Heater power
+      unit_of_measurement: W
+      device_class: power
+    energy:
+      id: heater_energy
+      name: Heater energy
+      unit_of_measurement: Wh
+      device_class: energy
+
+switch:
+  - platform: gpio
+    id: floor_relay
+    pin: GPIO11
+
+climate:
+  - platform: thermostat
+    id: floor_heating
+    name: Floor heating
+    sensor: room_temperature
+    visual:
+      min_temperature: 5 °C
+      max_temperature: 35 °C
+      temperature_step: 0.5 °C
+    min_heating_off_time: 120s
+    min_heating_run_time: 120s
+    min_idle_time: 60s
+    heat_action:
+      - switch.turn_on: floor_relay
+    idle_action:
+      - switch.turn_off: floor_relay

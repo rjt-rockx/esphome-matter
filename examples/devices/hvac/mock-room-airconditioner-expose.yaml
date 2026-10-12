@@ -1,0 +1,67 @@
+# mirrors: mock-room-airconditioner
+# Mirrors: HA fixture mock_room_airconditioner.json (see mock-room-airconditioner.yaml).
+# Variant (a) `expose:` shorthand, what a user would try first.
+#
+# Matches:  RAC device type + OnOff + Thermostat on one endpoint; temperature_sensor inferred from the sensor.
+# Differs:  * `climate` has no inference rule yet, `as: room_air_conditioner` is required (otherwise a hard error
+#             "no device type is inferred for this climate"); DIRECTION s6 says climate -> thermostat by default.
+#           * No way to say "this sensor is a PART of the AC" (parent:) or to add FanControl: the expose item has
+#             neither `parent:` nor `clusters:`.  The temperature sensor lands as a sibling under root (G2, G3).
+#           * `attach_to:` could put TemperatureMeasurement on the AC endpoint, but a RAC does not list it as an
+#             optional cluster (the dump has the sensor on its own child endpoint), so it is not used here.
+
+substitutions:
+  name: matter-room-ac-expose
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: split_ac, as: room_air_conditioner}
+    - room_temperature
+
+remote_transmitter:
+  pin: GPIO2
+  carrier_duty_percent: 50%
+
+sensor:
+  - platform: dht
+    pin: GPIO3
+    model: DHT22
+    temperature:
+      id: room_temperature
+      name: Room temperature
+    update_interval: 30s
+
+climate:
+  - platform: coolix
+    id: split_ac
+    name: Split AC
+    sensor: room_temperature
+    supports_heat: true
+    supports_cool: true
+    visual:
+      min_temperature: 17 °C
+      max_temperature: 30 °C
+      temperature_step: 1 °C

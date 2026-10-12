@@ -1,0 +1,78 @@
+# mirrors: tado-smart-radiator-thermostat-x
+# Mirrors: tado Smart Radiator Thermostat X, HA fixture tado_smart_radiator_thermostat_x.json (evidence=dump, Thread)
+#   source: home-assistant/core tests/components/matter/fixtures/nodes/tado_smart_radiator_thermostat_x.json
+#   EP1 thermostat (0x0301): Thermostat[HEAT] + RelativeHumidityMeasurement ON THE SAME ENDPOINT (no humidity endpoint)
+# Natural build: heat-only thermostat climate + SHT4x.  The humidity is a SECOND DEVICE TYPE on the same endpoint
+# (`humidity_sensor:` next to `thermostat:`) to get RelativeHumidityMeasurement into EP1 like the real device.
+#
+# Matches:  thermostat HEAT-only, RH cluster on the thermostat endpoint.
+# Differs:  DeviceTypeList is [thermostat, humidity_sensor] instead of [thermostat]; the real device has the RH cluster
+#           as an extra cluster outside the device type.  ACCEPTABLE: controllers (HA) read clusters, not the list.
+#           Whether Apple/Google accept two application device types on one endpoint is [verify] (spec allows it
+#           only for explicitly composable types; a conformance checker flags it if not): see report G3.
+
+substitutions:
+  name: matter-trv-x
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      thermostat:
+        climate_id: trv
+      humidity_sensor: room_humidity
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+sensor:
+  - platform: sht4x
+    temperature:
+      id: room_temperature
+    humidity:
+      id: room_humidity
+    update_interval: 30s
+
+output:
+  - platform: gpio
+    id: valve_open
+    pin: GPIO10
+
+climate:
+  - platform: bang_bang
+    id: trv
+    name: Radiator
+    sensor: room_temperature
+    default_target_temperature_low: 19 °C
+    default_target_temperature_high: 21 °C
+    visual:
+      min_temperature: 5 °C
+      max_temperature: 30 °C
+      temperature_step: 0.5 °C
+    heat_action:
+      - output.turn_on: valve_open
+    idle_action:
+      - output.turn_off: valve_open

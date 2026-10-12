@@ -1,0 +1,68 @@
+# mirrors: ir-room-ac-climate
+# Mirrors: esphome-hardware catalog entry `ir-room-ac-climate` (evidence=dump of the ESPHome climate_ir model;
+#   source: refs/esphome components/climate_ir*, docs/climate.md).  The minimal split-AC build: ONE endpoint.
+#   EP1 room_air_conditioner (0x0072): OnOff + Thermostat[HEAT,COOL,AUTO] (+ FanControl[MS] in the catalog)
+# Variant (c) "other": the same IR AC bound as a plain thermostat (what many users do because the docs list it first)
+# is compared in the report; this file uses the RAC type, with the room temperature taken from the climate's own
+# `sensor:` (LocalTemperature), i.e. no separate temperature endpoint.
+#
+# Matches:  RAC + OnOff + Thermostat.  LocalTemperature comes from the climate's current_temperature.
+# Differs:  catalog FanControl[MS] (fan speeds of the IR protocol) is not expressible: G1.
+#           coolix has fan modes (auto/low/medium/high) and swing modes; neither is mapped.
+
+substitutions:
+  name: matter-ir-ac
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      room_air_conditioner:
+        climate_id: split_ac
+
+remote_transmitter:
+  pin: GPIO2
+  carrier_duty_percent: 50%
+
+sensor:
+  - platform: aht10
+    variant: AHT20
+    temperature:
+      id: room_temperature
+    humidity:
+      id: room_humidity
+    update_interval: 30s
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+climate:
+  - platform: coolix
+    id: split_ac
+    name: Split AC
+    sensor: room_temperature
+    supports_heat: true
+    supports_cool: true

@@ -1,0 +1,63 @@
+# mirrors: inovelli-vtm36-fan-light-pid0004
+# Mirrors: Inovelli VTM36 fan + light module (DCL vid 4961 pid 0x0004; evidence=doc): Fan + (extended color) light.
+# Variant (a) `expose:` shorthand.  Light is inferred from the platform (monochromatic -> dimmable_light; the DCL
+# lists extended_color_light for the LED bar, here a dimmable light as a wall module drives a lamp).
+#
+# Matches:  fan + light siblings.
+# Differs:  `fan` needs `as: fan` today (G2).  Light type is dimmable_light, not extended_color_light (ACCEPTABLE,
+#           depends on the real load); the VTM36 LED notification bar has no ESPHome equivalent.
+#           FixedLabel is added to both endpoints (G9).
+
+substitutions:
+  name: matter-vtm36
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  expose:
+    - {id: fan1, as: fan}
+    - light1
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO2
+  - platform: ledc
+    id: light_pwm
+    pin: GPIO3
+
+fan:
+  - platform: speed
+    id: fan1
+    name: Fan
+    output: fan_pwm
+    speed_count: 4
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: monochromatic
+    id: light1
+    name: Light
+    output: light_pwm
+    restore_mode: ALWAYS_OFF

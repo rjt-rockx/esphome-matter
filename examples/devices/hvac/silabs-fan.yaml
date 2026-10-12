@@ -1,0 +1,69 @@
+# mirrors: silabs-fan
+# Mirrors: Silicon Labs reference fan, HA fixture silabs_fan.json (evidence=dump, Thread)
+#   source: home-assistant/core tests/components/matter/fixtures/nodes/silabs_fan.json
+#   EP1 fan (0x002B): Identify, Groups[GN], Descriptor, FanControl[SPD,AUT,RCK,WND,STEP,DIR]
+#   (also mock_fan.json / switchbot-circulator-fan: Fan, FanControl[SPD,WND,STEP], no OnOff on the Fan type)
+# Natural build: DC/PWM pedestal fan with 4 speeds, an oscillation motor relay and a direction relay.
+# Variant (b) explicit `endpoints:` <- this file.  -expose shows the shorthand.
+#
+# Matches:  fan device type, FanControl with MultiSpeed (SpeedMax=4), Rocking (RockSupport left/right),
+#           AirflowDirection; FanModeSequence derived from speed_count (Off/Low/Med/High); PercentSetting/SpeedSetting
+#           two-way with the ESPHome fan.
+# Differs:  * Auto (AUT): ESPHome fans have no automatic mode; leaving it out is correct (docs/fan.md).
+#           * Wind (WND) and Step (STEP): not mapped, only configurable by hand and then they do nothing: G10 (S).
+#           * Groups cluster present in the dump (GN feature), we create Groups via the device type: same.
+#           * Descriptor TagList absent in both.
+
+substitutions:
+  name: matter-fan
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: pedestal_fan
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO2
+    frequency: 25kHz
+  - platform: gpio
+    id: oscillation_relay
+    pin: GPIO3
+  - platform: gpio
+    id: direction_relay
+    pin: GPIO6
+
+fan:
+  - platform: speed
+    id: pedestal_fan
+    name: Pedestal fan
+    output: fan_pwm
+    speed_count: 4
+    oscillation_output: oscillation_relay
+    direction_output: direction_relay
+    restore_mode: ALWAYS_OFF
