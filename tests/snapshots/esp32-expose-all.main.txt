@@ -11,6 +11,26 @@
     device_config_0.level_control.max_level = 254;
     if (esp_matter::endpoint::dimmable_light::add(endpoint, &device_config_0) != ESP_OK)
       return false;
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return false;
+    }
     return true;
   });
   matter_mattercomponent_id->register_switch(relay, 38775);
