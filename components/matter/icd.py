@@ -407,13 +407,33 @@ def _warn(icd: ConfigType, full_config) -> None:
         )
 
 
+def core_option_supported(name: str) -> bool:
+    """True if the running ESPHome accepts `esphome: <name>:` (options differ between releases)."""
+    from esphome.core import config as core_config
+
+    stack = [core_config.CONFIG_SCHEMA]
+    seen = set()
+    while stack:
+        validator = stack.pop()
+        if id(validator) in seen:
+            continue
+        seen.add(id(validator))
+        schema = getattr(validator, "schema", None)
+        if isinstance(schema, dict) and any(str(key) == name for key in schema):
+            return True
+        stack.extend(getattr(validator, "validators", None) or [])
+    return False
+
+
 def _warn_light_sleep(full_config) -> None:
     from esphome.const import CONF_WATCHDOG_TIMEOUT
 
     esphome_cfg = full_config.get("esphome", {})
     suspend = esphome_cfg.get("suspend_loop", False)  # only on newer ESPHome
     loop_interval = esphome_cfg.get("loop_interval")
-    if not suspend and (
+    # Older ESPHome (2026.6/2026.7) has neither option, so there is nothing to recommend there.
+    tunable = core_option_supported("loop_interval") or core_option_supported("suspend_loop")
+    if tunable and not suspend and (
         loop_interval is None or loop_interval.total_milliseconds < 1000
     ):
         _LOGGER.warning(

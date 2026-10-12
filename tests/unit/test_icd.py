@@ -28,8 +28,7 @@ openthread:
 BASE = """
 esphome:
   name: matter-icd-unit
-  loop_interval: 1s
-
+{loop}
 esp32:
   variant: ESP32H2
 {toolchain}  watchdog_timeout: 60s
@@ -50,7 +49,8 @@ network:
 def make_config(body: str, *, thread: str | None = THREAD, base: str | None = None) -> str:
     from conftest import COMPONENTS
 
-    text = (base or BASE).format(toolchain=toolchain_line(), components=COMPONENTS)
+    loop = "  loop_interval: 1s\n" if icd.core_option_supported("loop_interval") else ""
+    text = (base or BASE).format(toolchain=toolchain_line(), components=COMPONENTS, loop=loop)
     text += thread or ""
     text += textwrap.dedent(body)
     return text
@@ -390,18 +390,19 @@ def test_warns_deep_sleep(run_icd):
 
 
 def test_warns_loop_and_watchdog_and_logger(run_icd):
-    base = BASE.replace("  loop_interval: 1s\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
+    base = BASE.replace("{loop}", "").replace("  watchdog_timeout: 60s\n", "").replace(
         "  baud_rate: 0\n", ""
     )
     result = run_icd("matter:\n  icd: {}\n", base=base)
     assert result.ok, result.output[-2000:]
-    assert "loop_interval" in result.output
+    if icd.core_option_supported("loop_interval"):
+        assert "loop_interval" in result.output
     assert "watchdog_timeout" in result.output
     assert "baud_rate: 0" in result.output
 
 
 def test_light_sleep_off_skips_light_sleep_warnings(run_icd):
-    base = BASE.replace("  loop_interval: 1s\n", "").replace("  watchdog_timeout: 60s\n", "").replace(
+    base = BASE.replace("{loop}", "").replace("  watchdog_timeout: 60s\n", "").replace(
         "  baud_rate: 0\n", ""
     )
     result = run_icd("matter:\n  icd:\n    light_sleep: false\n", base=base)
