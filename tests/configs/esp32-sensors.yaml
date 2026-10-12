@@ -1,0 +1,198 @@
+esphome:
+  name: matter-ci-sensors
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Basic sensors. The pressure is given in kPa and converted to the hPa that Matter expects.
+    1:
+      temperature_sensor: temperature
+    2:
+      pressure_sensor: pressure_kpa
+    3:
+      humidity_sensor: humidity
+    # Battery level on the same endpoint as the sensor it belongs to.
+    4:
+      light_sensor:
+        illuminance: illuminance
+      battery: battery_level
+    # Dedicated power source endpoint.
+    5:
+      power_source:
+        battery: battery_level_2
+    # Concentration clusters advertise the MeasurementUnit of the bound sensor.
+    6:
+      air_quality_sensor:
+        temperature: temperature
+        relative_humidity: humidity
+        carbon_dioxide: co2
+        total_voc: tvoc_ppb
+        formaldehyde: ch2o
+        pm_1: pm_1_0
+        pm_2_5: pm_2_5
+        pm_10: pm_10_0
+        radon: radon
+        measurement_units:
+          # Advertise ppb instead of the ppm that the sensor reports.
+          formaldehyde: ppb
+    # Electrical measurements (AC) with energy.
+    7:
+      electrical_sensor:
+        voltage: mains_voltage
+        active_current: mains_current
+        active_power: mains_power
+        apparent_power: mains_apparent_power
+        frequency: mains_frequency
+        power_factor: mains_power_factor
+        energy_imported: mains_energy
+        energy_exported: mains_energy_exported
+    # DC measurements without energy.
+    8:
+      electrical_sensor:
+        current_type: dc
+        voltage: dc_voltage
+        active_current: dc_current
+        active_power: dc_power
+
+sensor:
+  - platform: template
+    id: temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: return 21.5;
+  - platform: template
+    id: pressure_kpa
+    unit_of_measurement: "kPa"
+    device_class: pressure
+    lambda: return 101.3;
+  - platform: template
+    id: humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+    lambda: return 45.0;
+  - platform: template
+    id: illuminance
+    unit_of_measurement: "lx"
+    device_class: illuminance
+    lambda: return 300.0;
+  - platform: template
+    id: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 87.0;
+  - platform: template
+    id: battery_level_2
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 42.0;
+  - platform: template
+    id: co2
+    unit_of_measurement: "ppm"
+    device_class: carbon_dioxide
+    lambda: return 612.0;
+  - platform: template
+    id: tvoc_ppb
+    unit_of_measurement: "ppb"
+    device_class: volatile_organic_compounds_parts
+    lambda: return 120.0;
+  - platform: template
+    id: ch2o
+    unit_of_measurement: "ppm"
+    lambda: return 0.02;
+  - platform: template
+    id: pm_1_0
+    unit_of_measurement: "µg/m³"
+    device_class: pm1
+    lambda: return 3.0;
+  - platform: template
+    id: pm_2_5
+    unit_of_measurement: "µg/m³"
+    device_class: pm25
+    lambda: return 6.0;
+  - platform: template
+    id: pm_10_0
+    unit_of_measurement: "µg/m³"
+    device_class: pm10
+    lambda: return 9.0;
+  - platform: template
+    id: radon
+    unit_of_measurement: "pCi/L"
+    lambda: return 1.5;
+  - platform: template
+    id: mains_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.1;
+  - platform: template
+    id: mains_current
+    unit_of_measurement: "A"
+    device_class: current
+    lambda: return 0.43;
+  - platform: template
+    id: mains_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 98.0;
+  - platform: template
+    id: mains_apparent_power
+    unit_of_measurement: "VA"
+    device_class: apparent_power
+    lambda: return 99.0;
+  - platform: template
+    id: mains_frequency
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    lambda: return 50.0;
+  - platform: template
+    id: mains_power_factor
+    unit_of_measurement: "%"
+    device_class: power_factor
+    lambda: return 98.0;
+  - platform: template
+    id: mains_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 1234.567;
+  - platform: template
+    id: mains_energy_exported
+    unit_of_measurement: "Wh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 4000.0;
+  - platform: template
+    id: dc_voltage
+    unit_of_measurement: "mV"
+    device_class: voltage
+    lambda: return 12000.0;
+  - platform: template
+    id: dc_current
+    unit_of_measurement: "mA"
+    device_class: current
+    lambda: return 250.0;
+  - platform: template
+    id: dc_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 3.0;

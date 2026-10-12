@@ -87,9 +87,51 @@ class SensorAttribute:
     sensor_type: MockObjClass = field(default_factory=lambda: Sensor)
     features: tuple[str, ...] = ()
     code_driven: bool = False
+    # Key in units.SENSOR_FAMILIES (or "concentration"). Drives the unit and
+    # device_class validation and the conversion of the sensor value into the
+    # canonical unit expected by the C++ converter.
+    family: str | None = None
+    # Optional attributes are not created by esp-matter. When True, the build
+    # callback calls esp_matter::cluster::<cluster>::attribute::create_<name>().
+    create_attribute: bool = False
+    # How the sensor is wired up at runtime:
+    #   attribute         - esp_matter attribute store (or code driven cluster)
+    #   concentration     - ConcentrationMeasurementCluster owned by this component
+    #   electrical_power  - ElectricalPowerMeasurement delegate
+    #   electrical_energy - ElectricalEnergyMeasurement snapshots
+    kind: str = "attribute"
+    # Attribute only exists with the AlternatingCurrent feature.
+    ac_only: bool = False
     # Set by DeviceType:
     cluster: "Cluster | None" = None
     attribute: Attribute | None = None
+
+
+def _power(
+    conf_key: str,
+    converter: str,
+    family: str,
+    ac: bool = False,
+    create: bool = True,
+) -> SensorAttribute:
+    return SensorAttribute(
+        conf_key,
+        converter,
+        family=family,
+        create_attribute=create,
+        kind="electrical_power",
+        ac_only=ac,
+    )
+
+
+def _concentration(conf_key: str) -> SensorAttribute:
+    return SensorAttribute(
+        conf_key,
+        "concentration",
+        features=("NumericMeasurement",),
+        family="concentration",
+        kind="concentration",
+    )
 
 
 # Arranged by Cluster, Attribute
@@ -110,6 +152,7 @@ SENSOR_ATTRIBUTES = {
             "illuminance",
             "illuminance",
             code_driven=True,
+            family="illuminance",
         )
     },
     "TemperatureMeasurement": {  # 0x0402
@@ -117,6 +160,7 @@ SENSOR_ATTRIBUTES = {
             "temperature",
             "temperature",
             code_driven=True,
+            family="temperature",
         )
     },
     "PressureMeasurement": {  # 0x0403
@@ -124,6 +168,7 @@ SENSOR_ATTRIBUTES = {
             "pressure",
             "pressure",
             code_driven=True,
+            family="pressure",
         )
     },
     "FlowMeasurement": {  # 0x0404
@@ -131,6 +176,7 @@ SENSOR_ATTRIBUTES = {
             "flow",
             "flow",
             code_driven=True,
+            family="flow",
         )
     },
     "RelativeHumidityMeasurement": {  # 0x0405
@@ -138,83 +184,90 @@ SENSOR_ATTRIBUTES = {
             "relative_humidity",
             "percentage",
             code_driven=True,
+            family="humidity",
         )
     },
     "ElectricalPowerMeasurement": {  # 0x0090
-        "Voltage": SensorAttribute("voltage", "volts"),
-        "ActiveCurrent": SensorAttribute("active_current", "ampere"),
-        "ReactiveCurrent": SensorAttribute("reactive_current", "ampere"),
-        "ApparentCurrent": SensorAttribute("apparent_current", "ampere"),
-        "ActivePower": SensorAttribute("active_power", "watts"),
-        "ReactivePower": SensorAttribute("reactive_power", "watts"),
-        "ApparentPower": SensorAttribute("apparent_power", "watts"),
-        "RMSVoltage": SensorAttribute("rms_voltage", "volts"),
-        "RMSCurrent": SensorAttribute("rms_current", "ampere"),
-        "RMSPower": SensorAttribute("rms_power", "watts"),
-        "Frequency": SensorAttribute("frequency", "frequency"),
-        "PowerFactor": SensorAttribute("power_factor", "percentage"),
-        "NeutralCurrent": SensorAttribute("neutral_current", "ampere"),
+        # Values are exposed through a delegate (kind="electrical_power"). All
+        # attributes except ActivePower are optional and must be created.
+        "Voltage": _power("voltage", "volts", "voltage"),
+        "ActiveCurrent": _power("active_current", "ampere", "current"),
+        "ReactiveCurrent": _power("reactive_current", "ampere", "current", ac=True),
+        "ApparentCurrent": _power("apparent_current", "ampere", "current", ac=True),
+        "ActivePower": _power("active_power", "watts", "power", create=False),
+        "ReactivePower": _power("reactive_power", "watts", "reactive_power", ac=True),
+        "ApparentPower": _power("apparent_power", "watts", "apparent_power", ac=True),
+        "RMSVoltage": _power("rms_voltage", "volts", "voltage", ac=True),
+        "RMSCurrent": _power("rms_current", "ampere", "current", ac=True),
+        "RMSPower": _power("rms_power", "watts", "power", ac=True),
+        "Frequency": _power("frequency", "frequency", "frequency", ac=True),
+        "PowerFactor": _power("power_factor", "power_factor", "power_factor", ac=True),
+        "NeutralCurrent": _power("neutral_current", "ampere", "current", ac=True),
+    },
+    "ElectricalEnergyMeasurement": {  # 0x0091
+        # kWh sensors, exposed as EnergyMeasurementStruct in mWh.
+        "CumulativeEnergyImported": SensorAttribute(
+            "energy_imported",
+            "kilowatt_hours",
+            features=("ImportedEnergy", "CumulativeEnergy"),
+            family="energy",
+            kind="electrical_energy",
+        ),
+        "CumulativeEnergyExported": SensorAttribute(
+            "energy_exported",
+            "kilowatt_hours",
+            features=("ExportedEnergy", "CumulativeEnergy"),
+            family="energy",
+            kind="electrical_energy",
+        ),
+    },
+    "PowerSource": {  # 0x002F
+        # BatPercentRemaining is in half percent and requires the Battery
+        # feature (a choice with Wired).
+        "BatPercentRemaining": SensorAttribute(
+            "battery",
+            "battery_percent",
+            features=("Battery",),
+            family="battery",
+            create_attribute=True,
+        ),
     },
     "CarbonMonoxideConcentrationMeasurement": {  # 0x040C
-        "MeasuredValue": SensorAttribute(
-            "carbon_monoxide", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("carbon_monoxide")
     },
     "CarbonDioxideConcentrationMeasurement": {  # 0x040D
-        "MeasuredValue": SensorAttribute(
-            "carbon_dioxide", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("carbon_dioxide")
     },
     "NitrogenDioxideConcentrationMeasurement": {  # 0x0413
-        "MeasuredValue": SensorAttribute(
-            "nitrogen_dioxide", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("nitrogen_dioxide")
     },
     "OzoneConcentrationMeasurement": {  # 0x0415
-        "MeasuredValue": SensorAttribute(
-            "ozone", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("ozone")
     },
     "PM25ConcentrationMeasurement": {  # 0x042A
-        "MeasuredValue": SensorAttribute(
-            "pm_2_5", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("pm_2_5")
     },
     "FormaldehydeConcentrationMeasurement": {  # 0x042B
-        "MeasuredValue": SensorAttribute(
-            "formaldehyde", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("formaldehyde")
     },
     "PM1ConcentrationMeasurement": {  # 0x042C
-        "MeasuredValue": SensorAttribute(
-            "pm_1", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("pm_1")
     },
     "PM10ConcentrationMeasurement": {  # 0x042D
-        "MeasuredValue": SensorAttribute(
-            "pm_10", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("pm_10")
     },
     "TotalVolatileOrganicCompoundsConcentrationMeasurement": {  # 0x042E
-        "MeasuredValue": SensorAttribute(
-            "total_voc", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("total_voc")
     },
     "RadonConcentrationMeasurement": {  # 0x042F
-        "MeasuredValue": SensorAttribute(
-            "radon", "concentration", features=("NumericMeasurement",)
-        )
+        "MeasuredValue": _concentration("radon")
     },
     "SoilMeasurement": {  # 0x0430
         "SoilMoistureMeasuredValue": SensorAttribute("soil_moisture", "percentage")
     },
     # Not used by any device type?
     "SmokeConcentrationMeasurement": {  # 0x0434
-        "MeasuredValue": SensorAttribute(
-            "smoke_concentration",
-            "concentration",
-            features=("NumericMeasurement",),
-        )
+        "MeasuredValue": _concentration("smoke_concentration")
     },
 }
 

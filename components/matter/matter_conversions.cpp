@@ -95,6 +95,16 @@ esp_matter_attr_val_t ampere(float value) {
   return nullable_int64_scaled(value, 1000.0f);
 }
 
+esp_matter_attr_val_t battery_percent(float value) {
+  nullable<uint8_t> converted;
+  if (std::isfinite(value)) {
+    // Matter reports half percent steps: 0 - 200.
+    converted = static_cast<uint8_t>(
+        std::lround(std::clamp(value, 0.0f, 100.0f) * 2.0f));
+  }
+  return esp_matter_nullable_uint8(converted);
+}
+
 esp_matter_attr_val_t boolean_state(bool value) {
   return esp_matter_bool(value);
 }
@@ -133,8 +143,19 @@ esp_matter_attr_val_t illuminance(float value) {
   return esp_matter_nullable_uint16(converted);
 }
 
+esp_matter_attr_val_t kilowatt_hours(float value) {
+  return nullable_int64_scaled(value, 1000000.0f);
+}
+
 esp_matter_attr_val_t occupancy(bool value) {
   return esp_matter_bitmap8(value ? 1 : 0);
+}
+
+esp_matter_attr_val_t power_factor(float value) {
+  // PowerFactor is an int64 in 1/100 % (-10000 to 10000).
+  if (!std::isfinite(value) || value < -1.0f || value > 1.0f)
+    return esp_matter_nullable_int64(nullable<int64_t>());
+  return nullable_int64_scaled(value, 10000.0f);
 }
 
 esp_matter_attr_val_t percentage(float value) {

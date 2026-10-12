@@ -64,6 +64,47 @@ protected:
   SensorValueConverter converter_;
   SensorAttributeUpdater updater_;
 };
+
+// esp-matter doesn't serve the Concentration Measurement clusters. The cluster
+// is created and registered here, which also fixes its MeasurementUnit.
+class MatterConcentrationSensorMapping : public MatterSensorAttributeMapping {
+public:
+  MatterConcentrationSensorMapping(sensor::Sensor *sensor, uint16_t endpoint_id,
+                                   uint32_t cluster_id, uint32_t attribute_id,
+                                   SensorValueConverter converter,
+                                   uint8_t measurement_unit);
+
+  void initialize() override;
+
+protected:
+  uint8_t measurement_unit_;
+};
+
+// Values of the ElectricalPowerMeasurement and ElectricalEnergyMeasurement
+// clusters. The sensor value is converted into a nullable int64 (mW, mV, mA,
+// mHz, 1/100 % or mWh).
+class MatterElectricalSensorMapping : public MatterEndpointMappingBase {
+public:
+  enum class Kind : uint8_t { POWER, ENERGY_IMPORTED, ENERGY_EXPORTED };
+
+  MatterElectricalSensorMapping(sensor::Sensor *sensor, uint16_t endpoint_id,
+                                Kind kind, uint32_t attribute_id,
+                                SensorValueConverter converter);
+
+  void initialize() override;
+
+protected:
+  void publish_(float value);
+
+  sensor::Sensor *sensor_;
+  Kind kind_;
+  uint32_t attribute_id_;
+  SensorValueConverter converter_;
+};
+
+// Delegate of the ElectricalPowerMeasurement cluster of an endpoint, used in the
+// esp-matter cluster config. Called while building an endpoint.
+void *electrical_power_delegate(uint16_t endpoint_id, bool alternating_current);
 #endif // USE_SENSOR
 
 #ifdef USE_BINARY_SENSOR

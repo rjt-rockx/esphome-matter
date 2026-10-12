@@ -46,6 +46,7 @@ from .matter_ble import (
     validate_ble_commissioning,
 )
 from .network_config import configure_network
+from .sensor_mapping import validate_sensor_bindings
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -199,6 +200,7 @@ def _final_validate(config: dict):
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
     validate_cover_bindings(config, full_config)
+    validate_sensor_bindings(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -248,7 +250,9 @@ async def to_code(config: ConfigType):
         from esphome.components.esp32 import require_mbedtls_tls_extras
 
         # CHIP needs AES-CCM and deterministic ECDSA, trimmed by default since esphome#19088
-        require_mbedtls_tls_extras(("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC"))
+        require_mbedtls_tls_extras(
+            ("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC")
+        )
     except ImportError:
         pass
     try:

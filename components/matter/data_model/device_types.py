@@ -15,6 +15,12 @@ from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL
 from ..matter_climate import climate_schema, validate_climate_features
 from ..lock_valve import extend_device_type_schema
 from ..generic_switch import apply_switch_defaults, switch_schema_options
+from ..sensor_mapping import (
+    CONF_CURRENT_TYPE,
+    CONF_MEASUREMENT_UNITS,
+    measurement_units_schema,
+    validate_electrical_current_type,
+)
 from ..util import maybe_empty
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
@@ -30,6 +36,8 @@ SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_co
 # not select one. Keys are "<device_type>"/"<Cluster>" tuples or a cluster name.
 DEFAULT_CHOICE_FEATURES: dict[str | tuple[str, str], str] = {
     "Switch": "MomentarySwitch",
+    # A single electrical_sensor node always uses the NodeTopology.
+    "PowerTopology": "NodeTopology",
 }
 
 # Features that need other features to be enabled; esp-matter rejects them
@@ -251,6 +259,9 @@ class DeviceType:
             for sensor_attribute in self.sensor_attributes
         }
 
+        if units_schema := measurement_units_schema(self.sensor_attributes):
+            schema[cv.Optional(CONF_MEASUREMENT_UNITS)] = units_schema
+
         if features := self.get_features():
             schema[cv.Optional(CONF_FEATURES)] = cv.ensure_list(
                 cv.one_of(*(feature.name for feature in features))
@@ -312,46 +323,28 @@ class DeviceType:
         )
 
 
-# class ElectricalSensor(DeviceType):
-#     def _schema(self):
-#         schema = DeviceType._schema(self)
-#         schema[cv.Required("with_clusters")] = cv.All(
-#             cv.ensure_list(
-#                 cv.one_of("ElectricalEnergyMeasurement", "ElectricalPowerMeasurement")
-#             ),
-#             cv.Length(min=1),
-#         )
-#         return schema
-#
-#     def _config_expression(self, config: dict):
-#         namespace = f"esp_matter::endpoint::{self.namespace}"
-#         lines = ["[] {", f"{namespace}::config_t config{{}};"]
-#         lines.extend(self._feature_config_lines(config))
-#         for cluster_name in config["with_clusters"]:
-#             lines.append(f"config.with_{snake_case(cluster_name)}();")
-#         lines.extend(("return config;", "}()"))
-#         return cg.RawExpression("\n".join(lines))
-#
-#     def configured_server_clusters(self, config: dict) -> set[Cluster]:
-#         clusters = DeviceType.configured_server_clusters(self, config)
-#         clusters.update(
-#             CLUSTERS_BY_NAME[cluster_name] for cluster_name in config["with_clusters"]
-#         )
-#         return clusters
-#
-#     def register(self, var, endpoint_id: int, config: dict) -> set[Cluster]:
-#         created_clusters = DeviceType.register(self, var, endpoint_id, config)
-#         # esp_matter is written by idiots and doesn't properly guard cluster compilation...
-#         for cluster_name in (
-#             "electrical_energy_measurement",
-#             "electrical_power_measurement",
-#         ):
-#             created_clusters.add(CLUSTERS_BY_CONF_KEY[cluster_name])
-#         return created_clusters
+class ElectricalSensor(DeviceType):
+    """The electrical_sensor needs at least one of its measurement clusters.
+
+    These are created by esp-matter itself through the with_*() builders of its
+    config, see sensor_mapping.configure_electrical_sensor().
+    """
+
+    def _schema(self):
+        schema = DeviceType._schema(self)
+        schema[cv.Optional(CONF_CURRENT_TYPE, default="ac")] = cv.one_of(
+            "ac", "dc", lower=True
+        )
+        return schema
+
+    def _validate_features(self, config: dict) -> dict:
+        return validate_electrical_current_type(
+            self, DeviceType._validate_features(self, config)
+        )
 
 
 DEVICE_TYPE_OVERRIDES = {
-    # "electrical_sensor": ElectricalSensor,
+    "electrical_sensor": ElectricalSensor,
 }
 
 
