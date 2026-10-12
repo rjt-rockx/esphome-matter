@@ -295,7 +295,20 @@ def test_climate_id_binding(run_config):
 # --------------------------------------------------------------------------
 
 
-def test_garage_cover_rejected(run_config):
+GARAGE_COVER = """
+        cover:
+          - platform: template
+            id: garage
+            name: Garage
+            device_class: garage
+            optimistic: true
+            open_action: []
+            close_action: []
+            stop_action: []
+"""
+
+
+def test_garage_cover_window_covering_is_allowed_with_warning(run_config):
     result = run_config(
         """
         matter:
@@ -303,10 +316,43 @@ def test_garage_cover_rejected(run_config):
             1:
               window_covering:
                 cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+    assert "closure_compat" in result.output  # note explains the compat path
+
+
+def test_garage_cover_closure_compat_is_silent(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+    assert "acknowledge" not in result.output
+
+
+def test_closure_compat_requires_closure_class(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: shade
+                closure_compat: true
         cover:
           - platform: template
-            id: garage
-            device_class: garage
+            id: shade
+            name: Shade
+            device_class: shade
             optimistic: true
             open_action: []
             close_action: []
@@ -314,7 +360,60 @@ def test_garage_cover_rejected(run_config):
         """
     )
     assert not result.ok
-    assert "Garage" in result.output or "garage" in result.output
+    assert "closure_compat" in result.output  # note explains the compat path
+
+
+def test_closure_bound_to_garage_cover(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+
+
+def test_closure_rejects_window_covering_class(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: shade
+        cover:
+          - platform: template
+            id: shade
+            name: Shade
+            device_class: shade
+            optimistic: true
+            open_action: []
+            close_action: []
+            stop_action: []
+        """
+    )
+    assert not result.ok
+    assert "window_covering" in result.output
+
+
+def test_closure_bound_rejects_unsupported_feature(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: garage
+                with_features: [Positioning, MotionLatching]
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "Positioning" in result.output
 
 
 def test_cover_end_product_type_requires_cover_id(run_config):

@@ -241,7 +241,7 @@ def _rule_alternatives(rule: Any) -> list[Requirement]:
         return alternatives
     if rule_type == "disallowed":
         return []
-    if rule_type in ("deprecated", "provisional"):
+    if rule_type in ("deprecated", "provisional", "described"):
         return [Requirement()]
     raise ConformanceError(f"Unsupported conformance rule type: {rule_type}")
 

@@ -31,6 +31,8 @@ constexpr uint8_t kEndInteriorBlind = 0x0A;
 constexpr uint8_t kEndInteriorVenetianBlind = 0x0C;
 constexpr uint8_t kEndCentralCurtain = 0x10;
 constexpr uint8_t kEndRollerShutter = 0x11;
+constexpr uint8_t kEndSwingingShutter = 0x16;
+constexpr uint8_t kEndSlidingShutter = 0x17;
 constexpr uint8_t kEndAwningTerracePatio = 0x13;
 
 // ConfigStatus bits.
@@ -64,8 +66,13 @@ CoveringKind classify(bool has_tilt, const char *device_class) {
     return {kTypeAwning, kEndAwningTerracePatio};
   if (is_class(device_class, "curtain"))
     return {kTypeDrapery, kEndCentralCurtain};
-  if (is_class(device_class, "shutter"))
+  if (is_class(device_class, "shutter") || is_class(device_class, "garage"))
     return {kTypeShutter, kEndRollerShutter};
+  // Closures exposed as Window Covering (closure_compat, see docs/cover.md).
+  if (is_class(device_class, "gate"))
+    return {kTypeShutter, kEndSlidingShutter};
+  if (is_class(device_class, "door"))
+    return {kTypeShutter, kEndSwingingShutter};
   if (has_tilt)
     return {kTypeTiltBlindLiftAndTilt, kEndInteriorVenetianBlind};
   if (is_class(device_class, "blind"))

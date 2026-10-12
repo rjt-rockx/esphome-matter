@@ -252,7 +252,7 @@ The device types below can usually be created (add the key under an endpoint), b
 - chime
 - doorbell
 - window_covering
-- closure
+- closure (experimental, `cover_id` binding, see [cover.md](cover.md#garage-doors-gates-and-doors))
 - closure_panel
 - closure_controller
 - thermostat

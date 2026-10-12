@@ -45,6 +45,8 @@ DEFAULT_CHOICE_FEATURES: dict[str | tuple[str, str], str] = {
     "Switch": "MomentarySwitch",
     # A single electrical_sensor node always uses the NodeTopology.
     "PowerTopology": "NodeTopology",
+    # A closure needs Positioning or MotionLatching; Positioning is what covers provide.
+    "Closure Control": "Positioning",
 }
 
 # Features that need other features to be enabled; esp-matter rejects them
@@ -245,6 +247,10 @@ class DeviceType:
             and "cover_id" not in config
         ):
             raise cv.Invalid("end_product_type requires cover_id")
+        if self.name == "closure":
+            from ..closure import validate_closure_features
+
+            config = validate_closure_features(config)
         if self.has_required_cluster("Switch"):
             config = apply_switch_defaults(config)
         enabled = list(config.get(CONF_WITH_FEATURES, ()))
@@ -331,6 +337,10 @@ class DeviceType:
             from ..covers import schema_options
 
             schema.update(schema_options())
+        if self.name == "closure":
+            from ..closure import schema_options as closure_schema_options
+
+            schema.update(closure_schema_options())
         schema.update(climate_schema(self.name))
 
         if self.name.endswith("light") and any(

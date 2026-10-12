@@ -1,0 +1,90 @@
+esphome:
+  name: matter-ci-closure
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Matter 1.5 Closure (Closure Control cluster) bound to a garage door cover.
+    1:
+      label: Garage door
+      closure:
+        cover_id: garage_door
+    # Compatibility mode: the same kind of cover advertised as Window Covering, which
+    # is what today's retail openers and most controllers use.
+    2:
+      label: Side gate
+      window_covering:
+        cover_id: side_gate
+        closure_compat: true
+    3:
+      label: Garage compat
+      window_covering:
+        cover_id: garage_compat
+        closure_compat: true
+        end_product_type: roller_shutter
+
+output:
+  - platform: template
+    id: relay
+    type: binary
+    write_action:
+      - logger.log: relay pulse
+
+cover:
+  - platform: template
+    id: garage_door
+    name: Garage Door
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay
+    close_action:
+      - output.turn_on: relay
+    stop_action:
+      - output.turn_on: relay
+  - platform: template
+    id: side_gate
+    name: Side Gate
+    device_class: gate
+    assumed_state: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay
+    close_action:
+      - output.turn_on: relay
+    stop_action:
+      - output.turn_on: relay
+  - platform: template
+    id: garage_compat
+    name: Garage Compat
+    device_class: garage
+    has_position: true
+    optimistic: true
+    open_action:
+      - output.turn_on: relay
+    close_action:
+      - output.turn_on: relay
+    stop_action:
+      - output.turn_on: relay

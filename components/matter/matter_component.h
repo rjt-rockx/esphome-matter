@@ -9,6 +9,7 @@
 #include "matter_attributes.h"
 #include "matter_cover.h"
 #include "matter_climate.h"
+#include "matter_closure.h"
 #include "matter_conformance.h"
 #include "matter_device_info.h"
 #include "matter_endpoints.h"
@@ -107,6 +108,9 @@ public:
 #ifdef USE_COVER
   void register_cover(cover::Cover *cover, uint16_t endpoint_id);
 #endif // USE_COVER
+#if defined(USE_COVER) && defined(USE_MATTER_CLOSURE)
+  void register_closure(cover::Cover *cover, uint16_t endpoint_id);
+#endif // USE_COVER && USE_MATTER_CLOSURE
 #ifdef USE_CLIMATE
   void register_climate(climate::Climate *climate, uint16_t endpoint_id,
                         bool prefer_cooling);
