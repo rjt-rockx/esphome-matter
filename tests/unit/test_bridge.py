@@ -907,10 +907,18 @@ class TestCheckerDump:
 
 
 class TestOtherRules:
-    def test_aggregators_are_not_duplicates_of_each_other(self):
-        from components.matter.conformance import application_device_type_ids
+    def test_aggregators_are_duplicates_of_each_other(self):
+        # Aggregator.xml classifies it "simple", so sibling Aggregators overlap (Base Device
+        # Type: Descriptor TagList is mandatory under the Duplicate condition).
+        from components.matter.conformance import (
+            _duplicate_components,
+            application_device_type_ids,
+        )
 
         assert application_device_type_ids({"aggregator": {}}) == set()
+        assert _duplicate_components({1: {"aggregator": {}}, 2: {"aggregator": {}}}) == [
+            [1, 2]
+        ]
 
     def test_unique_id_is_optional_in_old_clusters(self, spec):
         def ep(device_types, parts, bdbi=None, revision=4):
