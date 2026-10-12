@@ -10,14 +10,14 @@ This module contains everything that is specific to exposing ESPHome sensors:
 """
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_DEVICE_CLASS, CONF_UNIT_OF_MEASUREMENT
 
 from .const import CONF_ENDPOINTS
-from .data_model.attributes import SENSOR_ATTRIBUTES, SensorAttribute
+from .data_model.attributes import SensorAttribute
 from .data_model.clusters import CLUSTERS_BY_NAME
 from .data_model.units import (
     CONCENTRATION_UNITS,
@@ -27,11 +27,12 @@ from .data_model.units import (
     concentration_scale,
 )
 from .data_model import espmatter_names
+from . import power_topology
 
 _LOGGER = logging.getLogger(__name__)
 
-# Endpoint level option that binds a battery level sensor (in %) to the
-# BatPercentRemaining attribute of a Power Source cluster on that endpoint.
+# Endpoint level option for the Power Source cluster (see power_source.py). The shorthand
+# `battery: sensor_id` binds a battery level sensor (in %) to BatPercentRemaining.
 CONF_BATTERY = "battery"
 # Device type option of the electrical_sensor.
 CONF_CURRENT_TYPE = "current_type"
@@ -61,16 +62,6 @@ for _unit in CONCENTRATION_UNITS:
     _UNIT_FAMILIES.setdefault(_unit, set()).add("concentration")
 
 
-def battery_sensor_attribute() -> SensorAttribute:
-    """The SensorAttribute behind the endpoint level `battery` option."""
-    cluster = CLUSTERS_BY_NAME["PowerSource"]
-    return replace(
-        SENSOR_ATTRIBUTES["PowerSource"]["BatPercentRemaining"],
-        cluster=cluster,
-        attribute=cluster.get_attribute("BatPercentRemaining"),
-    )
-
-
 def measurement_units_schema(sensor_attributes):
     """Schema for the `measurement_units` option, or None when not applicable."""
     concentration = [sa for sa in sensor_attributes if sa.kind == "concentration"]
@@ -85,16 +76,10 @@ def measurement_units_schema(sensor_attributes):
 
 
 def validate_battery_binding(config):
-    """The battery sensor can be bound at endpoint level or in a device type, not both."""
-    if CONF_BATTERY not in config:
-        return config
-    for conf_key, device_config in config.items():
-        if isinstance(device_config, dict) and CONF_BATTERY in device_config:
-            raise cv.Invalid(
-                f"'{CONF_BATTERY}' is configured on the endpoint and in '{conf_key}'. "
-                "Configure it only once"
-            )
-    return config
+    """The Power Source can be configured at endpoint level or in a device type, not both."""
+    from .power_source import validate_endpoint_power_source
+
+    return validate_endpoint_power_source(config)
 
 
 # --------------------------------------------------------------------------- #
@@ -251,10 +236,14 @@ def sensor_unit_info(full_config, sensor_id) -> tuple[str | None, str | None]:
 def _bindings(endpoint_config: dict):
     """Yields (config path, SensorAttribute, sensor id, measurement units override)."""
     from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+    from .power_source import bindings as power_source_bindings
+
+    for binding in power_source_bindings(endpoint_config):
+        if binding.sensor_attribute.family is not None:
+            yield list(binding.path), binding.sensor_attribute, binding.sensor_id, {}
 
     for conf_key, device_config in endpoint_config.items():
-        if conf_key == CONF_BATTERY and device_config is not None:
-            yield [CONF_BATTERY], battery_sensor_attribute(), device_config, {}
+        if conf_key in (CONF_BATTERY, "wired"):
             continue
         device_type = DEVICE_TYPES_BY_CONF_KEY.get(conf_key)
         if device_type is None or not isinstance(device_config, dict):
@@ -318,7 +307,15 @@ def converter_expression(sensor_attr: SensorAttribute, plan: SensorPlan):
 # Code generation helpers
 # --------------------------------------------------------------------------- #
 
-POWER_SOURCE_STATUS_ACTIVE = 1
+# The legacy esp-matter attribute creators of the Power Source cluster take explicit bounds
+# (value, min, max) for nullable attributes. Everything else is created with a default value.
+_CREATE_ARGUMENTS: dict[tuple[str, str], str] = {
+    ("PowerSource", "BatPercentRemaining"): "{}, 0, 200",
+    ("PowerSource", "BatVoltage"): "{}, 0, 0xFFFFFFFE",
+    ("PowerSource", "WiredAssessedInputVoltage"): "{}, 0, 0xFFFFFFFE",
+    ("PowerSource", "WiredAssessedInputFrequency"): "{}, 0, 0xFFFE",
+    ("PowerSource", "WiredAssessedCurrent"): "{}, 0, 0xFFFFFFFE",
+}
 
 
 def optional_attribute_lines(created: list[tuple]) -> list[str]:
@@ -345,25 +342,16 @@ def optional_attribute_lines(created: list[tuple]) -> list[str]:
         create_fn = (
             f"esp_matter::cluster::{cluster.espm_namespace}::attribute::{create_name}"
         )
+        arguments = _CREATE_ARGUMENTS.get((cluster.name, attribute.name), "{}")
         lines.extend(
             (
                 "{",
                 f"  auto *{cluster_var} = esp_matter::cluster::get(endpoint, {cluster.id});",
-                f"  if ({cluster_var} == nullptr || {create_fn}({cluster_var}, {{}}) == nullptr)",
+                f"  if ({cluster_var} == nullptr || {create_fn}({cluster_var}, {arguments}) == nullptr)",
                 "    return false;",
+                "}",
             )
         )
-        if cluster.name == "PowerSource":
-            # Status is "Unspecified" by default.
-            lines.extend(
-                (
-                    f"  auto *status_attr = esp_matter::attribute::get({cluster_var}, 0x0000);",
-                    f"  esp_matter_attr_val_t status_val = esp_matter_enum8({POWER_SOURCE_STATUS_ACTIVE});",
-                    "  if (status_attr != nullptr)",
-                    "    esp_matter::attribute::set_val(status_attr, &status_val, false);",
-                )
-            )
-        lines.append("}")
     return lines
 
 
@@ -391,8 +379,8 @@ def configure_electrical_sensor(
     with_power = bool(power_attrs) or not energy_attrs
     with_energy = bool(energy_attrs)
 
-    # Required by the Power Topology cluster, the only topology that fits a single node.
-    cluster_configs["PowerTopology"].enabled_features["NodeTopology"] = True
+    # The Power Topology cluster needs exactly one topology (`topology` option, default node).
+    power_topology.configure(cluster_configs, device_config)
 
     extra_power_features: list[str] = []
     if with_power:

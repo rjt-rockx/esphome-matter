@@ -19,6 +19,8 @@ from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
 from ..matter_climate import climate_schema, validate_climate_features
+from ..power_topology import apply_topology
+from ..power_topology import schema_options as topology_schema_options
 from ..sensor_mapping import (
     CONF_CURRENT_TYPE,
     CONF_MEASUREMENT_UNITS,
@@ -43,7 +45,7 @@ SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_co
 # not select one. Keys are "<device_type>"/"<Cluster>" tuples or a cluster name.
 DEFAULT_CHOICE_FEATURES: dict[str | tuple[str, str], str] = {
     "Switch": "MomentarySwitch",
-    # A single electrical_sensor node always uses the NodeTopology.
+    # The electrical_sensor selects its topology with the `topology` option (default node).
     "PowerTopology": "NodeTopology",
 }
 
@@ -67,7 +69,7 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
 # config_t::feature_flags (instead of only the choice features), so all of their
 # features, including per-feature config like MultiPressMax, are set through the
 # feature flags.
-FLAG_DRIVEN_CLUSTERS = frozenset({"Switch"})
+FLAG_DRIVEN_CLUSTERS = frozenset({"Switch", "PowerTopology"})
 
 
 
@@ -384,11 +386,12 @@ class ElectricalSensor(DeviceType):
         schema[cv.Optional(CONF_CURRENT_TYPE, default="ac")] = cv.one_of(
             "ac", "dc", lower=True
         )
+        schema.update(topology_schema_options())
         return schema
 
     def _validate_features(self, config: dict) -> dict:
         return validate_electrical_current_type(
-            self, DeviceType._validate_features(self, config)
+            self, DeviceType._validate_features(self, apply_topology(config))
         )
 
 

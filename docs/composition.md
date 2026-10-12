@@ -61,6 +61,6 @@ The ESP32 platform serves a compile time constant and cannot store the version, 
 
 ## Limits
 
-The build sets `CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT` to the number of configured endpoints plus the root node and `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` to the largest number of device types on one endpoint. Both are exact; the esp-matter defaults are 16.
+Endpoint 0 is the root node, which exists already. Configure it only to add a node level `battery:` / `wired:` Power Source or an `electrical_sensor` to it, see [power.md](power.md). The build sets `CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT` to the number of configured endpoints (without endpoint 0) plus the root node and `CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT` to the largest number of device types on one endpoint. Both are exact; the esp-matter defaults are 16.
 
 An [example](../examples/multi-relay.yaml) with four relays is available.

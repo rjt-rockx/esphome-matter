@@ -62,27 +62,40 @@ bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
   // Create endpoints
   for (const auto &registration : this->endpoint_registrations_) {
     uint16_t endpoint_id = registration.endpoint_id;
-    if (esp_matter::endpoint::get(node, endpoint_id) != nullptr) {
-      ESP_LOGE(TAG, "Matter endpoint id %u is already in use", endpoint_id);
-      return false;
-    }
+    esp_matter::endpoint_t *endpoint = nullptr;
 
-    esp_matter::endpoint_t *endpoint = esp_matter::endpoint::resume(
-        node, esp_matter::ENDPOINT_FLAG_NONE, endpoint_id, nullptr);
-    if (endpoint == nullptr) {
-      ESP_LOGE(TAG, "Failed to create endpoint %u", endpoint_id);
-      return false;
-    }
+    if (endpoint_id == 0) {
+      // The root node endpoint was created by esp_matter::node::create() with
+      // its mandatory clusters (including Descriptor). The build function only
+      // adds utility device types and clusters (Power Source, Electrical Sensor).
+      endpoint = esp_matter::endpoint::get(node, endpoint_id);
+      if (endpoint == nullptr) {
+        ESP_LOGE(TAG, "Root node endpoint is missing");
+        return false;
+      }
+    } else {
+      if (esp_matter::endpoint::get(node, endpoint_id) != nullptr) {
+        ESP_LOGE(TAG, "Matter endpoint id %u is already in use", endpoint_id);
+        return false;
+      }
 
-    // Create "empty" descriptor cluster. Connectedhomip fills this internally.
-    esp_matter::cluster::descriptor::config_t descriptor_config;
-    esp_matter::cluster_t *descriptor_cluster =
-        esp_matter::cluster::descriptor::create(
-            endpoint, &descriptor_config, esp_matter::CLUSTER_FLAG_SERVER);
-    if (descriptor_cluster == nullptr) {
-      ESP_LOGE(TAG, "Failed to create descriptor cluster for endpoint %u",
-               endpoint_id);
-      return false;
+      endpoint = esp_matter::endpoint::resume(
+          node, esp_matter::ENDPOINT_FLAG_NONE, endpoint_id, nullptr);
+      if (endpoint == nullptr) {
+        ESP_LOGE(TAG, "Failed to create endpoint %u", endpoint_id);
+        return false;
+      }
+
+      // Create "empty" descriptor cluster. Connectedhomip fills this internally.
+      esp_matter::cluster::descriptor::config_t descriptor_config;
+      esp_matter::cluster_t *descriptor_cluster =
+          esp_matter::cluster::descriptor::create(
+              endpoint, &descriptor_config, esp_matter::CLUSTER_FLAG_SERVER);
+      if (descriptor_cluster == nullptr) {
+        ESP_LOGE(TAG, "Failed to create descriptor cluster for endpoint %u",
+                 endpoint_id);
+        return false;
+      }
     }
 
     if (registration.build_fn == nullptr || !registration.build_fn(endpoint)) {

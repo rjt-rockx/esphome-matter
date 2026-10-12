@@ -20,6 +20,20 @@ EXPECTED = {
     "esp32-binary-sensors": ["register_binary_sensor_attribute"],
     "esp32-all-endpoints": ["register_endpoint"],
     "esp32-ble-commissioning": ["register_endpoint"],
+    "esp32-power-source": [
+        "MatterPowerSourceEndpointList(0, {1, 2, 3})",
+        "MatterFlagEnumMapping",
+        "create_bat_voltage",
+        "create_wired_present",
+        "esp_matter::endpoint::add_device_type(endpoint",
+        "wired_current_type",
+    ],
+    "esp32-power-topology": [
+        "tree_topology::get_id()",
+        "set_topology::get_id() | esp_matter::cluster::power_topology::feature::dynamic_power_flow",
+        "power_topology_delegate({11, 12}, {11})",
+        "register_endpoint(0,",
+    ],
 }
 
 

@@ -20,6 +20,17 @@ bool convert_attribute_value(const esp_matter_attr_val_t &value,
 esp_matter_attr_val_t ampere(float value);
 // PowerSource::BatPercentRemaining. Input in percent, output in half percent.
 esp_matter_attr_val_t battery_percent(float value);
+// PowerSource::BatChargeLevel (enum8: 0 OK, 1 Warning, 2 Critical) from a
+// level in percent. Not finite values are reported as OK.
+esp_matter_attr_val_t battery_charge_level(float percent, float warning_below,
+                                           float critical_below);
+// PowerSource::BatVoltage and WiredAssessedInputVoltage. Input in V, output
+// in mV (nullable uint32).
+esp_matter_attr_val_t millivolts(float value);
+// PowerSource::WiredAssessedCurrent. Input in A, output in mA (nullable uint32).
+esp_matter_attr_val_t milliamps(float value);
+// PowerSource::WiredAssessedInputFrequency. Input in Hz (nullable uint16).
+esp_matter_attr_val_t hertz(float value);
 esp_matter_attr_val_t boolean_state(bool value);
 esp_matter_attr_val_t concentration(float value);
 esp_matter_attr_val_t flow(float value);

@@ -1,0 +1,140 @@
+esphome:
+  name: matter-ci-power-topology
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # Mains source and a node level electrical sensor on the root node (topology node: the
+    # whole node is measured).
+    0:
+      wired:
+        present: mains_present
+      electrical_sensor:
+        topology: node
+        voltage: mains_voltage
+        active_power: total_power
+        energy_imported: total_energy
+    # A power strip: the total on endpoint 10 measures its two outlets below it.
+    10:
+      electrical_sensor:
+        topology: tree
+        active_power: strip_power
+    11:
+      parent: 10
+      on_off_plug_in_unit:
+        switch_id: outlet_1
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_1_power
+        energy_exported: outlet_1_energy
+    12:
+      parent: 10
+      on_off_plug_in_unit:
+        switch_id: outlet_2
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_2_power
+    # An electrical sensor on a cover endpoint (utility device type next to the application one).
+    20:
+      window_covering:
+        cover_id: shade
+      electrical_sensor:
+        topology: tree
+        active_power: motor_power
+    # A set topology that measures two of the outlets, one of which is currently active.
+    30:
+      electrical_sensor:
+        topology: set
+        available_endpoints: [11, 12]
+        active_endpoints: [11]
+        active_power: set_power
+
+switch:
+  - platform: template
+    id: outlet_1
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: outlet_2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+cover:
+  - platform: template
+    id: shade
+    optimistic: true
+
+sensor:
+  - platform: template
+    id: mains_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.0;
+  - platform: template
+    id: total_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 120.0;
+  - platform: template
+    id: total_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 12.5;
+  - platform: template
+    id: strip_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 80.0;
+  - platform: template
+    id: outlet_1_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 50.0;
+  - platform: template
+    id: outlet_1_energy
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    lambda: return 3.0;
+  - platform: template
+    id: outlet_2_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 30.0;
+  - platform: template
+    id: motor_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 20.0;
+  - platform: template
+    id: set_power
+    unit_of_measurement: "W"
+    device_class: power
+    lambda: return 50.0;
+
+binary_sensor:
+  - platform: template
+    id: mains_present
+    device_class: power

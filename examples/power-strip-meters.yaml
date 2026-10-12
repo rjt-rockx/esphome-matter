@@ -1,0 +1,107 @@
+# Hardware: any ESP32-C6 board (default esp32-c6-devkitc-1) with an ADE7953 energy meter on I2C (SDA GPIO6, SCL GPIO7)
+# and two relays on GPIO4 and GPIO5. The meter measures the two outlets on its two current channels.
+# Demonstrates: a power strip with an Electrical Sensor per outlet and one for the strip total. The total uses the Power
+# Topology "tree": it measures its own endpoint and the outlets below it (`parent: 10`). Each outlet reports its own
+# power. The mains supply is a wired Power Source on the root node (endpoint 0) that powers all endpoints.
+# See docs/power.md. Uses Wi-Fi.
+
+substitutions:
+  name: matter-power-strip
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  sda_pin: GPIO6
+  scl_pin: GPIO7
+  relay_1_pin: GPIO4
+  relay_2_pin: GPIO5
+
+esphome:
+  name: ${name}
+  friendly_name: Matter Power Strip
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    # The mains supply, shared by every endpoint. Endpoint 0 is the root node; only Power Source
+    # and Electrical Sensor can be added to it.
+    0:
+      wired:
+        voltage: mains_voltage
+    # The strip total: measures this endpoint and everything below it.
+    10:
+      electrical_sensor:
+        topology: tree
+        voltage: mains_voltage
+        active_power: total_power
+    # The outlets are children of the total. A sensor on a leaf endpoint measures just that endpoint.
+    11:
+      parent: 10
+      on_off_plug_in_unit:
+        switch_id: outlet_1
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_1_power
+    12:
+      parent: 10
+      on_off_plug_in_unit:
+        switch_id: outlet_2
+      electrical_sensor:
+        topology: tree
+        active_power: outlet_2_power
+
+i2c:
+  sda: ${sda_pin}
+  scl: ${scl_pin}
+
+switch:
+  - platform: gpio
+    id: outlet_1
+    name: Outlet 1
+    pin: ${relay_1_pin}
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: outlet_2
+    name: Outlet 2
+    pin: ${relay_2_pin}
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: ade7953_i2c
+    irq_pin: GPIO8
+    voltage:
+      id: mains_voltage
+      name: Mains voltage
+    active_power_a:
+      id: outlet_1_power
+      name: Outlet 1 power
+    active_power_b:
+      id: outlet_2_power
+      name: Outlet 2 power
+    update_interval: 5s
+  # The total is the sum of the outlets.
+  - platform: template
+    id: total_power
+    name: Total power
+    unit_of_measurement: W
+    device_class: power
+    update_interval: 5s
+    lambda: |-
+      return id(outlet_1_power).state + id(outlet_2_power).state;
