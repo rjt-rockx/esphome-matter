@@ -495,7 +495,9 @@ def test_config_lines_wired():
 def test_endpoint_list_defaults():
     root = {"battery": {"description": "B", "order": 0}}
     assert ps.endpoint_list(0, root, (0, 3, 1, 2)) == [1, 2, 3]
-    assert ps.endpoint_list(0, {"battery": {**root["battery"], "powers": [2]}}, (0, 1, 2)) == [2]
+    assert ps.endpoint_list(
+        0, {"battery": {**root["battery"], "powers": [2]}}, (0, 1, 2)
+    ) == [2]
     # An application endpoint lists nothing unless asked to.
     assert ps.endpoint_list(1, root, (0, 1)) == []
     assert ps.endpoint_list(1, {"on_off_light": {}}, (0, 1)) == []
@@ -508,7 +510,11 @@ def test_max_device_types_counts_the_root_node_additions():
 
 def test_root_node_is_not_a_sibling():
     plans = c.plan_endpoints(
-        {0: {"wired": {}}, 1: {"on_off_plug_in_unit": {}}, 2: {"on_off_plug_in_unit": {}}},
+        {
+            0: {"wired": {}},
+            1: {"on_off_plug_in_unit": {}},
+            2: {"on_off_plug_in_unit": {}},
+        },
         log=False,
     )
     assert not plans[0].tags
@@ -619,7 +625,9 @@ def test_single_threshold_is_checked_against_the_default(run_config):
 
 def test_powers_is_not_capped(run_config):
     many = ", ".join(str(n) for n in range(1, 25))
-    endpoints = "\n".join(f"    {n}:\n      on_off_plug_in_unit: {{}}" for n in range(1, 25))
+    endpoints = "\n".join(
+        f"    {n}:\n      on_off_plug_in_unit: {{}}" for n in range(1, 25)
+    )
     result = run_config(
         matter(f"    0:\n      wired:\n        powers: [{many}]\n{endpoints}")
     )

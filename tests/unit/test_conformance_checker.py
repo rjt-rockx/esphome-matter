@@ -201,12 +201,17 @@ class TestLayoutMode:
         # (espm._apply_code_driven_overlay), so nothing is left to baseline.
         assert not _codes(rep), _codes(rep)
 
-    def test_ethernet_only_network_commissioning_has_no_wifi_thread_commands(self, profile):
+    def test_ethernet_only_network_commissioning_has_no_wifi_thread_commands(
+        self, profile
+    ):
         nc = profile.data["clusters"]["network_commissioning"]
         assert nc["base"]["cmds"] == []
         for feat in ("WiFiNetworkInterface", "ThreadNetworkInterface"):
             assert "scan_networks" in nc["features"][feat]["cmds"]
-        assert "device_load_status" in profile.data["clusters"]["general_diagnostics"]["base"]["attrs"]
+        assert (
+            "device_load_status"
+            in profile.data["clusters"]["general_diagnostics"]["base"]["attrs"]
+        )
 
     def test_duplicate_device_types_require_tag_list(self, spec, profile):
         layout = copy.deepcopy(LIGHT_LAYOUT)

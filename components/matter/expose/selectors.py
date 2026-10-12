@@ -220,7 +220,9 @@ def select(
                 )
             if reason := entity.skipped_by_glob:
                 _LOGGER.warning(
-                    "matter.expose: '%s' is exposed explicitly although it is %s", eid, reason
+                    "matter.expose: '%s' is exposed explicitly although it is %s",
+                    eid,
+                    reason,
                 )
         result.selected.append(Selected(entity, overrides, level))
     return result

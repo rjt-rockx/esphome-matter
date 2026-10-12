@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = ROOT / "components" / "matter"
@@ -18,12 +18,26 @@ LOCK_ALLOWED = {
 LOCK_PATTERN = re.compile(r"\b(LockChipStack|ScopedChipStackLock)\b")
 
 
+def build_callbacks(text: str) -> list[str]:
+    """Bodies of the generated endpoint build callbacks (other lambdas may return false)."""
+    bodies = []
+    lines = text.splitlines()
+    for start, line in enumerate(lines):
+        if "(esp_matter::endpoint_t *endpoint) -> bool {" not in line:
+            continue
+        close = line[: len(line) - len(line.lstrip())] + "});"
+        end = next(i for i in range(start + 1, len(lines)) if lines[i] == close)
+        bodies.append("\n".join(lines[start:end]))
+    return bodies
+
+
 def test_generated_build_callbacks_name_the_failing_step():
     snapshots = sorted(SNAPSHOTS.glob("*.main.txt"))
     assert snapshots
+    assert any(build_callbacks(p.read_text()) for p in snapshots)
     for path in snapshots:
-        text = path.read_text()
-        assert "return false;" not in text, f"{path.name}: unnamed build failure"
+        for body in build_callbacks(path.read_text()):
+            assert "return false;" not in body, f"{path.name}: unnamed build failure"
     assert any('MATTER_BUILD_FAIL("endpoint ' in p.read_text() for p in snapshots)
 
 

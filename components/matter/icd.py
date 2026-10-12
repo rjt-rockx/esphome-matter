@@ -145,9 +145,7 @@ ICD_SCHEMA = cv.Schema(
         cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
         # LIT only
         cv.Optional(CONF_CLIENTS_PER_FABRIC): cv.int_range(min=1, max=255),
-        cv.Optional(CONF_UAT_HINT): cv.ensure_list(
-            cv.one_of(*UAT_HINTS, lower=True)
-        ),
+        cv.Optional(CONF_UAT_HINT): cv.ensure_list(cv.one_of(*UAT_HINTS, lower=True)),
         cv.Optional(CONF_UAT_INSTRUCTION): cv.All(
             cv.string_strict, cv.Length(max=_UAT_INSTRUCTION_MAX)
         ),
@@ -213,11 +211,13 @@ def _validate_icd(config: ConfigType) -> ConfigType:
         )
     if slow < 1:
         raise cv.Invalid(
-            f"`{CONF_SLOW_POLL_INTERVAL}` must be greater than 0", path=[CONF_SLOW_POLL_INTERVAL]
+            f"`{CONF_SLOW_POLL_INTERVAL}` must be greater than 0",
+            path=[CONF_SLOW_POLL_INTERVAL],
         )
     if fast < 1:
         raise cv.Invalid(
-            f"`{CONF_FAST_POLL_INTERVAL}` must be greater than 0", path=[CONF_FAST_POLL_INTERVAL]
+            f"`{CONF_FAST_POLL_INTERVAL}` must be greater than 0",
+            path=[CONF_FAST_POLL_INTERVAL],
         )
     if mode == MODE_SIT and slow > SIT_SLOW_POLL_MAX_MS:
         raise cv.Invalid(
@@ -380,9 +380,7 @@ def _warn(icd: ConfigType, full_config) -> None:
             "matter icd: `api:` keeps the radio busy (keepalive traffic the sleepy device has to poll for "
             "and the main loop wakes for). Remove it from battery builds"
         )
-    if any(
-        p.get(CONF_PLATFORM) == "esphome" for p in _platforms(full_config, "ota")
-    ):
+    if any(p.get(CONF_PLATFORM) == "esphome" for p in _platforms(full_config, "ota")):
         _LOGGER.warning(
             "matter icd: `ota: platform: esphome` does not work while `openthread: poll_period` is set. "
             "Use Matter OTA (`matter: ota:`) for updates"
@@ -434,9 +432,13 @@ def _warn_light_sleep(full_config) -> None:
     suspend = esphome_cfg.get("suspend_loop", False)  # only on newer ESPHome
     loop_interval = esphome_cfg.get("loop_interval")
     # Older ESPHome (2026.6/2026.7) has neither option, so there is nothing to recommend there.
-    tunable = core_option_supported("loop_interval") or core_option_supported("suspend_loop")
-    if tunable and not suspend and (
-        loop_interval is None or loop_interval.total_milliseconds < 1000
+    tunable = core_option_supported("loop_interval") or core_option_supported(
+        "suspend_loop"
+    )
+    if (
+        tunable
+        and not suspend
+        and (loop_interval is None or loop_interval.total_milliseconds < 1000)
     ):
         _LOGGER.warning(
             "matter icd: the ESPHome main loop wakes every 16 ms by default, which keeps the chip out of "
@@ -474,7 +476,11 @@ def _warn_update_intervals(full_config, idle_ms: int) -> None:
                 sensor_cfg = full_config.get_config_for_path(path)
             except (KeyError, IndexError):
                 continue
-            interval = sensor_cfg.get("update_interval") if isinstance(sensor_cfg, dict) else None
+            interval = (
+                sensor_cfg.get("update_interval")
+                if isinstance(sensor_cfg, dict)
+                else None
+            )
             if interval is None or not hasattr(interval, "total_milliseconds"):
                 continue
             ms = int(interval.total_milliseconds)

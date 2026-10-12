@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import HEADER, WIFI, COMPONENTS, run_esphome, toolchain_line
 import pytest
+from conftest import COMPONENTS, HEADER, WIFI, run_esphome, toolchain_line
 
 ENDPOINTS = """
   endpoints:
@@ -43,7 +43,10 @@ def test_persist_passcode_invalid(run_config, value):
 
 
 def test_persist_passcode_with_yaml_passcode(run_config):
-    body = "matter:\n  passcode: 20202021\n  persist_passcode: until_commissioned\n" + ENDPOINTS.lstrip("\n")
+    body = (
+        "matter:\n  passcode: 20202021\n  persist_passcode: until_commissioned\n"
+        + ENDPOINTS.lstrip("\n")
+    )
     result = run_config(body)
     assert result.ok, result.output
 
@@ -60,5 +63,7 @@ def test_persist_passcode_define(tmp_path, value, define):
     path.write_text(textwrap.dedent(text))
     result = run_esphome("compile", "--only-generate", str(path), cwd=tmp_path)
     assert result.ok, result.output[-3000:]
-    defines = (tmp_path / ".esphome/build/matter-unit/src/esphome/core/defines.h").read_text()
+    defines = (
+        tmp_path / ".esphome/build/matter-unit/src/esphome/core/defines.h"
+    ).read_text()
     assert f"#define MATTER_PERSIST_PASSCODE_MODE {define}\n" in defines

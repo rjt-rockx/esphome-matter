@@ -15,9 +15,9 @@ See docs/composition.md.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
 import zlib
+from dataclasses import dataclass, field
 
 import esphome.config_validation as cv
 
@@ -44,12 +44,39 @@ NAMESPACE_COMMON_POSITION = 0x08
 NAMESPACE_SWITCHES = 0x43
 
 # Common Number tags are Zero (0) to Thirty (30).
-_NUMBER_TAG_NAMES = (
-    "zero one two three four five six seven eight nine ten eleven twelve thirteen "
-    "fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty_one twenty_two "
-    "twenty_three twenty_four twenty_five twenty_six twenty_seven twenty_eight "
-    "twenty_nine thirty"
-).split()
+_NUMBER_TAG_NAMES = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "twenty_one",
+    "twenty_two",
+    "twenty_three",
+    "twenty_four",
+    "twenty_five",
+    "twenty_six",
+    "twenty_seven",
+    "twenty_eight",
+    "twenty_nine",
+    "thirty",
+]
 NUMBER_TAG_MAX = len(_NUMBER_TAG_NAMES) - 1
 
 # Standard namespaces from the Matter namespaces specification (1.4).
@@ -62,7 +89,9 @@ NAMESPACE_TAGS: dict[int, dict[str, int]] = {
     NAMESPACE_COMMON_NUMBER: {name: i for i, name in enumerate(_NUMBER_TAG_NAMES)},
     NAMESPACE_COMMON_POSITION: {
         name: i
-        for i, name in enumerate(("left", "right", "top", "bottom", "middle", "row", "column"))
+        for i, name in enumerate(
+            ("left", "right", "top", "bottom", "middle", "row", "column")
+        )
     },
     NAMESPACE_SWITCHES: {
         name: i
@@ -109,7 +138,9 @@ def _label(value):
     value = cv.string_strict(value)
     size = len(value.encode())
     if not value:
-        raise cv.Invalid(f"Labels must be 1 to {LABEL_MAX} UTF-8 bytes long, got an empty string")
+        raise cv.Invalid(
+            f"Labels must be 1 to {LABEL_MAX} UTF-8 bytes long, got an empty string"
+        )
     if size > LABEL_MAX:
         raise cv.Invalid(
             f"Label '{value}' is {size} UTF-8 bytes long, but Matter labels are limited to "
@@ -131,7 +162,12 @@ def default_label(name: str, source: str = "entity name") -> str:
     _LOGGER.warning(
         "Matter endpoint label derived from %s '%s' is %d bytes; truncated to '%s' "
         "(limit %d bytes). Set an explicit `label:` (max %d bytes) to choose it yourself",
-        source, name, len(encoded), truncated, LABEL_MAX, LABEL_MAX,
+        source,
+        name,
+        len(encoded),
+        truncated,
+        LABEL_MAX,
+        LABEL_MAX,
     )
     return truncated
 
@@ -152,7 +188,9 @@ def _tag_entry(value):
     value = cv.Schema(
         {
             cv.Required(CONF_NAMESPACE): _namespace,
-            cv.Required(CONF_TAG): cv.Any(cv.int_range(min=0, max=0xFF), cv.string_strict),
+            cv.Required(CONF_TAG): cv.Any(
+                cv.int_range(min=0, max=0xFF), cv.string_strict
+            ),
             cv.Optional(CONF_LABEL): _label,
         }
     )(value)
@@ -319,7 +357,11 @@ def plan_endpoints(
     return plans
 
 
-def structure_hash(endpoints: dict[int, dict], plans: dict[int, EndpointPlan], signatures: dict[int, str]) -> int:
+def structure_hash(
+    endpoints: dict[int, dict],
+    plans: dict[int, EndpointPlan],
+    signatures: dict[int, str],
+) -> int:
     """32-bit hash of everything that controllers cache about the composition."""
     parts = [f"v{_HASH_VERSION}"]
     for endpoint_id in sorted(endpoints):

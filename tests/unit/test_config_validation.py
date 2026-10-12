@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import COMPONENTS, config_files, prepare_config, run_esphome
 import pytest
+from conftest import COMPONENTS, config_files, prepare_config, run_esphome
 
 SWITCH = """
 switch:
@@ -57,15 +57,20 @@ def test_shipped_configs_validate(config, tmp_path):
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("device_type", ["on_off_light", "on_off_plug_in_unit", "mounted_on_off_control"])
+@pytest.mark.parametrize(
+    "device_type", ["on_off_light", "on_off_plug_in_unit", "mounted_on_off_control"]
+)
 def test_switch_id_binding(run_config, device_type):
-    body = f"""
+    body = (
+        f"""
         matter:
           endpoints:
             1:
               {device_type}:
                 switch_id: relay
-        """ + SWITCH
+        """
+        + SWITCH
+    )
     result = run_config(body)
     assert result.ok, result.output
 
@@ -552,7 +557,9 @@ def test_unknown_device_type_rejected(run_config):
     assert not result.ok
 
 
-@pytest.mark.skipif(not bound_code("generic_switch"), reason="generic switch not present")
+@pytest.mark.skipif(
+    not bound_code("generic_switch"), reason="generic switch not present"
+)
 def test_generic_switch_bare_defaults_to_momentary(run_config):
     # The mandatory Switch choice feature is resolved to MomentarySwitch.
     result = run_config(

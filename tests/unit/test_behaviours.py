@@ -3,13 +3,13 @@ in matter_behaviours_logic.h (compiled and run on the host)."""
 
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
 import textwrap
+from pathlib import Path
 
-from conftest import COMPONENTS
 import pytest
+from conftest import COMPONENTS
 
 PREAMBLE = """
 output:
@@ -30,7 +30,12 @@ ENDPOINTS = """
 
 
 def cfg(matter_extra: str) -> str:
-    return PREAMBLE + "matter:\n" + textwrap.indent(textwrap.dedent(matter_extra), "  ") + ENDPOINTS
+    return (
+        PREAMBLE
+        + "matter:\n"
+        + textwrap.indent(textwrap.dedent(matter_extra), "  ")
+        + ENDPOINTS
+    )
 
 
 def test_status_led_output_ok(run_config):
@@ -213,10 +218,20 @@ def test_logic_header_on_host(tmp_path: Path):
     src.write_text(HARNESS)
     exe = tmp_path / "t"
     comp = subprocess.run(
-        ["g++", "-std=c++17", "-Wall", "-Werror", f"-I{COMPONENTS / 'matter'}", str(src), "-o", str(exe)],
+        [
+            "g++",
+            "-std=c++17",
+            "-Wall",
+            "-Werror",
+            f"-I{COMPONENTS / 'matter'}",
+            str(src),
+            "-o",
+            str(exe),
+        ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert comp.returncode == 0, comp.stderr
-    run = subprocess.run([str(exe)], capture_output=True, text=True)
+    run = subprocess.run([str(exe)], capture_output=True, text=True, check=False)
     assert run.returncode == 0, run.stdout + run.stderr

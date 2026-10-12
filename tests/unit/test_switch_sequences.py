@@ -23,7 +23,12 @@ MSR_MSL_MSM = {"release": True, "long_press": True, "multi_press": True}
 AS_MSM = {"action_switch": True, "multi_press": True}
 AS_MSL_MSM = {"action_switch": True, "long_press": True, "multi_press": True}
 
-I, S, O2, O3 = "initial_press", "short_release", "multi_press_ongoing(2)", "multi_press_ongoing(3)"
+I, S, O2, O3 = (
+    "initial_press",
+    "short_release",
+    "multi_press_ongoing(2)",
+    "multi_press_ongoing(3)",
+)
 LP, LR = "long_press", "long_release"
 C = "multi_press_complete"
 
@@ -46,9 +51,23 @@ CASES = [
         True,
     ),
     # 2.5 8a/8b: tap, then long press: no LongPress/LongRelease, count 2
-    ("msl-msm-tap-long", MSR_MSL_MSM, "tL.", [I, S, I, O2, S, f"{C}(2)"], "2.5 steps 8a, 8b", True),
+    (
+        "msl-msm-tap-long",
+        MSR_MSL_MSM,
+        "tL.",
+        [I, S, I, O2, S, f"{C}(2)"],
+        "2.5 steps 8a, 8b",
+        True,
+    ),
     # 2.5 9a/9b: long press, then tap: a new sequence, no MultiPressOngoing, count 1
-    ("msl-msm-long-tap", MSR_MSL_MSM, "Lt.", [I, LP, LR, I, S, f"{C}(1)"], "2.5 steps 9a, 9b", True),
+    (
+        "msl-msm-long-tap",
+        MSR_MSL_MSM,
+        "Lt.",
+        [I, LP, LR, I, S, f"{C}(1)"],
+        "2.5 steps 9a, 9b",
+        True,
+    ),
     # 2.6 steps 4a/4b, 5a/5b
     ("as-1", AS_MSM, "t.", [I, f"{C}(1)"], "2.6 steps 4a, 4b", True),
     ("as-2", AS_MSM, "tt.", [I, f"{C}(2)"], "2.6 steps 5a, 5b", True),
@@ -57,22 +76,47 @@ CASES = [
     # 2.6 8a/8b: tap, then long press: one InitialPress, no LongPress, count 2
     ("as-msl-tap-long", AS_MSL_MSM, "tL.", [I, f"{C}(2)"], "2.6 steps 8a, 8b", True),
     # 2.6 9a/9b: long press, then tap: InitialPress, LongPress, LongRelease, InitialPress, count 1
-    ("as-msl-long-tap", AS_MSL_MSM, "Lt.", [I, LP, LR, I, f"{C}(1)"], "2.6 steps 9a, 9b", True),
+    (
+        "as-msl-long-tap",
+        AS_MSL_MSM,
+        "Lt.",
+        [I, LP, LR, I, f"{C}(1)"],
+        "2.6 steps 9a, 9b",
+        True,
+    ),
     # No test step: MSM without AS exceeding MultiPressMax.
-    ("msm-overflow", MSR_MSM, "ttt.", [I, S, I, O2, S, I, S, f"{C}(0)"], "no TC_SWTCH step", False),
-    ("latching", {"latching": True}, "t", ["switch_latched", "switch_latched"], "n/a", False),
+    (
+        "msm-overflow",
+        MSR_MSM,
+        "ttt.",
+        [I, S, I, O2, S, I, S, f"{C}(0)"],
+        "no TC_SWTCH step",
+        False,
+    ),
+    (
+        "latching",
+        {"latching": True},
+        "t",
+        ["switch_latched", "switch_latched"],
+        "n/a",
+        False,
+    ),
 ]
 
 
 @pytest.mark.parametrize(
-    ("name", "features", "gesture", "expected", "source", "documented"), CASES, ids=[c[0] for c in CASES]
+    ("name", "features", "gesture", "expected", "source", "documented"),
+    CASES,
+    ids=[c[0] for c in CASES],
 )
 def test_sequence(name, features, gesture, expected, source, documented):
     assert run(SwitchModel(**features), gesture) == expected, source
 
 
 @pytest.mark.parametrize(
-    ("name", "expected"), [(c[0], c[3]) for c in CASES if c[5]], ids=[c[0] for c in CASES if c[5]]
+    ("name", "expected"),
+    [(c[0], c[3]) for c in CASES if c[5]],
+    ids=[c[0] for c in CASES if c[5]],
 )
 def test_documented(name, expected):
     """Every sequence of the docs table is one that the model produces."""

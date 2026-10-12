@@ -6,10 +6,9 @@ Pure Python: lowering is driven directly with a fake ``CORE.raw_config``.
 from __future__ import annotations
 
 import esphome.config_validation as cv
-from esphome.core import CORE
 import pytest
+from esphome.core import CORE
 
-from components.matter.expose import lower
 from components.matter.expose.inference import (
     LoweredEndpoint,
     NoMapping,
@@ -19,7 +18,11 @@ from components.matter.expose.inference import (
 )
 from components.matter.expose.inventory import build_inventory
 from components.matter.expose.lower import bare_matter_error, lower_expose
-from components.matter.expose.numbering import endpoint_for_key, natural_key, resolve_numbers
+from components.matter.expose.numbering import (
+    endpoint_for_key,
+    natural_key,
+    resolve_numbers,
+)
 from components.matter.expose.schema import EXCLUDE_SCHEMA, EXPOSE_SCHEMA
 from components.matter.expose.selectors import parse_items, select
 
@@ -29,7 +32,13 @@ def sw(id_, name=None, **kw):
 
 
 RAW = {
-    "switch": [sw("relay"), sw("relay_1"), sw("relay_2"), sw("relay_10"), sw("hidden", internal=True)],
+    "switch": [
+        sw("relay"),
+        sw("relay_1"),
+        sw("relay_2"),
+        sw("relay_10"),
+        sw("hidden", internal=True),
+    ],
     "light": [
         {"platform": "rgbww", "id": "desk", "name": "Desk"},
         {"platform": "monochromatic", "id": "lamp", "name": "Lamp"},
@@ -38,10 +47,19 @@ RAW = {
     "sensor": [
         {"platform": "template", "id": "t", "name": "T", "device_class": "temperature"},
         {"platform": "template", "id": "h", "name": "H", "device_class": "humidity"},
-        {"platform": "template", "id": "diag", "name": "D", "device_class": "temperature",
-         "entity_category": "diagnostic"},
-        {"platform": "scd4x", "co2": {"name": "CO2"},
-         "temperature": {"id": "scd_t", "name": "ST"}, "humidity": {"id": "scd_h", "name": "SH"}},
+        {
+            "platform": "template",
+            "id": "diag",
+            "name": "D",
+            "device_class": "temperature",
+            "entity_category": "diagnostic",
+        },
+        {
+            "platform": "scd4x",
+            "co2": {"name": "CO2"},
+            "temperature": {"id": "scd_t", "name": "ST"},
+            "humidity": {"id": "scd_h", "name": "SH"},
+        },
         {"platform": "template", "name": "No id", "device_class": "temperature"},
     ],
     "button": [{"platform": "template", "id": "btn", "name": "Btn"}],
@@ -68,7 +86,7 @@ def ids(config):
     out = {}
     for number, ep in config["endpoints"].items():
         found = []
-        for key, block in ep.items():
+        for block in ep.values():
             if isinstance(block, dict):
                 for value in block.values():
                     value = getattr(value, "id", value)
@@ -111,7 +129,10 @@ def test_collision_is_hard_error_with_suggestion():
         "{id: e84, endpoint: 6810} (6810 is free); e276 then keeps 47922."
     )
     # the suggestion must itself resolve
-    assert resolve_numbers(["e276", "e84"], {"e84": 6810}) == {"e84": 6810, "e276": 47922}
+    assert resolve_numbers(["e276", "e84"], {"e84": 6810}) == {
+        "e84": 6810,
+        "e276": 47922,
+    }
 
 
 def test_pin_frees_the_other_key():
@@ -142,7 +163,9 @@ def test_pin_out_of_range():
 
 def test_natural_sort():
     assert sorted(["relay_10", "relay_2", "relay_1"], key=natural_key) == [
-        "relay_1", "relay_2", "relay_10"
+        "relay_1",
+        "relay_2",
+        "relay_10",
     ]
 
 
@@ -171,7 +194,11 @@ def test_inventory_non_exposable_without_id(raw):
 
 
 def test_inventory_two_levels():
-    raw = {"sensor": [{"platform": "ina3221", "channel_1": {"current": {"id": "i1", "name": "I"}}}]}
+    raw = {
+        "sensor": [
+            {"platform": "ina3221", "channel_1": {"current": {"id": "i1", "name": "I"}}}
+        ]
+    }
     inv = build_inventory(raw)
     assert [(e.id, e.sub_key) for e in inv if e.id] == [("i1", "current")]
 
@@ -217,7 +244,9 @@ def test_unknown_id_suggests(raw):
 
 def test_unmappable_explicit_errors_with_reason(raw):
     lowered = None
-    with pytest.raises(cv.Invalid, match="'num' cannot be exposed: a number has no faithful"):
+    with pytest.raises(
+        cv.Invalid, match="'num' cannot be exposed: a number has no faithful"
+    ):
         lowered = run(["num"])
     assert lowered is None
 
@@ -287,7 +316,9 @@ def test_conflicting_overrides_error(raw):
 
 
 def test_duplicate_same_or_empty_is_fine(raw):
-    s = sel(raw, ["relay", {"id": "relay", "label": "R"}, {"id": "relay", "label": "R"}])
+    s = sel(
+        raw, ["relay", {"id": "relay", "label": "R"}, {"id": "relay", "label": "R"}]
+    )
     assert names(s) == ["relay"] and s.selected[0].overrides.label == "R"
 
 
@@ -296,10 +327,16 @@ def test_duplicate_same_or_empty_is_fine(raw):
 
 def test_spike_rules(raw):
     inv = {e.id: e for e in build_inventory(raw)}
-    assert list(infer(inv["relay"], Overrides()).device_types) == ["on_off_plug_in_unit"]
-    assert list(infer(inv["desk"], Overrides()).device_types) == ["extended_color_light"]
+    assert list(infer(inv["relay"], Overrides()).device_types) == [
+        "on_off_plug_in_unit"
+    ]
+    assert list(infer(inv["desk"], Overrides()).device_types) == [
+        "extended_color_light"
+    ]
     assert list(infer(inv["lamp"], Overrides()).device_types) == ["dimmable_light"]
-    assert infer(inv["t"], Overrides()).device_types == {"temperature_sensor": {"temperature": "t"}}
+    assert infer(inv["t"], Overrides()).device_types == {
+        "temperature_sensor": {"temperature": "t"}
+    }
     assert infer(inv["h"], Overrides()).device_types == {
         "humidity_sensor": {"relative_humidity": "h"}
     }
@@ -310,11 +347,16 @@ def test_spike_rules(raw):
 
 def test_as_features_options(raw):
     inv = {e.id: e for e in build_inventory(raw)}
-    out = infer(inv["relay"], Overrides(as_="on_off_light", features=["Lighting"], options={"x": 1}))
+    out = infer(
+        inv["relay"],
+        Overrides(as_="on_off_light", features=["Lighting"], options={"x": 1}),
+    )
     assert out.device_types == {
         "on_off_light": {"switch_id": "relay", "with_features": ["Lighting"], "x": 1}
     }
-    with pytest.raises(cv.Invalid, match="unknown device type 'on_of_light'.*on_off_light"):
+    with pytest.raises(
+        cv.Invalid, match="unknown device type 'on_of_light'.*on_off_light"
+    ):
         infer(inv["relay"], Overrides(as_="on_of_light"))
     with pytest.raises(cv.Invalid, match="collide with the binding"):
         infer(inv["relay"], Overrides(options={"switch_id": "x"}))
@@ -328,7 +370,9 @@ def test_registry_is_extensible(raw):
     try:
         register_rule(
             "number",
-            lambda e, o: LoweredEndpoint({"on_off_plug_in_unit": {"switch_id": e.id}}, merge_group="g"),
+            lambda e, o: LoweredEndpoint(
+                {"on_off_plug_in_unit": {"switch_id": e.id}}, merge_group="g"
+            ),
         )
         assert infer(inv["num"], Overrides()).merge_group == "g"
     finally:
@@ -422,11 +466,14 @@ def test_merge_group_and_attach_to(raw):
     try:
         register_rule(
             "sensor",
-            lambda e, o: LoweredEndpoint(
-                {"temperature_sensor": {"temperature": e.id}}, merge_group="air_quality"
-            )
-            if e.id == "t"
-            else None,
+            lambda e, o: (
+                LoweredEndpoint(
+                    {"temperature_sensor": {"temperature": e.id}},
+                    merge_group="air_quality",
+                )
+                if e.id == "t"
+                else None
+            ),
         )
         # `t` is rewritten into group:air_quality (precedes the spike sensor rule)
         _RULES = inference._RULES["sensor"]
@@ -476,7 +523,10 @@ def test_bare_matter_is_valid_and_hints(raw, caplog):
         assert lower_expose(cfg) is cfg
     text = caplog.text
     assert "no entities are exposed (root node only)" in text
-    assert "  expose: [relay, relay_1, relay_2, relay_10, desk, lamp, t, h, scd_t, scd_h]" in text
+    assert (
+        "  expose: [relay, relay_1, relay_2, relay_10, desk, lamp, t, h, scd_t, scd_h]"
+        in text
+    )
     assert "# inferred from your config; edit as needed" in text
     assert "\n  expose: all\n" in text
     assert "hidden" not in text and "strip" not in text and "btn" not in text

@@ -26,10 +26,9 @@ import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import binary_sensor, button, sensor
 from esphome.const import CONF_TRIGGER_ID
-
-from .const import CONF_WITH_FEATURES
 from esphome.core import ID
 
+from .const import CONF_WITH_FEATURES
 from .types import MatterFilterMapping, MatterFilterResetTrigger
 
 CONF_CONDITION = "condition"
@@ -98,7 +97,11 @@ def validate_cluster(config: dict) -> dict:
     features = _feature_names(config)
     has_condition = CONF_CONDITION in config
     if not has_condition:
-        for key in (CONF_DEGRADATION_DIRECTION, CONF_WARNING_LEVEL, CONF_CRITICAL_LEVEL):
+        for key in (
+            CONF_DEGRADATION_DIRECTION,
+            CONF_WARNING_LEVEL,
+            CONF_CRITICAL_LEVEL,
+        ):
             if key in config:
                 raise cv.Invalid(f"{key} needs the `{CONF_CONDITION}` sensor")
         if "condition" in features:
@@ -116,7 +119,11 @@ def validate_cluster(config: dict) -> dict:
         critical = config.get(CONF_CRITICAL_LEVEL)
         warning = config.get(CONF_WARNING_LEVEL)
         if warning is not None and critical is None:
-            critical = DEFAULT_CRITICAL_LEVEL if direction == "down" else 100 - DEFAULT_CRITICAL_LEVEL
+            critical = (
+                DEFAULT_CRITICAL_LEVEL
+                if direction == "down"
+                else 100 - DEFAULT_CRITICAL_LEVEL
+            )
         if warning is not None and critical is not None:
             ordered = warning > critical if direction == "down" else warning < critical
             if not ordered:
@@ -166,40 +173,44 @@ def create_lines(cluster, config: dict, endpoint_id: int) -> list[str]:
             f"{mapping_name(endpoint_id, cluster.id)});"
         )
     lines += [
-        f"auto *{var} = {ns}::create(endpoint, &{cluster.espm_namespace}_config, "
-        "esp_matter::CLUSTER_FLAG_SERVER);",
+        (
+            f"auto *{var} = {ns}::create(endpoint, &{cluster.espm_namespace}_config, "
+            "esp_matter::CLUSTER_FLAG_SERVER);"
+        ),
         f"if ({var} == nullptr)",
-        "  return MATTER_BUILD_FAIL(\"resource monitoring cluster create\");",
+        '  return MATTER_BUILD_FAIL("resource monitoring cluster create");',
     ]
     features = {str(f) for f in config.get(CONF_WITH_FEATURES, ())}
     if "condition" in features:
-        direction = DEGRADATION_DIRECTIONS[config.get(CONF_DEGRADATION_DIRECTION, "down")]
+        direction = DEGRADATION_DIRECTIONS[
+            config.get(CONF_DEGRADATION_DIRECTION, "down")
+        ]
         initial = 100 if direction == 0 else 0
         lines += [
-            f"{{",
+            "{",
             f"  {ns}::feature::condition::config_t condition_config{{}};",
             f"  condition_config.condition = {initial};",
             f"  condition_config.degradation_direction = {direction};",
             f"  if ({ns}::feature::condition::add({var}, &condition_config) != ESP_OK)",
-            "    return MATTER_BUILD_FAIL(\"resource monitoring condition feature\");",
+            '    return MATTER_BUILD_FAIL("resource monitoring condition feature");',
             "}",
         ]
     if "warning" in features:
         lines += [
             f"if ({ns}::feature::warning::add({var}) != ESP_OK)",
-            "  return MATTER_BUILD_FAIL(\"resource monitoring warning feature\");",
+            '  return MATTER_BUILD_FAIL("resource monitoring warning feature");',
         ]
     if "replacement_product_list" in features:
         lines += [
             f"if ({ns}::feature::replacement_product_list::add({var}) != ESP_OK)",
-            "  return MATTER_BUILD_FAIL(\"resource monitoring replacement product list feature\");",
+            '  return MATTER_BUILD_FAIL("resource monitoring replacement product list feature");',
         ]
     if has_reset(config):
         # Without the delegate above the command would reach an unset pointer.
         assert is_bound(config)
         lines += [
             f"if ({ns}::command::create_reset_condition({var}) == nullptr)",
-            "  return MATTER_BUILD_FAIL(\"resource monitoring reset condition command\");",
+            '  return MATTER_BUILD_FAIL("resource monitoring reset condition command");',
         ]
     return lines
 
@@ -211,7 +222,11 @@ async def register_filter(var, endpoint_id: int, cluster, config: dict):
     if CONF_CONDITION in config:
         critical = config.get(CONF_CRITICAL_LEVEL)
         if critical is None:
-            critical = DEFAULT_CRITICAL_LEVEL if direction == 0 else 100 - DEFAULT_CRITICAL_LEVEL
+            critical = (
+                DEFAULT_CRITICAL_LEVEL
+                if direction == 0
+                else 100 - DEFAULT_CRITICAL_LEVEL
+            )
     else:
         critical = -1
     cg.add_define("USE_MATTER_FILTER_MONITORING")
@@ -223,10 +238,14 @@ async def register_filter(var, endpoint_id: int, cluster, config: dict):
         ),
         endpoint_id,
         cluster.id,
-        cg.RawExpression(f"esphome::matter::FilterLevels{{{direction}, {warning}, {critical}}}"),
+        cg.RawExpression(
+            f"esphome::matter::FilterLevels{{{direction}, {warning}, {critical}}}"
+        ),
     )
     if CONF_CONDITION in config:
-        cg.add(mapping.set_condition_sensor(await cg.get_variable(config[CONF_CONDITION])))
+        cg.add(
+            mapping.set_condition_sensor(await cg.get_variable(config[CONF_CONDITION]))
+        )
     if CONF_REPLACE_NEEDED in config:
         cg.add(
             mapping.set_replace_needed_sensor(
@@ -234,7 +253,9 @@ async def register_filter(var, endpoint_id: int, cluster, config: dict):
             )
         )
     if CONF_RESET_BUTTON in config:
-        cg.add(mapping.set_reset_button(await cg.get_variable(config[CONF_RESET_BUTTON])))
+        cg.add(
+            mapping.set_reset_button(await cg.get_variable(config[CONF_RESET_BUTTON]))
+        )
     for conf in config.get(CONF_ON_RESET, ()):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
         cg.add(mapping.add_reset_trigger(trigger))

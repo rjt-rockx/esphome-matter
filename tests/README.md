@@ -1,13 +1,14 @@
 # Tests
 
-CI (`.github/workflows/ci.yml`) does three things with the YAML files in this
+CI (`.github/workflows/ci.yml`, plus the nightly workflow) does these things with the YAML files in this
 repository. All of them can be reproduced locally.
 
 | Check | What it runs | Inputs |
 |---|---|---|
 | Config validation | `esphome config` | every `tests/configs/*.yaml` and `examples/*.yaml` (glob, new files are picked up automatically) |
 | Compile matrix | `esphome compile` | `esp32-wifi.yaml` on C6 / S3 / C3, `esp32-thread.yaml` on C6 / H2, `esp32-h2-icd.yaml` (ICD SIT) on H2, `esp32-c6-icd.yaml` (ICD LIT) on C6 |
-| Lint (non-blocking) | `ruff`, `clang-format` | `components/`, `.github/`, `tests/` |
+| Lint | `ruff check` and `ruff format --check` (blocking), `clang-format` (non-blocking, only with a `.clang-format`) | `components/`, `.github/`, `tests/` |
+| Nightly compile (`.github/workflows/nightly.yml`) | `esphome compile` | every `tests/configs/*.yaml` on ESPHome dev and release, including `esp32-compile-all.yaml` (every device type and option in one ESP32-C6 image) |
 
 To add a test config, drop a YAML file into `tests/configs/`. Use
 `external_components: - source: ../../components`. Do not hard-code

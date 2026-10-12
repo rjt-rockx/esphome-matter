@@ -665,7 +665,7 @@ def _create_block(cluster, calls: list[str]) -> list[str]:
         "{",
         f"  auto *{var} = esp_matter::cluster::get(endpoint, {cluster.id});",
         f"  if ({conditions})",
-        "    return MATTER_BUILD_FAIL(\"sensor extras cluster create\");",
+        '    return MATTER_BUILD_FAIL("sensor extras cluster create");',
         "}",
     ]
 
@@ -820,7 +820,7 @@ async def _register_boolean_state_configuration(
                 "&boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);"
             ),
             "if (boolean_state_configuration_cluster == nullptr)",
-            "  return MATTER_BUILD_FAIL(\"boolean state configuration cluster create\");",
+            '  return MATTER_BUILD_FAIL("boolean state configuration cluster create");',
         ]
 
         def add_feature(feature: str, fields: dict[str, int]) -> None:
@@ -836,7 +836,9 @@ async def _register_boolean_state_configuration(
                 f"  if ({namespace}::feature::{feature}::add(boolean_state_configuration_cluster, "
                 f"&{feature}_config) != ESP_OK)"
             )
-            out.append("    return MATTER_BUILD_FAIL(\"boolean state configuration feature\");")
+            out.append(
+                '    return MATTER_BUILD_FAIL("boolean state configuration feature");'
+            )
             out.append("}")
 
         if visual:
@@ -860,7 +862,9 @@ async def _register_boolean_state_configuration(
             )
         for call in optional:
             out.append(f"if ({call} == nullptr)")
-            out.append("  return MATTER_BUILD_FAIL(\"boolean state configuration attribute\");")
+            out.append(
+                '  return MATTER_BUILD_FAIL("boolean state configuration attribute");'
+            )
         return out
 
     def elements() -> list[tuple[str, str]]:
@@ -992,7 +996,7 @@ async def _register_refrigerator_alarm(endpoint, var, device_config: dict) -> No
                 "if (refrigerator_alarm_cluster == nullptr || "
                 f"esp_matter::event::create(refrigerator_alarm_cluster, {notify.id}) == nullptr)"
             ),
-            "  return MATTER_BUILD_FAIL(\"refrigerator alarm cluster create\");",
+            '  return MATTER_BUILD_FAIL("refrigerator alarm cluster create");',
         ]
 
     endpoint.extras.append(

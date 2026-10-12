@@ -6,8 +6,8 @@ checks for the expected Matter registration calls.
 
 from __future__ import annotations
 
-from conftest import config_files, prepare_config, run_esphome
 import pytest
+from conftest import config_files, prepare_config, run_esphome
 
 pytestmark = pytest.mark.slow
 
@@ -25,8 +25,14 @@ EXPECTED = {
         "esp_matter::endpoint::heat_pump::add",
     ],
     "esp32-cover": ["register_cover", "configure_window_covering"],
-    "esp32-binary-sensors": ["register_binary_sensor_attribute", "MatterSmokeCoAlarmMapping"],
-    "esp32-sensor-extras": ["MatterOccupancyHoldTimeMapping", "MatterRefrigeratorAlarmMapping"],
+    "esp32-binary-sensors": [
+        "register_binary_sensor_attribute",
+        "MatterSmokeCoAlarmMapping",
+    ],
+    "esp32-sensor-extras": [
+        "MatterOccupancyHoldTimeMapping",
+        "MatterRefrigeratorAlarmMapping",
+    ],
     "esp32-all-endpoints": ["register_endpoint"],
     "esp32-ble-commissioning": ["register_endpoint"],
     "esp32-power-source": [
@@ -73,7 +79,9 @@ def test_generate(config, tmp_path):
     code = mains[0].read_text()
     assert "matter" in code.lower()
     for needle in EXPECTED.get(config.stem, []):
-        assert needle in code, f"{needle!r} missing from generated main.cpp of {config.name}"
+        assert needle in code, (
+            f"{needle!r} missing from generated main.cpp of {config.name}"
+        )
 
 
 def test_all_expected_configs_exist():

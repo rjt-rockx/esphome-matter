@@ -85,8 +85,18 @@ BDBI_REACHABLE_ATTRIBUTE_ID = 0x11
 STRING_ATTRIBUTES = (
     (CONF_VENDOR_NAME, "VendorName", "create_vendor_name", 32),
     (CONF_PRODUCT_NAME, "ProductName", "create_product_name", 32),
-    (CONF_HARDWARE_VERSION_STRING, "HardwareVersionString", "create_hardware_version_string", 64),
-    (CONF_SOFTWARE_VERSION_STRING, "SoftwareVersionString", "create_software_version_string", 64),
+    (
+        CONF_HARDWARE_VERSION_STRING,
+        "HardwareVersionString",
+        "create_hardware_version_string",
+        64,
+    ),
+    (
+        CONF_SOFTWARE_VERSION_STRING,
+        "SoftwareVersionString",
+        "create_software_version_string",
+        64,
+    ),
     (CONF_MANUFACTURING_DATE, "ManufacturingDate", "create_manufacturing_date", 16),
     (CONF_PART_NUMBER, "PartNumber", "create_part_number", 32),
     (CONF_PRODUCT_URL, "ProductURL", "create_product_url", 254),
@@ -97,10 +107,26 @@ STRING_ATTRIBUTES = (
 NUMBER_ATTRIBUTES = (
     (CONF_VENDOR_ID, "VendorID", "create_vendor_id", "uint16_t", 1, 0xFFFE),
     (CONF_PRODUCT_ID, "ProductID", "create_product_id", "uint16_t", 1, 0xFFFE),
-    (CONF_HARDWARE_VERSION, "HardwareVersion", "create_hardware_version", "uint16_t", 0, 0xFFFF),
-    (CONF_SOFTWARE_VERSION, "SoftwareVersion", "create_software_version", "uint32_t", 0, 0xFFFFFFFF),
+    (
+        CONF_HARDWARE_VERSION,
+        "HardwareVersion",
+        "create_hardware_version",
+        "uint16_t",
+        0,
+        0xFFFF,
+    ),
+    (
+        CONF_SOFTWARE_VERSION,
+        "SoftwareVersion",
+        "create_software_version",
+        "uint32_t",
+        0,
+        0xFFFFFFFF,
+    ),
 )
-IDENTITY_KEYS = tuple(a[0] for a in STRING_ATTRIBUTES) + tuple(a[0] for a in NUMBER_ATTRIBUTES)
+IDENTITY_KEYS = tuple(a[0] for a in STRING_ATTRIBUTES) + tuple(
+    a[0] for a in NUMBER_ATTRIBUTES
+)
 
 # BDBI NodeLabel and UniqueID are limited to 32 bytes.
 MAX_LABEL_LENGTH = 32
@@ -265,7 +291,10 @@ def _validate_device(key: str, raw) -> dict:
         if extra in handled:
             continue
         if extra in reserved:
-            raise cv.Invalid(f"'{extra}' is not allowed in a bridge device: {reserved[extra]}", path=[extra])
+            raise cv.Invalid(
+                f"'{extra}' is not allowed in a bridge device: {reserved[extra]}",
+                path=[extra],
+            )
         if extra not in allowed:
             hint = difflib.get_close_matches(str(extra), sorted(allowed), n=1)
             raise cv.Invalid(
@@ -316,7 +345,9 @@ def _validate_device(key: str, raw) -> dict:
     return device
 
 
-def split_device_types(device: dict, application: list[str]) -> tuple[list[str], list[str]]:
+def split_device_types(
+    device: dict, application: list[str]
+) -> tuple[list[str], list[str]]:
     """(device types on the Bridged Node endpoint, device types with a child endpoint)."""
     primary = device.get(CONF_PRIMARY)
     if primary is not None:
@@ -363,10 +394,15 @@ def _describe(key: str, number: int | str = "N") -> tuple[str, str]:
             f"the {app} endpoint of device '{device}'",
             f"bridge: {{devices: {{{device}: {{parts: {{{app}: {number}}}}}}}}}",
         )
-    return f"device '{rest}'", f"bridge: {{devices: {{{rest}: {{endpoint: {number}}}}}}}"
+    return (
+        f"device '{rest}'",
+        f"bridge: {{devices: {{{rest}: {{endpoint: {number}}}}}}}",
+    )
 
 
-def _resolve_numbers(keys: list[str], pins: dict[str, int], reserved: set[int]) -> dict[str, int]:
+def _resolve_numbers(
+    keys: list[str], pins: dict[str, int], reserved: set[int]
+) -> dict[str, int]:
     """Endpoint number per key: pinned, else hashed. Collisions are errors that say what to pin."""
     from .expose.numbering import _free_suggestion, endpoint_for_key
 
@@ -377,9 +413,13 @@ def _resolve_numbers(keys: list[str], pins: dict[str, int], reserved: set[int]) 
     for key, number in pins.items():
         what, _ = _describe(key)
         if number in reserved:
-            raise invalid(f"endpoint {number} is pinned for {what}, but `endpoints:` already uses it")
+            raise invalid(
+                f"endpoint {number} is pinned for {what}, but `endpoints:` already uses it"
+            )
         if number in pinned:
-            raise invalid(f"endpoint {number} is pinned for both {_describe(pinned[number])[0]} and {what}")
+            raise invalid(
+                f"endpoint {number} is pinned for both {_describe(pinned[number])[0]} and {what}"
+            )
         pinned[number] = key
     hashed: dict[int, list[str]] = {}
     for key in keys:  # YAML order: the last key of a collision is the one added last
@@ -394,7 +434,9 @@ def _resolve_numbers(keys: list[str], pins: dict[str, int], reserved: set[int]) 
         what, pin = _describe(newest, free)
         if number in pinned or number in reserved:
             holder = (
-                _describe(pinned[number])[0] if number in pinned else "an endpoint under `endpoints:`"
+                _describe(pinned[number])[0]
+                if number in pinned
+                else "an endpoint under `endpoints:`"
             )
             raise invalid(
                 f"{what} hashes to endpoint {number}, which {holder} already uses. Pin {what} to a free "
@@ -482,7 +524,9 @@ def lower_bridge(config: dict) -> dict:
             node_config[option] = value
         # Utility device types (electrical_sensor, ...) stay on the Bridged Node endpoint.
         for conf_key, value in device.items():
-            if conf_key in _known_device_keys() and not _is_application_device_type(conf_key):
+            if conf_key in _known_device_keys() and not _is_application_device_type(
+                conf_key
+            ):
                 node_config[conf_key] = value
         children: dict[int, dict] = {
             number: {app_key: device[app_key], CONF_PARENT: node_number}
@@ -512,11 +556,15 @@ def lower_bridge(config: dict) -> dict:
     config[CONF_ENDPOINTS] = dict(sorted(endpoints.items()))
     CORE.data.setdefault(CONF_MATTER, {})["bridge_plan"] = plan_lines
     CORE.data[CONF_MATTER]["bridge_keys"] = bridge_keys
-    _LOGGER.info("matter.bridge: %d device(s)\n  %s", len(devices), "\n  ".join(plan_lines))
+    _LOGGER.info(
+        "matter.bridge: %d device(s)\n  %s", len(devices), "\n  ".join(plan_lines)
+    )
     return config
 
 
-def _assign_tags(endpoints: dict[int, dict], owners: dict[int, tuple[int, str]]) -> None:
+def _assign_tags(
+    endpoints: dict[int, dict], owners: dict[int, tuple[int, str]]
+) -> None:
     """Common Number tags for bridged devices that share an application device type (Duplicate condition).
 
     The base engine numbers siblings in endpoint-number order, which is a hash here: adding a device would
@@ -603,7 +651,9 @@ def validate_topology(matter_config: dict) -> dict:
         others = sorted(
             k
             for k in config
-            if k != DEVICE_TYPE_AGGREGATOR and k in device_type_keys and _is_application_device_type(k)
+            if k != DEVICE_TYPE_AGGREGATOR
+            and k in device_type_keys
+            and _is_application_device_type(k)
         )
         if others:
             raise cv.Invalid(
@@ -664,7 +714,9 @@ def validate_topology(matter_config: dict) -> dict:
         has_application = any(
             _is_application_device_type(k) for k in config if k in device_type_keys
         )
-        has_children = any(c.get(CONF_PARENT) == endpoint_id for c in endpoints.values())
+        has_children = any(
+            c.get(CONF_PARENT) == endpoint_id for c in endpoints.values()
+        )
         if not has_application and not has_children:
             _LOGGER.warning(
                 "Bridged node endpoint %s ('%s') has no application device type and no child endpoints",
@@ -674,9 +726,13 @@ def validate_topology(matter_config: dict) -> dict:
     # A bridged node below a bridged node is nonsense; the parent check above already rejects it.
 
     for endpoint_id in aggregators:
-        children = [e for e, c in endpoints.items() if c.get(CONF_PARENT, 0) == endpoint_id]
+        children = [
+            e for e, c in endpoints.items() if c.get(CONF_PARENT, 0) == endpoint_id
+        ]
         if not any(DEVICE_TYPE_BRIDGED_NODE in endpoints[c] for c in children):
-            _LOGGER.warning("Aggregator endpoint %s has no bridged_node endpoints", endpoint_id)
+            _LOGGER.warning(
+                "Aggregator endpoint %s has no bridged_node endpoints", endpoint_id
+            )
         for child in children:
             if DEVICE_TYPE_BRIDGED_NODE not in endpoints[child]:
                 _LOGGER.warning(
@@ -745,9 +801,7 @@ def config_lines(config_var: str, endpoint_id: int, node: dict) -> list[str]:
     """Fill the BDBI part of the esp-matter bridged_node config (UniqueID and the initial Reachable)."""
     bdbi = f"{config_var}.bridged_device_basic_information"
     if CONF_UNIQUE_ID in node:
-        unique_id = (
-            f"strncpy({bdbi}.unique_id, {_c_string(node[CONF_UNIQUE_ID])}, sizeof({bdbi}.unique_id) - 1);"
-        )
+        unique_id = f"strncpy({bdbi}.unique_id, {_c_string(node[CONF_UNIQUE_ID])}, sizeof({bdbi}.unique_id) - 1);"
     else:
         unique_id = (
             f"esphome::matter::format_bridge_unique_id({bdbi}.unique_id, sizeof({bdbi}.unique_id), "
@@ -767,7 +821,7 @@ def post_create_lines(node: dict) -> list[str]:
         "{",
         f"  auto *bdbi_cluster = esp_matter::cluster::get(endpoint, {BDBI_CLUSTER_ID});",
         "  if (bdbi_cluster == nullptr)",
-        "    return MATTER_BUILD_FAIL(\"bridged node basic information cluster\");",
+        '    return MATTER_BUILD_FAIL("bridged node basic information cluster");',
     ]
 
     def add_string(function: str, value: str):
@@ -777,7 +831,9 @@ def post_create_lines(node: dict) -> list[str]:
             f"  if ({attribute}::{function}(bdbi_cluster, const_cast<char *>({literal}), "
             f"{len(value.encode())}) == nullptr)"
         )
-        lines.append("    return MATTER_BUILD_FAIL(\"bridged node basic information attribute\");")
+        lines.append(
+            '    return MATTER_BUILD_FAIL("bridged node basic information attribute");'
+        )
 
     # A NodeLabel that a controller wrote stays in flash and wins over the YAML; a changed `name:` resets it.
     lines.append(
@@ -793,7 +849,9 @@ def post_create_lines(node: dict) -> list[str]:
             lines.append(
                 f"  if ({attribute}::{function}(bdbi_cluster, static_cast<{ctype}>({node[conf_key]}U)) == nullptr)"
             )
-            lines.append("    return MATTER_BUILD_FAIL(\"bridged node basic information attribute\");")
+            lines.append(
+                '    return MATTER_BUILD_FAIL("bridged node basic information attribute");'
+            )
     lines.append("}")
     return lines
 

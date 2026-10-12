@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import esphome.config_validation as cv
-from esphome.core import CORE
 import pytest
+from conftest import CONFIGS, prepare_config, run_esphome
+from esphome.core import CORE
 
 from components.matter.event_binding import (
     DEFAULT_EVENT_NAMES,
@@ -17,9 +18,11 @@ from components.matter.expose.inventory import build_inventory
 from components.matter.expose.lower import lower_expose
 from components.matter.expose.schema import EXPOSE_SCHEMA
 
-from conftest import CONFIGS, prepare_config, run_esphome
-
-MULTI = ["MomentarySwitchRelease", "MomentarySwitchLongPress", "MomentarySwitchMultiPress"]
+MULTI = [
+    "MomentarySwitchRelease",
+    "MomentarySwitchLongPress",
+    "MomentarySwitchMultiPress",
+]
 
 
 def resolve(types=None, configured=None, features=MULTI, max_=2):
@@ -30,7 +33,9 @@ def resolve(types=None, configured=None, features=MULTI, max_=2):
 
 
 def test_default_names_map_the_common_gestures():
-    got = resolve(["single", "Double Click", "triple-press", "hold", "release", "ring"], max_=3)
+    got = resolve(
+        ["single", "Double Click", "triple-press", "hold", "release", "ring"], max_=3
+    )
     assert got == {
         "single": 1,
         "Double Click": 2,
@@ -98,7 +103,9 @@ def test_long_press_releases_itself_unless_a_release_is_mapped():
         ("single", "PRESS", 1, True),
         ("hold", "LONG_PRESS", 1, True),
     ]
-    assert gesture_args({"hold": "long_press", "up": "press_end", "down": "press_start"}) == [
+    assert gesture_args(
+        {"hold": "long_press", "up": "press_end", "down": "press_start"}
+    ) == [
         ("hold", "LONG_PRESS", 1, False),
         ("up", "PRESS_END", 1, False),
         ("down", "PRESS_START", 1, False),
@@ -109,7 +116,12 @@ def test_long_press_releases_itself_unless_a_release_is_mapped():
 
 
 def ent(domain, id_, **kw):
-    return {"platform": "template", "id": id_, "name": id_.replace("_", " ").title(), **kw}
+    return {
+        "platform": "template",
+        "id": id_,
+        "name": id_.replace("_", " ").title(),
+        **kw,
+    }
 
 
 RAW = {
@@ -195,7 +207,9 @@ def test_camera_doorbells_are_refused_with_the_reason(raw, name):
 
 def test_event_configs_validate(tmp_path):
     for name in ("esp32-event-switch.yaml", "esp32-event-expose.yaml"):
-        result = run_esphome("config", str(prepare_config(CONFIGS / name, tmp_path)), cwd=tmp_path)
+        result = run_esphome(
+            "config", str(prepare_config(CONFIGS / name, tmp_path)), cwd=tmp_path
+        )
         assert result.ok, result.output
 
 
@@ -225,7 +239,9 @@ def test_triple_press_needs_multi_press_max(run_config):
     result = run_config(config("      generic_switch: {event_id: ev}"))
     assert not result.ok
     assert "'triple' maps to 3 presses but multi_press_max is 2" in result.output
-    assert run_config(config("      generic_switch: {event_id: ev, multi_press_max: 3}")).ok
+    assert run_config(
+        config("      generic_switch: {event_id: ev, multi_press_max: 3}")
+    ).ok
 
 
 def test_latching_event_switch_is_rejected(run_config):

@@ -14,27 +14,21 @@ from esphome.const import (
     CONF_ID,
     Framework,
 )
-from esphome.const import (
-    __version__ as ESPHOME_VERSION,
-)
 from esphome.core import CORE, HexInt
 from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
-from . import bridge, ethernet
+from . import bridge, ethernet, sensor_extras
 from .actions import register_bound_command_actions
-from .binary_sensors import check_binary_sensors
-from .conformance import validate_composition
-from .power_source import validate_power_configuration
-from .power_topology import validate_topologies
 from .behaviours import BEHAVIOURS_SCHEMA, behaviours_to_code
-from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
-from .delegates import validate_delegate_clusters
-from .const import *
-from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+from .binary_sensors import check_binary_sensors
 from .closure import validate_closure_bindings, validate_unique_cover_bindings
+from .commissioning import COMMISSIONING_SCHEMA, commissioning_to_code
+from .conformance import validate_composition
+from .const import *
 from .covers import validate_cover_bindings
-from .event_binding import validate_event_bindings
+from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
+from .delegates import validate_delegate_clusters
 from .device_info import (
     DEVICE_INFO_SCHEMA,
     setup_device_info,
@@ -46,6 +40,7 @@ from .endpoints import (
     register_endpoints,
     switch_restore_warning,
 )
+from .event_binding import validate_event_bindings
 from .expose import (
     CONF_EXCLUDE,
     CONF_EXPOSE,
@@ -56,13 +51,13 @@ from .expose import (
     plan_to_code,
 )
 from .fan_binding import fan_restore_warning
+from .fan_binding import final_validate as fan_final_validate
 from .icd import CONF_ICD, final_validate_icd, icd_to_code, validate_icd_schema
 from .light_binding import (
     light_restore_warning,
     validate_light_effects,
     warn_missing_color_temperature,
 )
-from .fan_binding import final_validate as fan_final_validate
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
     add_ble_sdkconfig,
@@ -70,8 +65,9 @@ from .matter_ble import (
 )
 from .network_config import configure_network
 from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
+from .power_source import validate_power_configuration
+from .power_topology import validate_topologies
 from .sensor_mapping import validate_sensor_bindings
-from . import sensor_extras
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)

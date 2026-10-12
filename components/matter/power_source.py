@@ -188,11 +188,10 @@ def _validate_battery(value):
             f"With a percent sensor the charge level follows '{CONF_WARNING_BELOW}' and "
             f"'{CONF_CRITICAL_BELOW}'"
         )
-    if has_thresholds:
-        if CONF_PERCENT not in value:
-            raise cv.Invalid(
-                f"'{CONF_WARNING_BELOW}' / '{CONF_CRITICAL_BELOW}' need a '{CONF_PERCENT}' sensor"
-            )
+    if has_thresholds and CONF_PERCENT not in value:
+        raise cv.Invalid(
+            f"'{CONF_WARNING_BELOW}' / '{CONF_CRITICAL_BELOW}' need a '{CONF_PERCENT}' sensor"
+        )
     if has_thresholds:
         warning = value.get(CONF_WARNING_BELOW, DEFAULT_WARNING_BELOW)
         critical = value.get(CONF_CRITICAL_BELOW, DEFAULT_CRITICAL_BELOW)
@@ -205,9 +204,7 @@ def _validate_battery(value):
             )
 
     rechargeable = bool(
-        value.get(CONF_RECHARGEABLE)
-        or CONF_CHARGING in value
-        or CONF_CHARGED in value
+        value.get(CONF_RECHARGEABLE) or CONF_CHARGING in value or CONF_CHARGED in value
     )
     if value.get(CONF_RECHARGEABLE) is False and (
         CONF_CHARGING in value or CONF_CHARGED in value
@@ -271,7 +268,10 @@ def validate_endpoint_power_source(config):
     for conf_key, device_config in config.items():
         if conf_key in (CONF_BATTERY, CONF_WIRED):
             continue
-        if isinstance(device_config, dict) and _DEVICE_TYPE_BATTERY_KEY in device_config:
+        if (
+            isinstance(device_config, dict)
+            and _DEVICE_TYPE_BATTERY_KEY in device_config
+        ):
             raise cv.Invalid(
                 f"'{key}' is configured on the endpoint and '{_DEVICE_TYPE_BATTERY_KEY}' in "
                 f"'{conf_key}'. Configure the Power Source only once"
@@ -452,7 +452,7 @@ DEFAULT_CRITICAL_BELOW = 10.0
 
 
 def kind(config: dict) -> str | None:
-    """"battery", "wired" or None for the Power Source option of an endpoint."""
+    """ "battery", "wired" or None for the Power Source option of an endpoint."""
     if config.get(CONF_BATTERY):
         return CONF_BATTERY
     if config.get(CONF_WIRED) is not None:
@@ -503,8 +503,10 @@ def config_lines(target: str, config: dict) -> list[str]:
     lines = [
         f"{target}.status = {STATUS_ACTIVE};",
         f"{target}.order = {options[CONF_ORDER]};",
-        f"snprintf({target}.description, sizeof({target}.description), \"%s\", "
-        f"{_c_string(options[CONF_DESCRIPTION])});",
+        (
+            f'snprintf({target}.description, sizeof({target}.description), "%s", '
+            f"{_c_string(options[CONF_DESCRIPTION])});"
+        ),
     ]
     if which == CONF_WIRED:
         lines.append(
@@ -529,7 +531,7 @@ def config_lines(target: str, config: dict) -> list[str]:
     if "Replaceable" in features(config):
         lines.append(
             f"snprintf({target}.features.replaceable.bat_replacement_description, "
-            f"sizeof({target}.features.replaceable.bat_replacement_description), \"%s\", "
+            f'sizeof({target}.features.replaceable.bat_replacement_description), "%s", '
             f"{_c_string(options[CONF_REPLACEMENT_DESCRIPTION])});"
         )
         lines.append(
@@ -548,8 +550,10 @@ def device_type_lines(target: str, device_config: dict) -> list[str]:
     return [
         f"{target}.status = {STATUS_ACTIVE};",
         f"{target}.order = {device_config.get(CONF_ORDER, 0)};",
-        f"snprintf({target}.description, sizeof({target}.description), \"%s\", "
-        f"{_c_string(device_config.get(CONF_DESCRIPTION, default))});",
+        (
+            f'snprintf({target}.description, sizeof({target}.description), "%s", '
+            f"{_c_string(device_config.get(CONF_DESCRIPTION, default))});"
+        ),
     ]
 
 
@@ -564,9 +568,11 @@ def device_type_schema_options() -> dict:
 def root_device_type_lines() -> list[str]:
     """Adds the Power Source device type to the root node endpoint."""
     return [
-        "if (esp_matter::endpoint::add_device_type(endpoint, "
-        "esp_matter::endpoint::power_source::get_device_type_id(), "
-        "esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)",
+        (
+            "if (esp_matter::endpoint::add_device_type(endpoint, "
+            "esp_matter::endpoint::power_source::get_device_type_id(), "
+            "esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)"
+        ),
         '  return MATTER_BUILD_FAIL("device type power_source on the root node");',
     ]
 
@@ -593,8 +599,9 @@ MATTER_POWER_INCLUDE = '#include "esphome/components/matter/matter_power.h"'
 
 async def register(endpoint, var) -> None:
     """Registers the Power Source option of an `Endpoint` (endpoints.Endpoint)."""
-    from .sensor_mapping import converter_expression, plan_sensor, sensor_unit_info
     from esphome.core import CORE
+
+    from .sensor_mapping import converter_expression, plan_sensor, sensor_unit_info
 
     config = endpoint.config
     which = kind(config)
@@ -792,7 +799,9 @@ def power_sources(endpoints: dict) -> list[tuple]:
 # esp-matter; only utility device types can be added to it.
 # The Electrical Sensor device type has endpoint scope in the device library, so it cannot be
 # on the root node; the Power Source device type has node scope.
-ROOT_ALLOWED_KEYS = frozenset({"id", CONF_BATTERY, CONF_WIRED, "on_attribute", CONF_CLUSTERS})
+ROOT_ALLOWED_KEYS = frozenset(
+    {"id", CONF_BATTERY, CONF_WIRED, "on_attribute", CONF_CLUSTERS}
+)
 
 
 def validate_root_endpoint(matter_config: dict) -> None:
@@ -812,7 +821,8 @@ def validate_root_endpoint(matter_config: dict) -> None:
             )
         if key in ("parent", "label", "tags"):
             raise cv.Invalid(
-                f"'{key}' is not available on endpoint 0 (the root node)", path=[*path, key]
+                f"'{key}' is not available on endpoint 0 (the root node)",
+                path=[*path, key],
             )
         if value in (None, {}, []):
             continue

@@ -7,15 +7,15 @@ YAML files; it takes well under a second per config.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
-from esphome.core import CORE
 import pytest
+from esphome.core import CORE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPONENTS = REPO_ROOT / "components"
@@ -112,6 +112,7 @@ def run_config(tmp_path):
             text=True,
             cwd=tmp_path,
             timeout=300,
+            check=False,
         )
         return Result(proc)
 
@@ -124,7 +125,9 @@ def prepare_config(src: Path, dst_dir: Path) -> Path:
     text = src.read_text()
     text = text.replace("../../components", str(COMPONENTS))
     text = re.sub(r"^  toolchain:.*\n", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^(esp32:\n)", lambda m: m[1] + toolchain_line(), text, flags=re.MULTILINE)
+    text = re.sub(
+        r"^(esp32:\n)", lambda m: m[1] + toolchain_line(), text, flags=re.MULTILINE
+    )
     dst = dst_dir / src.name
     dst.write_text(text)
     return dst
@@ -132,7 +135,14 @@ def prepare_config(src: Path, dst_dir: Path) -> Path:
 
 def run_esphome(*args: str, cwd: Path) -> Result:
     return Result(
-        subprocess.run([*ESPHOME, *args], capture_output=True, text=True, cwd=cwd, timeout=900)
+        subprocess.run(
+            [*ESPHOME, *args],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=900,
+            check=False,
+        )
     )
 
 

@@ -1,0 +1,2503 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("Compile All Node");
+  matter_mattercomponent_id->get_device_info().set_serial_number("SN-COMPILE-ALL");
+  matter_mattercomponent_id->get_device_info().set_unique_id("compile-all-0001");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("rev-c");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("1.0.0-ci");
+  matter_mattercomponent_id->get_device_info().set_max_fabrics(8);
+  new(matter_identifytrigger_id) matter::IdentifyTrigger(matter_mattercomponent_id, 65535);
+  matter::register_identify_trigger(matter_identifytrigger_id);
+  new(automation_id_4) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id);
+  new(matter_identifytrigger_id_2) matter::IdentifyTrigger(matter_mattercomponent_id, 1);
+  matter::register_identify_trigger(matter_identifytrigger_id_2);
+  new(automation_id_5) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id_2);
+  new(matter_mattersetattributeaction_id) matter::MatterSetAttributeAction<bool>();
+  matter_mattersetattributeaction_id->set_endpoint_id(3);
+  matter_mattersetattributeaction_id->set_cluster_id(6);
+  matter_mattersetattributeaction_id->set_attribute_id(0);
+  matter_mattersetattributeaction_id->set_value([]() -> bool {
+      return true;
+  });
+  new(matter_mattersendeventaction_id) matter::MatterSendEventAction<>();
+  matter_mattersendeventaction_id->set_endpoint_id(24);
+  matter_mattersendeventaction_id->set_cluster_id(59);
+  matter_mattersendeventaction_id->set_event_id(1);
+  matter_mattersendeventaction_id->set_priority(1);
+  matter_mattersendeventaction_id->set_data("{\0420:U8\042: 1}");
+  new(matter_mattersendeventaction_id_2) matter::MatterSendEventAction<>();
+  matter_mattersendeventaction_id_2->set_endpoint_id(24);
+  matter_mattersendeventaction_id_2->set_cluster_id(59);
+  matter_mattersendeventaction_id_2->set_event_id(3);
+  matter_mattersendeventaction_id_2->set_priority(1);
+  matter_mattersendeventaction_id_2->set_data("{\0420:U8\042: 1}");
+  automation_id->add_action(matter_mattersetattributeaction_id);
+  automation_id->add_action(matter_mattersendeventaction_id);
+  automation_id->add_action(matter_mattersendeventaction_id_2);
+  new(matter_matterremovefabricaction_id) matter::MatterRemoveFabricAction<>();
+  matter_matterremovefabricaction_id->set_fabric_index([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_96->add_action(matter_matterremovefabricaction_id);
+  new(matter_ota_state) template_::TemplateTextSensor();
+  App.register_text_sensor(matter_ota_state, "Matter OTA state", 1067051259, 0);
+  matter_ota_state->set_update_interval(60000);
+  App.register_component_(matter_ota_state, 23);
+  new(matter_mattertextsensor_id_4) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_4, "Matter pairing code", 3176657465UL, 167837696);  // disabled_by_default, category:diagnostic, icon:mdi:key
+  App.register_component_(matter_mattertextsensor_id_4, 24);
+  matter_mattertextsensor_id_4->set_type(matter::MatterTextSensorType::PAIRING_CODE);
+  new(matter_mattertextsensor_id_5) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_5, "Matter QR code", 1535156712, 167903232);  // disabled_by_default, category:diagnostic, icon:mdi:qrcode
+  App.register_component_(matter_mattertextsensor_id_5, 24);
+  matter_mattertextsensor_id_5->set_type(matter::MatterTextSensorType::QR_CODE);
+  new(matter_mattertextsensor_id) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id, "Matter state", 3615238436UL, 134414336);  // category:diagnostic, icon:mdi:state-machine
+  App.register_component_(matter_mattertextsensor_id, 24);
+  matter_mattertextsensor_id->set_type(matter::MatterTextSensorType::COMMISSIONING_STATE);
+  new(matter_mattertextsensor_id_3) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_3, "Matter fabrics", 2522131001UL, 134479872);  // category:diagnostic, icon:mdi:counter
+  App.register_component_(matter_mattertextsensor_id_3, 24);
+  matter_mattertextsensor_id_3->set_type(matter::MatterTextSensorType::FABRIC_COUNT);
+  new(matter_mattertextsensor_id_2) matter::MatterTextSensor();
+  App.register_text_sensor(matter_mattertextsensor_id_2, "Matter controllers", 866795476, 134545408);  // category:diagnostic, icon:mdi:account-network
+  App.register_component_(matter_mattertextsensor_id_2, 24);
+  matter_mattertextsensor_id_2->set_type(matter::MatterTextSensorType::CONTROLLERS);
+  matter_mattercomponent_id->set_fabric_label_sensor(0, text_sensor_textsensor_id);
+  matter_mattercomponent_id->set_fabric_node_id_sensor(0, text_sensor_textsensor_id_2);
+  new(matter_mattersendcommandaction_id_2) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_2->set_endpoint_id(21);
+  matter_mattersendcommandaction_id_2->set_cluster_id(8);
+  matter_mattersendcommandaction_id_2->set_command_id(5);
+  matter_mattersendcommandaction_id_2->set_data("{\0420:U8\042: 0, \0421:U8\042: 50, \0422:U8\042: 0, \0423:U8\042: 0}");
+  automation_id_98->add_action(matter_mattersendcommandaction_id_2);
+  new(matter_mattersendcommandaction_id_3) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_3->set_endpoint_id(21);
+  matter_mattersendcommandaction_id_3->set_cluster_id(8);
+  matter_mattersendcommandaction_id_3->set_command_id(7);
+  matter_mattersendcommandaction_id_3->set_data("{\0420:U8\042: 0, \0421:U8\042: 0}");
+  automation_id_99->add_action(matter_mattersendcommandaction_id_3);
+  new(matter_mattersendcommandaction_id) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id->set_endpoint_id(21);
+  matter_mattersendcommandaction_id->set_cluster_id(6);
+  matter_mattersendcommandaction_id->set_command_id(1);
+  matter_mattersendcommandaction_id->set_data("{}");
+  automation_id_97->add_action(matter_mattersendcommandaction_id);
+  new(matter_mattersendcommandaction_id_5) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_5->set_endpoint_id(21);
+  matter_mattersendcommandaction_id_5->set_cluster_id(8);
+  matter_mattersendcommandaction_id_5->set_command_id(5);
+  matter_mattersendcommandaction_id_5->set_data("{\0420:U8\042: 1, \0421:U8\042: 50, \0422:U8\042: 0, \0423:U8\042: 0}");
+  automation_id_101->add_action(matter_mattersendcommandaction_id_5);
+  new(matter_mattersendcommandaction_id_6) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_6->set_endpoint_id(21);
+  matter_mattersendcommandaction_id_6->set_cluster_id(8);
+  matter_mattersendcommandaction_id_6->set_command_id(7);
+  matter_mattersendcommandaction_id_6->set_data("{\0420:U8\042: 0, \0421:U8\042: 0}");
+  automation_id_102->add_action(matter_mattersendcommandaction_id_6);
+  new(matter_mattersendcommandaction_id_4) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_4->set_endpoint_id(21);
+  matter_mattersendcommandaction_id_4->set_cluster_id(6);
+  matter_mattersendcommandaction_id_4->set_command_id(0);
+  matter_mattersendcommandaction_id_4->set_data("{}");
+  automation_id_100->add_action(matter_mattersendcommandaction_id_4);
+  new(matter_mattersendcommandaction_id_7) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_7->set_endpoint_id(20);
+  matter_mattersendcommandaction_id_7->set_cluster_id(6);
+  matter_mattersendcommandaction_id_7->set_command_id(2);
+  matter_mattersendcommandaction_id_7->set_data("{}");
+  automation_id_103->add_action(matter_mattersendcommandaction_id_7);
+  new(matter_mattersendcommandaction_id_8) matter::MatterSendCommandAction<>();
+  matter_mattersendcommandaction_id_8->set_endpoint_id(22);
+  matter_mattersendcommandaction_id_8->set_cluster_id(768);
+  matter_mattersendcommandaction_id_8->set_command_id(10);
+  matter_mattersendcommandaction_id_8->set_data("{\0420:U16\042: 370, \0421:U16\042: 10, \0422:U8\042: 0, \0423:U8\042: 0}");
+  automation_id_104->add_action(matter_mattersendcommandaction_id_8);
+  new(matter_mattersendswitcheventaction_id) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id->set_endpoint_id(24);
+  matter_mattersendswitcheventaction_id->set_event(matter::MatterSwitchEvent::INITIAL_PRESS);
+  matter_mattersendswitcheventaction_id->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_105->add_action(matter_mattersendswitcheventaction_id);
+  new(matter_mattersendswitcheventaction_id_2) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id_2->set_endpoint_id(24);
+  matter_mattersendswitcheventaction_id_2->set_event(matter::MatterSwitchEvent::SHORT_RELEASE);
+  matter_mattersendswitcheventaction_id_2->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id_2->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_106->add_action(matter_mattersendswitcheventaction_id_2);
+  new(matter_mattersendswitcheventaction_id_3) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id_3->set_endpoint_id(24);
+  matter_mattersendswitcheventaction_id_3->set_event(matter::MatterSwitchEvent::LONG_PRESS);
+  matter_mattersendswitcheventaction_id_3->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id_3->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_107->add_action(matter_mattersendswitcheventaction_id_3);
+  new(matter_matteropencommissioningwindowaction_id) matter::MatterOpenCommissioningWindowAction<>();
+  matter_matteropencommissioningwindowaction_id->set_timeout([]() -> uint32_t {
+      return 300;
+  });
+  automation_id_108->add_action(matter_matteropencommissioningwindowaction_id);
+  new(matter_matterresetidentityaction_id) matter::MatterResetIdentityAction<>();
+  new(matter_matterfactoryresetaction_id) matter::MatterFactoryResetAction<>();
+  matter_matterfactoryresetaction_id->set_parent(matter_mattercomponent_id);
+  automation_id_109->add_action(matter_matterresetidentityaction_id);
+  automation_id_109->add_action(matter_matterfactoryresetaction_id);
+  new(matter_matteroperationalstatesetaction_id) matter::MatterOperationalStateSetAction<>();
+  matter_matteroperationalstatesetaction_id->set_endpoint_id(121);
+  matter_matteroperationalstatesetaction_id->set_cluster_id(96);
+  matter_matteroperationalstatesetaction_id->set_state(ESPHOME_F("running"));
+  matter_matteroperationalstatesetaction_id->set_phase(ESPHOME_F("Wash"));
+  new(matter_matteroperationalstateerroraction_id) matter::MatterOperationalStateErrorAction<>();
+  matter_matteroperationalstateerroraction_id->set_endpoint_id(120);
+  matter_matteroperationalstateerroraction_id->set_cluster_id(97);
+  matter_matteroperationalstateerroraction_id->set_error([]() -> uint8_t {
+      return 65;
+  });
+  matter_matteroperationalstateerroraction_id->set_label(ESPHOME_F("Wheels stuck"));
+  new(matter_matteroperationalstatecompletedaction_id) matter::MatterOperationalStateCompletedAction<>();
+  matter_matteroperationalstatecompletedaction_id->set_endpoint_id(121);
+  matter_matteroperationalstatecompletedaction_id->set_cluster_id(96);
+  matter_matteroperationalstatecompletedaction_id->set_error([]() -> uint8_t {
+      return 0;
+  });
+  matter_matteroperationalstatecompletedaction_id->set_total_operational_time([]() -> uint32_t {
+      return 3600;
+  });
+  new(matter_mattermodesetaction_id) matter::MatterModeSetAction<>();
+  matter_mattermodesetaction_id->set_endpoint_id(121);
+  matter_mattermodesetaction_id->set_cluster_id(81);
+  matter_mattermodesetaction_id->set_mode([]() -> uint8_t {
+      return 10;
+  });
+  new(matter_mattersetattributeaction_id_2) matter::MatterSetAttributeAction<bool>();
+  matter_mattersetattributeaction_id_2->set_endpoint_id(3);
+  matter_mattersetattributeaction_id_2->set_cluster_id(6);
+  matter_mattersetattributeaction_id_2->set_attribute_id(0);
+  matter_mattersetattributeaction_id_2->set_value([]() -> bool {
+      return false;
+  });
+  automation_id_110->add_action(matter_matteroperationalstatesetaction_id);
+  automation_id_110->add_action(matter_matteroperationalstateerroraction_id);
+  automation_id_110->add_action(matter_matteroperationalstatecompletedaction_id);
+  automation_id_110->add_action(matter_mattermodesetaction_id);
+  automation_id_110->add_action(matter_mattersetattributeaction_id_2);
+  new(matter_matterremovefabricaction_id_2) matter::MatterRemoveFabricAction<>();
+  matter_matterremovefabricaction_id_2->set_fabric_index([]() -> uint8_t {
+      return 2;
+  });
+  automation_id_111->add_action(matter_matterremovefabricaction_id_2);
+  new(matter_mattercommissionedtrigger_id) matter::MatterCommissionedTrigger();
+  new(automation_id_2) Automation<>(matter_mattercommissionedtrigger_id);
+  new(matter_matterdecommissionedtrigger_id) matter::MatterDecommissionedTrigger();
+  new(automation_id_3) Automation<>(matter_matterdecommissionedtrigger_id);
+  new(matter_matterbehaviours_id) matter::MatterBehaviours();
+  App.register_component_(matter_matterbehaviours_id, 30);
+  matter_matterbehaviours_id->set_status_output(status_led_out);
+  matter_matterbehaviours_id->set_status_led_enabled(true, true);
+  matter_matterbehaviours_id->set_pairing_sensor(pair_button);
+  matter_matterbehaviours_id->set_pairing(3000, 10000, 300);
+  new(matter_matterota_id) matter::MatterOta();
+  App.register_component_(matter_matterota_id, 31);
+  matter_matterota_id->set_query_interval(43200);
+  matter_matterota_id->set_watchdog_timeout(300);
+  new(matter_matterotastatetrigger_id) matter::MatterOtaStateTrigger(matter_matterota_id);
+  new(automation_id_6) Automation<std::string>(matter_matterotastatetrigger_id);
+  new(matter_matterotaeventtrigger_id) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::DOWNLOAD_STARTED);
+  new(automation_id_7) Automation<>(matter_matterotaeventtrigger_id);
+  new(matter_matterotaeventtrigger_id_2) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::DOWNLOAD_COMPLETE);
+  new(automation_id_8) Automation<>(matter_matterotaeventtrigger_id_2);
+  new(matter_matterotaeventtrigger_id_3) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::DOWNLOAD_FAILED);
+  new(automation_id_9) Automation<>(matter_matterotaeventtrigger_id_3);
+  new(matter_matterotaeventtrigger_id_4) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::APPLY_STARTED);
+  new(automation_id_10) Automation<>(matter_matterotaeventtrigger_id_4);
+  new(matter_matterotaeventtrigger_id_5) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::APPLY_FAILED);
+  new(automation_id_11) Automation<>(matter_matterotaeventtrigger_id_5);
+  matter_mattercomponent_id->register_sensor_attribute(battery_percent, 0, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(battery_percent, 0, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 25.0f, 8.0f); });
+  matter_mattercomponent_id->register_sensor_attribute(battery_voltage, 0, 47, 11, esphome::matter::conversion::millivolts);
+  matter_mattercomponent_id->register_binary_sensor_attribute(battery_replace, 0, 47, 15, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(0, 47, 26, 3, 0, {{battery_charging, 1}, {battery_full, 2}}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(0, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 140, 141, 142, 143, 144, 145, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177}));
+  matter_mattercomponent_id->register_endpoint(0, [](esp_matter::endpoint_t *endpoint) -> bool {
+    if (esp_matter::endpoint::add_device_type(endpoint, esp_matter::endpoint::power_source::get_device_type_id(), esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 0: device type power_source on the root node");
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id() | esp_matter::cluster::power_source::feature::rechargeable::get_id() | esp_matter::cluster::power_source::feature::replaceable::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 1;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Main battery");
+    power_source_config.features.battery.bat_replaceability = 2;
+    power_source_config.features.rechargeable.bat_functional_while_charging = true;
+    power_source_config.features.rechargeable.bat_charge_state = 0;
+    snprintf(power_source_config.features.replaceable.bat_replacement_description, sizeof(power_source_config.features.replaceable.bat_replacement_description), "%s", "CR123A");
+    power_source_config.features.replaceable.bat_quantity = 2;
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 0: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 0: attribute PowerSource.BatPercentRemaining create");
+    }
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_voltage(power_source_cluster, {}, 0, 0xFFFFFFFE) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 0: attribute PowerSource.BatVoltage create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(binary_light, 1);
+  matter_mattercomponent_id->register_endpoint_parent(1, 0);
+  matter_mattercomponent_id->register_endpoint_label(1, "Binary light");
+  matter_mattercomponent_id->register_endpoint_tag(1, 7, 1, "Binary light");
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 1: device type on_off_light");
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 1: cluster FixedLabel create");
+    return true;
+  });
+  matter_mattercomponent_id->register_light(dimmable_light, 2);
+  matter_mattercomponent_id->register_endpoint_parent(2, 0);
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmable_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 25;
+    device_config_0.level_control.max_level = 229;
+    if (esp_matter::endpoint::dimmable_light::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 2: device type dimmable_light");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 2: attribute LevelControl.OnOffTransitionTime create");
+      auto *created_attribute = esp_matter::attribute::get(level_control_cluster, 16);
+      {
+        esp_matter_attr_val_t transition_val = esp_matter_uint16(20);
+        if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)
+          return MATTER_BUILD_FAIL("endpoint 2: attribute OnOffTransitionTime initial value");
+      }
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 2: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 2: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 2: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(ct_light, 3);
+  matter_mattercomponent_id->register_endpoint_parent(3, 0);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::color_temperature_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    auto light_traits_0 = ct_light->get_traits();
+    device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = light_traits_0.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds()) : 153;
+    device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = light_traits_0.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds()) : 500;
+    if (esp_matter::endpoint::color_temperature_light::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 3: device type color_temperature_light");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 3: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 3: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 3: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 3: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(rgbww_light, 4, "Color loop");
+  matter_mattercomponent_id->register_endpoint_parent(4, 0);
+  matter_mattercomponent_id->register_endpoint_tag(4, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extended_color_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    auto light_traits_0 = rgbww_light->get_traits();
+    device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = light_traits_0.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds()) : 153;
+    device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = light_traits_0.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds()) : 500;
+    if (esphome::matter::add_extended_color_light(endpoint, &device_config_0, rgbww_light) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 4: device type extended_color_light");
+    auto *color_control_cluster = esp_matter::cluster::get(endpoint, 768);
+    if (color_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ColorControl missing after device type creation");
+    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::hue_saturation::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ColorControl feature HueAndSaturation");
+    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::enhanced_hue::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ColorControl feature EnhancedHue");
+    if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::color_loop::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ColorControl feature ColorLoop");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(rgb_light, 5);
+  matter_mattercomponent_id->register_endpoint_parent(5, 0);
+  matter_mattercomponent_id->register_endpoint_tag(5, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extended_color_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    auto light_traits_0 = rgb_light->get_traits();
+    device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = light_traits_0.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds()) : 153;
+    device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = light_traits_0.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds()) : 500;
+    if (esphome::matter::add_extended_color_light(endpoint, &device_config_0, rgb_light) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 5: device type extended_color_light");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 5: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 5: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 5: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 5: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(plug_dimmer, 6);
+  matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint_tag(6, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmable_plug_in_unit::config_t device_config_0{};
+    device_config_0.level_control.min_level = 13;
+    device_config_0.level_control.max_level = 254;
+    if (esp_matter::endpoint::dimmable_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 6: device type dimmable_plug_in_unit");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OnOffTransitionTime create");
+      auto *created_attribute = esp_matter::attribute::get(level_control_cluster, 16);
+      {
+        esp_matter_attr_val_t transition_val = esp_matter_uint16(5);
+        if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)
+          return MATTER_BUILD_FAIL("endpoint 6: attribute OnOffTransitionTime initial value");
+      }
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(mounted_dimmer, 7);
+  matter_mattercomponent_id->register_endpoint_parent(7, 0);
+  matter_mattercomponent_id->register_endpoint(7, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::mounted_dimmable_load_control::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    if (esp_matter::endpoint::mounted_dimmable_load_control::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 7: device type mounted_dimmable_load_control");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(plug_relay_light, 8);
+  matter_mattercomponent_id->register_endpoint_parent(8, 0);
+  matter_mattercomponent_id->register_endpoint_tag(8, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(8, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 8: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_light(mounted_light, 9);
+  matter_mattercomponent_id->register_endpoint_parent(9, 0);
+  matter_mattercomponent_id->register_endpoint_tag(9, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(9, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::mounted_on_off_control::config_t device_config_0{};
+    if (esp_matter::endpoint::mounted_on_off_control::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 9: device type mounted_on_off_control");
+    esp_matter::cluster::level_control::config_t level_control_config{};
+    auto *level_control_cluster = esp_matter::cluster::level_control::create(endpoint, &level_control_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (level_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 9: cluster LevelControl create");
+    if (esphome::matter::add_feature(level_control_cluster, esp_matter::cluster::level_control::feature::on_off::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 9: cluster LevelControl feature OnOff");
+    if (esphome::matter::add_feature(level_control_cluster, esp_matter::cluster::level_control::feature::lighting::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 9: cluster LevelControl feature Lighting");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 9: attribute LevelControl.OnOffTransitionTime create");
+      auto *created_attribute = esp_matter::attribute::get(level_control_cluster, 16);
+      {
+        esp_matter_attr_val_t transition_val = esp_matter_uint16(10);
+        if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)
+          return MATTER_BUILD_FAIL("endpoint 9: attribute OnOffTransitionTime initial value");
+      }
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 9: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 9: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 9: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(plug_switch, 10);
+  matter_mattercomponent_id->register_endpoint_parent(10, 0);
+  matter_mattercomponent_id->register_endpoint_tag(10, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(10, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 10: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(lamp_switch, 11);
+  matter_mattercomponent_id->register_endpoint_parent(11, 0);
+  matter_mattercomponent_id->register_endpoint_tag(11, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(11, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 11: device type on_off_light");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(mounted_switch, 12);
+  matter_mattercomponent_id->register_endpoint_parent(12, 0);
+  matter_mattercomponent_id->register_endpoint_tag(12, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(12, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::mounted_on_off_control::config_t device_config_0{};
+    if (esp_matter::endpoint::mounted_on_off_control::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 12: device type mounted_on_off_control");
+    return true;
+  });
+  matter_mattercomponent_id->register_light(binding_light, 13);
+  matter_mattercomponent_id->register_endpoint_parent(13, 0);
+  matter_mattercomponent_id->register_endpoint_tag(13, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(13, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 13: device type on_off_light");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 13: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(20, 0);
+  matter_mattercomponent_id->register_endpoint(20, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_light_switch::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_light_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 20: device type on_off_light_switch");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 20: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(21, 0);
+  matter_mattercomponent_id->register_endpoint(21, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmer_switch::config_t device_config_0{};
+    if (esp_matter::endpoint::dimmer_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 21: device type dimmer_switch");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 21: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(22, 0);
+  matter_mattercomponent_id->register_endpoint(22, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::color_dimmer_switch::config_t device_config_0{};
+    if (esp_matter::endpoint::color_dimmer_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 22: device type color_dimmer_switch");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 22: cluster Binding create");
+    return true;
+  });
+  new(matter_generic_switch_mapping_23) matter::MatterGenericSwitchMapping(switch_button, 23, 600, 350);
+  App.register_component_(matter_generic_switch_mapping_23, 32);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_23);
+  matter_mattercomponent_id->register_endpoint_parent(23, 0);
+  matter_mattercomponent_id->register_endpoint_tag(23, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(23, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 3;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 23: device type generic_switch");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(24, 0);
+  matter_mattercomponent_id->register_endpoint_tag(24, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(24, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 24: device type generic_switch");
+    return true;
+  });
+  new(matter_generic_switch_mapping_25) matter::MatterGenericSwitchMapping(toggle, 25, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_25, 32);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_25);
+  matter_mattercomponent_id->register_endpoint_parent(25, 0);
+  matter_mattercomponent_id->register_endpoint_tag(25, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(25, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::latching_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 25: device type generic_switch");
+    return true;
+  });
+  new(matter_generic_switch_mapping_26) matter::MatterGenericSwitchMapping(action_button, 26, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_26, 32);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_26);
+  matter_mattercomponent_id->register_endpoint_parent(26, 0);
+  matter_mattercomponent_id->register_endpoint_tag(26, 7, 4, "");
+  matter_mattercomponent_id->register_endpoint(26, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 4;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::action_switch::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 26: device type generic_switch");
+    return true;
+  });
+  new(matter_generic_switch_mapping_27) matter::MatterGenericSwitchEventMapping(remote_event, 27, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_27, 32);
+  matter_generic_switch_mapping_27->add_event("single", esphome::matter::MatterEventGesture::PRESS, 1, true);
+  matter_generic_switch_mapping_27->add_event("double", esphome::matter::MatterEventGesture::PRESS, 2, true);
+  matter_generic_switch_mapping_27->add_event("triple", esphome::matter::MatterEventGesture::PRESS, 3, true);
+  matter_generic_switch_mapping_27->add_event("hold", esphome::matter::MatterEventGesture::LONG_PRESS, 1, true);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_27);
+  matter_mattercomponent_id->register_endpoint_parent(27, 0);
+  matter_mattercomponent_id->register_endpoint_tag(27, 7, 5, "");
+  matter_mattercomponent_id->register_endpoint(27, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 3;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 27: device type generic_switch");
+    return true;
+  });
+  new(matter_generic_switch_mapping_28) matter::MatterGenericSwitchEventMapping(held_event, 28, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_28, 32);
+  matter_generic_switch_mapping_28->add_event("tap", esphome::matter::MatterEventGesture::PRESS, 1, true);
+  matter_generic_switch_mapping_28->add_event("tap_twice", esphome::matter::MatterEventGesture::PRESS, 2, true);
+  matter_generic_switch_mapping_28->add_event("hold", esphome::matter::MatterEventGesture::LONG_PRESS, 1, false);
+  matter_generic_switch_mapping_28->add_event("release", esphome::matter::MatterEventGesture::PRESS_END, 1, false);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_28);
+  matter_mattercomponent_id->register_endpoint_parent(28, 0);
+  matter_mattercomponent_id->register_endpoint_tag(28, 7, 6, "");
+  matter_mattercomponent_id->register_endpoint(28, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 2;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 28: device type generic_switch");
+    return true;
+  });
+  new(matter_generic_switch_mapping_29) matter::MatterGenericSwitchEventMapping(bell_event, 29, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_29, 32);
+  matter_generic_switch_mapping_29->add_event("ring", esphome::matter::MatterEventGesture::PRESS, 1, true);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_29);
+  matter_mattercomponent_id->register_endpoint_parent(29, 0);
+  matter_mattercomponent_id->register_endpoint_tag(29, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(29, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::doorbell::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 29: device type doorbell");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 29: cluster Binding create");
+    return true;
+  });
+  new(matter_generic_switch_mapping_30) matter::MatterGenericSwitchMapping(bell_button, 30, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_30, 32);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_30);
+  matter_mattercomponent_id->register_endpoint_parent(30, 0);
+  matter_mattercomponent_id->register_endpoint_tag(30, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(30, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::doorbell::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 2;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 30: device type doorbell");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 30: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(31, 0);
+  matter_mattercomponent_id->register_endpoint(31, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::audio_doorbell::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    device_config_0.camera_av_stream_management.feature_flags = esp_matter::cluster::camera_av_stream_management::feature::audio::get_id();
+    if (esp_matter::endpoint::audio_doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 31: device type audio_doorbell");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 40, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(40, 0);
+  matter_mattercomponent_id->register_endpoint_tag(40, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(40, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 40: device type temperature_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::PressureMeasurementCluster, int16_t, &chip::app::Clusters::PressureMeasurementCluster::SetMeasuredValue>(pressure_kpa, 41, 1027, 0, [](float v) { return esphome::matter::conversion::pressure(v * 10.0f); });
+  matter_mattercomponent_id->register_endpoint_parent(41, 0);
+  matter_mattercomponent_id->register_endpoint(41, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::pressure_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::pressure_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 41: device type pressure_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(humidity, 42, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(42, 0);
+  matter_mattercomponent_id->register_endpoint_tag(42, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(42, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 42: device type humidity_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::IlluminanceMeasurementCluster, uint16_t, &chip::app::Clusters::IlluminanceMeasurementCluster::SetMeasuredValue>(illuminance, 43, 1024, 0, esphome::matter::conversion::illuminance);
+  matter_mattercomponent_id->register_sensor_attribute(battery_level, 43, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(battery_level, 43, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_endpoint_parent(43, 0);
+  matter_mattercomponent_id->register_endpoint(43, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::light_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::light_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 43: device type light_sensor");
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 2;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 43: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 43: attribute PowerSource.BatPercentRemaining create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::FlowMeasurementCluster, uint16_t, &chip::app::Clusters::FlowMeasurementCluster::SetMeasuredValue>(flow_rate, 44, 1028, 0, [](float v) { return esphome::matter::conversion::flow(v * 0.06f); });
+  matter_mattercomponent_id->register_endpoint_parent(44, 0);
+  matter_mattercomponent_id->register_endpoint(44, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::flow_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::flow_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 44: device type flow_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_sensor_attribute(battery_level_2, 45, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_endpoint_parent(45, 0);
+  matter_mattercomponent_id->register_endpoint(45, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::power_source::config_t device_config_0{};
+    device_config_0.power_source.status = 1;
+    device_config_0.power_source.order = 0;
+    snprintf(device_config_0.power_source.description, sizeof(device_config_0.power_source.description), "%s", "Battery");
+    device_config_0.power_source.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    if (esp_matter::endpoint::power_source::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 45: device type power_source");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 45: attribute PowerSource.BatPercentRemaining create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 46, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(humidity, 46, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_concentration_sensor(co2, 46, 1037, 0, esphome::matter::conversion::concentration, 0);
+  matter_mattercomponent_id->register_concentration_sensor(pm_2_5, 46, 1066, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(ch2o, 46, 1067, 0, [](float v) { return esphome::matter::conversion::concentration(v * 1000.0f); }, 1);
+  matter_mattercomponent_id->register_concentration_sensor(pm_1_0, 46, 1068, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(pm_10_0, 46, 1069, 0, esphome::matter::conversion::concentration, 4);
+  matter_mattercomponent_id->register_concentration_sensor(tvoc_ppb, 46, 1070, 0, esphome::matter::conversion::concentration, 1);
+  matter_mattercomponent_id->register_concentration_sensor(radon, 46, 1071, 0, [](float v) { return esphome::matter::conversion::concentration(v * 37.0f); }, 7);
+  matter_mattercomponent_id->register_endpoint_parent(46, 0);
+  matter_mattercomponent_id->register_endpoint_tag(46, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(46, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 46: device type air_quality_sensor");
+    esp_matter::cluster::temperature_measurement::config_t temperature_measurement_config{};
+    if (esp_matter::cluster::temperature_measurement::create(endpoint, &temperature_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster TemperatureMeasurement create");
+    esp_matter::cluster::relative_humidity_measurement::config_t relative_humidity_measurement_config{};
+    if (esp_matter::cluster::relative_humidity_measurement::create(endpoint, &relative_humidity_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster RelativeHumidityMeasurement create");
+    esp_matter::cluster::carbon_dioxide_concentration_measurement::config_t carbon_dioxide_concentration_measurement_config{};
+    carbon_dioxide_concentration_measurement_config.feature_flags = esp_matter::cluster::carbon_dioxide_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::carbon_dioxide_concentration_measurement::create(endpoint, &carbon_dioxide_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster CarbonDioxideConcentrationMeasurement create");
+    esp_matter::cluster::pm25_concentration_measurement::config_t pm25_concentration_measurement_config{};
+    pm25_concentration_measurement_config.feature_flags = esp_matter::cluster::pm25_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm25_concentration_measurement::create(endpoint, &pm25_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster PM25ConcentrationMeasurement create");
+    esp_matter::cluster::formaldehyde_concentration_measurement::config_t formaldehyde_concentration_measurement_config{};
+    formaldehyde_concentration_measurement_config.feature_flags = esp_matter::cluster::formaldehyde_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::formaldehyde_concentration_measurement::create(endpoint, &formaldehyde_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster FormaldehydeConcentrationMeasurement create");
+    esp_matter::cluster::pm1_concentration_measurement::config_t pm1_concentration_measurement_config{};
+    pm1_concentration_measurement_config.feature_flags = esp_matter::cluster::pm1_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm1_concentration_measurement::create(endpoint, &pm1_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster PM1ConcentrationMeasurement create");
+    esp_matter::cluster::pm10_concentration_measurement::config_t pm10_concentration_measurement_config{};
+    pm10_concentration_measurement_config.feature_flags = esp_matter::cluster::pm10_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm10_concentration_measurement::create(endpoint, &pm10_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster PM10ConcentrationMeasurement create");
+    esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::config_t total_volatile_organic_compounds_concentration_measurement_config{};
+    total_volatile_organic_compounds_concentration_measurement_config.feature_flags = esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::total_volatile_organic_compounds_concentration_measurement::create(endpoint, &total_volatile_organic_compounds_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster TotalVolatileOrganicCompoundsConcentrationMeasurement create");
+    esp_matter::cluster::radon_concentration_measurement::config_t radon_concentration_measurement_config{};
+    radon_concentration_measurement_config.feature_flags = esp_matter::cluster::radon_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::radon_concentration_measurement::create(endpoint, &radon_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 46: cluster RadonConcentrationMeasurement create");
+    return true;
+  });
+  matter_mattercomponent_id->register_concentration_sensor(co2, 47, 1037, 0, esphome::matter::conversion::concentration, 0);
+  new(matter_air_quality_47) matter::MatterSensorAttributeMapping(air_quality_index, 47, 91, 0, esphome::matter::conversion::air_quality_index, esphome::matter::update_air_quality_attribute);
+  matter_mattercomponent_id->register_mapping(matter_air_quality_47);
+  matter_mattercomponent_id->register_endpoint_parent(47, 0);
+  matter_mattercomponent_id->register_endpoint_tag(47, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(47, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 47: device type air_quality_sensor");
+    esp_matter::cluster::carbon_dioxide_concentration_measurement::config_t carbon_dioxide_concentration_measurement_config{};
+    carbon_dioxide_concentration_measurement_config.feature_flags = esp_matter::cluster::carbon_dioxide_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::carbon_dioxide_concentration_measurement::create(endpoint, &carbon_dioxide_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster CarbonDioxideConcentrationMeasurement create");
+    auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
+    if (air_quality_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster AirQuality missing after device type creation");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster AirQuality feature Fair");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster AirQuality feature Moderate");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::very_poor::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster AirQuality feature VeryPoor");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::extremely_poor::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 47: cluster AirQuality feature ExtremelyPoor");
+    return true;
+  });
+  matter_mattercomponent_id->register_concentration_sensor(pm_2_5, 48, 1066, 0, esphome::matter::conversion::concentration, 4);
+  new(matter_air_quality_48) matter::MatterAirQualityMapping(pm_2_5, 48, 91, 0, std::vector<esphome::matter::MatterAirQualityThreshold>{{2, 9.0f}, {3, 35.4f}, {4, 55.4f}, {5, 125.4f}, {6, 225.4f}}, 0.02f);
+  matter_mattercomponent_id->register_mapping(matter_air_quality_48);
+  matter_mattercomponent_id->register_endpoint_parent(48, 0);
+  matter_mattercomponent_id->register_endpoint_tag(48, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(48, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 48: device type air_quality_sensor");
+    esp_matter::cluster::pm25_concentration_measurement::config_t pm25_concentration_measurement_config{};
+    pm25_concentration_measurement_config.feature_flags = esp_matter::cluster::pm25_concentration_measurement::feature::numeric_measurement::get_id();
+    if (esp_matter::cluster::pm25_concentration_measurement::create(endpoint, &pm25_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster PM25ConcentrationMeasurement create");
+    auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
+    if (air_quality_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster AirQuality missing after device type creation");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster AirQuality feature Fair");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster AirQuality feature Moderate");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::very_poor::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster AirQuality feature VeryPoor");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::extremely_poor::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 48: cluster AirQuality feature ExtremelyPoor");
+    return true;
+  });
+  new(matter_air_quality_49) matter::MatterAirQualityMapping(tvoc_ppb, 49, 91, 0, std::vector<esphome::matter::MatterAirQualityThreshold>{{2, 220.0f}, {3, 660.0f}, {4, 2200.0f}}, 0.02f);
+  matter_mattercomponent_id->register_mapping(matter_air_quality_49);
+  matter_mattercomponent_id->register_endpoint_parent(49, 0);
+  matter_mattercomponent_id->register_endpoint_tag(49, 7, 4, "");
+  matter_mattercomponent_id->register_endpoint(49, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 49: device type air_quality_sensor");
+    auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
+    if (air_quality_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 49: cluster AirQuality missing after device type creation");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 49: cluster AirQuality feature Fair");
+    if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 49: cluster AirQuality feature Moderate");
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_voltage, 50, 4, esphome::matter::conversion::volts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_current, 50, 5, esphome::matter::conversion::ampere);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_power, 50, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_apparent_power, 50, 10, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_frequency, 50, 14, esphome::matter::conversion::frequency);
+  matter_mattercomponent_id->register_electrical_power_sensor(mains_power_factor, 50, 17, [](float v) { return esphome::matter::conversion::power_factor(v * 0.01f); });
+  matter_mattercomponent_id->register_electrical_energy_sensor(mains_energy, 50, 1, esphome::matter::conversion::kilowatt_hours);
+  matter_mattercomponent_id->register_electrical_energy_sensor(mains_energy_exported, 50, 2, [](float v) { return esphome::matter::conversion::kilowatt_hours(v * 0.001f); });
+  matter_mattercomponent_id->register_endpoint_parent(50, 0);
+  matter_mattercomponent_id->register_endpoint(50, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(50, true);
+    device_config_0.with_electrical_energy_measurement().feature_flags = esp_matter::cluster::electrical_energy_measurement::feature::imported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::exported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 50: device type electrical_sensor");
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_voltage(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 50: attribute ElectricalPowerMeasurement.Voltage create");
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_active_current(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 50: attribute ElectricalPowerMeasurement.ActiveCurrent create");
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_apparent_power(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 50: attribute ElectricalPowerMeasurement.ApparentPower create");
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_frequency(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 50: attribute ElectricalPowerMeasurement.Frequency create");
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_power_factor(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 50: attribute ElectricalPowerMeasurement.PowerFactor create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_voltage, 51, 4, [](float v) { return esphome::matter::conversion::volts(v * 0.001f); });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_current, 51, 5, [](float v) { return esphome::matter::conversion::ampere(v * 0.001f); });
+  matter_mattercomponent_id->register_electrical_power_sensor(dc_power, 51, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(51, 0);
+  matter_mattercomponent_id->register_endpoint(51, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::direct_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(51, false);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 51: device type electrical_sensor");
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_voltage(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 51: attribute ElectricalPowerMeasurement.Voltage create");
+    }
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_active_current(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 51: attribute ElectricalPowerMeasurement.ActiveCurrent create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 52, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_soil_moisture_sensor(soil_moisture, 52, 1072, 1, esphome::matter::conversion::percent);
+  matter_mattercomponent_id->register_endpoint_parent(52, 0);
+  matter_mattercomponent_id->register_endpoint(52, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::soil_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::soil_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 52: device type soil_sensor");
+    esphome::matter::set_soil_moisture_limits(esp_matter::endpoint::get_id(endpoint));
+    esp_matter::cluster::temperature_measurement::config_t temperature_measurement_config{};
+    if (esp_matter::cluster::temperature_measurement::create(endpoint, &temperature_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 52: cluster TemperatureMeasurement create");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(temperature, 53, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_sensor_attribute(wired_voltage, 53, 47, 3, esphome::matter::conversion::millivolts);
+  matter_mattercomponent_id->register_sensor_attribute(wired_frequency, 53, 47, 4, esphome::matter::conversion::hertz);
+  matter_mattercomponent_id->register_sensor_attribute(wired_current, 53, 47, 6, [](float v) { return esphome::matter::conversion::milliamps(v * 0.001f); });
+  matter_mattercomponent_id->register_binary_sensor_attribute(mains_present, 53, 47, 9, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(53, 47, 0, 3, -1, {{mains_present, 1}}));
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(53, {53}));
+  matter_mattercomponent_id->register_endpoint_parent(53, 0);
+  matter_mattercomponent_id->register_endpoint_tag(53, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(53, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 53: device type temperature_sensor");
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::wired::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 6;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Mains");
+    power_source_config.features.wired.wired_current_type = 0;
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 53: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_wired_assessed_input_voltage(power_source_cluster, {}, 0, 0xFFFFFFFE) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 53: attribute PowerSource.WiredAssessedInputVoltage create");
+    }
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_wired_assessed_input_frequency(power_source_cluster, {}, 0, 0xFFFE) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 53: attribute PowerSource.WiredAssessedInputFrequency create");
+    }
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_wired_assessed_current(power_source_cluster, {}, 0, 0xFFFFFFFE) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 53: attribute PowerSource.WiredAssessedCurrent create");
+    }
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_wired_present(power_source_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 53: attribute PowerSource.WiredPresent create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(humidity, 54, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_sensor_attribute(battery_percent_2, 54, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(battery_percent_2, 54, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_endpoint_parent(54, 0);
+  matter_mattercomponent_id->register_endpoint_tag(54, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(54, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 54: device type humidity_sensor");
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 4;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 54: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 54: attribute PowerSource.BatPercentRemaining create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(door, 55, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterFlagEnumMapping(55, 47, 14, 0, -1, {{battery_critical, 2}, {battery_low, 1}}));
+  matter_mattercomponent_id->register_endpoint_parent(55, 0);
+  matter_mattercomponent_id->register_endpoint_tag(55, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(55, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 55: device type contact_sensor");
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 5;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Door battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 55: cluster PowerSource create");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(front_door, 60, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
+  new(matter_bsc_60) matter::MatterBooleanStateConfigMapping(60);
+  matter_mattercomponent_id->register_mapping(matter_bsc_60);
+  matter_bsc_60->set_alarm_source(front_door);
+  matter_mattercomponent_id->register_endpoint_parent(60, 0);
+  matter_mattercomponent_id->register_endpoint_tag(60, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(60, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 60: device type contact_sensor");
+    esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
+    auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (boolean_state_configuration_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 60: boolean state configuration cluster create");
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::visual::config_t visual_config{};
+      visual_config.alarms_supported = 1;
+      if (esp_matter::cluster::boolean_state_configuration::feature::visual::add(boolean_state_configuration_cluster, &visual_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 60: boolean state configuration feature");
+    }
+    if (esp_matter::cluster::boolean_state_configuration::attribute::create_alarms_enabled(boolean_state_configuration_cluster, 0) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 60: boolean state configuration attribute");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(window, 61, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(61, 0);
+  matter_mattercomponent_id->register_endpoint_tag(61, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(61, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 61: device type contact_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(reed_switch, 62, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(62, 0);
+  matter_mattercomponent_id->register_endpoint_tag(62, 7, 4, "");
+  matter_mattercomponent_id->register_endpoint(62, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 62: device type contact_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(closed_switch, 63, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(63, 0);
+  matter_mattercomponent_id->register_endpoint_tag(63, 7, 5, "");
+  matter_mattercomponent_id->register_endpoint(63, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::contact_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 63: device type contact_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(hallway_motion, 64, 1030, 0, esphome::matter::conversion::occupancy, esphome::matter::update_occupancy_attribute);
+  new(matter_hold_time_64) matter::MatterOccupancyHoldTimeMapping(64, 5, 600, 45);
+  matter_hold_time_64->set_number(hallway_hold_time);
+  matter_mattercomponent_id->register_mapping(matter_hold_time_64);
+  matter_mattercomponent_id->register_endpoint_parent(64, 0);
+  matter_mattercomponent_id->register_endpoint_tag(64, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(64, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
+    device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::passive_infrared::get_id();
+    if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 64: device type occupancy_sensor");
+    {
+      auto *occupancy_sensing_cluster = esp_matter::cluster::get(endpoint, 1030);
+      if (occupancy_sensing_cluster == nullptr ||
+          esp_matter::cluster::occupancy_sensing::attribute::create_hold_time(occupancy_sensing_cluster, 45) == nullptr ||
+          esp_matter::cluster::occupancy_sensing::attribute::create_hold_time_limits(occupancy_sensing_cluster, nullptr, 0, 0) == nullptr ||
+          esp_matter::cluster::occupancy_sensing::attribute::create_pir_occupied_to_unoccupied_delay(occupancy_sensing_cluster, 45) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 64: sensor extras cluster create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(office_presence, 65, 1030, 0, esphome::matter::conversion::occupancy, esphome::matter::update_occupancy_attribute);
+  new(matter_hold_time_65) matter::MatterOccupancyHoldTimeMapping(65, 1, 300, 20);
+  matter_mattercomponent_id->register_mapping(matter_hold_time_65);
+  matter_mattercomponent_id->register_endpoint_parent(65, 0);
+  matter_mattercomponent_id->register_endpoint_tag(65, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(65, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
+    device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::radar::get_id();
+    if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 65: device type occupancy_sensor");
+    {
+      auto *occupancy_sensing_cluster = esp_matter::cluster::get(endpoint, 1030);
+      if (occupancy_sensing_cluster == nullptr ||
+          esp_matter::cluster::occupancy_sensing::attribute::create_hold_time(occupancy_sensing_cluster, 20) == nullptr ||
+          esp_matter::cluster::occupancy_sensing::attribute::create_hold_time_limits(occupancy_sensing_cluster, nullptr, 0, 0) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 65: sensor extras cluster create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(desk_pressure_mat, 66, 1030, 0, esphome::matter::conversion::occupancy, esphome::matter::update_occupancy_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(66, 0);
+  matter_mattercomponent_id->register_endpoint_tag(66, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(66, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
+    device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::physical_contact::get_id();
+    if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 66: device type occupancy_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(basement_leak, 67, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
+  new(matter_bsc_67) matter::MatterBooleanStateConfigMapping(67);
+  matter_bsc_67->set_sensitivity_number(leak_sensitivity);
+  new(matter_matteralarmsactivetrigger_id) matter::MatterAlarmsActiveTrigger();
+  new(automation_id_12) Automation<bool, bool>(matter_matteralarmsactivetrigger_id);
+  matter_bsc_67->add_alarms_active_trigger(matter_matteralarmsactivetrigger_id);
+  new(matter_matteralarmssuppressedtrigger_id) matter::MatterAlarmsSuppressedTrigger();
+  new(automation_id_13) Automation<bool, bool>(matter_matteralarmssuppressedtrigger_id);
+  matter_bsc_67->add_alarms_suppressed_trigger(matter_matteralarmssuppressedtrigger_id);
+  matter_mattercomponent_id->register_mapping(matter_bsc_67);
+  matter_bsc_67->set_alarm_source(basement_leak);
+  matter_mattercomponent_id->register_endpoint_parent(67, 0);
+  matter_mattercomponent_id->register_endpoint(67, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_leak_detector::config_t device_config_0{};
+    if (esp_matter::endpoint::water_leak_detector::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 67: device type water_leak_detector");
+    esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
+    auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (boolean_state_configuration_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration cluster create");
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::visual::config_t visual_config{};
+      visual_config.alarms_supported = 3;
+      if (esp_matter::cluster::boolean_state_configuration::feature::visual::add(boolean_state_configuration_cluster, &visual_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration feature");
+    }
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::audible::config_t audible_config{};
+      audible_config.alarms_supported = 3;
+      if (esp_matter::cluster::boolean_state_configuration::feature::audible::add(boolean_state_configuration_cluster, &audible_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration feature");
+    }
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::alarm_suppress::config_t alarm_suppress_config{};
+      if (esp_matter::cluster::boolean_state_configuration::feature::alarm_suppress::add(boolean_state_configuration_cluster, &alarm_suppress_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration feature");
+    }
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::config_t sensitivity_level_config{};
+      sensitivity_level_config.supported_sensitivity_levels = 3;
+      if (esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::add(boolean_state_configuration_cluster, &sensitivity_level_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration feature");
+    }
+    if (esp_matter::cluster::boolean_state_configuration::attribute::create_alarms_enabled(boolean_state_configuration_cluster, 0) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration attribute");
+    if (esp_matter::cluster::boolean_state_configuration::attribute::create_default_sensitivity_level(boolean_state_configuration_cluster, 1) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 67: boolean state configuration attribute");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(pipe_cold, 68, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
+  matter_mattercomponent_id->register_endpoint_parent(68, 0);
+  matter_mattercomponent_id->register_endpoint(68, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_freeze_detector::config_t device_config_0{};
+    if (esp_matter::endpoint::water_freeze_detector::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 68: device type water_freeze_detector");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(roof_rain, 69, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
+  new(matter_bsc_69) matter::MatterBooleanStateConfigMapping(69);
+  matter_mattercomponent_id->register_mapping(matter_bsc_69);
+  matter_mattercomponent_id->register_endpoint_parent(69, 0);
+  matter_mattercomponent_id->register_endpoint(69, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::rain_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::rain_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 69: device type rain_sensor");
+    esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
+    auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (boolean_state_configuration_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 69: boolean state configuration cluster create");
+    {
+      esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::config_t sensitivity_level_config{};
+      sensitivity_level_config.supported_sensitivity_levels = 5;
+      if (esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::add(boolean_state_configuration_cluster, &sensitivity_level_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 69: boolean state configuration feature");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(kitchen_smoke, 70, 92, 1, esphome::matter::conversion::alarm_state, esphome::matter::update_smoke_state_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(kitchen_co, 70, 92, 2, esphome::matter::conversion::alarm_state, esphome::matter::update_co_state_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(alarm_fault, 70, 92, 6, esphome::matter::conversion::boolean_state, esphome::matter::update_hardware_fault_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(alarm_expired, 70, 92, 7, esphome::matter::conversion::end_of_service, esphome::matter::update_end_of_service_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(alarm_muted, 70, 92, 4, esphome::matter::conversion::mute_state, esphome::matter::update_device_muted_attribute);
+  new(matter_smoke_co_70) matter::MatterSmokeCoAlarmMapping(70, 8000);
+  new(matter_mattersmokecoselftesttrigger_id) matter::MatterSmokeCoSelfTestTrigger();
+  new(automation_id_14) Automation<>(matter_mattersmokecoselftesttrigger_id);
+  matter_smoke_co_70->add_self_test_trigger(matter_mattersmokecoselftesttrigger_id);
+  matter_mattercomponent_id->register_mapping(matter_smoke_co_70);
+  matter_mattercomponent_id->register_endpoint_parent(70, 0);
+  matter_mattercomponent_id->register_endpoint_tag(70, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(70, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
+    device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id() | esp_matter::cluster::smoke_co_alarm::feature::co_alarm::get_id();
+    if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 70: device type smoke_co_alarm");
+    {
+      auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
+      if (smoke_co_alarm_cluster == nullptr || esp_matter::cluster::smoke_co_alarm::attribute::create_device_muted(smoke_co_alarm_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 70: attribute SmokeCOAlarm.DeviceMuted create");
+    }
+    {
+      auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
+      if (smoke_co_alarm_cluster == nullptr ||
+          esp_matter::cluster::smoke_co_alarm::command::create_self_test_request(smoke_co_alarm_cluster) == nullptr ||
+          esp_matter::cluster::smoke_co_alarm::event::create_alarm_muted(smoke_co_alarm_cluster) == nullptr ||
+          esp_matter::cluster::smoke_co_alarm::event::create_mute_ended(smoke_co_alarm_cluster) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 70: sensor extras cluster create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(hall_smoke, 71, 92, 1, esphome::matter::conversion::alarm_state, esphome::matter::update_smoke_state_attribute);
+  matter_mattercomponent_id->register_binary_sensor_attribute(hall_testing, 71, 92, 5, esphome::matter::conversion::boolean_state, esphome::matter::update_test_in_progress_attribute);
+  new(matter_smoke_co_71) matter::MatterSmokeCoAlarmMapping(71, 0);
+  new(matter_mattersmokecoselftesttrigger_id_2) matter::MatterSmokeCoSelfTestTrigger();
+  new(automation_id_15) Automation<>(matter_mattersmokecoselftesttrigger_id_2);
+  matter_smoke_co_71->add_self_test_trigger(matter_mattersmokecoselftesttrigger_id_2);
+  matter_mattercomponent_id->register_mapping(matter_smoke_co_71);
+  matter_mattercomponent_id->register_endpoint_parent(71, 0);
+  matter_mattercomponent_id->register_endpoint_tag(71, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(71, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
+    device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id();
+    if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 71: device type smoke_co_alarm");
+    {
+      auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
+      if (smoke_co_alarm_cluster == nullptr ||
+          esp_matter::cluster::smoke_co_alarm::command::create_self_test_request(smoke_co_alarm_cluster) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 71: sensor extras cluster create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(living_room_shade, 80);
+  matter_mattercomponent_id->register_endpoint_parent(80, 0);
+  matter_mattercomponent_id->register_endpoint_tag(80, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(80, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(80, "shade", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 80, "shade");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 80: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(bedroom_blind, 81);
+  matter_mattercomponent_id->register_endpoint_parent(81, 0);
+  matter_mattercomponent_id->register_endpoint_tag(81, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(81, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(81, "blind", 13)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 81, "blind");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 81: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(open_close_awning, 82);
+  matter_mattercomponent_id->register_endpoint_parent(82, 0);
+  matter_mattercomponent_id->register_endpoint_tag(82, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(82, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(82, "awning", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 82, "awning");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 82: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_closure(garage_door, 83);
+  matter_mattercomponent_id->register_endpoint_parent(83, 0);
+  matter_mattercomponent_id->register_endpoint_label(83, "Garage door");
+  matter_mattercomponent_id->register_endpoint(83, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::closure::config_t device_config_0{};
+    device_config_0.closure_control.delegate = esphome::matter::get_closure_delegate(83);
+    device_config_0.closure_control.feature_flags = esp_matter::cluster::closure_control::feature::positioning::get_id();
+    if (esp_matter::endpoint::closure::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 83: device type closure");
+    esp_matter::cluster::fixed_label::config_t fixed_label_config{};
+    if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 83: cluster FixedLabel create");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(side_gate, 84);
+  matter_mattercomponent_id->register_endpoint_parent(84, 0);
+  matter_mattercomponent_id->register_endpoint_tag(84, 7, 4, "");
+  matter_mattercomponent_id->register_endpoint(84, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(84, "gate", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 84, "gate");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 84: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(garage_compat, 85);
+  matter_mattercomponent_id->register_endpoint_parent(85, 0);
+  matter_mattercomponent_id->register_endpoint_tag(85, 7, 5, "");
+  matter_mattercomponent_id->register_endpoint(85, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(85, "garage", 17)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 85, "garage");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 85: device type window_covering");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(86, 0);
+  matter_mattercomponent_id->register_endpoint(86, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::closure_panel::config_t device_config_0{};
+    device_config_0.closure_dimension.feature_flags = esp_matter::cluster::closure_dimension::feature::positioning::get_id() | esp_matter::cluster::closure_dimension::feature::translation::get_id();
+    if (esp_matter::endpoint::closure_panel::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 86: device type closure_panel");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(87, 0);
+  matter_mattercomponent_id->register_endpoint(87, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::closure_controller::config_t device_config_0{};
+    if (esp_matter::endpoint::closure_controller::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 87: device type closure_controller");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 87: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_lock(front_lock, 88);
+  matter_mattercomponent_id->register_endpoint_parent(88, 0);
+  matter_mattercomponent_id->register_endpoint(88, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::door_lock::config_t device_config_0{};
+    device_config_0.door_lock.actuator_enabled = true;
+    device_config_0.door_lock.lock_type = 0;
+    if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 88: device type door_lock");
+    auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
+    if (door_lock_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 88: cluster DoorLock missing after device type creation");
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::weekday_access_schedules::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 88: cluster DoorLock feature WeekDayAccessSchedules");
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 88: cluster DoorLock feature DoorPositionSensor");
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 88: cluster DoorLock feature CredentialsOverTheAirAccess");
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 88: cluster DoorLock feature Unbolt");
+    return true;
+  });
+  matter_mattercomponent_id->register_valve(garden_valve, 89);
+  matter_mattercomponent_id->register_endpoint_parent(89, 0);
+  matter_mattercomponent_id->register_endpoint_tag(89, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(89, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_valve::config_t device_config_0{};
+    device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
+    device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(89);
+    if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 89: device type water_valve");
+    auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
+    if (valve_configuration_and_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 89: cluster ValveConfigurationandControl missing after device type creation");
+    if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::level::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 89: cluster ValveConfigurationandControl feature Level");
+    return true;
+  });
+  matter_mattercomponent_id->register_valve(simple_valve, 90);
+  matter_mattercomponent_id->register_endpoint_parent(90, 0);
+  matter_mattercomponent_id->register_endpoint_tag(90, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(90, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_valve::config_t device_config_0{};
+    device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
+    device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(90);
+    if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 90: device type water_valve");
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(ceiling_fan, 100);
+  matter_mattercomponent_id->register_endpoint_parent(100, 0);
+  matter_mattercomponent_id->register_endpoint_tag(100, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(100, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::fan::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(ceiling_fan->get_traits(), false);
+    if (esp_matter::endpoint::fan::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 100: device type fan");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 100: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, ceiling_fan) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 100: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(relay_fan, 101);
+  matter_mattercomponent_id->register_endpoint_parent(101, 0);
+  matter_mattercomponent_id->register_endpoint_tag(101, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(101, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::fan::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(relay_fan->get_traits(), false);
+    if (esp_matter::endpoint::fan::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 101: device type fan");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 101: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, relay_fan) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 101: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(102, 0);
+  matter_mattercomponent_id->register_endpoint_tag(102, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(102, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::fan::config_t device_config_0{};
+    if (esp_matter::endpoint::fan::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 102: device type fan");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 102: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_feature(fan_control_cluster, esp_matter::cluster::fan_control::feature::fan_auto::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 102: cluster FanControl feature Auto");
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(purifier_fan, 103, "Breeze", "Sleep");
+  new(matter_filter_103_113) matter::MatterFilterMapping(103, 113, esphome::matter::FilterLevels{0, 25, 10});
+  matter_filter_103_113->set_condition_sensor(hepa_life);
+  matter_filter_103_113->set_replace_needed_sensor(hepa_replace);
+  matter_filter_103_113->set_reset_button(hepa_reset_button);
+  new(matter_filterresettrigger_id) matter::FilterResetTrigger();
+  matter_filter_103_113->add_reset_trigger(matter_filterresettrigger_id);
+  new(automation_id_16) Automation<>(matter_filterresettrigger_id);
+  matter_mattercomponent_id->register_mapping(matter_filter_103_113);
+  new(matter_filter_103_114) matter::MatterFilterMapping(103, 114, esphome::matter::FilterLevels{0, -1, -1});
+  matter_filter_103_114->set_replace_needed_sensor(carbon_replace);
+  new(matter_filterresettrigger_id_2) matter::FilterResetTrigger();
+  matter_filter_103_114->add_reset_trigger(matter_filterresettrigger_id_2);
+  new(automation_id_17) Automation<>(matter_filterresettrigger_id_2);
+  matter_mattercomponent_id->register_mapping(matter_filter_103_114);
+  matter_mattercomponent_id->register_endpoint_parent(103, 0);
+  matter_mattercomponent_id->register_endpoint(103, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::air_purifier::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(purifier_fan->get_traits(), false);
+    if (esp_matter::endpoint::air_purifier::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 103: device type air_purifier");
+    esp_matter::cluster::hepa_filter_monitoring::config_t hepa_filter_monitoring_config{};
+    hepa_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_103_113);
+    auto *hepa_filter_monitoring_cluster = esp_matter::cluster::hepa_filter_monitoring::create(endpoint, &hepa_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (hepa_filter_monitoring_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 103: resource monitoring cluster create");
+    {
+      esp_matter::cluster::hepa_filter_monitoring::feature::condition::config_t condition_config{};
+      condition_config.condition = 100;
+      condition_config.degradation_direction = 0;
+      if (esp_matter::cluster::hepa_filter_monitoring::feature::condition::add(hepa_filter_monitoring_cluster, &condition_config) != ESP_OK)
+        return MATTER_BUILD_FAIL("endpoint 103: resource monitoring condition feature");
+    }
+    if (esp_matter::cluster::hepa_filter_monitoring::feature::warning::add(hepa_filter_monitoring_cluster) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 103: resource monitoring warning feature");
+    if (esp_matter::cluster::hepa_filter_monitoring::command::create_reset_condition(hepa_filter_monitoring_cluster) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 103: resource monitoring reset condition command");
+    esp_matter::cluster::activated_carbon_filter_monitoring::config_t activated_carbon_filter_monitoring_config{};
+    activated_carbon_filter_monitoring_config.delegate = static_cast<chip::app::Clusters::ResourceMonitoring::Delegate *>(matter_filter_103_114);
+    auto *activated_carbon_filter_monitoring_cluster = esp_matter::cluster::activated_carbon_filter_monitoring::create(endpoint, &activated_carbon_filter_monitoring_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (activated_carbon_filter_monitoring_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 103: resource monitoring cluster create");
+    if (esp_matter::cluster::activated_carbon_filter_monitoring::command::create_reset_condition(activated_carbon_filter_monitoring_cluster) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 103: resource monitoring reset condition command");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 103: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, purifier_fan, esphome::matter::FanFeatureOptions{true, "Breeze", "Sleep"}) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 103: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_fan(hood_fan, 104);
+  matter_mattercomponent_id->register_endpoint_parent(104, 0);
+  matter_mattercomponent_id->register_endpoint(104, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extractor_hood::config_t device_config_0{};
+    device_config_0.fan_control.fan_mode_sequence = esphome::matter::fan_mode_sequence(hood_fan->get_traits(), false);
+    if (esp_matter::endpoint::extractor_hood::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 104: device type extractor_hood");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 104: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, hood_fan, esphome::matter::FanFeatureOptions{true, nullptr, nullptr}) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 104: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(ac, 105, true);
+  matter_mattercomponent_id->register_climate_fan(ac, 105);
+  matter_mattercomponent_id->register_endpoint_parent(105, 0);
+  matter_mattercomponent_id->register_endpoint_tag(105, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(105, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, ac, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 105: device type room_air_conditioner");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, ac, true))
+      return MATTER_BUILD_FAIL("endpoint 105: thermostat extension");
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::climate_fan_mode_sequence(ac);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 105: cluster FanControl create");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 105: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_climate_fan_features(fan_control_cluster, ac, false) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 105: cluster FanControl climate fan features");
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(ac2, 106, true);
+  matter_mattercomponent_id->register_fan(indoor_fan, 106);
+  matter_mattercomponent_id->register_endpoint_parent(106, 0);
+  matter_mattercomponent_id->register_endpoint_tag(106, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(106, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::room_air_conditioner::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, ac2, true);
+    if (esp_matter::endpoint::room_air_conditioner::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 106: device type room_air_conditioner");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, ac2, true))
+      return MATTER_BUILD_FAIL("endpoint 106: thermostat extension");
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::fan_mode_sequence(indoor_fan->get_traits(), false);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 106: cluster FanControl create");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 106: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, indoor_fan) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 106: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(107, 0);
+  matter_mattercomponent_id->register_endpoint(107, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::heat_pump::config_t device_config_0{};
+    if (esp_matter::endpoint::heat_pump::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 107: device type heat_pump");
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(boiler, 108, false);
+  matter_mattercomponent_id->register_endpoint_parent(108, 107);
+  matter_mattercomponent_id->register_endpoint_tag(108, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(108, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, boiler, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 108: device type thermostat");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, boiler, false))
+      return MATTER_BUILD_FAIL("endpoint 108: thermostat extension");
+    return true;
+  });
+  matter_mattercomponent_id->register_climate(hall_thermostat, 109, false);
+  matter_mattercomponent_id->register_fan(stat_fan, 109);
+  matter_mattercomponent_id->register_endpoint_parent(109, 0);
+  matter_mattercomponent_id->register_endpoint_tag(109, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(109, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    esphome::matter::configure_climate_thermostat(device_config_0.thermostat, hall_thermostat, false);
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 109: device type thermostat");
+    if (!esphome::matter::extend_climate_thermostat(endpoint, hall_thermostat, false))
+      return MATTER_BUILD_FAIL("endpoint 109: thermostat extension");
+    esp_matter::cluster::fan_control::config_t fan_control_config{};
+    fan_control_config.fan_mode_sequence = esphome::matter::fan_mode_sequence(stat_fan->get_traits(), false);
+    if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 109: cluster FanControl create");
+    auto *fan_control_cluster = esp_matter::cluster::get(endpoint, 514);
+    if (fan_control_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 109: cluster FanControl missing after device type creation");
+    if (esphome::matter::add_fan_features(fan_control_cluster, stat_fan) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 109: cluster FanControl trait features");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(110, 0);
+  matter_mattercomponent_id->register_endpoint_tag(110, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(110, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat::config_t device_config_0{};
+    device_config_0.thermostat.feature_flags = esp_matter::cluster::thermostat::feature::heating::get_id() | esp_matter::cluster::thermostat::feature::cooling::get_id();
+    if (esp_matter::endpoint::thermostat::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 110: device type thermostat");
+    esp_matter::cluster::thermostat_user_interface_configuration::config_t thermostat_user_interface_configuration_config{};
+    if (esp_matter::cluster::thermostat_user_interface_configuration::create(endpoint, &thermostat_user_interface_configuration_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 110: cluster ThermostatUserInterfaceConfiguration create");
+    auto *thermostat_cluster = esp_matter::cluster::get(endpoint, 513);
+    if (thermostat_cluster == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 110: cluster Thermostat missing after device type creation");
+    if (esphome::matter::add_feature(thermostat_cluster, esp_matter::cluster::thermostat::feature::auto_mode::add) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 110: cluster Thermostat feature AutoMode");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(111, 0);
+  matter_mattercomponent_id->register_endpoint(111, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thermostat_controller::config_t device_config_0{};
+    if (esp_matter::endpoint::thermostat_controller::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 111: device type thermostat_controller");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 111: cluster Binding create");
+    return true;
+  });
+  new(matter_mattermodemapping_id) matter::MatterModeMapping(120, 84);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id);
+  matter_mattermodemapping_id->add_mode("Idle", 0, "Idle");
+  matter_mattermodemapping_id->add_tag(16384, 0, false);
+  matter_mattermodemapping_id->add_mode("Cleaning", 1, "Cleaning");
+  matter_mattermodemapping_id->add_tag(16385, 0, false);
+  matter_mattermodemapping_id->add_mode("Mapping", 2, "Mapping");
+  matter_mattermodemapping_id->add_tag(16386, 0, false);
+  matter_mattermodemapping_id->set_select(vacuum_run_mode);
+  matter_mattermodemapping_id->set_decision(true, 250);
+  matter_mattermodemapping_id->set_accept_when_idle(false);
+  new(matter_matterchangetomodetrigger_id) matter::MatterChangeToModeTrigger();
+  matter_mattermodemapping_id->add_change_trigger(matter_matterchangetomodetrigger_id);
+  new(automation_id_18) Automation<uint8_t>(matter_matterchangetomodetrigger_id);
+  new(matter_mattermoderejectaction_id) matter::MatterModeRejectAction<uint8_t>();
+  matter_mattermoderejectaction_id->set_status([](uint8_t mode) -> uint8_t {
+      return 67;
+  });
+  matter_mattermoderejectaction_id->set_text(ESPHOME_F("Empty the dust bin first"));
+  ifaction_id_2->add_then_action(matter_mattermoderejectaction_id);
+  new(matter_mattermodemapping_id_2) matter::MatterModeMapping(120, 85);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_2);
+  matter_mattermodemapping_id_2->add_mode("Vacuum", 0, "Vacuum");
+  matter_mattermodemapping_id_2->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_2->add_mode("Mop", 1, "Mop");
+  matter_mattermodemapping_id_2->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_2->add_tag(2, 0, false);
+  matter_mattermodemapping_id_2->add_mode("Vacuum then mop", 5, "Vacuum then mop");
+  matter_mattermodemapping_id_2->add_tag(16387, 0, false);
+  matter_mattermodemapping_id_2->set_decision(false, 250);
+  matter_mattermodemapping_id_2->set_accept_when_idle(false);
+  new(matter_matterchangetomodetrigger_id_2) matter::MatterChangeToModeTrigger();
+  matter_mattermodemapping_id_2->add_change_trigger(matter_matterchangetomodetrigger_id_2);
+  new(automation_id_19) Automation<uint8_t>(matter_matterchangetomodetrigger_id_2);
+  new(matter_matteroperationalstatemapping_id) matter::MatterOperationalStateMapping(120, 97);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id);
+  matter_matteroperationalstatemapping_id->add_state(0, "");
+  matter_matteroperationalstatemapping_id->add_state(1, "");
+  matter_matteroperationalstatemapping_id->add_state(2, "");
+  matter_matteroperationalstatemapping_id->add_state(3, "");
+  matter_matteroperationalstatemapping_id->add_state(64, "");
+  matter_matteroperationalstatemapping_id->add_state(65, "");
+  matter_matteroperationalstatemapping_id->add_state(66, "");
+  matter_matteroperationalstatemapping_id->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id->add_state_name("seeking_charger", 64);
+  matter_matteroperationalstatemapping_id->add_state_name("charging", 65);
+  matter_matteroperationalstatemapping_id->add_state_name("docked", 66);
+  matter_matteroperationalstatemapping_id->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id->add_error_name("failed_to_find_charging_dock", 64);
+  matter_matteroperationalstatemapping_id->add_error_name("stuck", 65);
+  matter_matteroperationalstatemapping_id->add_error_name("dust_bin_missing", 66);
+  matter_matteroperationalstatemapping_id->add_error_name("dust_bin_full", 67);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_empty", 68);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_missing", 69);
+  matter_matteroperationalstatemapping_id->add_error_name("water_tank_lid_open", 70);
+  matter_matteroperationalstatemapping_id->add_error_name("mop_cleaning_pad_missing", 71);
+  matter_matteroperationalstatemapping_id->add_error_name("low_battery", 72);
+  matter_matteroperationalstatemapping_id->add_error_name("cannot_reach_target_area", 73);
+  matter_matteroperationalstatemapping_id->add_error_name("dirty_water_tank_full", 74);
+  matter_matteroperationalstatemapping_id->add_error_name("dirty_water_tank_missing", 75);
+  matter_matteroperationalstatemapping_id->add_error_name("wheels_jammed", 76);
+  matter_matteroperationalstatemapping_id->add_error_name("brush_jammed", 77);
+  matter_matteroperationalstatemapping_id->add_error_name("navigation_sensor_obscured", 78);
+  matter_matteroperationalstatemapping_id->add_phase("Cleaning");
+  matter_matteroperationalstatemapping_id->add_phase("Returning");
+  matter_matteroperationalstatemapping_id->set_decision(true, 300);
+  matter_matteroperationalstatemapping_id->add_idle_state(0);
+  matter_matteroperationalstatemapping_id->add_idle_state(66);
+  matter_matteroperationalstatemapping_id->add_idle_state(65);
+  matter_matteroperationalstatemapping_id->set_state_select(vacuum_state);
+  matter_matteroperationalstatemapping_id->set_phase_text_sensor(vacuum_phase);
+  matter_matteroperationalstatemapping_id->set_countdown_sensor(vacuum_eta);
+  new(matter_matteroperationalcommandtrigger_id) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::PAUSE, matter_matteroperationalcommandtrigger_id);
+  new(automation_id_20) Automation<>(matter_matteroperationalcommandtrigger_id);
+  new(matter_matteroperationalcommandtrigger_id_2) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::RESUME, matter_matteroperationalcommandtrigger_id_2);
+  new(automation_id_21) Automation<>(matter_matteroperationalcommandtrigger_id_2);
+  new(matter_matteroperationalcommandtrigger_id_3) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::GO_HOME, matter_matteroperationalcommandtrigger_id_3);
+  new(automation_id_22) Automation<>(matter_matteroperationalcommandtrigger_id_3);
+  new(matter_matteroperationalstaterejectaction_id) matter::MatterOperationalStateRejectAction<>();
+  matter_matteroperationalstaterejectaction_id->set_error([]() -> uint8_t {
+      return 3;
+  });
+  automation_id_22->add_action(matter_matteroperationalstaterejectaction_id);
+  matter_mattercomponent_id->register_endpoint_parent(120, 0);
+  matter_mattercomponent_id->register_endpoint(120, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::robotic_vacuum_cleaner::config_t device_config_0{};
+    if (esp_matter::endpoint::robotic_vacuum_cleaner::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 120: device type robotic_vacuum_cleaner");
+    esp_matter::cluster::rvc_clean_mode::config_t rvc_clean_mode_config{};
+    if (esp_matter::cluster::rvc_clean_mode::create(endpoint, &rvc_clean_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 120: cluster RVCCleanMode create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0054))
+      return MATTER_BUILD_FAIL("endpoint 120: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0055))
+      return MATTER_BUILD_FAIL("endpoint 120: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0061))
+      return MATTER_BUILD_FAIL("endpoint 120: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_3) matter::MatterModeMapping(121, 81);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_3);
+  matter_mattermodemapping_id_3->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_3->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_3->add_mode("Delicate", 1, "Delicate");
+  matter_mattermodemapping_id_3->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_3->add_tag(2, 0, false);
+  matter_mattermodemapping_id_3->add_mode("Heavy", 10, "Heavy");
+  matter_mattermodemapping_id_3->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_3->add_tag(7, 0, false);
+  matter_mattermodemapping_id_3->set_select(washer_program);
+  matter_mattermodemapping_id_3->set_decision(false, 250);
+  matter_mattermodemapping_id_3->set_accept_when_idle(true);
+  new(matter_matterlaundrycontrolsmapping_id) matter::MatterLaundryControlsMapping(121);
+  matter_mattercomponent_id->register_mapping(matter_matterlaundrycontrolsmapping_id);
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("Off");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("400");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("800");
+  matter_matterlaundrycontrolsmapping_id->add_spin_speed("1200");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(0, "none");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(1, "normal");
+  matter_matterlaundrycontrolsmapping_id->add_rinse(2, "extra");
+  matter_matterlaundrycontrolsmapping_id->set_spin_speed_select(washer_spin);
+  matter_matterlaundrycontrolsmapping_id->set_rinses_select(washer_rinses);
+  new(matter_matteroperationalstatemapping_id_2) matter::MatterOperationalStateMapping(121, 96);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id_2);
+  matter_matteroperationalstatemapping_id_2->add_state(0, "");
+  matter_matteroperationalstatemapping_id_2->add_state(1, "");
+  matter_matteroperationalstatemapping_id_2->add_state(2, "");
+  matter_matteroperationalstatemapping_id_2->add_state(3, "");
+  matter_matteroperationalstatemapping_id_2->add_state(128, "Soaking");
+  matter_matteroperationalstatemapping_id_2->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id_2->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id_2->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id_2->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Soaking", 128);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Idle", 0);
+  matter_matteroperationalstatemapping_id_2->add_state_name("Washing", 1);
+  matter_matteroperationalstatemapping_id_2->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id_2->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id_2->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id_2->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id_2->add_phase("Pre-wash");
+  matter_matteroperationalstatemapping_id_2->add_phase("Wash");
+  matter_matteroperationalstatemapping_id_2->add_phase("Rinse");
+  matter_matteroperationalstatemapping_id_2->add_phase("Spin");
+  matter_matteroperationalstatemapping_id_2->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::START, 0);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 1);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 2);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(0);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(2);
+  matter_matteroperationalstatemapping_id_2->set_state_select(washer_state);
+  matter_matteroperationalstatemapping_id_2->set_countdown_sensor(washer_remaining);
+  new(matter_matteroperationalcommandtrigger_id_6) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::PAUSE, matter_matteroperationalcommandtrigger_id_6);
+  new(automation_id_25) Automation<>(matter_matteroperationalcommandtrigger_id_6);
+  new(matter_matteroperationalcommandtrigger_id_7) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::RESUME, matter_matteroperationalcommandtrigger_id_7);
+  new(automation_id_26) Automation<>(matter_matteroperationalcommandtrigger_id_7);
+  new(matter_matteroperationalcommandtrigger_id_4) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::START, matter_matteroperationalcommandtrigger_id_4);
+  new(automation_id_23) Automation<>(matter_matteroperationalcommandtrigger_id_4);
+  new(matter_matteroperationalcommandtrigger_id_5) matter::MatterOperationalCommandTrigger();
+  matter_matteroperationalstatemapping_id_2->add_command_trigger(matter::MatterOperationalCommand::STOP, matter_matteroperationalcommandtrigger_id_5);
+  new(automation_id_24) Automation<>(matter_matteroperationalcommandtrigger_id_5);
+  matter_mattercomponent_id->register_endpoint_parent(121, 0);
+  matter_mattercomponent_id->register_endpoint(121, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::laundry_washer::config_t device_config_0{};
+    if (esp_matter::endpoint::laundry_washer::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 121: device type laundry_washer");
+    esp_matter::cluster::laundry_washer_mode::config_t laundry_washer_mode_config{};
+    if (esp_matter::cluster::laundry_washer_mode::create(endpoint, &laundry_washer_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 121: cluster LaundryWasherMode create");
+    esp_matter::cluster::laundry_washer_controls::config_t laundry_washer_controls_config{};
+    laundry_washer_controls_config.feature_flags = esp_matter::cluster::laundry_washer_controls::feature::spin::get_id() | esp_matter::cluster::laundry_washer_controls::feature::rinse::get_id();
+    laundry_washer_controls_config.features.rinse.number_of_rinses = 0;
+    if (esp_matter::cluster::laundry_washer_controls::create(endpoint, &laundry_washer_controls_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 121: cluster LaundryWasherControls create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0051))
+      return MATTER_BUILD_FAIL("endpoint 121: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0053))
+      return MATTER_BUILD_FAIL("endpoint 121: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0060))
+      return MATTER_BUILD_FAIL("endpoint 121: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodeselectmapping_id) matter::MatterModeSelectMapping(122);
+  matter_mattercomponent_id->register_mapping(matter_mattermodeselectmapping_id);
+  matter_mattermodeselectmapping_id->add_mode("Low", 0, "Low");
+  matter_mattermodeselectmapping_id->add_tag(1, 65521, true);
+  matter_mattermodeselectmapping_id->add_mode("High", 1, "High");
+  matter_mattermodeselectmapping_id->set_select(fan_preset);
+  new(matter_matterchangetomodetrigger_id_3) matter::MatterChangeToModeTrigger();
+  matter_mattermodeselectmapping_id->add_change_trigger(matter_matterchangetomodetrigger_id_3);
+  new(automation_id_27) Automation<uint8_t>(matter_matterchangetomodetrigger_id_3);
+  matter_mattercomponent_id->register_endpoint_parent(122, 0);
+  matter_mattercomponent_id->register_endpoint(122, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::mode_select::config_t device_config_0{};
+    strncpy(device_config_0.mode_select.description, "Fan speed preset", sizeof(device_config_0.mode_select.description) - 1);
+    device_config_0.mode_select.current_mode = 0;
+    if (esp_matter::endpoint::mode_select::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 122: device type mode_select");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0050))
+      return MATTER_BUILD_FAIL("endpoint 122: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_4) matter::MatterModeMapping(123, 158);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_4);
+  matter_mattermodemapping_id_4->add_mode("Off", 0, "Off");
+  matter_mattermodemapping_id_4->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_4->add_mode("Manual", 1, "Manual");
+  matter_mattermodemapping_id_4->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_4->add_mode("Timed", 2, "Timed");
+  matter_mattermodemapping_id_4->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_4->add_tag(5, 0, false);
+  matter_mattermodemapping_id_4->set_decision(false, 250);
+  matter_mattermodemapping_id_4->set_accept_when_idle(false);
+  matter_mattercomponent_id->register_endpoint_parent(123, 0);
+  matter_mattercomponent_id->register_endpoint(123, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::water_heater::config_t device_config_0{};
+    device_config_0.thermostat.feature_flags = esp_matter::cluster::thermostat::feature::heating::get_id();
+    if (esp_matter::endpoint::water_heater::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 123: device type water_heater");
+    if (!esphome::matter::attach_delegate(endpoint, 0x009E))
+      return MATTER_BUILD_FAIL("endpoint 123: cluster delegate attach");
+    return true;
+  });
+  new(matter_mattermodemapping_id_5) matter::MatterModeMapping(124, 89);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_5);
+  matter_mattermodemapping_id_5->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_5->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_5->add_mode("Heavy", 1, "Heavy");
+  matter_mattermodemapping_id_5->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_5->add_mode("Light", 2, "Light");
+  matter_mattermodemapping_id_5->add_tag(16386, 0, false);
+  matter_mattermodemapping_id_5->add_tag(1, 0, false);
+  matter_mattermodemapping_id_5->set_decision(false, 250);
+  matter_mattermodemapping_id_5->set_accept_when_idle(false);
+  new(matter_matteroperationalstatemapping_id_3) matter::MatterOperationalStateMapping(124, 96);
+  matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id_3);
+  matter_matteroperationalstatemapping_id_3->add_state(0, "");
+  matter_matteroperationalstatemapping_id_3->add_state(1, "");
+  matter_matteroperationalstatemapping_id_3->add_state(2, "");
+  matter_matteroperationalstatemapping_id_3->add_state(3, "");
+  matter_matteroperationalstatemapping_id_3->add_state_name("stopped", 0);
+  matter_matteroperationalstatemapping_id_3->add_state_name("running", 1);
+  matter_matteroperationalstatemapping_id_3->add_state_name("paused", 2);
+  matter_matteroperationalstatemapping_id_3->add_state_name("error", 3);
+  matter_matteroperationalstatemapping_id_3->add_error_name("no_error", 0);
+  matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_start_or_resume", 1);
+  matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_complete_operation", 2);
+  matter_matteroperationalstatemapping_id_3->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id_3->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_3->add_idle_state(0);
+  matter_matteroperationalstatemapping_id_3->set_state_select(dishwasher_state);
+  matter_mattercomponent_id->register_endpoint_parent(124, 0);
+  matter_mattercomponent_id->register_endpoint(124, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dish_washer::config_t device_config_0{};
+    if (esp_matter::endpoint::dish_washer::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 124: device type dishwasher");
+    esp_matter::cluster::dish_washer_mode::config_t dish_washer_mode_config{};
+    if (esp_matter::cluster::dish_washer_mode::create(endpoint, &dish_washer_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 124: cluster DishwasherMode create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0059))
+      return MATTER_BUILD_FAIL("endpoint 124: cluster delegate attach");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0060))
+      return MATTER_BUILD_FAIL("endpoint 124: cluster delegate attach");
+    return true;
+  });
+  new(matter_refrigerator_alarm_125) matter::MatterRefrigeratorAlarmMapping(125, fridge_door);
+  matter_mattercomponent_id->register_mapping(matter_refrigerator_alarm_125);
+  new(matter_mattermodemapping_id_6) matter::MatterModeMapping(125, 82);
+  matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_6);
+  matter_mattermodemapping_id_6->add_mode("Normal", 0, "Normal");
+  matter_mattermodemapping_id_6->add_tag(0, 0, false);
+  matter_mattermodemapping_id_6->add_mode("Rapid cool", 1, "Rapid cool");
+  matter_mattermodemapping_id_6->add_tag(16384, 0, false);
+  matter_mattermodemapping_id_6->add_mode("Vacation", 2, "Away");
+  matter_mattermodemapping_id_6->add_tag(5, 0, false);
+  matter_mattermodemapping_id_6->add_tag(4, 0, false);
+  matter_mattermodemapping_id_6->set_select(fridge_mode);
+  matter_mattermodemapping_id_6->set_decision(false, 250);
+  matter_mattermodemapping_id_6->set_accept_when_idle(false);
+  matter_mattercomponent_id->register_endpoint_parent(125, 0);
+  matter_mattercomponent_id->register_endpoint(125, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::refrigerator::config_t device_config_0{};
+    if (esp_matter::endpoint::refrigerator::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 125: device type refrigerator");
+    esp_matter::cluster::refrigerator_and_tcc_mode::config_t refrigerator_and_tcc_mode_config{};
+    if (esp_matter::cluster::refrigerator_and_tcc_mode::create(endpoint, &refrigerator_and_tcc_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 125: cluster RefrigeratorAndTemperatureControlledCabinetMode create");
+    esp_matter::cluster::refrigerator_alarm::config_t refrigerator_alarm_config{};
+    refrigerator_alarm_config.mask = 1;
+    refrigerator_alarm_config.supported = 1;
+    refrigerator_alarm_config.state = 0;
+    auto *refrigerator_alarm_cluster = esp_matter::cluster::refrigerator_alarm::create(endpoint, &refrigerator_alarm_config, esp_matter::CLUSTER_FLAG_SERVER);
+    if (refrigerator_alarm_cluster == nullptr || esp_matter::event::create(refrigerator_alarm_cluster, 0) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 125: refrigerator alarm cluster create");
+    if (!esphome::matter::attach_delegate(endpoint, 0x0052))
+      return MATTER_BUILD_FAIL("endpoint 125: cluster delegate attach");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(126, 0);
+  matter_mattercomponent_id->register_endpoint(126, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_controlled_cabinet::config_t device_config_0{};
+    device_config_0.temperature_control.feature_flags = esp_matter::cluster::temperature_control::feature::temperature_number::get_id();
+    if (esp_matter::endpoint::temperature_controlled_cabinet::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 126: device type temperature_controlled_cabinet");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(127, 0);
+  matter_mattercomponent_id->register_endpoint(127, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::laundry_dryer::config_t device_config_0{};
+    if (esp_matter::endpoint::laundry_dryer::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 127: device type laundry_dryer");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(128, 0);
+  matter_mattercomponent_id->register_endpoint(128, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::oven::config_t device_config_0{};
+    if (esp_matter::endpoint::oven::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 128: device type oven");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(129, 0);
+  matter_mattercomponent_id->register_endpoint(129, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::cook_surface::config_t device_config_0{};
+    if (esp_matter::endpoint::cook_surface::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 129: device type cook_surface");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(130, 0);
+  matter_mattercomponent_id->register_endpoint(130, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::microwave_oven::config_t device_config_0{};
+    device_config_0.microwave_oven_control.feature_flags = esp_matter::cluster::microwave_oven_control::feature::power_as_number::get_id();
+    if (esp_matter::endpoint::microwave_oven::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 130: device type microwave_oven");
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(topo_voltage, 140, 4, esphome::matter::conversion::volts);
+  matter_mattercomponent_id->register_electrical_power_sensor(topo_total_power, 140, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_energy_sensor(topo_total_energy, 140, 1, esphome::matter::conversion::kilowatt_hours);
+  matter_mattercomponent_id->register_endpoint_parent(140, 0);
+  matter_mattercomponent_id->register_endpoint(140, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::node_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(140, true);
+    device_config_0.with_electrical_energy_measurement().feature_flags = esp_matter::cluster::electrical_energy_measurement::feature::imported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 140: device type electrical_sensor");
+    {
+      auto *electrical_power_measurement_cluster = esp_matter::cluster::get(endpoint, 144);
+      if (electrical_power_measurement_cluster == nullptr || esp_matter::cluster::electrical_power_measurement::attribute::create_voltage(electrical_power_measurement_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 140: attribute ElectricalPowerMeasurement.Voltage create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(strip_power, 141, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(141, 0);
+  matter_mattercomponent_id->register_endpoint(141, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::tree_topology::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(141, true);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 141: device type electrical_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(outlet_1, 142);
+  matter_mattercomponent_id->register_electrical_power_sensor(outlet_1_power, 142, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_electrical_energy_sensor(outlet_1_energy, 142, 2, esphome::matter::conversion::kilowatt_hours);
+  matter_mattercomponent_id->register_endpoint_parent(142, 141);
+  matter_mattercomponent_id->register_endpoint_tag(142, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(142, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 142: device type on_off_plug_in_unit");
+    esp_matter::endpoint::electrical_sensor::config_t device_config_1{};
+    device_config_1.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::tree_topology::get_id();
+    device_config_1.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_1.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(142, true);
+    device_config_1.with_electrical_energy_measurement().feature_flags = esp_matter::cluster::electrical_energy_measurement::feature::exported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 142: device type electrical_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(outlet_2, 143);
+  matter_mattercomponent_id->register_electrical_power_sensor(outlet_2_power, 143, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(143, 141);
+  matter_mattercomponent_id->register_endpoint_tag(143, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(143, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 143: device type on_off_plug_in_unit");
+    esp_matter::endpoint::electrical_sensor::config_t device_config_1{};
+    device_config_1.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::tree_topology::get_id();
+    device_config_1.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_1.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(143, true);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 143: device type electrical_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_cover(shade, 144);
+  matter_mattercomponent_id->register_electrical_power_sensor(motor_power, 144, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(144, 0);
+  matter_mattercomponent_id->register_endpoint_tag(144, 7, 6, "");
+  matter_mattercomponent_id->register_endpoint(144, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(144, "", -1)};
+    esphome::matter::configure_window_covering(device_config_0.window_covering, 144, "");
+    if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 144: device type window_covering");
+    esp_matter::endpoint::electrical_sensor::config_t device_config_1{};
+    device_config_1.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::tree_topology::get_id();
+    device_config_1.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_1.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(144, true);
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 144: device type electrical_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_electrical_power_sensor(set_power, 145, 8, esphome::matter::conversion::watts);
+  matter_mattercomponent_id->register_endpoint_parent(145, 0);
+  matter_mattercomponent_id->register_endpoint(145, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_sensor::config_t device_config_0{};
+    device_config_0.power_topology.feature_flags = esp_matter::cluster::power_topology::feature::set_topology::get_id() | esp_matter::cluster::power_topology::feature::dynamic_power_flow::get_id();
+    device_config_0.with_electrical_power_measurement().feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.with_electrical_power_measurement().delegate = esphome::matter::electrical_power_delegate(145, true);
+    device_config_0.power_topology.delegate = esphome::matter::power_topology_delegate({142, 143}, {142});
+    if (esp_matter::endpoint::electrical_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 145: device type electrical_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(150, 0);
+  matter_mattercomponent_id->register_endpoint(150, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::aggregator::config_t device_config_0{};
+    if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 150: device type aggregator");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay1, 151);
+  matter_mattercomponent_id->register_endpoint_parent(151, 150);
+  matter_mattercomponent_id->register_endpoint(151, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "96ce0289");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 151: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 151: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay 1");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay 1"), 7) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 151: bridged node basic information attribute");
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 151: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay2, 152);
+  matter_mattercomponent_id->register_endpoint_parent(152, 150);
+  matter_mattercomponent_id->register_endpoint(152, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "relay-two", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 152: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 152: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay 2");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay 2"), 7) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 152: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("ACME"), 4) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 152: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("Relay board"), 11) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 152: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_serial_number(bdbi_cluster, const_cast<char *>("R2-0001"), 7) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 152: bridged node basic information attribute");
+    }
+    esp_matter::endpoint::on_off_light::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 152: device type on_off_light");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(garage_online, 153, 57, 17, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_sensor_attribute(garage_battery, 153, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(garage_battery, 153, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(153, {153, 154, 155}));
+  matter_mattercomponent_id->register_endpoint_parent(153, 150);
+  matter_mattercomponent_id->register_endpoint(153, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = false;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "d80acea2");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 153: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Garage Sensor");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Garage Sensor"), 13) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("Xiaomi"), 6) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("LYWSD03MMC"), 10) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_software_version_string(bdbi_cluster, const_cast<char *>("1.0.0_0130"), 10) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_manufacturing_date(bdbi_cluster, const_cast<char *>("20250131"), 8) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_url(bdbi_cluster, const_cast<char *>("https://example.com/sensor"), 26) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_hardware_version(bdbi_cluster, static_cast<uint16_t>(1U)) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_software_version(bdbi_cluster, static_cast<uint32_t>(2U)) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: bridged node basic information attribute");
+    }
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 153: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 153: attribute PowerSource.BatPercentRemaining create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(garage_temp, 154, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(154, 153);
+  matter_mattercomponent_id->register_endpoint(154, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 154: device type temperature_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(garage_humidity, 155, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(155, 153);
+  matter_mattercomponent_id->register_endpoint(155, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 155: device type humidity_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(160, 0);
+  matter_mattercomponent_id->register_endpoint(160, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::camera::config_t device_config_0{};
+    device_config_0.camera_av_stream_management.feature_flags = esp_matter::cluster::camera_av_stream_management::feature::video::get_id();
+    if (esp_matter::endpoint::camera::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 160: device type camera");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(161, 0);
+  matter_mattercomponent_id->register_endpoint(161, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::chime::config_t device_config_0{};
+    if (esp_matter::endpoint::chime::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 161: device type chime");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(162, 0);
+  matter_mattercomponent_id->register_endpoint(162, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::video_doorbell::config_t device_config_0{};
+    if (esp_matter::endpoint::video_doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 162: device type video_doorbell");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(163, 0);
+  matter_mattercomponent_id->register_endpoint(163, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::pump::config_t device_config_0{};
+    device_config_0.pump_configuration_and_control.feature_flags = esp_matter::cluster::pump_configuration_and_control::feature::constant_speed::get_id();
+    if (esp_matter::endpoint::pump::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 163: device type pump");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(164, 0);
+  matter_mattercomponent_id->register_endpoint(164, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::pump_controller::config_t device_config_0{};
+    if (esp_matter::endpoint::pump_controller::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 164: device type pump_controller");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 164: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(165, 0);
+  matter_mattercomponent_id->register_endpoint(165, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::energy_evse::config_t device_config_0{};
+    if (esp_matter::endpoint::energy_evse::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 165: device type evse");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(166, 0);
+  matter_mattercomponent_id->register_endpoint(166, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::device_energy_management::config_t device_config_0{};
+    device_config_0.device_energy_management.feature_flags = esp_matter::cluster::device_energy_management::feature::power_adjustment::get_id() | esp_matter::cluster::device_energy_management::feature::power_forecast_reporting::get_id();
+    if (esp_matter::endpoint::device_energy_management::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 166: device type device_energy_management");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(167, 0);
+  matter_mattercomponent_id->register_endpoint(167, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_utility_meter::config_t device_config_0{};
+    if (esp_matter::endpoint::electrical_utility_meter::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 167: device type electrical_utility_meter");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(168, 0);
+  matter_mattercomponent_id->register_endpoint(168, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_energy_tariff::config_t device_config_0{};
+    if (esp_matter::endpoint::electrical_energy_tariff::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 168: device type electrical_energy_tariff");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(169, 0);
+  matter_mattercomponent_id->register_endpoint(169, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::electrical_meter::config_t device_config_0{};
+    device_config_0.electrical_power_measurement.feature_flags = esp_matter::cluster::electrical_power_measurement::feature::alternating_current::get_id();
+    device_config_0.electrical_energy_measurement.feature_flags = esp_matter::cluster::electrical_energy_measurement::feature::imported_energy::get_id() | esp_matter::cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();
+    if (esp_matter::endpoint::electrical_meter::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 169: device type electrical_meter");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(170, 0);
+  matter_mattercomponent_id->register_endpoint(170, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::control_bridge::config_t device_config_0{};
+    if (esp_matter::endpoint::control_bridge::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 170: device type control_bridge");
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 170: cluster Binding create");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(171, 0);
+  matter_mattercomponent_id->register_endpoint(171, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::solar_power::config_t device_config_0{};
+    if (esp_matter::endpoint::solar_power::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 171: device type solar_power");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(172, 0);
+  matter_mattercomponent_id->register_endpoint(172, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::battery_storage::config_t device_config_0{};
+    if (esp_matter::endpoint::battery_storage::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 172: device type battery_storage");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(173, 0);
+  matter_mattercomponent_id->register_endpoint(173, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::thread_border_router::config_t device_config_0{};
+    if (esp_matter::endpoint::thread_border_router::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 173: device type thread_border_router");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(174, 0);
+  matter_mattercomponent_id->register_endpoint(174, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::ota_provider::config_t device_config_0{};
+    if (esp_matter::endpoint::ota_provider::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 174: device type ota_provider");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(175, 0);
+  matter_mattercomponent_id->register_endpoint(175, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::ota_requestor::config_t device_config_0{};
+    if (esp_matter::endpoint::ota_requestor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 175: device type ota_requestor");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(176, 0);
+  matter_mattercomponent_id->register_endpoint_tag(176, 7, 3, "");
+  matter_mattercomponent_id->register_endpoint(176, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 176: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(177, 0);
+  matter_mattercomponent_id->register_endpoint_tag(177, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(177, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::dimmable_plug_in_unit::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    if (esp_matter::endpoint::dimmable_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 177: device type dimmable_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(bridge_relay_a, 300);
+  matter_mattercomponent_id->register_endpoint_parent(300, 60585);
+  matter_mattercomponent_id->register_endpoint_tag(300, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(300, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "e426ba24");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 300: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 300: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay A");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay A"), 7) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 300: bridged node basic information attribute");
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 300: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(kitchen_seen, 19275, 57, 17, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_sensor_attribute(kitchen_battery, 19275, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(kitchen_battery, 19275, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(19275, {19275, 52632, 45897}));
+  matter_mattercomponent_id->register_endpoint_parent(19275, 60585);
+  matter_mattercomponent_id->register_endpoint(19275, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = false;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "12f8f014");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 19275: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 19275: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Kitchen Thermometer");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Kitchen Thermometer"), 19) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 19275: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("Xiaomi"), 6) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 19275: bridged node basic information attribute");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("LYWSD03MMC"), 10) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 19275: bridged node basic information attribute");
+    }
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return MATTER_BUILD_FAIL("endpoint 19275: cluster PowerSource create");
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 19275: attribute PowerSource.BatPercentRemaining create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(bridge_relay_b, 35938);
+  matter_mattercomponent_id->register_endpoint_parent(35938, 55030);
+  matter_mattercomponent_id->register_endpoint(35938, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 35938: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(kitchen_humidity, 45897, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(45897, 19275);
+  matter_mattercomponent_id->register_endpoint(45897, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 45897: device type humidity_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(heater_temp, 46177, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(46177, 51983);
+  matter_mattercomponent_id->register_endpoint(46177, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 46177: device type temperature_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(bridge_relay_c, 51983);
+  matter_mattercomponent_id->register_endpoint_parent(51983, 60585);
+  matter_mattercomponent_id->register_endpoint_tag(51983, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(51983, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "39eef303");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 51983: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 51983: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Heater");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Heater"), 6) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 51983: bridged node basic information attribute");
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 51983: device type on_off_plug_in_unit");
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(kitchen_temp, 52632, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(52632, 19275);
+  matter_mattercomponent_id->register_endpoint(52632, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 52632: device type temperature_sensor");
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(55030, 60585);
+  matter_mattercomponent_id->register_endpoint(55030, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    esphome::matter::format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id, sizeof(device_config_0.bridged_device_basic_information.unique_id), "e88ecc7c");
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 55030: device type bridged_node");
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 55030: bridged node basic information cluster");
+      esphome::matter::reset_changed_node_label(esp_matter::endpoint::get_id(endpoint), "Relay B");
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay B"), 7) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 55030: bridged node basic information attribute");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(60585, 0);
+  matter_mattercomponent_id->register_endpoint(60585, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::aggregator::config_t device_config_0{};
+    if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 60585: device type aggregator");
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0xBA3A6818);

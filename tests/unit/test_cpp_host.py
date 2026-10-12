@@ -7,9 +7,9 @@ or esp-matter headers are needed. Skipped when g++ is not installed.
 
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -48,7 +48,7 @@ def _build(out: Path, std: str) -> Path:
         "-o",
         str(exe),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     assert result.returncode == 0, f"host build failed ({std}):\n{result.stderr}"
     return exe
 
@@ -56,6 +56,8 @@ def _build(out: Path, std: str) -> Path:
 @pytest.mark.parametrize("std", STANDARDS)
 def test_cpp_host_tests(tmp_path: Path, std: str) -> None:
     exe = _build(tmp_path, std)
-    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=120)
+    result = subprocess.run(
+        [str(exe)], capture_output=True, text=True, timeout=120, check=False
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "0 failed checks" in result.stdout

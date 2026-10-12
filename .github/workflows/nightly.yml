@@ -1,0 +1,195 @@
+name: Nightly
+
+# Compiles every tests/configs/*.yaml (not only the PR compile matrix of ci.yml) on ESPHome
+# dev and the latest release. The configs are picked up by glob, so a new test config is
+# compiled automatically. The compile, cache and size summary steps mirror the `compile` job
+# in ci.yml; keep the two in sync.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: >-
+          Only compile configs whose file name (without .yaml) contains this text,
+          for example "compile-all". Empty compiles everything.
+        type: string
+        default: ""
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_PYTHON: "3.12" # Same as ESPHome
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # One matrix entry per tests/configs/*.yaml
+  # ---------------------------------------------------------------------------
+  configs:
+    name: List configs
+    runs-on: ubuntu-24.04
+    outputs:
+      configs: ${{ steps.list.outputs.configs }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: List tests/configs/*.yaml
+        id: list
+        env:
+          FILTER: ${{ inputs.filter }}
+        run: python .github/scripts/nightly_matrix.py "$FILTER"
+
+  # ---------------------------------------------------------------------------
+  # Compile matrix (native ESP-IDF toolchain where the ESPHome version supports it)
+  # ---------------------------------------------------------------------------
+  compile:
+    name: Compile ${{ matrix.config.name }} (ESPHome ${{ matrix.esphome }})
+    runs-on: ubuntu-24.04
+    needs: configs
+    timeout-minutes: 180
+    strategy:
+      # A failing config must not hide the others; the failed run is the nightly signal.
+      fail-fast: false
+      matrix:
+        esphome:
+          - dev
+          - release
+        config: ${{ fromJSON(needs.configs.outputs.configs) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+
+      - name: Install ccache
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ccache
+
+      - name: Configure cache locations
+        id: cfg
+        run: |
+          # ESPHome uses ccache automatically when it is on PATH. Keep the IDF
+          # tools and the ccache directory in separate, individually cached
+          # folders (ESPHome would otherwise nest ccache inside the IDF prefix).
+          echo "ESPHOME_ESP_IDF_PREFIX=$HOME/.cache/esphome-idf" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Install ESPHome
+        run: |
+          python -m venv .venv
+          if [ "${{ matrix.esphome }}" = "dev" ]; then
+            .venv/bin/python -m pip install "esphome @ git+https://github.com/esphome/esphome.git@dev"
+          else
+            .venv/bin/python -m pip install --upgrade esphome
+          fi
+          .venv/bin/esphome version | tee esphome-version.txt
+
+      # ESP-IDF toolchains + python env (several GB; refreshed weekly).
+      - name: Cache ESP-IDF install
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ESPHOME_ESP_IDF_PREFIX }}
+            ~/.espressif
+          key: idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.variant }}-${{ steps.cfg.outputs.week }}
+          restore-keys: |
+            idf-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.variant }}-
+            idf-${{ runner.os }}-${{ matrix.esphome }}-
+
+      # esp_matter (+ connectedhomeip) fetched by the IDF component manager.
+      - name: Cache managed_components (esp_matter)
+        uses: actions/cache@v6
+        with:
+          path: |
+            tests/configs/.esphome/build/*/managed_components
+            tests/configs/.esphome/build/*/dependencies.lock
+          key: managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.name }}-${{ hashFiles('components/matter/__init__.py') }}
+          restore-keys: |
+            managed-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.name }}-
+            managed-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.name }}-
+            ccache-${{ runner.os }}-${{ matrix.esphome }}-
+
+      # The native ESP-IDF toolchain needs ESPHome >= 2026.9.0 (and dev); older
+      # releases still compile with PlatformIO (same rule as tests/validate.sh).
+      - name: Prepare config (local components, toolchain by ESPHome version)
+        id: prep
+        run: |
+          tc=$(.venv/bin/esphome version | python -c '
+          import re, sys
+          m = re.search(r"(\d+)\.(\d+)", sys.stdin.read())
+          print("platformio" if m and (int(m[1]), int(m[2])) < (2026, 9) else "esp-idf")
+          ')
+          echo "toolchain=$tc" >> "$GITHUB_OUTPUT"
+          path=$(python .github/scripts/ci_prepare.py "${{ matrix.config.config }}" --toolchain "$tc")
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          grep -n "toolchain" "$path" || echo "(no toolchain line; ESPHome default applies)"
+
+      - name: Cache PlatformIO (only with platformio toolchain)
+        if: steps.prep.outputs.toolchain == 'platformio'
+        uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config.variant }}-${{ steps.cfg.outputs.week }}
+          restore-keys: |
+            pio-${{ runner.os }}-${{ matrix.esphome }}-
+
+      - name: Compile
+        run: |
+          set -o pipefail
+          ccache --zero-stats || true
+          .venv/bin/esphome -s esp32_variant "${{ matrix.config.variant }}" compile "${{ steps.prep.outputs.path }}" 2>&1 | tee compile.log
+
+      - name: Firmware size summary
+        if: always()
+        run: |
+          python .github/scripts/size_summary.py compile.log tests/configs/.esphome/build \
+            "${{ matrix.config.name }}, ESPHome ${{ matrix.esphome }} ($(tail -n1 esphome-version.txt)), toolchain ${{ steps.prep.outputs.toolchain }}"
+
+      - name: ccache statistics
+        if: always()
+        run: |
+          {
+            echo "<details><summary>ccache statistics (${{ matrix.config.name }}, ESPHome ${{ matrix.esphome }})</summary>"
+            echo
+            echo '```'
+            ccache --show-stats || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compile log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compile-log-${{ matrix.config.name }}-${{ matrix.esphome }}
+          path: compile.log
+          retention-days: 7

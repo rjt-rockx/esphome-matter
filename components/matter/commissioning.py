@@ -64,11 +64,7 @@ COMMISSIONING_SCHEMA = cv.Schema(
             {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(MatterCommissionedTrigger)}
         ),
         cv.Optional(CONF_ON_DECOMMISSIONED): automation.validate_automation(
-            {
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(
-                    MatterDecommissionedTrigger
-                )
-            }
+            {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(MatterDecommissionedTrigger)}
         ),
     }
 )

@@ -8,8 +8,8 @@ from __future__ import annotations
 import logging
 
 import esphome.config_validation as cv
-from esphome.core import CORE
 import pytest
+from esphome.core import CORE
 
 from components.matter.expose.inference import NoMapping, Overrides, infer
 from components.matter.expose.inventory import build_inventory
@@ -19,7 +19,12 @@ from components.matter.expose.schema import EXCLUDE_SCHEMA, EXPOSE_SCHEMA
 
 
 def ent(domain, id_, platform="template", name=None, **kw):
-    return {"platform": platform, "id": id_, "name": name or id_.replace("_", " ").title(), **kw}
+    return {
+        "platform": platform,
+        "id": id_,
+        "name": name or id_.replace("_", " ").title(),
+        **kw,
+    }
 
 
 def sensor(id_, device_class, unit=None, **kw):
@@ -107,14 +112,20 @@ def entity(eid):
 
 
 def bound(block):
-    return {k: getattr(v, "id", v) for k, v in block.items() if isinstance(v, (str, type(None))) or hasattr(v, "id")}
+    return {
+        k: getattr(v, "id", v)
+        for k, v in block.items()
+        if isinstance(v, (str, type(None))) or hasattr(v, "id")
+    }
 
 
 def ep_of(cfg, eid):
     """The lowered endpoint dict that binds entity `eid`."""
     for ep in cfg["endpoints"].values():
         for block in ep.values():
-            if isinstance(block, dict) and eid in [getattr(v, "id", v) for v in block.values()]:
+            if isinstance(block, dict) and eid in [
+                getattr(v, "id", v) for v in block.values()
+            ]:
                 return ep
         if _batt_id(ep.get("battery")) == eid:
             return ep
@@ -180,7 +191,9 @@ def test_garage_cover_uses_closure_compat_when_the_schema_has_it(raw, monkeypatc
 
     monkeypatch.setattr(inference, "closure_compat_supported", lambda: True)
     out = infer(entity("garage"), Overrides())
-    assert out.device_types == {"window_covering": {"cover_id": "garage", "closure_compat": True}}
+    assert out.device_types == {
+        "window_covering": {"cover_id": "garage", "closure_compat": True}
+    }
     plain = infer(entity("blind"), Overrides())
     assert "closure_compat" not in plain.device_types["window_covering"]
 
@@ -195,7 +208,9 @@ def test_garage_cover_falls_back_to_plain_window_covering(raw, monkeypatch, capl
     with pytest.raises(NoMapping, match="closure_compat"):
         infer(entity("garage"), Overrides(via_glob=True))
     assert ep_of_unbound(cfg)["window_covering"]["cover_id"].id == "garage"
-    assert not ep_of_unbound(cfg)["window_covering"].get("closure_compat")  # schema default is False
+    assert not ep_of_unbound(cfg)["window_covering"].get(
+        "closure_compat"
+    )  # schema default is False
     assert "plain Window Covering" in caplog.text and "garage" in caplog.text
 
 
@@ -260,7 +275,12 @@ def test_air_quality_sensors_merge(raw):
     cfg = run(["co2", "pm25", "pm10", "voc"])
     assert list(cfg["endpoints"]) == [endpoint_for_key("group:air_quality")]
     (ep,) = cfg["endpoints"].values()
-    assert set(ep["air_quality_sensor"]) >= {"carbon_dioxide", "pm_2_5", "pm_10", "total_voc"}
+    assert set(ep["air_quality_sensor"]) >= {
+        "carbon_dioxide",
+        "pm_2_5",
+        "pm_10",
+        "total_voc",
+    }
 
 
 def test_nested_sub_sensor_hints_map(raw):
@@ -349,12 +369,12 @@ def test_meters_names_the_load(raw):
 def test_meter_prefix_picks_the_load_when_unambiguous(raw):
     cfg = run(["relay_1", "relay_2", "relay_1_power", "relay_2_power"])
     assert len(cfg["endpoints"]) == 2
-    assert getattr(ep_of(cfg, "relay_1")["electrical_sensor"]["active_power"], "id", None) == (
-        "relay_1_power"
-    )
-    assert getattr(ep_of(cfg, "relay_2")["electrical_sensor"]["active_power"], "id", None) == (
-        "relay_2_power"
-    )
+    assert getattr(
+        ep_of(cfg, "relay_1")["electrical_sensor"]["active_power"], "id", None
+    ) == ("relay_1_power")
+    assert getattr(
+        ep_of(cfg, "relay_2")["electrical_sensor"]["active_power"], "id", None
+    ) == ("relay_2_power")
 
 
 def test_meter_trailing_number_picks_the_load(raw):
@@ -376,8 +396,12 @@ def test_meter_without_any_load_is_standalone(raw):
 
 
 def test_two_unmatched_power_sensors_spill_into_separate_endpoints(raw):
-    cfg = run(["relay_1", "relay_2", "power", "grid_power"], raw_override=_with_extra_power())
-    meters = [ep for ep in cfg["endpoints"].values() if types_of(ep) == ["electrical_sensor"]]
+    cfg = run(
+        ["relay_1", "relay_2", "power", "grid_power"], raw_override=_with_extra_power()
+    )
+    meters = [
+        ep for ep in cfg["endpoints"].values() if types_of(ep) == ["electrical_sensor"]
+    ]
     assert len(meters) == 2
 
 
@@ -420,7 +444,9 @@ def test_ordinals_when_ids_do_not_end_in_numbers(raw):
 
 
 def test_tags_do_not_depend_on_the_hash(raw):
-    assert endpoint_for_key("relay_1") > endpoint_for_key("relay_2")  # hash order is reversed
+    assert endpoint_for_key("relay_1") > endpoint_for_key(
+        "relay_2"
+    )  # hash order is reversed
     cfg = run(["relay_2", "relay_10", "relay_1"])
     assert tag_numbers(cfg, ["relay_1", "relay_2", "relay_10"]) == {
         "relay_1": 1,
@@ -432,7 +458,10 @@ def test_tags_do_not_depend_on_the_hash(raw):
 def test_explicit_tags_replace_automatic_ones(raw):
     cfg = run(
         [
-            {"id": "relay_1", "tags": [{"namespace": "common_position", "tag": "left"}]},
+            {
+                "id": "relay_1",
+                "tags": [{"namespace": "common_position", "tag": "left"}],
+            },
             "relay_2",
         ]
     )
@@ -444,7 +473,11 @@ def test_explicit_tags_replace_automatic_ones(raw):
 def test_explicit_number_tags_are_not_reused(raw):
     raw2 = {"fan": [ent("fan", "zz"), ent("fan", "fan_1"), ent("fan", "fan_2")]}
     cfg = run(
-        [{"id": "zz", "tags": [{"namespace": "common_number", "tag": 1}]}, "fan_1", "fan_2"],
+        [
+            {"id": "zz", "tags": [{"namespace": "common_number", "tag": 1}]},
+            "fan_1",
+            "fan_2",
+        ],
         raw_override=raw2,
     )
     got = {eid: ep_of(cfg, eid)["tags"][0]["tag"] for eid in ("zz", "fan_1", "fan_2")}
@@ -454,11 +487,15 @@ def test_explicit_number_tags_are_not_reused(raw):
 
 def test_tag_validation_names_unknown_tags(raw):
     with pytest.raises(cv.Invalid, match="Unknown tag"):
-        EXPOSE_SCHEMA([{"id": "relay_1", "tags": [{"namespace": "common_position", "tag": "x"}]}])
+        EXPOSE_SCHEMA(
+            [{"id": "relay_1", "tags": [{"namespace": "common_position", "tag": "x"}]}]
+        )
 
 
 def test_explicit_tags_on_a_non_duplicate_are_kept(raw):
-    cfg = run([{"id": "lamp", "tags": [{"namespace": "common_position", "tag": "top"}]}])
+    cfg = run(
+        [{"id": "lamp", "tags": [{"namespace": "common_position", "tag": "top"}]}]
+    )
     assert ep_of_unbound(cfg)["tags"][0]["tag"] == 2
 
 
@@ -476,7 +513,9 @@ def test_labels_only_for_duplicates(raw):
 
 def test_siblings_of_different_types_are_not_duplicates(raw):
     cfg = run(["relay_1", "lamp", "fan_1", "door"])
-    assert all("label" not in ep and "tags" not in ep for ep in cfg["endpoints"].values())
+    assert all(
+        "label" not in ep and "tags" not in ep for ep in cfg["endpoints"].values()
+    )
 
 
 def test_explicit_label_always_applies(raw):
@@ -525,7 +564,16 @@ def test_clusters_are_passed_to_the_endpoint(raw):
 
 def test_attach_item_cannot_carry_endpoint_keys(raw):
     with pytest.raises(cv.Invalid, match="put it on the item of 'heater'"):
-        run(["heater", {"id": "hum", "attach_to": "heater", "tags": [{"namespace": 7, "tag": 1}]}])
+        run(
+            [
+                "heater",
+                {
+                    "id": "hum",
+                    "attach_to": "heater",
+                    "tags": [{"namespace": 7, "tag": 1}],
+                },
+            ]
+        )
 
 
 # --- glob warning --------------------------------------------------------------------------

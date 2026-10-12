@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 import textwrap
 
-from conftest import COMPONENTS, HEADER, WIFI, run_esphome, toolchain_line
 import pytest
+from conftest import COMPONENTS, HEADER, WIFI, run_esphome, toolchain_line
 
 ENTITIES = """
 switch:
@@ -104,10 +104,13 @@ def test_expose_codegen_equals_handwritten(tmp_path):
 
 def matter_codegen(code: str) -> str:
     """main.cpp without the config echo comment block and #line pragmas."""
-    code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
     # The expose plan table (matter_plan.h) only exists for the expose form.
     code = re.sub(
-        r"static constexpr esphome::matter::PlanRow MATTER_PLAN\[\].*?\};", "", code, flags=re.S
+        r"static constexpr esphome::matter::PlanRow MATTER_PLAN\[\].*?\};",
+        "",
+        code,
+        flags=re.DOTALL,
     )
     code = re.sub(r".*(matter_plan\.h|set_plan\().*", "", code)
     return "\n".join(

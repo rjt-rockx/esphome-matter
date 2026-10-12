@@ -38,7 +38,9 @@ _TRAILING_INT = re.compile(r"(\d+)$")
 
 
 def duplicate_sets(
-    planned: dict[str, PlannedEndpoint], numbers: dict[str, int], explicit: dict[int, dict]
+    planned: dict[str, PlannedEndpoint],
+    numbers: dict[str, int],
+    explicit: dict[int, dict],
 ) -> list[list[int]]:
     """Groups of endpoint numbers that share an application device type under the same parent.
 
@@ -49,7 +51,10 @@ def duplicate_sets(
         parent = ep.parent
         if isinstance(parent, str):
             parent = numbers[parent]
-        shape[numbers[key]] = {CONF_PARENT: parent or 0, **dict.fromkeys(ep.device_types)}
+        shape[numbers[key]] = {
+            CONF_PARENT: parent or 0,
+            **dict.fromkeys(ep.device_types),
+        }
     for number, config in explicit.items():
         shape[number] = {k: v for k, v in config.items() if k != CONF_LABEL}
     return _duplicate_components(shape)
@@ -133,13 +138,17 @@ def assign_duplicate_tags(
     explicit = explicit or {}
     by_number = {numbers[k]: k for k in planned}
     for component in duplicate_sets(planned, numbers, explicit):
-        keys = sorted((by_number[n] for n in component if n in by_number), key=natural_key)
+        keys = sorted(
+            (by_number[n] for n in component if n in by_number), key=natural_key
+        )
         if not keys:
             continue
         for key in keys:
             ep = planned[key]
             if CONF_LABEL not in ep.extra and ep.default_label:
-                ep.extra[CONF_LABEL] = default_label(ep.default_label, f"entity '{key}'")
+                ep.extra[CONF_LABEL] = default_label(
+                    ep.default_label, f"entity '{key}'"
+                )
         _disambiguate(planned, [k for k in keys if planned[k].default_label])
         used: set[int] = set()
         for n in component:
@@ -168,7 +177,8 @@ def assign_duplicate_tags(
                 "tagged One, Two, ... in id order. Such a number follows the position, so "
                 "adding an entity before them renumbers them. End the ids with a number "
                 "(relay_1, relay_2) or give `tags:` to pin them",
-                ", ".join(k for k in untagged if _trailing(k) is None) or ", ".join(untagged),
+                ", ".join(k for k in untagged if _trailing(k) is None)
+                or ", ".join(untagged),
             )
     for ep in planned.values():
         ep.label = ep.extra.get(CONF_LABEL)
@@ -183,7 +193,10 @@ def warn_smoke_power(planned: dict[str, PlannedEndpoint]) -> None:
     """
     if not any("smoke_co_alarm" in ep.device_types for ep in planned.values()):
         return
-    if any("battery" in ep.extra or "power_source" in ep.device_types for ep in planned.values()):
+    if any(
+        "battery" in ep.extra or "power_source" in ep.device_types
+        for ep in planned.values()
+    ):
         return
     _LOGGER.warning(
         "matter.expose: a Smoke CO Alarm is exposed without a Power Source. Expose its battery "

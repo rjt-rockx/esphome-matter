@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import esphome.config_validation as cv
-from esphome.core import CORE
 import pytest
+from esphome.core import CORE
 
 from components.matter.expose.inference import NoMapping, Overrides, infer
 from components.matter.expose.inventory import build_inventory
@@ -41,7 +41,9 @@ def run(raw, expose, *, endpoints=None, exclude=()):
 
 
 def idof(value):
-    if isinstance(value, dict) and "percent" in value:  # battery: {percent, description, order}
+    if (
+        isinstance(value, dict) and "percent" in value
+    ):  # battery: {percent, description, order}
         value = value["percent"]
     return getattr(value, "id", value)
 
@@ -106,7 +108,10 @@ def test_number_relation_needs_a_numbered_family():
     }
     cfg = run(family, "all")
     for n in (1, 2):
-        assert idof(endpoint_with(cfg, f"relay_{n}")["electrical_sensor"]["active_power"]) == f"power_{n}"
+        assert (
+            idof(endpoint_with(cfg, f"relay_{n}")["electrical_sensor"]["active_power"])
+            == f"power_{n}"
+        )
     unnumbered = {**family, "switch": [ent("relay_1"), ent("lamp")]}
     cfg = run(unnumbered, "all")  # lamp has no number: not a family
     assert "electrical_sensor" not in endpoint_with(cfg, "relay_1")
@@ -132,7 +137,9 @@ def test_as_smoke_co_alarm_binds_by_device_class():
 def test_as_electrical_sensor_binds_by_device_class(caplog):
     raw = {"switch": [ent("sw_a")], "sensor": [sens("pa", "power", "W")]}
     cfg = run(raw, ["sw_a", {"id": "pa", "as": "electrical_sensor"}])
-    assert types(endpoint_with(cfg, "pa")) == ["electrical_sensor"]  # standalone by `as:`
+    assert types(endpoint_with(cfg, "pa")) == [
+        "electrical_sensor"
+    ]  # standalone by `as:`
     assert "electrical_sensor" not in endpoint_with(cfg, "sw_a")
 
 
@@ -160,21 +167,36 @@ def test_all_with_air_quality_gases_and_alarms_validates():
     cfg = run(raw, "all")
     assert count(cfg, "air_quality_sensor") == 1 and count(cfg, "smoke_co_alarm") == 1
     air = endpoint_with(cfg, "co2")["air_quality_sensor"]
-    assert {"carbon_dioxide", "carbon_monoxide", "nitrogen_dioxide", "total_voc"} <= set(air)
+    assert {
+        "carbon_dioxide",
+        "carbon_monoxide",
+        "nitrogen_dioxide",
+        "total_voc",
+    } <= set(air)
 
 
 # --- c3, a6, a8, #2/#8: merge-group collisions spill ---------------------------------------------
 
 
 def test_two_co2_sensors_under_all_get_separate_endpoints():
-    raw = {"sensor": [sens("co2_a", "carbon_dioxide", "ppm"), sens("co2_b", "carbon_dioxide", "ppm")]}
+    raw = {
+        "sensor": [
+            sens("co2_a", "carbon_dioxide", "ppm"),
+            sens("co2_b", "carbon_dioxide", "ppm"),
+        ]
+    }
     cfg = run(raw, "all")
     assert count(cfg, "air_quality_sensor") == 2
     assert endpoint_with(cfg, "co2_a") is not endpoint_with(cfg, "co2_b")
 
 
 def test_two_smoke_detectors_spill():
-    raw = {"binary_sensor": [ent("smoke_1", device_class="smoke"), ent("smoke_2", device_class="smoke")]}
+    raw = {
+        "binary_sensor": [
+            ent("smoke_1", device_class="smoke"),
+            ent("smoke_2", device_class="smoke"),
+        ]
+    }
     cfg = run(raw, "all")
     assert count(cfg, "smoke_co_alarm") == 2
 
@@ -191,7 +213,12 @@ def test_two_unmatched_same_kind_power_meters_under_all_spill():
 
 
 def test_as_override_and_unknown_device_type_in_as(caplog):
-    raw = {"sensor": [sens("co2_a", "carbon_dioxide", "ppm"), sens("co2_b", "carbon_dioxide", "ppm")]}
+    raw = {
+        "sensor": [
+            sens("co2_a", "carbon_dioxide", "ppm"),
+            sens("co2_b", "carbon_dioxide", "ppm"),
+        ]
+    }
     cfg = run(raw, ["co2_a", {"id": "co2_b", "as": "air_quality_sensor"}])
     assert count(cfg, "air_quality_sensor") == 2
     with pytest.raises(cv.Invalid, match="unknown device type 'carbon_dioxide_sensor'"):
@@ -236,7 +263,9 @@ def test_name_prefix_needs_a_word_boundary():
     cfg = run(raw, "all")
     for sw in ("relay_1", "relay_2"):
         assert "electrical_sensor" not in endpoint_with(cfg, sw)
-    assert count(cfg, "electrical_sensor") == 2  # the two power sensors collide: they spill
+    assert (
+        count(cfg, "electrical_sensor") == 2
+    )  # the two power sensors collide: they spill
 
 
 def test_name_only_relation_with_a_boundary_attaches():
@@ -277,17 +306,23 @@ def test_hand_written_sibling_makes_an_exposed_endpoint_a_duplicate():
             sens("t_b", "temperature", "°C", name="Tb"),
         ]
     }
-    cfg = run(raw, ["t_a"], endpoints={9: {"temperature_sensor": {"temperature": "t_b"}}})
+    cfg = run(
+        raw, ["t_a"], endpoints={9: {"temperature_sensor": {"temperature": "t_b"}}}
+    )
     ours = endpoint_with(cfg, "t_a")
     assert ours["tags"][0]["tag"] == 1 and ours["label"] == "Ta"
     from components.matter import conformance
 
-    plans = conformance.plan_endpoints(cfg["endpoints"], log=False)  # no identical-tag error
+    plans = conformance.plan_endpoints(
+        cfg["endpoints"], log=False
+    )  # no identical-tag error
     assert plans[9].auto_tag.tag == 2
 
 
 def test_hand_written_tags_are_occupied():
-    raw = {"sensor": [sens("t_1", "temperature", "°C"), sens("t_2", "temperature", "°C")]}
+    raw = {
+        "sensor": [sens("t_1", "temperature", "°C"), sens("t_2", "temperature", "°C")]
+    }
     cfg = run(
         raw,
         ["t_1"],
@@ -341,7 +376,10 @@ def test_parent_by_key_and_by_number_agree():
         "sensor": [sens("t_a", "temperature", "°C"), sens("t_b", "temperature", "°C")],
     }
     number = endpoint_for_key("heater")
-    cfg = run(raw, ["heater", {"id": "t_a", "parent": "heater"}, {"id": "t_b", "parent": number}])
+    cfg = run(
+        raw,
+        ["heater", {"id": "t_a", "parent": "heater"}, {"id": "t_b", "parent": number}],
+    )
     a, b = endpoint_with(cfg, "t_a"), endpoint_with(cfg, "t_b")
     assert a["parent"] == b["parent"] == number
     assert a["tags"][0]["tag"] != b["tags"][0]["tag"]  # siblings under one parent
@@ -352,7 +390,9 @@ def test_parent_by_key_and_by_number_agree():
 
 def test_label_conflict_in_a_merge_group_raises():
     raw = {"sensor": [sens("c", "carbon_dioxide", "ppm"), sens("p", "pm25", "µg/m³")]}
-    with pytest.raises(cv.Invalid, match="conflicting `label:` for group:air_quality: 'A' and 'B'"):
+    with pytest.raises(
+        cv.Invalid, match="conflicting `label:` for group:air_quality: 'A' and 'B'"
+    ):
         run(raw, [{"id": "c", "label": "A"}, {"id": "p", "label": "B"}])
 
 
@@ -360,7 +400,9 @@ def test_tags_conflict_shows_both_values():
     raw = {"sensor": [sens("c", "carbon_dioxide", "ppm"), sens("p", "pm25", "µg/m³")]}
     one = [{"namespace": "common_number", "tag": 1}]
     two = [{"namespace": "common_number", "tag": 2}]
-    with pytest.raises(cv.Invalid, match=r"conflicting `tags:` for group:air_quality: .*1.*2"):
+    with pytest.raises(
+        cv.Invalid, match=r"conflicting `tags:` for group:air_quality: .*1.*2"
+    ):
         run(raw, [{"id": "c", "tags": one}, {"id": "p", "tags": two}])
 
 
@@ -394,7 +436,10 @@ def test_bare_matter_is_valid():
 
 
 def test_smoke_alarm_without_power_source_warns(caplog):
-    raw = {"binary_sensor": [ent("smoke", device_class="smoke")], "sensor": [sens("smoke_batt", "battery", "%")]}
+    raw = {
+        "binary_sensor": [ent("smoke", device_class="smoke")],
+        "sensor": [sens("smoke_batt", "battery", "%")],
+    }
     with caplog.at_level("WARNING"):
         run(raw, ["smoke"])
     assert "Smoke CO Alarm is exposed without a Power Source" in caplog.text
@@ -413,7 +458,9 @@ def test_garage_cover_under_all_is_skipped_without_closure_compat(monkeypatch):
     from components.matter.expose.plan import KEY_EXPOSE_PLAN
 
     monkeypatch.setattr(inference, "closure_compat_supported", lambda: False)
-    raw = {"cover": [ent("gar", device_class="garage"), ent("blind", device_class="blind")]}
+    raw = {
+        "cover": [ent("gar", device_class="garage"), ent("blind", device_class="blind")]
+    }
     cfg = run(raw, "all")
     assert count(cfg, "window_covering") == 1
     plan = CORE.data["matter"][KEY_EXPOSE_PLAN]

@@ -8,8 +8,9 @@ import re
 import textwrap
 from pathlib import Path
 
-from conftest import run_esphome
+import esphome.config_validation as cv
 import pytest
+from conftest import run_esphome
 
 from components.matter import bridge
 from tools.conformance.checks import ERROR, WARNING, check_node
@@ -71,7 +72,7 @@ class TestHelpers:
         bridge.identity_options()  # builds
         validator = bridge._utf8_string(254)
         assert validator("x" * 254)
-        with pytest.raises(Exception):
+        with pytest.raises(cv.Invalid):
             validator("x" * 255)
 
     def test_bridge_subtree(self):
@@ -102,11 +103,15 @@ class TestHelpers:
         assert "reset_changed_node_label" in text
         assert "create_node_label" in text and 'const_cast<char *>("Node"), 4' in text
         assert "create_vendor_name" in text and "create_serial_number" in text
-        assert "create_software_version(bdbi_cluster, static_cast<uint32_t>(7U))" in text
+        assert (
+            "create_software_version(bdbi_cluster, static_cast<uint32_t>(7U))" in text
+        )
         assert "create_product_name" not in text
 
     def test_config_lines_reachable_starts_false_when_bound(self):
-        bound = bridge.config_lines("cfg", 3, {"name": "n", "reachable": object(), "unique_id": "u"})
+        bound = bridge.config_lines(
+            "cfg", 3, {"name": "n", "reachable": object(), "unique_id": "u"}
+        )
         unbound = bridge.config_lines("cfg", 3, {"name": "n"})
         assert any(".reachable = false;" in l for l in bound)
         assert any(".reachable = true;" in l for l in unbound)
@@ -115,7 +120,9 @@ class TestHelpers:
 
     def test_attribute_names(self):
         assert bridge.attribute_names({"name": "n"}) == ["NodeLabel"]
-        assert bridge.attribute_names({"name": "n", "product_url": "u", "vendor_id": 5}) == [
+        assert bridge.attribute_names(
+            {"name": "n", "product_url": "u", "vendor_id": 5}
+        ) == [
             "NodeLabel",
             "ProductURL",
             "VendorID",
@@ -149,7 +156,9 @@ class TestBridgeBlock:
         assert out.count("bridged_node:") == 2
         assert "100:" in out  # pinned
         # three application devices: temp + humidity child endpoints below the node, plug in the node endpoint
-        assert out.count("temperature_sensor:") == 1 and out.count("humidity_sensor:") == 1
+        assert (
+            out.count("temperature_sensor:") == 1 and out.count("humidity_sensor:") == 1
+        )
         assert "\n        unique_id:" not in out  # defaults are generated at runtime
 
     def test_primary_shares_the_bridged_node_endpoint(self, run_config):
@@ -189,17 +198,26 @@ class TestBridgeBlock:
         assert not result.ok and "`primary: humidity_sensor` is not" in result.output
 
     def test_endpoint_numbers_are_stable(self, run_config):
-        body = """
+        body = (
+            """
             matter:
               bridge:
                 devices:
                   thermo:
                     temperature_sensor: temp
-            """ + SENSORS
+            """
+            + SENSORS
+        )
         first = run_config(body)
         second = run_config(body)
         assert first.ok, first.output
-        numbers = lambda r: [l for l in r.output.splitlines() if l.startswith("    ") and l.rstrip().endswith(":") and l.strip()[:-1].isdigit()]
+        numbers = lambda r: [
+            l
+            for l in r.output.splitlines()
+            if l.startswith("    ")
+            and l.rstrip().endswith(":")
+            and l.strip()[:-1].isdigit()
+        ]
         assert numbers(first) == numbers(second) and len(numbers(first)) == 2
 
     def test_pin_collision_is_a_clear_error(self, run_config):
@@ -251,7 +269,7 @@ class TestBridgeBlock:
         for key in ("bridged_node: x", "aggregator: {}", "parent: 1"):
             result = run_config(
                 textwrap.dedent(
-                f"""
+                    f"""
                 matter:
                   bridge:
                     devices:
@@ -262,7 +280,9 @@ class TestBridgeBlock:
                 )
                 + textwrap.dedent(SENSORS)
             )
-            assert not result.ok and "is not allowed in a bridge device" in result.output, key
+            assert (
+                not result.ok and "is not allowed in a bridge device" in result.output
+            ), key
 
     def test_nested_false_conflicts_with_several_types(self, run_config):
         result = run_config(
@@ -287,7 +307,7 @@ class TestBridgeBlock:
         ):
             result = run_config(
                 textwrap.dedent(
-                f"""
+                    f"""
                 matter:
                   bridge:
                     devices:
@@ -331,7 +351,6 @@ class TestBridgeBlock:
         )
         assert result.ok, result.output
 
-
     def _tag_of(self, output: str, endpoint: int):
         block = re.split(r"\n    \d+:\n", output.split(f"    {endpoint}:\n", 1)[1])[0]
         match = re.search(r"tags:\n\s+- namespace: (\d+)\n\s+tag: (\d+)", block)
@@ -339,16 +358,15 @@ class TestBridgeBlock:
 
     def test_identical_devices_get_stable_number_tags(self, run_config):
         def tags(names):
-            body = (
-                "matter:\n  bridge:\n    endpoint: 1\n    devices:\n"
-                + "".join(
-                    f"      {n}:\n        endpoint: {100 + i}\n        temperature_sensor: temp\n"
-                    for i, n in enumerate(names)
-                )
+            body = "matter:\n  bridge:\n    endpoint: 1\n    devices:\n" + "".join(
+                f"      {n}:\n        endpoint: {100 + i}\n        temperature_sensor: temp\n"
+                for i, n in enumerate(names)
             )
             result = run_config(body + SENSORS_PLAIN)
             assert result.ok, result.output
-            return {n: self._tag_of(result.output, 100 + i) for i, n in enumerate(names)}
+            return {
+                n: self._tag_of(result.output, 100 + i) for i, n in enumerate(names)
+            }
 
         before = tags(["relay_2", "lamp", "relay_5"])
         # a key ending in a number keeps it; the others take the lowest free numbers in YAML order
@@ -385,7 +403,8 @@ matter:
 
     def test_nested_devices_need_no_tags(self, run_config):
         body = "matter:\n  bridge:\n    devices:\n" + "".join(
-            f"      d{i:02d}:\n        nested: true\n        temperature_sensor: temp\n" for i in range(33)
+            f"      d{i:02d}:\n        nested: true\n        temperature_sensor: temp\n"
+            for i in range(33)
         )
         result = run_config(body + SENSORS_PLAIN)
         assert result.ok, result.output
@@ -414,7 +433,9 @@ matter:
         out = " ".join(result.output.split())
         assert f"device '{a}' and device '{b}' hash to the same endpoint" in out
         assert f"bridge: {{devices: {{{b}: {{endpoint: " in out
-        assert "`.." not in out and ".." not in out.split("keeps")[0].replace("unit.yaml...", "")
+        assert "`.." not in out and ".." not in out.split("keeps")[0].replace(
+            "unit.yaml...", ""
+        )
 
     def test_expose_all_skips_bridged_entities(self, run_config):
         body = """
@@ -428,7 +449,9 @@ matter:
         result = run_config(body + SENSORS_PLAIN)
         assert result.ok, result.output
         assert result.output.count("temperature_sensor:") == 1
-        assert result.output.count("relative_humidity:") == 1  # hum is not bridged: exposed
+        assert (
+            result.output.count("relative_humidity:") == 1
+        )  # hum is not bridged: exposed
 
     def test_explicit_expose_of_a_bridged_entity_warns(self, run_config):
         body = """
@@ -611,21 +634,31 @@ class TestCodegen:
         code, _ = self._generate("esp32-bridge.yaml", tmp_path)
         assert "create_node_label" in code
         assert 'create_vendor_name(bdbi_cluster, const_cast<char *>("ACME"), 4)' in code
-        assert 'create_serial_number(bdbi_cluster, const_cast<char *>("R2-0001"), 7)' in code
-        assert "create_hardware_version(bdbi_cluster, static_cast<uint16_t>(1U))" in code
+        assert (
+            'create_serial_number(bdbi_cluster, const_cast<char *>("R2-0001"), 7)'
+            in code
+        )
+        assert (
+            "create_hardware_version(bdbi_cluster, static_cast<uint16_t>(1U))" in code
+        )
         assert "register_binary_sensor_attribute(garage_online, 4, 57, 17" in code
         assert "register_endpoint_parent(2, 1)" in code
         assert "register_endpoint_parent(5, 4)" in code
         assert 'unique_id, "relay-two"' in code
         # no explicit unique_id: <node id>-<hash of the endpoint seed>, never the node name
-        assert f'format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id' in code
+        assert (
+            "format_bridge_unique_id(device_config_0.bridged_device_basic_information.unique_id"
+            in code
+        )
         assert "matter-ci-bridge-2" not in code
         assert "CONFIG_ESP_MATTER_ENABLE_GENERATED_DATA_MODEL" in code
         # the Aggregator and the bridged subtree are not powered by the root node Power Source
         assert "MatterPowerSourceEndpointList(0, {10})" in code
         # the Bridged Node device type is added before the application device type
         endpoint_2 = code[code.index("register_endpoint(2,") :]
-        assert endpoint_2.index("bridged_node::add") < endpoint_2.index("on_off_plug_in_unit::add")
+        assert endpoint_2.index("bridged_node::add") < endpoint_2.index(
+            "on_off_plug_in_unit::add"
+        )
 
     def test_bridge_block(self, tmp_path):
         code, _ = self._generate("esp32-bridge-block.yaml", tmp_path)
@@ -635,9 +668,10 @@ class TestCodegen:
         assert code.count("aggregator::add") == 1
         # Power Source EndpointList names the Bridged Node and its child endpoints
         assert "MatterPowerSourceEndpointList(" in code
-        assert "CONFIG_SUPPORT_BRIDGED_DEVICE_BASIC_INFORMATION_CLUSTER=y" in next(
-            tmp_path.glob(".esphome/build/*/sdkconfig.*")
-        ).read_text()
+        assert (
+            "CONFIG_SUPPORT_BRIDGED_DEVICE_BASIC_INFORMATION_CLUSTER=y"
+            in next(tmp_path.glob(".esphome/build/*/sdkconfig.*")).read_text()
+        )
 
 
 # --------------------------------------------------------------------------- conformance checker
@@ -676,10 +710,22 @@ def _layout(**endpoints):
 
 
 def _agg(parent=0):
-    return {"device_types": [{"name": "aggregator", "id": 0x0E}], "clusters": {}, "dynamic_features": [], "parent": parent}
+    return {
+        "device_types": [{"name": "aggregator", "id": 0x0E}],
+        "clusters": {},
+        "dynamic_features": [],
+        "parent": parent,
+    }
 
 
-def _node(parent, unique_id="n-1", label="Node", app=True, name="temperature_sensor", did=0x302):
+def _node(
+    parent,
+    unique_id="n-1",
+    label="Node",
+    app=True,
+    name="temperature_sensor",
+    did=0x302,
+):
     types = [{"name": "bridged_node", "id": 0x13}]
     if app:
         types.append({"name": name, "id": did})
@@ -693,7 +739,13 @@ def _node(parent, unique_id="n-1", label="Node", app=True, name="temperature_sen
 
 
 def _codes(rep, level=ERROR):
-    return sorted({(f.code, f.where) for f in rep.findings if f.level == level and f.code.startswith("BR-")})
+    return sorted(
+        {
+            (f.code, f.where)
+            for f in rep.findings
+            if f.level == level and f.code.startswith("BR-")
+        }
+    )
 
 
 def _check(spec, profile, layout):
@@ -707,7 +759,12 @@ class TestCheckerLayout:
         assert not _codes(rep) and not _codes(rep, WARNING)
 
     def test_composed_bridged_node(self, spec, profile):
-        child = {"device_types": [{"name": "temperature_sensor", "id": 0x302}], "clusters": {}, "dynamic_features": [], "parent": 2}
+        child = {
+            "device_types": [{"name": "temperature_sensor", "id": 0x302}],
+            "clusters": {},
+            "dynamic_features": [],
+            "parent": 2,
+        }
         layout = _layout(**{"1": _agg(), "2": _node(1, app=False), "3": child})
         rep = _check(spec, profile, layout)
         assert not _codes(rep) and not _codes(rep, WARNING)
@@ -717,12 +774,19 @@ class TestCheckerLayout:
         assert ("BR-NODE-NOAGG", "endpoint 2") in _codes(rep)
 
     def test_bridged_node_under_application_endpoint(self, spec, profile):
-        other = {"device_types": [{"name": "temperature_sensor", "id": 0x302}], "clusters": {}, "dynamic_features": [], "parent": 0}
+        other = {
+            "device_types": [{"name": "temperature_sensor", "id": 0x302}],
+            "clusters": {},
+            "dynamic_features": [],
+            "parent": 0,
+        }
         rep = _check(spec, profile, _layout(**{"1": _agg(), "2": other, "3": _node(2)}))
         assert ("BR-NODE-NOAGG", "endpoint 3") in _codes(rep)
 
     def test_nested_aggregator(self, spec, profile):
-        rep = _check(spec, profile, _layout(**{"1": _agg(), "2": _agg(1), "3": _node(2)}))
+        rep = _check(
+            spec, profile, _layout(**{"1": _agg(), "2": _agg(1), "3": _node(2)})
+        )
         assert ("BR-AGG-PARENT", "endpoint 2") in _codes(rep)
 
     def test_aggregator_with_application_type(self, spec, profile):
@@ -732,13 +796,25 @@ class TestCheckerLayout:
         assert ("BR-AGG-APP", "endpoint 1") in _codes(rep)
 
     def test_duplicate_unique_id_and_label(self, spec, profile):
-        layout = _layout(**{"1": _agg(), "2": _node(1), "3": _node(1, name="humidity_sensor", did=0x307)})
+        layout = _layout(
+            **{
+                "1": _agg(),
+                "2": _node(1),
+                "3": _node(1, name="humidity_sensor", did=0x307),
+            }
+        )
         rep = _check(spec, profile, layout)
         assert ("BR-UNIQUEID", "endpoint 3") in _codes(rep)
         assert ("BR-NODELABEL", "endpoint 3") in _codes(rep, WARNING)
 
     def test_missing_and_overlong_unique_id(self, spec, profile):
-        layout = _layout(**{"1": _agg(), "2": _node(1, unique_id=""), "3": _node(1, "x" * 33, "Other", name="humidity_sensor", did=0x307)})
+        layout = _layout(
+            **{
+                "1": _agg(),
+                "2": _node(1, unique_id=""),
+                "3": _node(1, "x" * 33, "Other", name="humidity_sensor", did=0x307),
+            }
+        )
         rep = _check(spec, profile, layout)
         assert ("BR-UNIQUEID", "endpoint 2") in _codes(rep)
         assert ("BR-UNIQUEID", "endpoint 3") in _codes(rep)
@@ -750,29 +826,68 @@ class TestCheckerLayout:
         assert ("BR-NODE-EMPTY", "endpoint 2") in _codes(rep, WARNING)
 
     def test_non_bridged_child_of_aggregator(self, spec, profile):
-        other = {"device_types": [{"name": "temperature_sensor", "id": 0x302}], "clusters": {}, "dynamic_features": [], "parent": 1}
+        other = {
+            "device_types": [{"name": "temperature_sensor", "id": 0x302}],
+            "clusters": {},
+            "dynamic_features": [],
+            "parent": 1,
+        }
         rep = _check(spec, profile, _layout(**{"1": _agg(), "2": _node(1), "3": other}))
         assert ("BR-AGG-CHILD", "endpoint 3") in _codes(rep, WARNING)
 
     def test_siblings_below_different_parents_need_no_tag_list(self, spec, profile):
         # Same application device type, different parents: not siblings, so no Duplicate condition.
-        child = lambda parent: {"device_types": [{"name": "temperature_sensor", "id": 0x302}], "clusters": {}, "dynamic_features": [], "parent": parent}
-        layout = _layout(**{"1": _agg(), "2": _node(1, app=False), "3": _node(1, "n-2", "Other", app=False), "4": child(2), "5": child(3)})
+        child = lambda parent: {
+            "device_types": [{"name": "temperature_sensor", "id": 0x302}],
+            "clusters": {},
+            "dynamic_features": [],
+            "parent": parent,
+        }
+        layout = _layout(
+            **{
+                "1": _agg(),
+                "2": _node(1, app=False),
+                "3": _node(1, "n-2", "Other", app=False),
+                "4": child(2),
+                "5": child(3),
+            }
+        )
         rep = _check(spec, profile, layout)
-        assert not [f for f in rep.findings if f.level == ERROR and "TagList" in f.message]
+        assert not [
+            f for f in rep.findings if f.level == ERROR and "TagList" in f.message
+        ]
 
 
 class TestCheckerDump:
     def _dump(self, parts_aggregator):
         def ep(device_types, parts, bdbi=None):
             out = {
-                "29": {"0": [{"0": d, "1": 1} for d in device_types], "1": [29], "2": [], "3": parts, "65528": [], "65529": [], "65531": [0, 1, 2, 3, 65528, 65529, 65531, 65532, 65533], "65532": 0, "65533": 2},
+                "29": {
+                    "0": [{"0": d, "1": 1} for d in device_types],
+                    "1": [29],
+                    "2": [],
+                    "3": parts,
+                    "65528": [],
+                    "65529": [],
+                    "65531": [0, 1, 2, 3, 65528, 65529, 65531, 65532, 65533],
+                    "65532": 0,
+                    "65533": 2,
+                },
             }
             if bdbi:
                 out["57"] = bdbi
             return out
 
-        bdbi = {"18": "uid-1", "5": "Node", "17": True, "65532": 0, "65533": 4, "65531": [5, 17, 18], "65528": [], "65529": []}
+        bdbi = {
+            "18": "uid-1",
+            "5": "Node",
+            "17": True,
+            "65532": 0,
+            "65533": 4,
+            "65531": [5, 17, 18],
+            "65528": [],
+            "65529": [],
+        }
         return {
             "0": ep([0x16], [1, 2, 3]),
             "1": ep([0x0E], parts_aggregator),
@@ -782,7 +897,9 @@ class TestCheckerDump:
 
     def test_aggregator_lists_all_descendants(self, spec):
         rep = check_node(from_dump(self._dump([2, 3]), spec), spec)
-        assert not [f for f in rep.findings if f.code.startswith("BR-") and f.level == ERROR]
+        assert not [
+            f for f in rep.findings if f.code.startswith("BR-") and f.level == ERROR
+        ]
 
     def test_missing_descendant_in_parts_list(self, spec):
         rep = check_node(from_dump(self._dump([2]), spec), spec)
@@ -798,17 +915,38 @@ class TestOtherRules:
     def test_unique_id_is_optional_in_old_clusters(self, spec):
         def ep(device_types, parts, bdbi=None, revision=4):
             out = {
-                "29": {"0": [{"0": d, "1": 1} for d in device_types], "1": [29], "2": [], "3": parts,
-                       "65528": [], "65529": [], "65531": [0, 1, 2, 3, 65528, 65529, 65531, 65532, 65533],
-                       "65532": 0, "65533": 2},
+                "29": {
+                    "0": [{"0": d, "1": 1} for d in device_types],
+                    "1": [29],
+                    "2": [],
+                    "3": parts,
+                    "65528": [],
+                    "65529": [],
+                    "65531": [0, 1, 2, 3, 65528, 65529, 65531, 65532, 65533],
+                    "65532": 0,
+                    "65533": 2,
+                },
             }
             if bdbi:
                 out["57"] = bdbi
             return out
 
         def codes(revision):
-            bdbi = {"5": "Node", "17": True, "65532": 0, "65533": revision, "65531": [5, 17], "65528": [], "65529": []}
-            dump = {"0": ep([0x16], [1, 2, 3]), "1": ep([0x0E], [2, 3]), "2": ep([0x13], [3], bdbi), "3": ep([0x302], [])}
+            bdbi = {
+                "5": "Node",
+                "17": True,
+                "65532": 0,
+                "65533": revision,
+                "65531": [5, 17],
+                "65528": [],
+                "65529": [],
+            }
+            dump = {
+                "0": ep([0x16], [1, 2, 3]),
+                "1": ep([0x0E], [2, 3]),
+                "2": ep([0x13], [3], bdbi),
+                "3": ep([0x302], []),
+            }
             rep = check_node(from_dump(dump, spec), spec)
             return {f.level for f in rep.findings if f.code == "BR-UNIQUEID"}
 
@@ -818,6 +956,10 @@ class TestOtherRules:
     def test_structure_signature_includes_bridge_attributes(self):
         from components.matter.endpoints import Endpoint
 
-        a = Endpoint(5, {"bridged_node": {"name": "n"}, "clusters": {}}).structure_signature()
-        b = Endpoint(5, {"bridged_node": {"name": "n", "vendor_name": "x"}, "clusters": {}}).structure_signature()
+        a = Endpoint(
+            5, {"bridged_node": {"name": "n"}, "clusters": {}}
+        ).structure_signature()
+        b = Endpoint(
+            5, {"bridged_node": {"name": "n", "vendor_name": "x"}, "clusters": {}}
+        ).structure_signature()
         assert a != b

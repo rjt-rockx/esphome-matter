@@ -277,7 +277,8 @@ class Cluster:
 
 
 def _load_clusters(
-    clusters_file: Path = Path(__file__).resolve().parent / "clusters.json",
+    clusters_file: Path = Path(__file__).resolve().parent  # noqa: B008 - evaluated once at import
+    / "clusters.json",
 ) -> tuple[Cluster, ...]:
     clusters: list[Cluster] = []
     with open(clusters_file, "r") as file:

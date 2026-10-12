@@ -44,7 +44,9 @@ def extend_device_type_schema(device_type_name: str, schema: dict) -> None:
         schema[cv.Optional(CONF_VALVE_ID)] = cv.use_id(valve.Valve)
 
 
-async def register_entity(var, endpoint_id: int, device_type_name: str, device_config: dict) -> None:
+async def register_entity(
+    var, endpoint_id: int, device_type_name: str, device_config: dict
+) -> None:
     """Register the ESPHome entity bound to an endpoint."""
     if device_type_name == DEVICE_TYPE_DOOR_LOCK and CONF_LOCK_ID in device_config:
         lock_ = await cg.get_variable(device_config[CONF_LOCK_ID])
