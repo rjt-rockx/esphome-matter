@@ -113,7 +113,7 @@ ESPHome `cover:` to Matter Window Covering (`cover_id`) is documented in [cover.
 
 # Fans
 
-ESPHome `fan:` to Matter Fan Control (`fan_id`) is documented in [fan.md](fan.md).
+ESPHome `fan:` to Matter Fan Control (`fan_id`) is documented in [fan.md](fan.md). Fan Control on air purifiers, extractor hoods, room air conditioners (also bound to climate fan modes), filter monitoring, and `climate_id` on water heaters and heat pumps are in [hvac.md](hvac.md).
 
 # Locks & valves
 

@@ -1,0 +1,212 @@
+esphome:
+  name: matter-ci-fan-hvac
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+# Fan Control bindings on every endpoint that can have the cluster, Wind / Step,
+# and filter monitoring (docs/fan.md, docs/hvac.md).
+matter:
+  endpoints:
+    # Air purifier: fan with Wind (preset modes) and Step, HEPA + carbon filters.
+    1:
+      air_purifier:
+        fan_id: purifier_fan
+        wind_presets:
+          natural: Breeze
+          sleep: Sleep
+        with_features: [step]
+      clusters:
+        hepa_filter_monitoring:
+          condition: hepa_life
+          warning_level: 25%
+          critical_level: 10%
+          replace_needed: hepa_replace
+          reset_button: hepa_reset_button
+          on_reset:
+            - logger.log: HEPA filter replaced
+        activated_carbon_filter_monitoring:
+          replace_needed: carbon_replace
+          on_reset:
+            - logger.log: Carbon filter replaced
+    # Extractor hood with a fan that has speed steps.
+    2:
+      extractor_hood:
+        fan_id: hood_fan
+        with_features: [step]
+    # Room air conditioner: Fan Control bound to the climate fan modes and swing.
+    3:
+      room_air_conditioner:
+        climate_id: ac
+      clusters:
+        fan_control:
+          climate_id: ac
+    # Room air conditioner with a separate ESPHome fan for the indoor unit.
+    4:
+      room_air_conditioner:
+        climate_id: ac2
+        fan_id: indoor_fan
+    # Heat pump with its thermostat on a child endpoint (the conforming layout).
+    5:
+      heat_pump: {}
+    # (both thermostat endpoints need distinguishing tags: the device type appears twice)
+    7:
+      parent: 5
+      tags:
+        - {namespace: common_number, tag: one}
+      thermostat:
+        climate_id: boiler
+    # Thermostat endpoint with a Fan Control server cluster (not part of the
+    # Thermostat device type, see docs/hvac.md).
+    6:
+      tags:
+        - {namespace: common_number, tag: two}
+      thermostat:
+        climate_id: hall_thermostat
+      clusters:
+        fan_control:
+          fan_id: stat_fan
+
+output:
+  - platform: ledc
+    id: pwm_a
+    pin: GPIO4
+  - platform: ledc
+    id: pwm_b
+    pin: GPIO5
+  - platform: ledc
+    id: pwm_c
+    pin: GPIO6
+  - platform: ledc
+    id: pwm_d
+    pin: GPIO7
+
+fan:
+  - platform: speed
+    id: purifier_fan
+    name: Purifier fan
+    output: pwm_a
+    speed_count: 4
+    restore_mode: ALWAYS_OFF
+    preset_modes:
+      - Breeze
+      - Sleep
+  - platform: speed
+    id: hood_fan
+    name: Hood fan
+    output: pwm_b
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+  - platform: speed
+    id: indoor_fan
+    name: Indoor unit fan
+    output: pwm_c
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
+  - platform: speed
+    id: stat_fan
+    name: Thermostat fan
+    output: pwm_d
+    speed_count: 2
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: template
+    id: hepa_life
+    name: HEPA filter life
+    unit_of_measurement: "%"
+    update_interval: never
+  - platform: template
+    id: room_temperature
+    name: Room temperature
+    unit_of_measurement: "°C"
+    update_interval: never
+
+binary_sensor:
+  - platform: template
+    id: hepa_replace
+    name: HEPA replace
+  - platform: template
+    id: carbon_replace
+    name: Carbon replace
+
+button:
+  - platform: template
+    id: hepa_reset_button
+    name: Reset HEPA filter
+    on_press:
+      - sensor.template.publish:
+          id: hepa_life
+          state: 100
+
+climate:
+  - platform: thermostat
+    id: ac
+    name: Room AC
+    sensor: room_temperature
+    min_cooling_off_time: 20s
+    min_cooling_run_time: 20s
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s
+    min_fanning_off_time: 20s
+    min_fanning_run_time: 20s
+    cool_action: []
+    heat_action: []
+    idle_action: []
+    fan_only_action: []
+    fan_mode_auto_action: []
+    fan_mode_low_action: []
+    fan_mode_medium_action: []
+    fan_mode_high_action: []
+    min_fan_mode_switching_time: 5s
+    swing_both_action: []
+    swing_off_action: []
+    swing_horizontal_action: []
+    swing_vertical_action: []
+  - platform: thermostat
+    id: ac2
+    name: Indoor unit
+    sensor: room_temperature
+    cool_action: []
+    idle_action: []
+    min_cooling_off_time: 20s
+    min_cooling_run_time: 20s
+    min_idle_time: 20s
+  - platform: thermostat
+    id: boiler
+    name: Boiler
+    sensor: room_temperature
+    heat_action: []
+    idle_action: []
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s
+  - platform: thermostat
+    id: hall_thermostat
+    name: Thermostat
+    sensor: room_temperature
+    heat_action: []
+    idle_action: []
+    min_heating_off_time: 20s
+    min_heating_run_time: 20s
+    min_idle_time: 20s

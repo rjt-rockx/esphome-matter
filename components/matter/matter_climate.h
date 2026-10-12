@@ -36,8 +36,11 @@ struct MatterClimateSpec {
   int16_t clamp_cooling(int16_t centi) const;
 };
 
+// heating_only: the device type can only heat (Water Heater). Cooling modes
+// of the climate are then not exposed.
 MatterClimateSpec derive_climate_spec(climate::Climate *climate,
-                                      bool prefer_cooling);
+                                      bool prefer_cooling,
+                                      bool heating_only = false);
 
 // Called from the generated endpoint build callback: configure_ before the
 // device type is added (fills the Thermostat cluster config including the
@@ -45,14 +48,16 @@ MatterClimateSpec derive_climate_spec(climate::Climate *climate,
 // running state attributes).
 void configure_climate_thermostat(
     esp_matter::cluster::thermostat::config_t &config,
-    climate::Climate *climate, bool prefer_cooling);
+    climate::Climate *climate, bool prefer_cooling,
+    bool heating_only = false);
 bool extend_climate_thermostat(esp_matter::endpoint_t *endpoint,
-                               climate::Climate *climate, bool prefer_cooling);
+                               climate::Climate *climate, bool prefer_cooling,
+                               bool heating_only = false);
 
 class MatterClimateMapping : public MatterEndpointMappingBase {
 public:
   MatterClimateMapping(climate::Climate *climate, uint16_t endpoint_id,
-                       bool prefer_cooling);
+                       bool prefer_cooling, bool heating_only = false);
 
   void initialize() override;
 
@@ -66,6 +71,7 @@ protected:
 
   climate::Climate *climate_;
   bool prefer_cooling_;
+  bool heating_only_;
   MatterClimateSpec spec_;
   bool has_on_off_{false};
   bool has_running_state_{false};

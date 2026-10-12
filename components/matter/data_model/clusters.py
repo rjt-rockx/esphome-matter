@@ -264,6 +264,10 @@ class Cluster:
             schema[cv.Optional(CONF_WITH_FEATURES, default=list)] = cv.ensure_list(
                 self._validate_feature_name
             )
+        # Entity bindings of some clusters (fan_control, filter monitoring).
+        from .. import cluster_options
+
+        schema.update(cluster_options.extra_schema(self.conf_key))
         return schema
 
 

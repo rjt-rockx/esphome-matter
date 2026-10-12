@@ -15,3 +15,5 @@ MatterSetAttributeAction = matter_ns.class_(
 MatterSendCommandAction = matter_ns.class_("MatterSendCommandAction", automation.Action)
 MatterIdentifyTrigger = matter_ns.class_("IdentifyTrigger", automation.Trigger)
 MatterSendEventAction = matter_ns.class_("MatterSendEventAction", automation.Action)
+MatterFilterMapping = matter_ns.class_("MatterFilterMapping")
+MatterFilterResetTrigger = matter_ns.class_("FilterResetTrigger", automation.Trigger)

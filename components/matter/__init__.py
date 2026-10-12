@@ -58,6 +58,7 @@ from .light_binding import (
     validate_light_effects,
     warn_missing_color_temperature,
 )
+from .fan_binding import final_validate as fan_final_validate
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
     add_ble_sdkconfig,
@@ -230,6 +231,7 @@ def _final_validate(config: dict):
     switch_restore_warning(config, full_config)
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
+    fan_final_validate(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     validate_cover_bindings(config, full_config)
     validate_closure_bindings(config, full_config)
     validate_unique_cover_bindings(config)

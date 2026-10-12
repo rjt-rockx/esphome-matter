@@ -27,6 +27,7 @@ esphome-matter is an experimental ESPHome external component that exposes ESPHom
 - [binary-sensors.md](binary-sensors.md) (contact, occupancy, leak, smoke/CO)
 - [generic-switch.md](generic-switch.md) (buttons and events)
 - [fan.md](fan.md)
+- [hvac.md](hvac.md) (room air conditioner, air purifier, filter monitoring, heat pump, water heater)
 - [climate.md](climate.md) (thermostat and room air conditioner)
 - [cover.md](cover.md) (window coverings and garage doors)
 - [lock-valve.md](lock-valve.md)

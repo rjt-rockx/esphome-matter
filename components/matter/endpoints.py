@@ -13,7 +13,7 @@ from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGE
 from esphome.core import CORE, ID, HexInt
 from esphome.types import ConfigType
 
-from . import binary_sensors
+from . import binary_sensors, cluster_options
 from . import conformance
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
@@ -41,7 +41,8 @@ from .data_model.device_types import (
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
-from . import fan_binding, layout_dump
+from . import fan_binding, filter_monitoring, layout_dump
+from . import matter_climate as climate_binding
 from .matter_climate import (
     CLIMATE_INCLUDE,
     CONF_CLIMATE_ID,
@@ -122,12 +123,53 @@ def _validate_on_attribute_forms(config):
     return config
 
 
+def _check_heat_pump_climate(config):
+    heat_pump = config.get("heat_pump")
+    if not isinstance(heat_pump, dict):
+        return config
+    on_endpoint = heat_pump.get(climate_binding.CONF_THERMOSTAT_ON_ENDPOINT, False)
+    if CONF_CLIMATE_ID in heat_pump and not on_endpoint:
+        raise cv.Invalid(
+            "heat_pump: the Heat Pump device type has Thermostat only as a client "
+            "cluster, so a conforming device puts the climate on a separate "
+            "`thermostat` endpoint below the heat pump:\n"
+            "  1: {heat_pump: {}}\n"
+            "  2: {parent: 1, thermostat: {climate_id: ...}}\n"
+            f"To put the Thermostat server on the heat pump endpoint anyway (what "
+            f"Home Assistant needs on a single endpoint, but not what the device "
+            f"type describes), set `{climate_binding.CONF_THERMOSTAT_ON_ENDPOINT}: true`"
+        )
+    if on_endpoint:
+        if CONF_CLIMATE_ID not in heat_pump:
+            raise cv.Invalid(
+                f"heat_pump: {climate_binding.CONF_THERMOSTAT_ON_ENDPOINT} needs climate_id"
+            )
+        if "thermostat" in config[CONF_CLUSTERS]:
+            raise cv.Invalid(
+                "heat_pump: climate_id creates the Thermostat server cluster, remove "
+                "`clusters: thermostat`"
+            )
+        _LOGGER.warning(
+            "heat_pump with thermostat_on_endpoint puts a Thermostat server on the Heat "
+            "Pump endpoint; the Matter device type only lists Thermostat as a client "
+            "cluster there. Prefer a `thermostat` endpoint below the heat pump "
+            "(`parent:`), see docs/hvac.md"
+        )
+    return config
+
+
+def _normalize_fan_control(config):
+    return fan_binding.normalize_endpoint(config, DEVICE_TYPES_BY_CONF_KEY)
+
+
 ENDPOINT_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(MatterEndpointRef),
             cv.Optional(CONF_CLUSTERS, default=dict): {
-                cluster.schema_key: maybe_empty(cluster.schema())
+                cluster.schema_key: maybe_empty(
+                    cluster.schema(), cluster_options.validate(cluster.conf_key)
+                )
                 for cluster in CLUSTERS
             },
             # TODO: move on_attribute to clusters
@@ -140,6 +182,8 @@ ENDPOINT_SCHEMA = cv.All(
     ),
     _validate_on_attribute_forms,
     validate_battery_binding,
+    _normalize_fan_control,
+    _check_heat_pump_climate,
 )
 
 
@@ -176,7 +220,12 @@ class Endpoint:
         self._device_types: list[DeviceType] = []
         self._light_variables = {}
         self._fan_variable = None
+        self._fan_binding: fan_binding.FanBinding | None = None
         self._climate_variables = {}
+        # Device types whose climate_id needs a Thermostat server created next to them.
+        self._thermostat_outside: set[str] = set()
+        # Clusters whose creation lines are emitted with their device type.
+        self._custom_created: set[str] = set()
         # (Cluster, Attribute) of sensor attributes that esp-matter does not create itself.
         self._optional_attributes: list[tuple[Cluster, Attribute]] = []
         # Extra lines that set the initial value of a created optional attribute.
@@ -277,8 +326,8 @@ class Endpoint:
             if usage.conformance is not None:
                 usages_by_cluster[cluster.id].append(usage)
 
-        for conf_key in self._config[CONF_CLUSTERS]:
-            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
+        for cluster_key in self._config[CONF_CLUSTERS]:
+            cluster = CLUSTERS_BY_CONF_KEY[cluster_key]
             clusters_by_id[cluster.id] = cluster
 
         for config_key, device_config in self._config.items():
@@ -428,13 +477,17 @@ class Endpoint:
 
         await power_source.register(self, var)
 
-        for conf_key, config in self._config[CONF_CLUSTERS].items():
-            cluster = CLUSTERS_BY_CONF_KEY[conf_key]
+        await self._register_fan_control(var)
+
+        for cluster_key, config in self._config[CONF_CLUSTERS].items():
+            cluster = CLUSTERS_BY_CONF_KEY[cluster_key]
             self.enabled_sdkconfig_options.add(cluster.sdkconfig_option)
             cluster_config = self._cluster_configs[cluster.name]
             for configured_feature in config.get(CONF_WITH_FEATURES, ()):
                 if feature := cluster.get_feature(configured_feature):
                     cluster_config.enabled_features[feature.name] = True
+
+        await self._register_filter_monitoring(var)
 
         if self.plan.label is not None:
             # The label is served by the FixedLabel cluster (see matter_conformance.cpp).
@@ -450,6 +503,47 @@ class Endpoint:
 
         build_fn = cg.RawExpression(self._make_build_callback())
         cg.add(var.register_endpoint(self._endpoint_id, build_fn))
+
+    @property
+    def fan_control_binding(self) -> "fan_binding.FanBinding | None":
+        return self._fan_binding
+
+    async def _register_fan_control(self, var):
+        """Binds the Fan Control cluster to an ESPHome fan or to the fan modes of a climate."""
+        binding = fan_binding.find_binding(self._config, DEVICE_TYPES_BY_CONF_KEY)
+        if binding is None:
+            return
+        self._fan_binding = binding
+        self._fan_variable = await cg.get_variable(binding.entity_id)
+        if binding.kind == "fan":
+            self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
+            args = [self._fan_variable, self._endpoint_id]
+            if binding.wind:
+                args += [
+                    binding.wind_natural or cg.RawExpression("nullptr"),
+                    binding.wind_sleep or cg.RawExpression("nullptr"),
+                ]
+            cg.add(var.register_fan(*args))
+        else:
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_climate_fan.h"'
+            )
+            cg.add_define("USE_MATTER_CLIMATE_FAN")
+            cg.add(var.register_climate_fan(self._fan_variable, self._endpoint_id))
+
+    def _filter_clusters(self):
+        for cluster_key, config in self._config[CONF_CLUSTERS].items():
+            if filter_monitoring.is_filter_cluster(cluster_key):
+                yield CLUSTERS_BY_CONF_KEY[cluster_key], config
+
+    async def _register_filter_monitoring(self, var):
+        for cluster, config in self._filter_clusters():
+            if not filter_monitoring.is_bound(config):
+                continue
+            self.global_includes.add(filter_monitoring.FILTER_INCLUDE)
+            await filter_monitoring.register_filter(
+                var, self._endpoint_id, cluster, config
+            )
 
     def _register_conformance(self, var):
         """Parent, label and semantic tags are applied by matter_conformance.cpp."""
@@ -573,12 +667,6 @@ class Endpoint:
             var, self._endpoint_id, device_type.name, device_config
         )
 
-        if fan_binding.CONF_FAN_ID in device_config:
-            self._fan_variable = await cg.get_variable(
-                device_config[fan_binding.CONF_FAN_ID]
-            )
-            cg.add(var.register_fan(self._fan_variable, self._endpoint_id))
-            self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
         await closure.register_entity(var, self._endpoint_id, device_type.name, device_config)
         if CONF_COVER_ID in device_config and device_type.name == WINDOW_COVERING:
             cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
@@ -586,14 +674,24 @@ class Endpoint:
         if CONF_CLIMATE_ID in device_config:
             climate_ = await cg.get_variable(device_config[CONF_CLIMATE_ID])
             self._climate_variables[device_type.name] = climate_
+            if not climate_binding.has_thermostat_member(device_type.name):
+                # (only reachable for heat_pump with thermostat_on_endpoint)
+                # The device type has no Thermostat server of its own (Heat
+                # Pump): the cluster is created next to it, like an explicit one.
+                self._thermostat_outside.add(device_type.name)
+                thermostat = CLUSTERS_BY_NAME["Thermostat"]
+                self.enabled_sdkconfig_options.add(thermostat.sdkconfig_option)
+                self._cluster_configs.setdefault(thermostat.name, _ClusterConfig())
+                self._custom_created.add(thermostat.name)
             self.global_includes.add(CLIMATE_INCLUDE)
-            cg.add(
-                var.register_climate(
-                    climate_,
-                    self._endpoint_id,
-                    climate_prefer_cooling(device_type.name),
-                )
-            )
+            climate_args = [
+                climate_,
+                self._endpoint_id,
+                climate_prefer_cooling(device_type.name),
+            ]
+            if climate_binding.heating_only(device_type.name):
+                climate_args.append(True)
+            cg.add(var.register_climate(*climate_args))
 
         # Register Switch cluster event bindings
         await register_switch_binding(var, self._endpoint_id, device_config)
@@ -666,10 +764,13 @@ class Endpoint:
                 )
             )
 
-        if device_type.name == "fan" and self._fan_variable is not None:
+        if self._fan_binding is not None and device_type.has_required_cluster(
+            "FanControl"
+        ):
             lines.extend(
                 fan_binding.config_lines(
                     config_var,
+                    self._fan_binding,
                     self._fan_variable,
                     self._cluster_configs["FanControl"].enabled_features,
                 )
@@ -730,7 +831,7 @@ class Endpoint:
 
         lines.extend(cover_lines)
         climate_ = self._climate_variables.get(device_type.name)
-        if climate_ is not None:
+        if climate_ is not None and device_type.name not in self._thermostat_outside:
             lines.extend(climate_config_lines(config_var, climate_, device_type.name))
 
         if device_type.name == "electrical_sensor":
@@ -768,6 +869,12 @@ class Endpoint:
                 "esphome::matter::set_soil_moisture_limits(esp_matter::endpoint::get_id(endpoint));"
             )
         if climate_ is not None:
+            if device_type.name in self._thermostat_outside:
+                lines.extend(
+                    climate_binding.separate_thermostat_lines(
+                        climate_, device_type.name
+                    )
+                )
             lines.extend(climate_post_create_lines(climate_, device_type.name))
         return lines
 
@@ -926,6 +1033,14 @@ class Endpoint:
 
     def _make_cluster_lines(self, cluster: Cluster):
         """Build lines for a cluster not created by a device type."""
+        if cluster.name == "FanControl":
+            return self._make_fan_control_lines(cluster)
+        if filter_monitoring.is_filter_cluster(cluster.conf_key):
+            return filter_monitoring.create_lines(
+                cluster,
+                self._config[CONF_CLUSTERS][cluster.conf_key],
+                self._endpoint_id,
+            )
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
         config_var = f"{cluster.espm_namespace}_config"
@@ -994,6 +1109,30 @@ class Endpoint:
                             enabled[alternatives[0]] = True
                             changed = True
 
+    def _make_fan_control_lines(self, cluster: Cluster):
+        """Creates an optional Fan Control cluster.
+
+        esp-matter's fan_control::config_t has no feature flags: the features are
+        added afterwards (see _make_build_callback).
+        """
+        lines = ["esp_matter::cluster::fan_control::config_t fan_control_config{};"]
+        if self._fan_binding is not None:
+            lines.extend(
+                fan_binding.cluster_config_lines(
+                    self._fan_binding,
+                    self._fan_variable,
+                    self._cluster_configs[cluster.name].enabled_features,
+                )
+            )
+        lines.extend(
+            (
+                "if (esp_matter::cluster::fan_control::create(endpoint, &fan_control_config, "
+                "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
+                "  return false;",
+            )
+        )
+        return lines
+
     def _make_build_callback(self) -> str:
         """ """
         self._expand_feature_dependencies()
@@ -1007,14 +1146,16 @@ class Endpoint:
             lines.extend(power_source.root_device_type_lines())
 
         for cluster_name, cluster_config in self._cluster_configs.items():
-            if not cluster_config.created:
+            if not cluster_config.created and cluster_name not in self._custom_created:
                 lines.extend(self._make_cluster_lines(CLUSTERS_BY_NAME[cluster_name]))
 
         # Choice features must be present in the config used to create their
         # cluster. Other features on device-type-created clusters are added
         # directly after the device type has created the cluster.
         for cluster_name, cluster_config in self._cluster_configs.items():
-            if not cluster_config.created:
+            # The features of an optional Fan Control cluster are added like those of
+            # a device type created one (it has no feature flags in its config).
+            if not cluster_config.created and cluster_name != "FanControl":
                 continue
             cluster = CLUSTERS_BY_NAME[cluster_name]
             if cluster_name in FLAG_DRIVEN_CLUSTERS:
@@ -1037,6 +1178,27 @@ class Endpoint:
             )
             # Features of a bound fan come from its traits instead.
             bound_fan = self._fan_variable if cluster.name == "FanControl" else None
+            direct_features = [
+                features_by_name[feature_name]
+                for feature_name, enabled in cluster_config.enabled_features.items()
+                if enabled
+                and feature_name in features_by_name
+                and (
+                    features_by_name[feature_name].conformance is None
+                    or features_by_name[feature_name].conformance.choice is None
+                )
+            ]
+            # Features of a bound fan or climate come from its traits instead.
+            bound_fan = (
+                self._fan_binding if cluster.name == "FanControl" else None
+            )
+            if bound_fan is not None:
+                # Wind and Step are added together with the binding.
+                direct_features = [
+                    feature
+                    for feature in direct_features
+                    if feature.name not in fan_binding.BOUND_ONLY_FEATURES
+                ]
             if not direct_features and bound_fan is None:
                 continue
             cluster_var = f"{cluster.espm_namespace}_cluster"
@@ -1048,7 +1210,9 @@ class Endpoint:
                 )
             )
             if bound_fan is not None:
-                lines.extend(fan_binding.feature_lines(cluster_var, bound_fan))
+                lines.extend(
+                    fan_binding.feature_lines(cluster_var, bound_fan, self._fan_variable)
+                )
             for feature in direct_features:
                 lines.extend(
                     (
