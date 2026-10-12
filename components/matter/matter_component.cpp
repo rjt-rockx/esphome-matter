@@ -163,10 +163,12 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
         ESP_LOGW(TAG_EVENT, "Thread role changed; unable to acquire instance");
       }
     }
-    if (thread_state.NetDataChanged)
+    if (thread_state.NetDataChanged) {
       ESP_LOGV(TAG_EVENT, "Thread network data changed");
-    if (thread_state.ChildNodesChanged)
+    }
+    if (thread_state.ChildNodesChanged) {
       ESP_LOGV(TAG_EVENT, "Thread child nodes changed");
+    }
     if (thread_state.AddressChanged) {
       ESP_LOGD(TAG_EVENT, "Thread address(es) changed");
       auto lock = esphome::openthread::InstanceLock::try_acquire(1000);
@@ -192,9 +194,10 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
       }
     }
     if (!thread_state.RoleChanged && !thread_state.AddressChanged &&
-        !thread_state.NetDataChanged && !thread_state.ChildNodesChanged)
+        !thread_state.NetDataChanged && !thread_state.ChildNodesChanged) {
       ESP_LOGV(TAG_EVENT, "ThreadStateChange: flags=0x%08" PRIx32,
                thread_state.OpenThread.Flags);
+    }
 #endif // USE_OPENTHREAD
     break;
   }
