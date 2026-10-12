@@ -61,7 +61,7 @@ Open work as of the latest plan and repro reports:
 - Sensor updates use one scheduled work item per reading with no coalescing; if the Matter event queue is full an update is dropped and the final value can be lost.
 - Not implemented yet: the `status_led` and `pairing` behaviours, `matter.remove_fabric` and a controllers sensor, entity-addressed actions, a bridge, and footprint measurement.
 - Tags and labels: the duplicate-endpoint check ignores tag labels, the tag error does not mention esp-matter's limit of 3 tags, the FixedLabel key is fixed to `name`, and there is no warning for a "structure only, no delegate" endpoint.
-- Deferred: EVSE and device energy management, Service Area, thermostat remote sensing and presets, ICD (low-power) devices.
+- Deferred: EVSE and device energy management, Service Area, thermostat remote sensing and presets. ICD (battery powered Thread devices, [icd.md](icd.md)) exists as an experimental first version for `openthread:` only: validated, snapshot-tested and CI compiled, never run on hardware; GPIO wake from light sleep, ICD over BLE commissioning and Thread CSL are not implemented.
 - Reconnect after a restart can take up to a minute ([troubleshooting-network.md](troubleshooting-network.md)).
 - The default test vendor ID means every controller treats the device as uncertified; production use needs a CSA vendor ID and your own attestation certificates.
 - Mapping gaps: `select`, `number`, `text_sensor` and `alarm_control_panel` have no Matter mapping.

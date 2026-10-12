@@ -16,7 +16,7 @@ files are written to ``tests/snapshots/``:
 ``<config>.sdkconfig.txt``
     The sorted ``CONFIG_*`` lines (minus ``CONFIG_SUPPORT_*_CLUSTER=n``, whose set depends
     on the installed esp_matter version) of the generated sdkconfig matching
-    ``ESP_MATTER_ SUPPORT_ CHIP_ ENABLE_ USE_ *MATTER*``, path-normalised.
+    ``ESP_MATTER_ SUPPORT_ CHIP_ ENABLE_ USE_ *MATTER*`` (plus the ICD / light sleep options), path-normalised.
 
 Regenerate everything with one command (the snapshots are ESPHome *dev* output;
 use the same ESPHome as CI):
@@ -49,7 +49,11 @@ PREPARE = REPO / ".github" / "scripts" / "ci_prepare.py"
 # a setup() statement is kept when it matches this
 MATTER_REF = re.compile(r"(?<![A-Za-z0-9])matter(?:::|_)|esp_matter|chip::")
 # sdkconfig lines kept
-SDK_KEEP = re.compile(r"^CONFIG_(?:ESP_MATTER_|SUPPORT_|CHIP_|ENABLE_|USE_|\w*MATTER)")
+SDK_KEEP = re.compile(
+    r"^CONFIG_(?:ESP_MATTER_|SUPPORT_|CHIP_|ENABLE_|USE_|\w*MATTER"
+    # ICD / light sleep (matter: icd:)
+    r"|ICD_|PM_ENABLE=|FREERTOS_USE_TICKLESS_IDLE=|IEEE802154_SLEEP_ENABLE=|ESP_PHY_MAC_BB_PD=|OPENTHREAD_MTD=)"
+)
 
 
 def esphome_cmd() -> list[str]:

@@ -17,6 +17,7 @@ The [examples/](../examples/) directory holds complete ESPHome configs. They are
 | [door-and-motion.yaml](../examples/door-and-motion.yaml) | Contact and occupancy sensors | [binary-sensors.md](binary-sensors.md) |
 | [all-sensors.yaml](../examples/all-sensors.yaml) | Environmental, air quality and electrical sensors with a battery | [sensors.md](sensors.md) |
 | [wireless-button.yaml](../examples/wireless-button.yaml) | Stateless button (generic switch) | [generic-switch.md](generic-switch.md) |
+| [battery-thread-sensor.yaml](../examples/battery-thread-sensor.yaml) | Battery powered Thread sensor (ICD, light sleep; experimental) | [icd.md](icd.md) |
 | [esp32-dimmer-button.yaml](../examples/esp32-dimmer-button.yaml) | A dimmer switch (over Thread) that controls another Matter light through a binding | [binding.md](binding.md) |
 | [bridge-ble-thermometers.yaml](../examples/bridge-ble-thermometers.yaml) | Two Bluetooth thermometers as Bridged Nodes (temperature, humidity, battery, Reachable) | [bridge.md](bridge.md) |
 | [bridge-espnow-sensors.yaml](../examples/bridge-espnow-sensors.yaml) | ESP-NOW sensor nodes and a relay as Bridged Nodes | [bridge.md](bridge.md) |
