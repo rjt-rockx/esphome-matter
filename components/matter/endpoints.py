@@ -27,6 +27,12 @@ from .data_model.device_types import (
     DeviceType,
 )
 from . import fan_binding
+from .matter_climate import (
+    CLIMATE_INCLUDE,
+    CONF_CLIMATE_ID,
+    config_lines as climate_config_lines,
+    post_create_lines as climate_post_create_lines,
+)
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import snake_case
 
@@ -158,6 +164,7 @@ class Endpoint:
         self._device_types: list[DeviceType] = []
         self._light_variables = {}
         self._fan_variable = None
+        self._climate_variables = {}
 
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
@@ -271,6 +278,12 @@ class Endpoint:
         if CONF_COVER_ID in device_config:
             cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
             cg.add(var.register_cover(cover_, self._endpoint_id))
+        if CONF_CLIMATE_ID in device_config:
+            climate_ = await cg.get_variable(device_config[CONF_CLIMATE_ID])
+            self._climate_variables[device_type.name] = climate_
+            self.global_includes.add(CLIMATE_INCLUDE)
+            prefer_cooling = device_type.name == "room_air_conditioner"
+            cg.add(var.register_climate(climate_, self._endpoint_id, prefer_cooling))
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
@@ -348,6 +361,9 @@ class Endpoint:
                 )
 
         lines.extend(cover_lines)
+        climate_ = self._climate_variables.get(device_type.name)
+        if climate_ is not None:
+            lines.extend(climate_config_lines(config_var, climate_, device_type.name))
 
         lines.extend(
             (
@@ -355,6 +371,8 @@ class Endpoint:
                 "  return false;",
             )
         )
+        if climate_ is not None:
+            lines.extend(climate_post_create_lines(climate_, device_type.name))
         return lines
 
     async def _register_sensor_attribute(
