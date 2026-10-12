@@ -1,0 +1,48 @@
+# Matter OTA requestor: let Home Assistant (matterjs-server --ota-provider-dir) or a
+# DCL-backed ecosystem update this device. See docs/matter-ota.md.
+esphome:
+  name: matter-ota-demo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter
+    components: [matter]
+
+logger:
+
+# ESPHome's own OTA keeps working next to Matter OTA.
+ota:
+  - platform: esphome
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+text_sensor:
+  - platform: template
+    name: Matter OTA state
+    id: matter_ota_state
+    entity_category: diagnostic
+
+matter:
+  software_version: 1 # increase for every image you offer as an update
+  ota:
+    on_state:
+      - text_sensor.template.publish:
+          id: matter_ota_state
+          state: !lambda return state;
+  endpoints:
+    1:
+      temperature_sensor:
+        temperature: internal_temp
+
+sensor:
+  - platform: internal_temperature
+    id: internal_temp
