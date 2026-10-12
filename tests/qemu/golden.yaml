@@ -1,0 +1,186 @@
+# Golden behavioural firmware for the runtime tests (tests/runtime, docs/dev/runtime-tests.md).
+# ESP32 classic + OpenCores Ethernet, built and booted by tools/qemu/run.sh.
+#
+# Endpoints (see tests/runtime/test_golden.py):
+#   1  on_off_light         binary light
+#   2  dimmable_light       monochromatic light
+#   3  on_off_plug_in_unit  template switch that can refuse turn_on (api action set_refuse)
+#   4  temperature_sensor   template sensor (api action set_temp)
+#   5  generic_switch       template binary_sensor driven by api action press (short|double|long)
+#   6  fan                  3-speed template-output fan
+# Passcode 20202021 / discriminator 3840 give the manual code 34970112332.
+esphome:
+  # Same name as esp32-openeth.yaml so that both can share one build directory (incremental rebuilds).
+  name: matter-qemu
+
+esp32:
+  variant: ESP32
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+  hardware_uart: UART0
+  level: DEBUG
+
+api:
+  reboot_timeout: 0s # Matter operation does not require an ESPHome API client.
+  actions:
+    - action: set_temp
+      variables:
+        value: float
+      then:
+        - sensor.template.publish:
+            id: golden_temp
+            state: !lambda "return value;"
+    - action: set_refuse
+      variables:
+        refuse: bool
+      then:
+        - globals.set:
+            id: refuse_on
+            value: !lambda "return refuse;"
+    # Drives the generic switch: kind is "short", "double" or "long".
+    - action: press
+      variables:
+        kind: string
+      then:
+        - binary_sensor.template.publish:
+            id: golden_button
+            state: true
+        - if:
+            condition:
+              lambda: 'return kind == "long";'
+            then:
+              - delay: 1200ms
+            else:
+              - delay: 100ms
+        - binary_sensor.template.publish:
+            id: golden_button
+            state: false
+        - if:
+            condition:
+              lambda: 'return kind == "double";'
+            then:
+              - delay: 100ms
+              - binary_sensor.template.publish:
+                  id: golden_button
+                  state: true
+              - delay: 100ms
+              - binary_sensor.template.publish:
+                  id: golden_button
+                  state: false
+
+network:
+  enable_ipv6: true
+
+ethernet:
+  type: OPENETH
+
+matter:
+  passcode: 20202021
+  discriminator: 3840
+  endpoints:
+    1:
+      on_off_light:
+        light_id: golden_binary_light
+    2:
+      dimmable_light:
+        light_id: golden_mono_light
+    3:
+      on_off_plug_in_unit:
+        switch_id: golden_switch
+    4:
+      temperature_sensor:
+        temperature: golden_temp
+    5:
+      generic_switch:
+        binary_sensor_id: golden_button
+        long_press_time: 600ms
+        multi_press_window: 800ms
+        multi_press_max: 3
+    6:
+      fan:
+        fan_id: golden_fan
+
+globals:
+  - id: refuse_on
+    type: bool
+    initial_value: "false"
+
+output:
+  - platform: template
+    id: golden_binary_out
+    type: binary
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_mono_out
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: golden_fan_out
+    type: float
+    write_action:
+      - lambda: ""
+
+light:
+  - platform: binary
+    id: golden_binary_light
+    name: Golden Binary Light
+    output: golden_binary_out
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: golden_mono_light
+    name: Golden Mono Light
+    output: golden_mono_out
+    default_transition_length: 0s
+    gamma_correct: 1.0 # brightness == level, so the Matter and API values are directly comparable
+    restore_mode: ALWAYS_OFF
+
+# Not optimistic: the state only changes through publish_state, so turn_on can be refused.
+switch:
+  - platform: template
+    id: golden_switch
+    name: Golden Switch
+    optimistic: false
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - if:
+          condition:
+            lambda: "return !id(refuse_on);"
+          then:
+            - switch.template.publish:
+                id: golden_switch
+                state: true
+          else:
+            - logger.log: "golden_switch: turn_on refused"
+    turn_off_action:
+      - switch.template.publish:
+          id: golden_switch
+          state: false
+
+sensor:
+  - platform: template
+    id: golden_temp
+    name: Golden Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+
+binary_sensor:
+  - platform: template
+    id: golden_button
+    name: Golden Button
+
+fan:
+  - platform: speed
+    id: golden_fan
+    name: Golden Fan
+    output: golden_fan_out
+    speed_count: 3
+    restore_mode: ALWAYS_OFF
