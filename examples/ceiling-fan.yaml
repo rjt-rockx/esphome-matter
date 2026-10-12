@@ -1,0 +1,80 @@
+# This is an example configuration for a ceiling fan with three speeds, a direction switch and a light, based
+# on an ESP32-C6.
+#
+# To create a fan, add the `fan` device type to an endpoint and point it to an ESPHome fan entity using the
+# fan_id option. esphome-matter synchronizes the fan state between the ESPHome fan and the Matter Fan Control
+# cluster in both directions. The Matter features follow the capabilities of the ESPHome fan:
+#   - speed_count        -> MultiSpeed feature, SpeedMax = speed_count
+#   - oscillation_output -> Rocking feature
+#   - direction_output   -> AirflowDirection feature
+# See docs/fan.md for more information.
+
+esphome:
+  name: ceiling-fan
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://DavidvtWout/esphome-matter@main
+
+api:
+
+ota:
+  platform: esphome
+
+logger:
+
+network:
+  enable_ipv6: true
+
+wifi:
+
+matter:
+  endpoints:
+    1:
+      fan:
+        fan_id: ceiling_fan
+    2:
+      dimmable_light:
+        light_id: fan_light
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO4
+    frequency: 25kHz
+  - platform: ledc
+    id: light_pwm
+    pin: GPIO5
+  - platform: gpio
+    id: fan_direction_output
+    pin: GPIO6
+
+fan:
+  - platform: speed
+    id: ceiling_fan
+    name: Ceiling fan
+    output: fan_pwm
+    speed_count: 3
+    direction_output: fan_direction_output
+    # Matter restores the fan state, so the ESPHome fan should always start off.
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: monochromatic
+    id: fan_light
+    name: Fan light
+    output: light_pwm
+    restore_mode: ALWAYS_OFF
+
+button:
+  - platform: template
+    name: "Matter Factory Reset"
+    entity_category: config
+    disabled_by_default: True
+    on_press:
+      matter.factory_reset:
