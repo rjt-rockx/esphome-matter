@@ -39,6 +39,13 @@ from .endpoints import (
     register_endpoints,
     switch_restore_warning,
 )
+from .expose import (
+    CONF_EXCLUDE,
+    CONF_EXPOSE,
+    EXCLUDE_SCHEMA,
+    EXPOSE_SCHEMA,
+    lower_expose,
+)
 from .fan_binding import fan_restore_warning
 from .matter_ble import (
     CONF_BLE_COMMISSIONING,
@@ -162,6 +169,9 @@ CONFIG_SCHEMA = cv.All(
             # Log reconnect timing milestones (IP up, DNS-SD, SRP, CASE, subscription)
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             **OTA_SCHEMA_KEYS,  # ota / ota_requestor / software_version (ota.py)
+            # Entity-centric exposure, lowered into `endpoints` by lower_expose (docs/expose.md)
+            cv.Optional(CONF_EXPOSE): EXPOSE_SCHEMA,
+            cv.Optional(CONF_EXCLUDE): EXCLUDE_SCHEMA,
             # Endpoints
             cv.Optional(CONF_ENDPOINTS, default={}): cv.Schema(
                 {
@@ -173,6 +183,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(DEVICE_INFO_SCHEMA)  # node_label, serial_number, on_identify, ...
     .extend(COMMISSIONING_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
+    lower_expose,
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
     validate_ota_schema,
