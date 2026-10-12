@@ -3,7 +3,8 @@
 `components/matter/matter_binding.h` / `.cpp` is the shared core for entity
 bindings. It replaces five hand-rolled echo mechanisms and the per-change heap
 allocations in the push paths. Migrated so far: switch, valve, sensors, binary
-sensors and the power-source flag enums; see [Migration order](#migration-order). Thread names follow
+sensors, the power-source flag enums, modes, Mode Select, operational state,
+laundry controls and the sensor-extras delegates; see [Migration order](#migration-order). Thread names follow
 [threading.md](threading.md): "main" is the ESPHome main loop, "CHIP" is the CHIP
 task.
 
@@ -140,6 +141,43 @@ window expiry pushes the unchanged state and `CurrentState` leaves
 created on the CHIP task (queued ahead of the boot push) instead of under the
 CHIP lock on the main loop.
 
+### Sync bindings
+
+`matter_sync_bindings.h` (host-tested in `tests/cpp/test_sync_bindings.cpp`)
+holds the two-way bindings built for step 7:
+
+- `MatterSettingBinding`: one integer setting between an entity (select, number)
+  and Matter. Hooks: `entity_value_()` (main), `command_value_()` (main),
+  `write_value_()` (CHIP, in the scope); `matter_changed_()` (CHIP) submits a
+  controller write. Used for the laundry selects (SpinSpeedCurrent,
+  NumberOfRinses), the HoldTime number and the Boolean State Configuration
+  sensitivity number. A push captured before a controller write is skipped and
+  the reconcile after the apply carries the converged state.
+- `MatterModeBinding`: CurrentMode of Mode Base derived clusters and Mode Select.
+  The main loop keeps `last_mode_` (what Matter holds); the select and
+  `matter.mode.set` push it. Controller changes queue (newest 4 kept) because
+  every accepted change runs `on_change_to_mode`; `drop_unchanged_inbound_()`
+  lets Mode Select skip a change the select already shows. Boot: the select
+  wins when it has a state, otherwise the stored CurrentMode is shown without
+  running the automation. The old `pending_echoes_` sequence queue is replaced
+  by `PushScope`/`is_echo()`.
+- `MatterAlarmSourceBinding`: a boolean source that drives a code-driven alarm
+  state. `matter_state_changed_()` (CHIP) re-pushes the source state after the
+  command that invalidated it (EnableDisableAlarm while the source is ON).
+
+Other step 7 users: operational state is a `MatterBinding<snapshot, NoInbound>`
+(state, phase and countdown coalesce) plus a `MatterEventQueue` for
+OperationalError and OperationCompletion; the Refrigerator Alarm door
+transitions go through a `MatterEventQueue<bool>` so each one raises its own
+Notify event; the Smoke CO self test counts requests as inbound (`merge` adds)
+and completes through an idempotent state push; the air quality level is a
+`MatterAttributePushBinding`. The delegate command decisions (`accept`,
+`allowed_states`, `decide_in_automation` and its blocking bridge) are unchanged.
+
+`DeviceBindingPlatform::write_attribute()` adopts the stored attribute type when
+only nullability differs, so nullable attributes can be written with a plain
+value.
+
 ## Migration order
 
 Each step is one change; codegen snapshots stay unchanged.
@@ -151,8 +189,8 @@ Each step is one change; codegen snapshots stay unchanged.
 4. Lock, cover, closure (`request_push_`/`push_done_`/`schedule_drain_` go away).
 5. Fan and climate fan (delete `pushing_`; wind and step hooks use `is_echo()`).
 6. Climate.
-7. Modes, operational state, Mode Select (drop `pending_echoes_`), sensor-extras
-   delegates.
+7. Modes, operational state, Mode Select (`pending_echoes_` dropped), laundry
+   controls and the sensor-extras delegates (done).
 8. Lights, last, behind the runtime golden test.
 9. Retire `MatterPushGuard` as a public API and `MatterAttributeDispatchGuard`;
    `test_attribute_writes.py` then checks "writes only inside PushScope".

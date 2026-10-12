@@ -85,6 +85,16 @@ public:
   esp_err_t write_attribute(uint16_t endpoint_id, uint32_t cluster_id,
                             uint32_t attribute_id, esp_matter_attr_val_t &value,
                             bool report) override {
+    // A nullable attribute (laundry SpinSpeedCurrent, ...) may be written with
+    // a plain value of the same base type: adopt the stored type.
+    esp_matter_val_type_t stored = esp_matter::attribute::get_val_type(
+        endpoint_id, cluster_id, attribute_id);
+    if (stored != ESP_MATTER_VAL_TYPE_INVALID) {
+      esp_matter_attr_val_t probe;
+      probe.type = stored;
+      if (probe.get_base_type() == value.get_base_type())
+        value.type = stored;
+    }
     return report ? esp_matter::attribute::report(endpoint_id, cluster_id,
                                                   attribute_id, &value)
                   : esp_matter::attribute::update(endpoint_id, cluster_id,

@@ -73,116 +73,131 @@ CHIP_ERROR MatterLaundryControlsMapping::GetSupportedRinseAtIndex(
 void MatterLaundryControlsMapping::initialize() {
 #ifdef USE_SELECT
   if (this->spin_speed_select_ != nullptr) {
-    this->spin_speed_select_->add_on_state_callback(
-        [this](auto &&...) { this->on_spin_speed_selected_(); });
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), LAUNDRY_WASHER_CONTROLS_ID,
-        controls_ns::Attributes::SpinSpeedCurrent::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          this->on_matter_spin_speed_(value.val.u8);
-        });
+    this->spin_speed_binding_ = new MatterLaundrySelectBinding(
+        this, MatterLaundrySelectBinding::Kind::SPIN_SPEED,
+        this->spin_speed_select_);
+    this->spin_speed_binding_->initialize();
   }
   if (this->rinses_select_ != nullptr) {
-    this->rinses_select_->add_on_state_callback(
-        [this](auto &&...) { this->on_rinses_selected_(); });
-    global_matter_component->register_attribute_callback(
-        this->endpoint_id(), LAUNDRY_WASHER_CONTROLS_ID,
-        controls_ns::Attributes::NumberOfRinses::Id,
-        [this](const esp_matter_attr_val_t &value) {
-          this->on_matter_rinses_(value.val.u8);
-        });
+    this->rinses_binding_ = new MatterLaundrySelectBinding(
+        this, MatterLaundrySelectBinding::Kind::RINSES, this->rinses_select_);
+    this->rinses_binding_->initialize();
   }
-  // The selects are the source of truth after a restart.
-  global_matter_component->defer_to_main_loop([this]() {
-    if (this->spin_speed_select_ != nullptr &&
-        this->spin_speed_select_->has_state())
-      this->on_spin_speed_selected_();
-    if (this->rinses_select_ != nullptr && this->rinses_select_->has_state())
-      this->on_rinses_selected_();
-  });
 #endif
 }
 
-void MatterLaundryControlsMapping::on_spin_speed_selected_() {
 #ifdef USE_SELECT
-  auto index = this->spin_speed_select_->active_index();
-  if (!index.has_value())
-    return;
-  auto option = this->spin_speed_select_->at(index.value());
-  if (!option.has_value())
-    return;
-  for (size_t i = 0; i < this->spin_speeds_.size(); i++) {
-    if (this->spin_speeds_[i] != option.value())
-      continue;
-    if (static_cast<int>(i) == this->last_spin_speed_)
-      return;
-    this->last_spin_speed_ = static_cast<int>(i);
-    set_attribute_value(this->endpoint_id(), LAUNDRY_WASHER_CONTROLS_ID,
-                        controls_ns::Attributes::SpinSpeedCurrent::Id,
-                        static_cast<uint64_t>(i));
-    return;
-  }
-  ESP_LOGW(TAG, "Select option '%s' is not a spin speed of endpoint %u",
-           option.value().c_str(), this->endpoint_id());
-#endif
-}
-
-void MatterLaundryControlsMapping::on_rinses_selected_() {
-#ifdef USE_SELECT
-  auto index = this->rinses_select_->active_index();
-  if (!index.has_value())
-    return;
-  auto option = this->rinses_select_->at(index.value());
-  if (!option.has_value())
-    return;
-  for (const auto &rinse : this->rinses_) {
-    if (rinse.name != option.value())
-      continue;
-    if (static_cast<int>(rinse.value) == this->last_rinses_)
-      return;
-    this->last_rinses_ = rinse.value;
-    set_attribute_value(this->endpoint_id(), LAUNDRY_WASHER_CONTROLS_ID,
-                        controls_ns::Attributes::NumberOfRinses::Id,
-                        static_cast<uint64_t>(rinse.value));
-    return;
-  }
-  ESP_LOGW(TAG, "Select option '%s' is not a rinse setting of endpoint %u",
-           option.value().c_str(), this->endpoint_id());
-#endif
-}
-
-// Called on the CHIP task after the SDK accepted a write of a controller.
-void MatterLaundryControlsMapping::on_matter_spin_speed_(uint8_t index) {
-  defer_to_main_loop(global_matter_component, [this, index]() {
-#ifdef USE_SELECT
-    if (static_cast<int>(index) == this->last_spin_speed_ ||
-        index >= this->spin_speeds_.size() ||
-        this->spin_speed_select_ == nullptr)
-      return;
-    this->last_spin_speed_ = index;
-    this->spin_speed_select_->make_call()
-        .set_option(this->spin_speeds_[index])
-        .perform();
-#endif
-  });
-}
-
-void MatterLaundryControlsMapping::on_matter_rinses_(uint8_t value) {
-  defer_to_main_loop(global_matter_component, [this, value]() {
-#ifdef USE_SELECT
-    if (static_cast<int>(value) == this->last_rinses_ ||
-        this->rinses_select_ == nullptr)
-      return;
-    for (const auto &rinse : this->rinses_) {
-      if (rinse.value != value)
-        continue;
-      this->last_rinses_ = value;
-      this->rinses_select_->make_call().set_option(rinse.name).perform();
-      return;
+bool MatterLaundryControlsMapping::option_to_value(
+    MatterLaundrySelectBinding::Kind kind, const std::string &option,
+    int32_t &value) const {
+  if (kind == MatterLaundrySelectBinding::Kind::SPIN_SPEED) {
+    for (size_t i = 0; i < this->spin_speeds_.size(); i++) {
+      if (this->spin_speeds_[i] == option) {
+        value = static_cast<int32_t>(i);
+        return true;
+      }
     }
-#endif
-  });
+    return false;
+  }
+  for (const auto &rinse : this->rinses_) {
+    if (rinse.name == option) {
+      value = rinse.value;
+      return true;
+    }
+  }
+  return false;
 }
+
+const std::string *MatterLaundryControlsMapping::value_to_option(
+    MatterLaundrySelectBinding::Kind kind, int32_t value) const {
+  if (kind == MatterLaundrySelectBinding::Kind::SPIN_SPEED) {
+    if (value < 0 || static_cast<size_t>(value) >= this->spin_speeds_.size())
+      return nullptr;
+    return &this->spin_speeds_[value];
+  }
+  for (const auto &rinse : this->rinses_) {
+    if (rinse.value == value)
+      return &rinse.name;
+  }
+  return nullptr;
+}
+
+// ------------------------------------------------- MatterLaundrySelectBinding
+
+MatterLaundrySelectBinding::MatterLaundrySelectBinding(
+    MatterLaundryControlsMapping *parent, Kind kind, select::Select *select)
+    : MatterSettingBinding(parent->endpoint_id()), parent_(parent), kind_(kind),
+      select_(select) {}
+
+uint32_t MatterLaundrySelectBinding::attribute_id_() const {
+  return this->kind_ == Kind::SPIN_SPEED
+             ? controls_ns::Attributes::SpinSpeedCurrent::Id
+             : controls_ns::Attributes::NumberOfRinses::Id;
+}
+
+void MatterLaundrySelectBinding::setup_() {
+  this->select_->add_on_state_callback(
+      [this](auto &&...) { this->request_push(); });
+  // Accepted writes of a controller (the SDK validated them against the lists).
+  this->watch_attribute(LAUNDRY_WASHER_CONTROLS_ID, this->attribute_id_());
+}
+
+// Main loop.
+bool MatterLaundrySelectBinding::entity_value_(int32_t &out) {
+  if (!this->select_->has_state())
+    return false;
+  auto index = this->select_->active_index();
+  if (!index.has_value())
+    return false;
+  auto option = this->select_->at(index.value());
+  if (!option.has_value())
+    return false;
+  if (this->parent_->option_to_value(this->kind_, option.value(), out))
+    return true;
+  ESP_LOGW(TAG, "Select option '%s' is not a %s of endpoint %u",
+           option.value().c_str(),
+           this->kind_ == Kind::SPIN_SPEED ? "spin speed" : "rinse setting",
+           this->endpoint_id());
+  return false;
+}
+
+// Main loop.
+void MatterLaundrySelectBinding::command_value_(int32_t value) {
+  const std::string *option = this->parent_->value_to_option(this->kind_, value);
+  if (option == nullptr)
+    return;
+  if (this->select_->has_state()) {
+    auto current = this->select_->active_index();
+    if (current.has_value() && this->select_->at(current.value()) == *option)
+      return;
+  }
+  this->select_->make_call().set_option(*option).perform();
+}
+
+// CHIP task, inside the PushScope.
+void MatterLaundrySelectBinding::write_value_(int32_t value) {
+  esp_matter_attr_val_t attribute_value =
+      this->kind_ == Kind::SPIN_SPEED
+          ? esp_matter_uint8(static_cast<uint8_t>(value))
+          : esp_matter_enum8(static_cast<uint8_t>(value));
+  esp_err_t err = binding_platform()->write_attribute(
+      this->endpoint_id(), LAUNDRY_WASHER_CONTROLS_ID, this->attribute_id_(),
+      attribute_value, false);
+  if (err != ESP_OK)
+    ESP_LOGW(TAG, "Cannot set %s %d on endpoint %u: %d",
+             this->kind_ == Kind::SPIN_SPEED ? "spin speed" : "rinses",
+             static_cast<int>(value), this->endpoint_id(),
+             static_cast<int>(err));
+}
+
+// CHIP task.
+void MatterLaundrySelectBinding::on_attribute_(uint32_t cluster,
+                                               uint32_t attribute,
+                                               const esp_matter_attr_val_t &v) {
+  if (cluster == LAUNDRY_WASHER_CONTROLS_ID && attribute == this->attribute_id_())
+    this->matter_changed_(v.val.u8);
+}
+#endif // USE_SELECT
 
 DelegateAttach attach_laundry_controls_delegate(esp_matter::endpoint_t *endpoint,
                                                 uint32_t cluster_id) {

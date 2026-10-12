@@ -5,6 +5,7 @@
 
 #include "esphome/core/automation.h"
 #include "matter_endpoints.h"
+#include "matter_sync_bindings.h"
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -16,7 +17,6 @@
 #include <app/clusters/boolean-state-configuration-server/BooleanStateConfigurationCluster.h>
 #include <data_model_provider/esp_matter_data_model_provider.h>
 
-#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -26,6 +26,51 @@ namespace esphome::matter {
 // State Configuration cluster changed (visual, audible).
 class MatterAlarmsActiveTrigger : public Trigger<bool, bool> {};
 class MatterAlarmsSuppressedTrigger : public Trigger<bool, bool> {};
+
+class MatterBooleanStateConfigMapping;
+
+#ifdef USE_BINARY_SENSOR
+// The alarm source as a binding (MatterAlarmSourceBinding): the latest source
+// state is applied to the cluster on the CHIP task, and re-applied after an
+// EnableDisableAlarm command while the source is ON.
+class MatterBscAlarmSource : public MatterAlarmSourceBinding {
+public:
+  MatterBscAlarmSource(uint16_t endpoint_id, binary_sensor::BinarySensor *source)
+      : MatterAlarmSourceBinding(endpoint_id), source_(source) {}
+
+  // CHIP task: the enabled alarms changed.
+  void on_alarms_enabled() { this->matter_state_changed_(); }
+
+protected:
+  void setup_() override;
+  bool source_state_(bool &on) override;
+  void apply_source_(bool on) override;
+
+  binary_sensor::BinarySensor *source_;
+};
+#endif
+
+#ifdef USE_NUMBER
+// CurrentSensitivityLevel <-> number, through the binding framework
+// (MatterSettingBinding).
+class MatterBscSensitivity : public MatterSettingBinding {
+public:
+  MatterBscSensitivity(uint16_t endpoint_id, number::Number *number)
+      : MatterSettingBinding(endpoint_id), number_(number) {}
+
+  // CHIP task: Matter holds a sensitivity level the controller (or the boot
+  // read) wants the number to show.
+  void on_matter_level(uint8_t level) { this->matter_changed_(level); }
+
+protected:
+  void setup_() override;
+  bool entity_value_(int32_t &out) override;
+  void command_value_(int32_t value) override;
+  void write_value_(int32_t value) override;
+
+  number::Number *number_;
+};
+#endif
 
 // Delegate and ESPHome bindings of the Boolean State Configuration cluster of
 // an endpoint:
@@ -80,21 +125,15 @@ public:
           new_value) override;
 
 protected:
-  // Matter thread: ON makes the enabled alarms active, OFF clears them.
-  void apply_source_(bool on);
-#ifdef USE_NUMBER
-  void on_number_(float value);
-  void publish_to_number_(uint8_t level);
-#endif
-
   std::vector<MatterAlarmsActiveTrigger *> triggers_;
   std::vector<MatterAlarmsSuppressedTrigger *> suppressed_triggers_;
-  std::atomic<bool> source_on_{false};
 #ifdef USE_BINARY_SENSOR
   binary_sensor::BinarySensor *source_{nullptr};
+  MatterBscAlarmSource *source_binding_{nullptr};
 #endif
 #ifdef USE_NUMBER
   number::Number *number_{nullptr};
+  MatterBscSensitivity *sensitivity_binding_{nullptr};
 #endif
 };
 

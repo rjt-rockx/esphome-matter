@@ -6,6 +6,7 @@
 #include "esphome/core/automation.h"
 #include "matter_delegates.h"
 #include "matter_endpoints.h"
+#include "matter_sync_bindings.h"
 #ifdef USE_SELECT
 #include "esphome/components/select/select.h"
 #endif
@@ -15,7 +16,6 @@
 #include <esp_matter.h>
 
 #include <cstdint>
-#include <deque>
 #include <string>
 #include <vector>
 
@@ -40,11 +40,12 @@ struct MatterModeEntry {
 class MatterChangeToModeTrigger : public Trigger<uint8_t> {};
 
 // Mode list, ESPHome select binding and change trigger shared by the Mode Base derived clusters and Mode Select.
+// A MatterModeBinding (binding framework): pushes of CurrentMode are coalesced and echo-suppressed by the framework.
 //
 // Matter -> ESPHome: an accepted ChangeToMode sets the bound select and runs `on_change_to_mode` on the main loop.
 // ESPHome -> Matter: the bound select (and `matter.mode.set`) updates CurrentMode.
 // Boot: the select wins when it has a (restored) state; otherwise the stored CurrentMode is replayed into the select.
-class MatterModeList : public MatterEndpointMappingBase {
+class MatterModeList : public MatterModeBinding {
 public:
   MatterModeList(uint16_t endpoint_id, uint32_t cluster_id);
 
@@ -70,22 +71,19 @@ public:
   const std::vector<MatterModeEntry> &modes() const { return this->modes_; }
   const MatterModeEntry *find_mode(uint8_t mode) const;
 
-  void initialize() override;
-
   // Main loop: sets CurrentMode in the Matter data model. The mode must be one of the configured modes.
   void set_current_mode(uint8_t mode);
 
 protected:
-  // Main loop: select update and user automation for an accepted mode change.
+  void setup_() override;
+  // Main loop: select update and user automation for a mode change (silent: boot replay, no automation).
+  void deliver_(uint8_t mode, bool silent) override;
+  // Main loop: the mode the bound select shows (-1: no select or no state).
+  int entity_mode_() override;
+  // Main loop: select update and user automation for a change accepted in the blocking decide_in_automation path.
   void apply_change_(uint8_t mode, MatterCommandOutcome &outcome);
-  // Main loop: shows a mode that Matter already has in the bound select (no automation).
-  void show_matter_mode_(uint8_t mode);
-  // Main loop: reads the stored CurrentMode and calls show_matter_mode_.
-  virtual void replay_matter_mode_() = 0;
   // Main loop: the bound select changed.
   void on_select_state_();
-  // Main loop: updates CurrentMode in the Matter data model (hops to the Matter thread when needed).
-  virtual void push_mode_to_matter_(uint8_t mode) = 0;
 
   uint32_t cluster_id_;
   std::vector<MatterModeEntry> modes_;
@@ -96,8 +94,6 @@ protected:
 #ifdef USE_SELECT
   select::Select *select_{nullptr};
 #endif
-  // Last mode seen on either side (main loop only); breaks select <-> Matter echo loops.
-  int last_mode_{-1};
 };
 
 // Delegate of a Mode Base derived cluster (Laundry Washer Mode, RVC Run Mode, ...).
@@ -130,8 +126,9 @@ public:
           &response) override;
 
 protected:
-  void push_mode_to_matter_(uint8_t mode) override;
-  void replay_matter_mode_() override;
+  // CHIP task, inside the PushScope.
+  void write_mode_(uint8_t mode) override;
+  bool read_matter_mode_(uint8_t &mode) override;
   chip::app::Clusters::ModeBase::Instance *instance_();
 
   // Kept alive until the CHIP task has encoded the response.
@@ -147,23 +144,22 @@ public:
 
   static MatterModeSelectMapping *find(uint16_t endpoint_id);
 
-  void initialize() override;
   // Builds the SDK structures for SupportedModes (once, before esp_matter::start).
   void finalize();
   chip::app::Clusters::ModeSelect::SupportedModesManager::ModeOptionsProvider
   options() const;
 
 protected:
-  void push_mode_to_matter_(uint8_t mode) override;
-  void replay_matter_mode_() override;
-  void on_matter_mode_(uint8_t mode);
+  void setup_() override;
+  // CHIP task: the store update of a controller or a scene recall. The framework drops the updates caused by our
+  // own writes (PushScope), so no echo bookkeeping is needed.
+  void on_attribute_(uint32_t cluster, uint32_t attribute,
+                     const esp_matter_attr_val_t &v) override;
+  void write_mode_(uint8_t mode) override;
+  bool read_matter_mode_(uint8_t &mode) override;
+  // A change that only repeats what the select shows has no command to run.
+  bool drop_unchanged_inbound_() const override { return true; }
 
-  // CurrentMode as the main loop believes Matter holds it (-1 unknown), and the writes pushed by the main loop whose
-  // attribute update callback has not been seen yet (sequence number, value). A callback that matches the oldest
-  // entry is our own echo and is dropped; anything else is a change from a controller or a scene recall.
-  int matter_mode_{-1};
-  uint32_t push_sequence_{0};
-  std::deque<std::pair<uint32_t, uint8_t>> pending_echoes_;
   std::vector<chip::app::Clusters::ModeSelect::Structs::ModeOptionStruct::Type>
       options_;
   std::vector<

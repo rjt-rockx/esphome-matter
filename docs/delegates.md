@@ -136,7 +136,7 @@ The CHIP task waits for the synchronous part of the automation (actions after a 
 
 A Scenes recall (and anything else that changes `CurrentMode` without a `ChangeToMode` command) is not a command: it can not be refused. For Mode Select it fires `on_change_to_mode` and sets the select like a command does, because Mode Select changes arrive through the attribute update. On the Mode Base clusters a scene can not change `CurrentMode`.
 
-**Mode Select** is different: the SDK handles `ChangeToMode` itself (the only possible answers are success and a constraint error), and `on_change_to_mode` is a notification; `accept`, `decide_in_automation` and `matter.mode.reject` do not exist for it. It may have a single mode, needs a `description` (1-64 bytes), and its semantic tags are `{mfg_code, value}` pairs. Echoes of values the main loop pushed itself are recognised by a sequence of pending writes and do not fire the automation again:
+**Mode Select** is different: the SDK handles `ChangeToMode` itself (the only possible answers are success and a constraint error), and `on_change_to_mode` is a notification; `accept`, `decide_in_automation` and `matter.mode.reject` do not exist for it. It may have a single mode, needs a `description` (1-64 bytes), and its semantic tags are `{mfg_code, value}` pairs. Writes that ESPHome does itself (the select, `matter.mode.set`) are made inside a binding `PushScope`, so the resulting attribute update is recognised as an echo and never fires the automation again, however late the update is dispatched. A push that was captured before a controller changed the mode is dropped and the controller's mode wins:
 
 ```yaml
 matter:
@@ -285,7 +285,8 @@ SDK callbacks run on the CHIP task, ESPHome on the main loop:
 |---|---|
 | Matter command -> ESPHome (default) | The CHIP task decides from the mode list, `accept` / `allowed_states` and state kept in atomics, answers, and posts the select update and automations to the main loop without waiting. |
 | Matter command -> ESPHome (`decide_in_automation`) | The CHIP task posts the automation and waits up to `decide_timeout` (250 ms) for its synchronous part; late completions are reconciled. |
-| ESPHome -> Matter | `run_on_matter_thread` (modes: `Instance::UpdateCurrentMode`; operational state: `SetOperationalState`, `SetCurrentPhase`, the event functions). Mode Select uses a normal attribute write. `matter.send_event` is also scheduled onto the CHIP task and never takes the stack lock on the main loop. |
+| ESPHome -> Matter | State goes through the binding framework (`docs/dev/binding-framework.md`): `request_push()` captures on the main loop and one coalesced work item per binding writes on the CHIP task inside a `PushScope` (modes: `Instance::UpdateCurrentMode`; operational state: `SetOperationalState`, `SetCurrentPhase`, `UpdateCountdownTimeFromDelegate`). Mode Select writes `CurrentMode` as a normal attribute. OperationalError and OperationCompletion are discrete events: they go through a `MatterEventQueue` (ordered, never coalesced). `matter.send_event` is also scheduled onto the CHIP task and never takes the stack lock on the main loop. |
+| Matter -> ESPHome (state) | Accepted `ChangeToMode` (default path), Mode Select / laundry attribute writes and scene recalls are submitted to the binding and applied on the main loop in order (every accepted mode change runs `on_change_to_mode`; the last 4 pending are kept). After the apply, a push that was skipped because it predated the controller write is re-issued with fresh state. |
 
 An automation that is slow (waits for hardware) should not run in the deciding path: leave `decide_in_automation` off, or answer from a state it already knows and do the slow work after a `delay:`/`script`.
 

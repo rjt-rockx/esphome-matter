@@ -4,6 +4,7 @@
 #ifdef USE_MATTER_SMOKE_CO
 
 #include "esphome/core/automation.h"
+#include "matter_binding.h"
 #include "matter_endpoints.h"
 
 #include <app/clusters/smoke-co-alarm-server/SmokeCoAlarmCluster.h>
@@ -29,24 +30,45 @@ class MatterSmokeCoSelfTestTrigger : public Trigger<> {};
 //    (TestInProgress=false, SelfTestComplete event, ExpressedState recomputed).
 //  * auto_complete_ms == 0: the application ends the test through the bound
 //    test_in_progress binary_sensor (OFF).
-class MatterSmokeCoAlarmMapping : public MatterEndpointMappingBase,
-                                  public chip::app::Clusters::SmokeCoAlarmDelegate {
+//
+// A binding (binding framework): the requests are the inbound side (counted,
+// never coalesced into fewer automation runs), the completion is the outbound
+// state (idempotent, so coalescing is safe).
+struct MatterSmokeCoSelfTestState {
+  // Number of completed self tests.
+  uint32_t completions{0};
+};
+
+class MatterSmokeCoAlarmMapping
+    : public MatterBinding<MatterSmokeCoSelfTestState, uint32_t>,
+      public chip::app::Clusters::SmokeCoAlarmDelegate {
 public:
   MatterSmokeCoAlarmMapping(uint16_t endpoint_id, uint32_t auto_complete_ms)
-      : MatterEndpointMappingBase(endpoint_id),
+      : MatterBinding<MatterSmokeCoSelfTestState, uint32_t>(
+            endpoint_id, BindingPolicy{BootSync::NONE, 0, false}),
         auto_complete_ms_(auto_complete_ms) {}
 
   void add_self_test_trigger(MatterSmokeCoSelfTestTrigger *trigger) {
     this->triggers_.push_back(trigger);
   }
 
-  void initialize() override;
-
   // Matter thread.
   void OnSelfTestRequested() override;
 
 protected:
+  void setup_() override;
+  MatterSmokeCoSelfTestState capture_() override;
+  void write_matter_(const MatterSmokeCoSelfTestState &s) override;
+  void merge_inbound_(uint32_t &acc, const uint32_t &in) override {
+    acc += in;
+  }
+  void apply_inbound_(const uint32_t &requests) override;
   void complete_self_test_();
+
+  // Main loop.
+  uint32_t completions_{0};
+  // Matter thread.
+  uint32_t written_completions_{0};
 
   uint32_t auto_complete_ms_;
   std::vector<MatterSmokeCoSelfTestTrigger *> triggers_;
