@@ -576,17 +576,9 @@ class Profile:
         ns = self.namespace_for(cluster_name)
         return self.data["clusters"][ns].get("revision") if ns else None
 
-    def predict(self, cluster_name: str, feature_names: list[str]):
-        """(attributes, commands, events) esp-matter creates, as normalised-name
-        sets, or None if the cluster is not covered by the legacy model."""
-        ns = self.namespace_for(cluster_name)
-        if ns is None:
-            return None
-        c = self.data["clusters"][ns]
-        if c.get("cls") is None:
-            return None
+    def _closure(self, c: dict, feature_names) -> set[str]:
+        """Normalised feature names enabled by ``feature_names`` plus what esp-matter adds itself."""
         enabled = {self._fnorm(f) for f in feature_names}
-        # resolve implications
         changed = True
         by_norm = {self._fnorm(k): k for k in c["features"]}
         while changed:
@@ -599,6 +591,27 @@ class Profile:
                         changed = True
         for imp in c["implies"].get("*", []):
             enabled.add(self._fnorm(imp))
+        return enabled
+
+    def implied_features(self, cluster_name: str, feature_names: list[str]) -> list[str]:
+        """Feature names (esp-matter spelling) that the creator turns on besides ``feature_names``."""
+        ns = self.namespace_for(cluster_name)
+        if ns is None or self.data["clusters"][ns].get("cls") is None:
+            return []
+        c = self.data["clusters"][ns]
+        enabled = self._closure(c, feature_names)
+        return [k for k in c["features"] if self._fnorm(k) in enabled]
+
+    def predict(self, cluster_name: str, feature_names: list[str]):
+        """(attributes, commands, events) esp-matter creates, as normalised-name
+        sets, or None if the cluster is not covered by the legacy model."""
+        ns = self.namespace_for(cluster_name)
+        if ns is None:
+            return None
+        c = self.data["clusters"][ns]
+        if c.get("cls") is None:
+            return None
+        enabled = self._closure(c, feature_names)
         attrs = {norm(a) for a in c["base"]["attrs"]}
         cmds = {norm(a) for a in c["base"]["cmds"]}
         events = {norm(a) for a in c["base"]["events"]}

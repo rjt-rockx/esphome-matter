@@ -217,6 +217,11 @@ def _predict_cluster(
     if side == "client":
         return inst
     names = [cspec.features[c].name for c in inst.features if c in cspec.features]
+    # Features that the esp-matter creator adds on its own (EVSE: ChargingPreferences) are enabled too.
+    inst.features |= _feature_codes(
+        cspec, profile, profile.implied_features(cspec.name, names), notes
+    )
+    names = [cspec.features[c].name for c in inst.features if c in cspec.features]
     predicted = profile.predict(cspec.name, names)
     if predicted is None:
         return inst  # attribute level unknown

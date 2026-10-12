@@ -776,6 +776,13 @@ class Endpoint:
             var, self._endpoint_id, device_config, device_type.name
         )
 
+        if device_type.name == "evse":
+            # esp-matter's evse add() also creates Device Energy Management, without a feature. The cluster
+            # needs PowerForecastReporting or StateForecastReporting (Device Energy Management cluster, choice a).
+            dem = self._cluster_configs["DeviceEnergyManagement"]
+            dem.created = True
+            dem.enabled_features["PowerForecastReporting"] = True
+
         # Register extra features
         for enabled_feature in device_config.get(CONF_WITH_FEATURES, ()):
             for cluster in device_type.server_clusters:
@@ -931,6 +938,12 @@ class Endpoint:
                 lines.append(
                     f"{config_var}.{device_type.config_member(cluster)}.feature_flags = {' | '.join(feature_flags)};"
                 )
+
+        if device_type.name == "evse":
+            lines.append(
+                f"{config_var}.device_energy_management.feature_flags = "
+                "esp_matter::cluster::device_energy_management::feature::power_forecast_reporting::get_id();"
+            )
 
         lines.extend(cover_lines)
         climate_ = self._climate_variables.get(device_type.name)
