@@ -449,7 +449,7 @@ class Endpoint:
         var,
         sensor_id: ID,
         sensor_attribute: SensorAttribute,
-        device_type: DeviceType,
+        device_type: DeviceType | None = None,
         device_config: dict | None = None,
     ):
         cluster = sensor_attribute.cluster
