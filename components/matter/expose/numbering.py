@@ -93,12 +93,14 @@ def resolve_numbers(
                 f"Pin {who[0]} elsewhere: {{id: {who[0]}, endpoint: {alt}}} ({alt} is free)."
             )
         if len(who) > 1:
-            first, keep = who[0], who[-1]
+            # Pinning a key to the colliding number would not help: the other key still
+            # hashes there. Pin one of them to a free number instead.
+            first, other = who[0], who[-1]
             alt = _free_suggestion(first, avoid)
             raise cv.Invalid(
                 f"matter: endpoint {number} collides: {' and '.join(who)}. "
-                f"Pin one: {{id: {keep}, endpoint: {number}}} keeps it; "
-                f"{first} could use {alt} (free)."
+                f"Pin one of them to a free endpoint: {{id: {first}, endpoint: {alt}}} "
+                f"({alt} is free); {other} then keeps {number}."
             )
     for number, who in hashed.items():
         result[who[0]] = number

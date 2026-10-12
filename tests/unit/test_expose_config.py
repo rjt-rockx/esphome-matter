@@ -55,7 +55,7 @@ def test_collision_is_an_error(run_config):
     result = run_config(body)
     assert not result.ok
     assert "endpoint 47922 collides: e84 and e276" in result.output
-    assert "e84 could use 6810 (free)" in result.output
+    assert "{id: e84, endpoint: 6810} (6810 is free)" in result.output
 
 
 def test_wrong_pairing_reports_stock_use_id_error(run_config):

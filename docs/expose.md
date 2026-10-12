@@ -93,10 +93,10 @@ The key is the entity `id` (`relay_1` is endpoint 30374), `group:<name>` for a m
 collision is a compile error naming both keys; nothing is salted or renumbered:
 
 ```
-matter: endpoint 47922 collides: e84 and e276. Pin one: {id: e276, endpoint: 47922} keeps it; e84 could use 6810 (free).
+matter: endpoint 47922 collides: e84 and e276. Pin one of them to a free endpoint: {id: e84, endpoint: 6810} (6810 is free); e276 then keeps 47922.
 ```
 
-Pin the colliding entity to a free number (`{id: e84, endpoint: 6810}`). Renaming an id moves its endpoint
+Pin one of the colliding entities to the suggested free number (`{id: e84, endpoint: 6810}`); the other keeps its hashed number. Pinning a key to the shared number does not help, because the other key still hashes there. Renaming an id moves its endpoint
 unless you add `was: old_id`. Collisions are rare (about 1% at 50 exposed entities).
 
 To move an existing hand-numbered endpoint to `expose` without re-pairing, pin its number:

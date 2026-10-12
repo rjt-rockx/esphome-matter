@@ -106,9 +106,11 @@ def test_collision_is_hard_error_with_suggestion():
     with pytest.raises(cv.Invalid) as exc:
         resolve_numbers(["e276", "e84"], {})
     assert str(exc.value.msg) == (
-        "matter: endpoint 47922 collides: e84 and e276. Pin one: {id: e276, endpoint: 47922} "
-        "keeps it; e84 could use 6810 (free)."
+        "matter: endpoint 47922 collides: e84 and e276. Pin one of them to a free endpoint: "
+        "{id: e84, endpoint: 6810} (6810 is free); e276 then keeps 47922."
     )
+    # the suggestion must itself resolve
+    assert resolve_numbers(["e276", "e84"], {"e84": 6810}) == {"e84": 6810, "e276": 47922}
 
 
 def test_pin_frees_the_other_key():
