@@ -35,7 +35,7 @@ from .data_model.device_types import (
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
-from . import fan_binding
+from . import fan_binding, layout_dump
 from .matter_climate import (
     CLIMATE_INCLUDE,
     CONF_CLIMATE_ID,
@@ -970,6 +970,8 @@ async def register_endpoints(var, config: ConfigType):
     if any(plan.label is not None for plan in plans.values()):
         # FixedLabel needs a DeviceInfoProvider; matter_conformance.cpp installs one.
         add_idf_sdkconfig_option("CONFIG_CUSTOM_DEVICE_INFO_PROVIDER", True)
+
+    layout_dump.dump_layout(CORE.data[CONF_MATTER][CONF_ENDPOINTS])  # opt-in: MATTER_LAYOUT_JSON
 
     # Set sdkconfig options to compile the correct clusters.
     for cluster in CLUSTERS:

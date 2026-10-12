@@ -1,0 +1,12 @@
+{
+ "gaps": [
+  {
+   "code": "DT-FEATURE-MISSING",
+   "where": "Base Device Type",
+   "message": "TagList",
+   "scope": "component",
+   "reason": "component gap: endpoints sharing an application device type with a sibling need Descriptor.TagList (Base Device Type 'Duplicate' condition) but esphome-matter never enables the Descriptor tag_list feature or sets tags. Remove this entry once fixed to arm the check",
+   "ref": "components/matter/endpoints.py Endpoint._make_build_callback (no Descriptor feature/tag handling); esp-matter descriptor::feature::tag_list"
+  }
+ ]
+}
