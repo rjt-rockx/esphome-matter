@@ -1,6 +1,31 @@
 from dataclasses import dataclass
 from enum import Enum
+import logging
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
+
+# Conformance conditions (spec 1.4 appendix "Conformance conditions"): the
+# component always implements Matter; other protocol conditions never apply.
+# Unknown conditions (device-type conditions like Duplicate/Client/Server, or
+# conditions that are defined in prose) evaluate to false.
+TRUE_CONDITIONS = frozenset({"Matter"})
+_LOGGED_DESCRIBED: set[str] = set()
+
+
+def condition_value(name: Any) -> bool:
+    return name in TRUE_CONDITIONS
+
+
+def _note_described() -> None:
+    """`described` conformance is defined in prose; treat it as optional."""
+    key = "described"
+    if key not in _LOGGED_DESCRIBED:
+        _LOGGED_DESCRIBED.add(key)
+        _LOGGER.info(
+            "Conformance rule is 'described' (defined by the element description); "
+            "treating it as optional"
+        )
 
 
 class ConformanceError(ValueError):
@@ -123,7 +148,7 @@ def _term_matches(term: Any, enabled_features: set[str]) -> bool | None:
     if operator == "feature":
         return value in enabled_features
     if operator == "condition":
-        return True if value == "Matter" else None
+        return condition_value(value)
     if operator == "literal":
         return bool(value)
     if operator in ("and", "or"):
@@ -192,6 +217,11 @@ def _term_alternatives(term: Any) -> list[Requirement]:
     operator, value = next(iter(term.items()))
     if operator == "feature":
         return [Requirement(required_features=frozenset((value,)))]
+    if operator == "condition":
+        # A true condition adds no feature requirement; a false one can never hold.
+        return [Requirement()] if condition_value(value) else []
+    if operator == "literal":
+        return [Requirement()] if value else []
     if operator == "and":
         alternatives = [Requirement()]
         for child in value:
@@ -202,6 +232,8 @@ def _term_alternatives(term: Any) -> list[Requirement]:
             alternative for child in value for alternative in _term_alternatives(child)
         ]
     if operator == "not":
+        if isinstance(value, dict) and set(value) == {"condition"}:
+            return [] if condition_value(value["condition"]) else [Requirement()]
         if not isinstance(value, dict) or set(value) != {"feature"}:
             raise ConformanceError(
                 f"Only negated feature references can currently be resolved: {value!r}"
@@ -242,6 +274,9 @@ def _rule_alternatives(rule: Any) -> list[Requirement]:
     if rule_type == "disallowed":
         return []
     if rule_type in ("deprecated", "provisional"):
+        return [Requirement()]
+    if rule_type == "described":
+        _note_described()
         return [Requirement()]
     raise ConformanceError(f"Unsupported conformance rule type: {rule_type}")
 
@@ -294,8 +329,27 @@ def resolve_feature_requirements(
     requirements: list[Conformance],
     feature_conformance: dict[str, Conformance | None],
     enabled_features: set[str],
+    context: str = "",
 ) -> set[str]:
-    """Resolve unambiguous feature dependencies to a fixed point."""
+    """Resolve unambiguous feature dependencies to a fixed point.
+
+    `context` (e.g. "Door Lock cluster on endpoint 1") prefixes every error.
+    """
+    try:
+        return _resolve_feature_requirements(
+            requirements, feature_conformance, enabled_features
+        )
+    except ConformanceError as err:
+        if context:
+            raise type(err)(f"{context}: {err}") from err
+        raise
+
+
+def _resolve_feature_requirements(
+    requirements: list[Conformance],
+    feature_conformance: dict[str, Conformance | None],
+    enabled_features: set[str],
+) -> set[str]:
     enabled = set(enabled_features)
     pending = list(requirements)
     pending.extend(

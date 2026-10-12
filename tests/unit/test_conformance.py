@@ -129,3 +129,28 @@ def test_schema_rejects_unknown_tag(run_config):
               on_off_light:
     """
     assert not run_config(body).ok
+
+
+def test_default_label_truncates_on_utf8_boundary(caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        out = c.default_label("Küche Deckenlampe links")
+    assert len(out.encode()) <= c.LABEL_MAX
+    assert out.startswith("Küche")
+    assert "truncated" in caplog.text
+    # multi-byte characters are never split
+    assert c.default_label("é" * 20) == "é" * 8
+
+
+def test_default_label_short_is_unchanged(caplog):
+    assert c.default_label("Relay 1") == "Relay 1"
+    assert "truncated" not in caplog.text
+
+
+def test_explicit_label_over_limit_is_error():
+    import esphome.config_validation as cv
+
+    with pytest.raises(cv.Invalid, match="17 UTF-8 bytes"):
+        c._label("x" * 17)
+    assert c._label("x" * 16) == "x" * 16

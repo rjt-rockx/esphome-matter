@@ -264,6 +264,13 @@ class Endpoint:
 
         return cluster_present, enabled_codes, disallowed_codes
 
+    def _device_type_names(self) -> list[str]:
+        return [
+            key
+            for key in self._config
+            if key in DEVICE_TYPES_BY_CONF_KEY
+        ]
+
     def resolve(self) -> None:
         usages_by_cluster = defaultdict(list)
         clusters_by_id = {}
@@ -293,11 +300,28 @@ class Endpoint:
             cluster_present, enabled_codes, disallowed_codes = self._cluster_state(
                 cluster
             )
+            device_types = self._device_type_names()
+            where = f"{cluster.name} cluster on endpoint {self._endpoint_id}" + (
+                f" ({', '.join(device_types)})" if device_types else ""
+            )
             if not cluster_present:
                 usage_names = ", ".join(usage.name for usage in usages)
+                key = snake_case(cluster.name)
+                if usage_names:
+                    reason = f"required by: {usage_names}"
+                else:
+                    features = ", ".join(
+                        f.conf_key
+                        for f in cluster.features
+                        if f.code in enabled_codes
+                    )
+                    reason = f"needed by the selected with_features: {features}"
                 raise cv.Invalid(
                     f"Matter endpoint {self._endpoint_id} does not contain the "
-                    f"{cluster.name} cluster required by: {usage_names}"
+                    f"{cluster.name} cluster ({reason}). The device type"
+                    f"{'s' if len(device_types) != 1 else ''} "
+                    f"{', '.join(device_types) or '(none)'} does not require it; "
+                    f"add it with `clusters: {{{key}: ...}}` on the endpoint"
                 )
 
             feature_conformance = {
@@ -308,12 +332,13 @@ class Endpoint:
                     [usage.conformance for usage in usages],
                     feature_conformance,
                     enabled_codes,
+                    context=where,
                 )
             except ConformanceError as err:
                 usage_names = ", ".join(usage.name for usage in usages)
                 raise cv.Invalid(
-                    f"Cannot resolve features for endpoint {self._endpoint_id} "
-                    f"from {usage_names}: {err}"
+                    f"Cannot resolve features for {err}"
+                    + (f" (from {usage_names})" if usage_names else "")
                 ) from err
 
             invalid_codes = (enabled_codes | inferred_codes) & disallowed_codes
