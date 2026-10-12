@@ -55,50 +55,38 @@ from .util import snake_case
 _LOGGER = logging.getLogger(__name__)
 
 
-def light_restore_warning(matter_config: dict, full_config: Config):
-    for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
-        for conf_key, device_config in endpoint_config.items():
-            if not isinstance(device_config, dict):
-                continue
-            light_id = device_config.get(CONF_LIGHT_ID)
-            if light_id is None:
-                continue
-            try:
-                light_path = full_config.get_path_for_id(light_id)[:-1]
-                light_config = full_config.get_config_for_path(light_path)
-            except KeyError:
-                continue
-            restore_mode = light_config.get(CONF_RESTORE_MODE)
-            if restore_mode is not None and restore_mode != "ALWAYS_OFF":
-                _LOGGER.warning(
-                    "Light '%s' is exposed through Matter with restore mode %s and should use "
-                    "restore_mode: ALWAYS_OFF so Matter can restore its power-on state",
-                    light_id,
-                    restore_mode,
-                )
-
-
-def switch_restore_warning(matter_config: dict, full_config: Config):
+def _restore_mode_warning(
+    matter_config: dict, full_config: Config, id_key: str, kind: str
+):
     for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
         for device_config in endpoint_config.values():
             if not isinstance(device_config, dict):
                 continue
-            switch_id = device_config.get(CONF_SWITCH_ID)
-            if switch_id is None:
+            entity_id = device_config.get(id_key)
+            if entity_id is None:
                 continue
             try:
-                switch_path = full_config.get_path_for_id(switch_id)[:-1]
-                switch_config = full_config.get_config_for_path(switch_path)
+                entity_path = full_config.get_path_for_id(entity_id)[:-1]
+                entity_config = full_config.get_config_for_path(entity_path)
             except KeyError:
                 continue
-            restore_mode = switch_config.get(CONF_RESTORE_MODE)
+            restore_mode = entity_config.get(CONF_RESTORE_MODE)
             if restore_mode is not None and restore_mode != "ALWAYS_OFF":
                 _LOGGER.warning(
-                    "Switch '%s' is exposed through Matter with restore mode %s and should use "
+                    "%s '%s' is exposed through Matter with restore mode %s and should use "
                     "restore_mode: ALWAYS_OFF so Matter can restore its power-on state",
-                    switch_id,
+                    kind,
+                    entity_id,
                     restore_mode,
                 )
+
+
+def light_restore_warning(matter_config: dict, full_config: Config):
+    _restore_mode_warning(matter_config, full_config, CONF_LIGHT_ID, "Light")
+
+
+def switch_restore_warning(matter_config: dict, full_config: Config):
+    _restore_mode_warning(matter_config, full_config, CONF_SWITCH_ID, "Switch")
 
 
 def _on_attribute_schema():
@@ -300,13 +288,13 @@ class Endpoint:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
             cg.add(var.register_light(light_, self._endpoint_id))
+        if CONF_SWITCH_ID in device_config:
+            switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
+            cg.add(var.register_switch(switch_, self._endpoint_id))
         await register_entity(
             var, self._endpoint_id, device_type.name, device_config
         )
 
-        if CONF_SWITCH_ID in device_config:
-            switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
-            cg.add(var.register_switch(switch_, self._endpoint_id))
         if fan_binding.CONF_FAN_ID in device_config:
             self._fan_variable = await cg.get_variable(
                 device_config[fan_binding.CONF_FAN_ID]
