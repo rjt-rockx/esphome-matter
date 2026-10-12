@@ -80,6 +80,19 @@ Matter-over-Thread requires the `openthread` component, ESPHome 2026.6.0 or newe
 - `matter.factory_reset` wipes fabrics and reopens the commissioning window. The discriminator is kept, and the passcode is new unless `persist_passcode: true` or `passcode:` is set. `matter.reset_identity` also creates a new discriminator.
 - Fabric data is stored in flash (NVS) and survives OTA updates.
 
+## The device boots but Matter is marked failed
+
+A configuration can pass validation and still fail when esp-matter builds an endpoint. The log then names the step:
+
+```
+[E][matter:...] Failed to build endpoint 2. Failing step: endpoint 2: cluster FanControl feature MultiSpeed
+[E][component:...] matter was marked as failed
+```
+
+The step is one of `device type <name>`, `cluster <Cluster> create`, `cluster <Cluster> feature <Feature>`, `cluster <Cluster> missing after device type creation`, `attribute <Cluster>.<Attribute> create` or a binding extension such as `thermostat extension`. Match it against [conformance.md](conformance.md) and [clusters.md](clusters.md): usually a feature or optional attribute that esp-matter cannot create for that device type. When you report it, include this line. The same reason is stored as the component's error status.
+
+`dump_config` prints "unavailable (CHIP stack busy)" for the commissioning window and fabrics when the Matter task holds its lock for more than 200 ms. This is harmless; the main loop does not wait longer.
+
 ## Other known issues
 
 - **BLE commissioning** (a build without `wifi`/`openthread`/`ethernet`) is implemented but not verified on hardware, and `esp32_ble*` components cannot be used in the same YAML. See [ble-commissioning.md](ble-commissioning.md).

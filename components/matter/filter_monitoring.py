@@ -169,7 +169,7 @@ def create_lines(cluster, config: dict, endpoint_id: int) -> list[str]:
         f"auto *{var} = {ns}::create(endpoint, &{cluster.espm_namespace}_config, "
         "esp_matter::CLUSTER_FLAG_SERVER);",
         f"if ({var} == nullptr)",
-        "  return false;",
+        "  return MATTER_BUILD_FAIL(\"resource monitoring cluster create\");",
     ]
     features = {str(f) for f in config.get(CONF_WITH_FEATURES, ())}
     if "condition" in features:
@@ -181,25 +181,25 @@ def create_lines(cluster, config: dict, endpoint_id: int) -> list[str]:
             f"  condition_config.condition = {initial};",
             f"  condition_config.degradation_direction = {direction};",
             f"  if ({ns}::feature::condition::add({var}, &condition_config) != ESP_OK)",
-            "    return false;",
+            "    return MATTER_BUILD_FAIL(\"resource monitoring condition feature\");",
             "}",
         ]
     if "warning" in features:
         lines += [
             f"if ({ns}::feature::warning::add({var}) != ESP_OK)",
-            "  return false;",
+            "  return MATTER_BUILD_FAIL(\"resource monitoring warning feature\");",
         ]
     if "replacement_product_list" in features:
         lines += [
             f"if ({ns}::feature::replacement_product_list::add({var}) != ESP_OK)",
-            "  return false;",
+            "  return MATTER_BUILD_FAIL(\"resource monitoring replacement product list feature\");",
         ]
     if has_reset(config):
         # Without the delegate above the command would reach an unset pointer.
         assert is_bound(config)
         lines += [
             f"if ({ns}::command::create_reset_condition({var}) == nullptr)",
-            "  return false;",
+            "  return MATTER_BUILD_FAIL(\"resource monitoring reset condition command\");",
         ]
     return lines
 

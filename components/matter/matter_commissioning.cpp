@@ -2,6 +2,7 @@
 #ifdef USE_MATTER
 
 #include "matter_commissioning.h"
+#include "matter_chip_lock.h"
 
 #include "esphome/core/log.h"
 #include "matter_attributes.h"
@@ -513,9 +514,12 @@ void MatterCommissioning::dump_config() {
                     : "verifier only");
   // The codes are only printed while a commissioning window is open (the
   // window-open event prints them too); never on a regular boot.
-  chip::DeviceLayer::PlatformMgr().LockChipStack();
-  this->refresh_(true, false);
-  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+  BoundedChipLock chip_lock;
+  if (chip_lock.locked())
+    this->refresh_(true, false);
+  else
+    ESP_LOGCONFIG(TAG, "  Commissioning window state: unavailable "
+                       "(CHIP stack busy)");
 }
 
 void MatterCommissioning::open_window(uint32_t timeout_s) {

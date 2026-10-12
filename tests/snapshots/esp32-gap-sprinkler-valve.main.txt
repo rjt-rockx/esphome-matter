@@ -12,15 +12,15 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(1);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type water_valve");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster FixedLabel create");
     auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
     if (valve_configuration_and_control_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster ValveConfigurationandControl missing after device type creation");
     if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::time_sync::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster ValveConfigurationandControl feature TimeSync");
     return true;
   });
   matter_mattercomponent_id->register_valve(zone_2, 2);
@@ -32,15 +32,15 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(2);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type water_valve");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster FixedLabel create");
     auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
     if (valve_configuration_and_control_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster ValveConfigurationandControl missing after device type creation");
     if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::time_sync::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster ValveConfigurationandControl feature TimeSync");
     return true;
   });
   matter_mattercomponent_id->register_valve(zone_3, 3);
@@ -52,15 +52,15 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(3);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: device type water_valve");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: cluster FixedLabel create");
     auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
     if (valve_configuration_and_control_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: cluster ValveConfigurationandControl missing after device type creation");
     if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::time_sync::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: cluster ValveConfigurationandControl feature TimeSync");
     return true;
   });
   matter_mattercomponent_id->register_valve(zone_4, 4);
@@ -72,15 +72,15 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(4);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: device type water_valve");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: cluster FixedLabel create");
     auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
     if (valve_configuration_and_control_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ValveConfigurationandControl missing after device type creation");
     if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::time_sync::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: cluster ValveConfigurationandControl feature TimeSync");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x59AF690B);

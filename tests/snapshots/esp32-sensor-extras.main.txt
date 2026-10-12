@@ -13,14 +13,14 @@
     esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
     device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::passive_infrared::get_id();
     if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type occupancy_sensor");
     {
       auto *occupancy_sensing_cluster = esp_matter::cluster::get(endpoint, 1030);
       if (occupancy_sensing_cluster == nullptr ||
           esp_matter::cluster::occupancy_sensing::attribute::create_hold_time(occupancy_sensing_cluster, 45) == nullptr ||
           esp_matter::cluster::occupancy_sensing::attribute::create_hold_time_limits(occupancy_sensing_cluster, nullptr, 0, 0) == nullptr ||
           esp_matter::cluster::occupancy_sensing::attribute::create_pir_occupied_to_unoccupied_delay(occupancy_sensing_cluster, 45) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 1: sensor extras cluster create");
     }
     return true;
   });
@@ -33,13 +33,13 @@
     esp_matter::endpoint::occupancy_sensor::config_t device_config_0{};
     device_config_0.occupancy_sensing.feature_flags = esp_matter::cluster::occupancy_sensing::feature::radar::get_id();
     if (esp_matter::endpoint::occupancy_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type occupancy_sensor");
     {
       auto *occupancy_sensing_cluster = esp_matter::cluster::get(endpoint, 1030);
       if (occupancy_sensing_cluster == nullptr ||
           esp_matter::cluster::occupancy_sensing::attribute::create_hold_time(occupancy_sensing_cluster, 20) == nullptr ||
           esp_matter::cluster::occupancy_sensing::attribute::create_hold_time_limits(occupancy_sensing_cluster, nullptr, 0, 0) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 2: sensor extras cluster create");
     }
     return true;
   });
@@ -58,38 +58,38 @@
   matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::water_leak_detector::config_t device_config_0{};
     if (esp_matter::endpoint::water_leak_detector::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: device type water_leak_detector");
     esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
     auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (boolean_state_configuration_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration cluster create");
     {
       esp_matter::cluster::boolean_state_configuration::feature::visual::config_t visual_config{};
       visual_config.alarms_supported = 3;
       if (esp_matter::cluster::boolean_state_configuration::feature::visual::add(boolean_state_configuration_cluster, &visual_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration feature");
     }
     {
       esp_matter::cluster::boolean_state_configuration::feature::audible::config_t audible_config{};
       audible_config.alarms_supported = 3;
       if (esp_matter::cluster::boolean_state_configuration::feature::audible::add(boolean_state_configuration_cluster, &audible_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration feature");
     }
     {
       esp_matter::cluster::boolean_state_configuration::feature::alarm_suppress::config_t alarm_suppress_config{};
       if (esp_matter::cluster::boolean_state_configuration::feature::alarm_suppress::add(boolean_state_configuration_cluster, &alarm_suppress_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration feature");
     }
     {
       esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::config_t sensitivity_level_config{};
       sensitivity_level_config.supported_sensitivity_levels = 3;
       if (esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::add(boolean_state_configuration_cluster, &sensitivity_level_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration feature");
     }
     if (esp_matter::cluster::boolean_state_configuration::attribute::create_alarms_enabled(boolean_state_configuration_cluster, 0) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration attribute");
     if (esp_matter::cluster::boolean_state_configuration::attribute::create_default_sensitivity_level(boolean_state_configuration_cluster, 1) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: boolean state configuration attribute");
     return true;
   });
   matter_mattercomponent_id->register_binary_sensor_attribute(front_door, 4, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
@@ -100,19 +100,19 @@
   matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::contact_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: device type contact_sensor");
     esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
     auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (boolean_state_configuration_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: boolean state configuration cluster create");
     {
       esp_matter::cluster::boolean_state_configuration::feature::visual::config_t visual_config{};
       visual_config.alarms_supported = 1;
       if (esp_matter::cluster::boolean_state_configuration::feature::visual::add(boolean_state_configuration_cluster, &visual_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 4: boolean state configuration feature");
     }
     if (esp_matter::cluster::boolean_state_configuration::attribute::create_alarms_enabled(boolean_state_configuration_cluster, 0) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: boolean state configuration attribute");
     return true;
   });
   matter_mattercomponent_id->register_binary_sensor_attribute(roof_rain, 5, 69, 0, esphome::matter::conversion::boolean_state, esphome::matter::update_boolean_state_attribute);
@@ -122,16 +122,16 @@
   matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::rain_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::rain_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 5: device type rain_sensor");
     esp_matter::cluster::boolean_state_configuration::config_t boolean_state_configuration_config{};
     auto *boolean_state_configuration_cluster = esp_matter::cluster::boolean_state_configuration::create(endpoint, &boolean_state_configuration_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (boolean_state_configuration_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 5: boolean state configuration cluster create");
     {
       esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::config_t sensitivity_level_config{};
       sensitivity_level_config.supported_sensitivity_levels = 5;
       if (esp_matter::cluster::boolean_state_configuration::feature::sensitivity_level::add(boolean_state_configuration_cluster, &sensitivity_level_config) != ESP_OK)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 5: boolean state configuration feature");
     }
     return true;
   });
@@ -151,11 +151,11 @@
     esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
     device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id() | esp_matter::cluster::smoke_co_alarm::feature::co_alarm::get_id();
     if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 6: device type smoke_co_alarm");
     {
       auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
       if (smoke_co_alarm_cluster == nullptr || esp_matter::cluster::smoke_co_alarm::attribute::create_device_muted(smoke_co_alarm_cluster, {}) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 6: attribute SmokeCOAlarm.DeviceMuted create");
     }
     {
       auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
@@ -163,7 +163,7 @@
           esp_matter::cluster::smoke_co_alarm::command::create_self_test_request(smoke_co_alarm_cluster) == nullptr ||
           esp_matter::cluster::smoke_co_alarm::event::create_alarm_muted(smoke_co_alarm_cluster) == nullptr ||
           esp_matter::cluster::smoke_co_alarm::event::create_mute_ended(smoke_co_alarm_cluster) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 6: sensor extras cluster create");
     }
     return true;
   });
@@ -180,12 +180,12 @@
     esp_matter::endpoint::smoke_co_alarm::config_t device_config_0{};
     device_config_0.smoke_co_alarm.feature_flags = esp_matter::cluster::smoke_co_alarm::feature::smoke_alarm::get_id();
     if (esp_matter::endpoint::smoke_co_alarm::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 7: device type smoke_co_alarm");
     {
       auto *smoke_co_alarm_cluster = esp_matter::cluster::get(endpoint, 92);
       if (smoke_co_alarm_cluster == nullptr ||
           esp_matter::cluster::smoke_co_alarm::command::create_self_test_request(smoke_co_alarm_cluster) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 7: sensor extras cluster create");
     }
     return true;
   });
@@ -197,22 +197,22 @@
   matter_mattercomponent_id->register_endpoint(8, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: device type air_quality_sensor");
     esp_matter::cluster::carbon_dioxide_concentration_measurement::config_t carbon_dioxide_concentration_measurement_config{};
     carbon_dioxide_concentration_measurement_config.feature_flags = esp_matter::cluster::carbon_dioxide_concentration_measurement::feature::numeric_measurement::get_id();
     if (esp_matter::cluster::carbon_dioxide_concentration_measurement::create(endpoint, &carbon_dioxide_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster CarbonDioxideConcentrationMeasurement create");
     auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
     if (air_quality_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster AirQuality missing after device type creation");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster AirQuality feature Fair");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster AirQuality feature Moderate");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::very_poor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster AirQuality feature VeryPoor");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::extremely_poor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 8: cluster AirQuality feature ExtremelyPoor");
     return true;
   });
   matter_mattercomponent_id->register_concentration_sensor(pm_2_5, 9, 1066, 0, esphome::matter::conversion::concentration, 4);
@@ -223,22 +223,22 @@
   matter_mattercomponent_id->register_endpoint(9, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: device type air_quality_sensor");
     esp_matter::cluster::pm25_concentration_measurement::config_t pm25_concentration_measurement_config{};
     pm25_concentration_measurement_config.feature_flags = esp_matter::cluster::pm25_concentration_measurement::feature::numeric_measurement::get_id();
     if (esp_matter::cluster::pm25_concentration_measurement::create(endpoint, &pm25_concentration_measurement_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster PM25ConcentrationMeasurement create");
     auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
     if (air_quality_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster AirQuality missing after device type creation");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster AirQuality feature Fair");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster AirQuality feature Moderate");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::very_poor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster AirQuality feature VeryPoor");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::extremely_poor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 9: cluster AirQuality feature ExtremelyPoor");
     return true;
   });
   new(matter_air_quality_10) matter::MatterAirQualityMapping(tvoc_ppb, 10, 91, 0, std::vector<esphome::matter::MatterAirQualityThreshold>{{2, 220.0f}, {3, 660.0f}, {4, 2200.0f}}, 0.02f);
@@ -248,14 +248,14 @@
   matter_mattercomponent_id->register_endpoint(10, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::air_quality_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::air_quality_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 10: device type air_quality_sensor");
     auto *air_quality_cluster = esp_matter::cluster::get(endpoint, 91);
     if (air_quality_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 10: cluster AirQuality missing after device type creation");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::fair::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 10: cluster AirQuality feature Fair");
     if (esphome::matter::add_feature(air_quality_cluster, esp_matter::cluster::air_quality::feature::moderate::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 10: cluster AirQuality feature Moderate");
     return true;
   });
   new(matter_refrigerator_alarm_11) matter::MatterRefrigeratorAlarmMapping(11, fridge_door);
@@ -276,19 +276,19 @@
   matter_mattercomponent_id->register_endpoint(11, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::refrigerator::config_t device_config_0{};
     if (esp_matter::endpoint::refrigerator::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 11: device type refrigerator");
     esp_matter::cluster::refrigerator_and_tcc_mode::config_t refrigerator_and_tcc_mode_config{};
     if (esp_matter::cluster::refrigerator_and_tcc_mode::create(endpoint, &refrigerator_and_tcc_mode_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 11: cluster RefrigeratorAndTemperatureControlledCabinetMode create");
     esp_matter::cluster::refrigerator_alarm::config_t refrigerator_alarm_config{};
     refrigerator_alarm_config.mask = 1;
     refrigerator_alarm_config.supported = 1;
     refrigerator_alarm_config.state = 0;
     auto *refrigerator_alarm_cluster = esp_matter::cluster::refrigerator_alarm::create(endpoint, &refrigerator_alarm_config, esp_matter::CLUSTER_FLAG_SERVER);
     if (refrigerator_alarm_cluster == nullptr || esp_matter::event::create(refrigerator_alarm_cluster, 0) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 11: refrigerator alarm cluster create");
     if (!esphome::matter::attach_delegate(endpoint, 0x0052))
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 11: cluster delegate attach");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x175C2DA5);

@@ -992,7 +992,7 @@ def build_attach_lines(cluster_ids: list[int]) -> list[str]:
         lines.extend(
             (
                 f"if (!esphome::matter::attach_delegate(endpoint, 0x{cluster_id:04X}))",
-                "  return false;",
+                "  return MATTER_BUILD_FAIL(\"cluster delegate attach\");",
             )
         )
     return lines

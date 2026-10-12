@@ -285,7 +285,7 @@ def feature_lines(cluster_var: str, binding: FanBinding, var):
         return [
             f"if (esphome::matter::add_climate_fan_features({cluster_var}, {var}, "
             f"{str(binding.step).lower()}) != ESP_OK)",
-            "  return false;",
+            "  return MATTER_BUILD_FAIL(\"cluster FanControl climate fan features\");",
         ]
     options = ""
     if binding.step or binding.wind:
@@ -295,7 +295,7 @@ def feature_lines(cluster_var: str, binding: FanBinding, var):
         )
     return [
         f"if (esphome::matter::add_fan_features({cluster_var}, {var}{options}) != ESP_OK)",
-        "  return false;",
+        '  return MATTER_BUILD_FAIL("cluster FanControl trait features");',
     ]
 
 

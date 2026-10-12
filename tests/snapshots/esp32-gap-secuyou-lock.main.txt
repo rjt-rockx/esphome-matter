@@ -10,16 +10,16 @@
     device_config_0.door_lock.actuator_enabled = true;
     device_config_0.door_lock.lock_type = 2;
     if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type door_lock");
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock missing after device type creation");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::pin_credential::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature PINCredential");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature CredentialsOverTheAirAccess");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::user::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature User");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x95C84536);

@@ -767,7 +767,7 @@ def post_create_lines(node: dict) -> list[str]:
         "{",
         f"  auto *bdbi_cluster = esp_matter::cluster::get(endpoint, {BDBI_CLUSTER_ID});",
         "  if (bdbi_cluster == nullptr)",
-        "    return false;",
+        "    return MATTER_BUILD_FAIL(\"bridged node basic information cluster\");",
     ]
 
     def add_string(function: str, value: str):
@@ -777,7 +777,7 @@ def post_create_lines(node: dict) -> list[str]:
             f"  if ({attribute}::{function}(bdbi_cluster, const_cast<char *>({literal}), "
             f"{len(value.encode())}) == nullptr)"
         )
-        lines.append("    return false;")
+        lines.append("    return MATTER_BUILD_FAIL(\"bridged node basic information attribute\");")
 
     # A NodeLabel that a controller wrote stays in flash and wins over the YAML; a changed `name:` resets it.
     lines.append(
@@ -793,7 +793,7 @@ def post_create_lines(node: dict) -> list[str]:
             lines.append(
                 f"  if ({attribute}::{function}(bdbi_cluster, static_cast<{ctype}>({node[conf_key]}U)) == nullptr)"
             )
-            lines.append("    return false;")
+            lines.append("    return MATTER_BUILD_FAIL(\"bridged node basic information attribute\");")
     lines.append("}")
     return lines
 

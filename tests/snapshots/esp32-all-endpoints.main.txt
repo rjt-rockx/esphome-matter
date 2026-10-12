@@ -7,20 +7,20 @@
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_light_switch::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_light_switch::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type on_off_light_switch");
     esp_matter::cluster::binding::config_t binding_config{};
     if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster Binding create");
     return true;
   });
   matter_mattercomponent_id->register_endpoint_parent(2, 0);
   matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::dimmer_switch::config_t device_config_0{};
     if (esp_matter::endpoint::dimmer_switch::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type dimmer_switch");
     esp_matter::cluster::binding::config_t binding_config{};
     if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster Binding create");
     return true;
   });
   new(matter_mattersetattributeaction_id) matter::MatterSetAttributeAction<bool>();
@@ -50,7 +50,7 @@
   matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::on_off_light::config_t device_config_0{};
     if (esp_matter::endpoint::on_off_light::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: device type on_off_light");
     return true;
   });
   matter_mattercomponent_id->register_light(dimmable_status_light, 4);
@@ -60,26 +60,26 @@
     device_config_0.level_control.min_level = 25;
     device_config_0.level_control.max_level = 229;
     if (esp_matter::endpoint::dimmable_light::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 4: device type dimmable_light");
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
       if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OnOffTransitionTime create");
     }
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
       if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OnTransitionTime create");
     }
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
       if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.OffTransitionTime create");
     }
     {
       auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
       if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 4: attribute LevelControl.DefaultMoveRate create");
     }
     return true;
   });
@@ -88,7 +88,7 @@
     esp_matter::endpoint::generic_switch::config_t device_config_0{};
     device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
     if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 5: device type generic_switch");
     return true;
   });
   matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 100, 1026, 0, esphome::matter::conversion::temperature);
@@ -97,7 +97,7 @@
   matter_mattercomponent_id->register_endpoint(100, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 100: device type temperature_sensor");
     return true;
   });
   matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 101, 1026, 0, esphome::matter::conversion::temperature);
@@ -106,7 +106,7 @@
   matter_mattercomponent_id->register_endpoint(101, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 101: device type temperature_sensor");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0xDFD4B6AB);

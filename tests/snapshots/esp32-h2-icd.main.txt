@@ -14,7 +14,7 @@
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type temperature_sensor");
     return true;
   });
   matter_mattercomponent_id->register_binary_sensor_attribute(door, 2, 69, 0, esphome::matter::conversion::boolean_state_inverted, esphome::matter::update_boolean_state_attribute);
@@ -22,7 +22,7 @@
   matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::contact_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::contact_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type contact_sensor");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x338C54E7);

@@ -352,7 +352,7 @@ def optional_attribute_lines(
                 "{",
                 f"  auto *{cluster_var} = esp_matter::cluster::get(endpoint, {cluster.id});",
                 f"  if ({cluster_var} == nullptr || {create_fn}({cluster_var}, {arguments}) == nullptr)",
-                "    return false;",
+                f'    return MATTER_BUILD_FAIL("attribute {cluster.name}.{attribute.name} create");',
             )
         )
         if extra := (initial_values or {}).get((cluster.id, attribute.id)):

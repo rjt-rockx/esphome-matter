@@ -7,10 +7,10 @@
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::dimmer_switch::config_t device_config_0{};
     if (esp_matter::endpoint::dimmer_switch::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type dimmer_switch");
     esp_matter::cluster::binding::config_t binding_config{};
     if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster Binding create");
     return true;
   });
   new(matter_mattersendcommandaction_id_2) matter::MatterSendCommandAction<>();
@@ -54,7 +54,7 @@
   matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
     if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type temperature_sensor");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x66D79EB4);

@@ -12,39 +12,39 @@
     device_config_0.door_lock.actuator_enabled = true;
     device_config_0.door_lock.lock_type = 0;
     if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type door_lock");
     esp_matter::cluster::power_source::config_t power_source_config{};
     power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
     power_source_config.status = 1;
     power_source_config.order = 0;
     snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
     if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster PowerSource create");
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock missing after device type creation");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::pin_credential::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature PINCredential");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::rfid_credential::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature RFIDCredential");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::weekday_access_schedules::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature WeekDayAccessSchedules");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature DoorPositionSensor");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature CredentialsOverTheAirAccess");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::user::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature User");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::year_day_access_schedules::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature YearDayAccessSchedules");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::holiday_schedules::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature HolidaySchedules");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature Unbolt");
     {
       auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
       if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 1: attribute PowerSource.BatPercentRemaining create");
     }
     return true;
   });

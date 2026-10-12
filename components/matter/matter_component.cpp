@@ -9,6 +9,7 @@
 #include "esphome/core/log.h"
 #include "matter_commissioning.h"
 #include "matter_component.h"
+#include "matter_chip_lock.h"
 #include "matter_icd.h"
 #include "matter_identify.h"
 #include "matter_network.h"
@@ -256,7 +257,10 @@ void MatterComponent::setup() {
   }
 
   if (!this->create_endpoints_(node)) {
-    this->mark_failed();
+    // The reason is a string literal of the generated code (MATTER_BUILD_FAIL).
+    const char *reason = last_build_failure();
+    this->mark_failed(reinterpret_cast<const LogString *>(
+        reason != nullptr ? reason : "failed to create endpoints"));
     return;
   }
 
@@ -334,7 +338,13 @@ void MatterComponent::dump_config() {
 
   MatterCommissioning::instance().dump_config();
 
-  chip::DeviceLayer::PlatformMgr().LockChipStack();
+  // Bounded wait: the main loop must not block on the CHIP lock.
+  BoundedChipLock chip_lock;
+  if (!chip_lock.locked()) {
+    ESP_LOGCONFIG(TAG, "  Commissioning window and fabrics: unavailable "
+                       "(CHIP stack busy)");
+    return;
+  }
   auto &server = chip::Server::GetInstance();
   ESP_LOGCONFIG(
       TAG, "  Commissioning window: %s",
@@ -364,7 +374,6 @@ void MatterComponent::dump_config() {
           label[0] ? ", Label: " : "", label);
     }
   }
-  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
 }
 
 } // namespace esphome::matter

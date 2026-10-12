@@ -567,7 +567,7 @@ def root_device_type_lines() -> list[str]:
         "if (esp_matter::endpoint::add_device_type(endpoint, "
         "esp_matter::endpoint::power_source::get_device_type_id(), "
         "esp_matter::endpoint::power_source::get_device_type_version()) != ESP_OK)",
-        "  return false;",
+        '  return MATTER_BUILD_FAIL("device type power_source on the root node");',
     ]
 
 

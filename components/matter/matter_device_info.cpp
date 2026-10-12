@@ -1,4 +1,5 @@
 #include "matter_device_info.h"
+#include "matter_attributes.h"
 #ifdef USE_MATTER
 
 #include "esphome/core/helpers.h"
@@ -164,11 +165,12 @@ void device_info_apply_post_start(const DeviceInfoConfig &cfg) {
   if (cfg.unique_id.empty())
     return;
   // The generated UniqueID lives in the CHIP config store; overwrite it so the attribute is stable and user chosen.
-  chip::DeviceLayer::PlatformMgr().LockChipStack();
-  CHIP_ERROR err = chip::DeviceLayer::ConfigurationMgr().StoreUniqueId(cfg.unique_id.c_str(), cfg.unique_id.size());
-  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
-  if (err != CHIP_NO_ERROR)
-    ESP_LOGW(TAG, "failed to store unique_id: %" CHIP_ERROR_FORMAT, err.Format());
+  // Runs on the CHIP task: the main loop never takes the CHIP stack lock.
+  run_on_matter_thread([unique_id = cfg.unique_id]() {
+    CHIP_ERROR err = chip::DeviceLayer::ConfigurationMgr().StoreUniqueId(unique_id.c_str(), unique_id.size());
+    if (err != CHIP_NO_ERROR)
+      ESP_LOGW(TAG, "failed to store unique_id: %" CHIP_ERROR_FORMAT, err.Format());
+  });
 }
 
 void device_info_dump_config(const DeviceInfoConfig &cfg) {

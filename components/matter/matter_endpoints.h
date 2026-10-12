@@ -13,6 +13,15 @@ namespace esphome::matter {
 
 using MatterEndpointBuildFn = bool (*)(esp_matter::endpoint_t *);
 
+// Boot diagnostics. A generated build callback returns
+// MATTER_BUILD_FAIL("endpoint 1: cluster FanControl feature MultiSpeed") for the
+// step that failed. The step must be a string literal: MatterComponent keeps the
+// pointer as the failure reason of the component.
+bool record_build_failure(const char *step);
+// The most recent step passed to record_build_failure, or nullptr.
+const char *last_build_failure();
+#define MATTER_BUILD_FAIL(step) ::esphome::matter::record_build_failure(step)
+
 struct MatterEndpointRegistration {
   uint16_t endpoint_id;
   MatterEndpointBuildFn build_fn;

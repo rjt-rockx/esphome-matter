@@ -97,7 +97,7 @@ def separate_thermostat_lines(climate_var, device_type_name: str) -> list[str]:
         f"{climate_var}, {_flags(device_type_name)});",
         "  if (esp_matter::cluster::thermostat::create(endpoint, &thermostat_config, "
         "esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
-        "    return false;",
+        "    return MATTER_BUILD_FAIL(\"thermostat cluster create\");",
         "}",
     ]
 
@@ -130,5 +130,5 @@ def post_create_lines(climate_var, device_type_name: str) -> list[str]:
     return [
         f"if (!esphome::matter::extend_climate_thermostat(endpoint, {climate_var}, "
         f"{_flags(device_type_name)}))",
-        "  return false;",
+        '  return MATTER_BUILD_FAIL("thermostat extension");',
     ]
