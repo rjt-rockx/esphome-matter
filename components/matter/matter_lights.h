@@ -12,6 +12,10 @@
 
 #include <cstdint>
 
+namespace chip::TLV {
+class TLVReader;
+}
+
 namespace esphome::matter {
 
 struct MatterColorTemperatureRange {
@@ -49,6 +53,30 @@ struct MatterLightPendingUpdate {
   optional<bool> on;
   optional<uint8_t> level;
   optional<MatterLightColorUpdate> color;
+  // The values are authoritative (end of a commanded transition, restore after
+  // a Stop command): apply them instantly, also when they look unchanged
+  // because the light is still fading towards a different target.
+  bool settle{false};
+};
+
+// A Matter command that moves the light to a target, decoded on the CHIP task
+// before CHIP executes it. Applied as one ESPHome light call with the real
+// transition length instead of following CHIP's intermediate steps.
+struct MatterLightCommand {
+  optional<bool> on;
+  optional<uint8_t> level;
+  // Apply `level` only when this command turns a light that is off on (On
+  // command with OnLevel).
+  bool level_if_turning_on{false};
+  optional<MatterLightColorUpdate> color;
+  uint32_t transition_ms{0};
+  // Attribute groups whose CHIP-driven intermediate writes are ignored while
+  // the transition runs.
+  bool light_group{false}; // OnOff and CurrentLevel
+  bool color_group{false}; // ColorControl attributes
+  // Stop commands: CHIP stops where it is, so the light does as well.
+  bool stop_light{false};
+  bool stop_color{false};
 };
 
 class MatterLightMapping : public MatterEndpointMappingBase,
@@ -61,6 +89,10 @@ public:
 
   void push_state_to_matter();
 
+  // Called on the CHIP task, before CHIP executes the command.
+  void handle_command(uint32_t cluster_id, uint32_t command_id,
+                      chip::TLV::TLVReader &reader);
+
 protected:
   bool has_attribute_(uint32_t cluster_id, uint32_t attribute_id) const;
 
@@ -68,11 +100,27 @@ protected:
   void schedule_color_read_();
   optional<MatterLightColorUpdate> read_color_update_();
 
+  void schedule_full_read_(bool settle, bool light, bool color);
+  MatterLightPendingUpdate read_state_();
+  bool decode_level_command_(uint32_t command_id, chip::TLV::TLVReader &reader,
+                             MatterLightCommand &command);
+  bool decode_color_command_(uint32_t command_id, chip::TLV::TLVReader &reader,
+                             MatterLightCommand &command);
+  bool decode_on_off_command_(uint32_t command_id, MatterLightCommand &command);
+  bool execute_if_off_(uint32_t cluster_id, uint32_t options_attribute_id,
+                       uint8_t options_mask, uint8_t options_override);
+  void register_commands_();
+
   // Run on the ESPHome main loop.
   void queue_update_(MatterLightPendingUpdate update);
   void apply_pending_();
+  void apply_command_(const MatterLightCommand &command);
+  void finish_command_windows_();
+  bool light_group_suppressed_(uint32_t now) const;
+  bool color_group_suppressed_(uint32_t now) const;
+  void remember_applied_values_();
   bool add_color_to_call_(light::LightCall &call,
-                          const MatterLightColorUpdate &color);
+                          const MatterLightColorUpdate &color, bool force);
 
   light::LightState *light_;
   MatterLightCapabilities capabilities_;
@@ -87,6 +135,15 @@ protected:
   bool applied_values_valid_{false};
   uint32_t last_apply_ms_{0};
   bool last_apply_valid_{false};
+  // While a transition that came from a Matter command runs, CHIP's
+  // intermediate attribute writes for that group are ignored. Matter still
+  // reports them. The end of the window is set by the command's transition
+  // time plus a margin, after which the light is synchronized with the final
+  // attribute values.
+  bool light_window_active_{false};
+  uint32_t light_window_until_ms_{0};
+  bool color_window_active_{false};
+  uint32_t color_window_until_ms_{0};
   // Last colour that was reported to Matter, to avoid needlessly rewriting
   // ColorMode (which would switch a controller's HS mode back to XY).
   bool reported_color_valid_{false};
