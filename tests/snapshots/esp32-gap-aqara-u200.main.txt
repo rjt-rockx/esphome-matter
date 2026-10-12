@@ -10,18 +10,18 @@
     device_config_0.door_lock.actuator_enabled = true;
     device_config_0.door_lock.lock_type = 9;
     if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type door_lock");
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock missing after device type creation");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::pin_credential::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature PINCredential");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::rfid_credential::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature RFIDCredential");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature CredentialsOverTheAirAccess");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::user::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature User");
     return true;
   });
   matter_mattercomponent_id->register_sensor_attribute(lock_battery, 2, 47, 12, esphome::matter::conversion::battery_percent);
@@ -33,11 +33,11 @@
     snprintf(device_config_0.power_source.description, sizeof(device_config_0.power_source.description), "%s", "Battery");
     device_config_0.power_source.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
     if (esp_matter::endpoint::power_source::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type power_source");
     {
       auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
       if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
-        return false;
+        return MATTER_BUILD_FAIL("endpoint 2: attribute PowerSource.BatPercentRemaining create");
     }
     return true;
   });

@@ -11,10 +11,10 @@
     device_config_0.closure_control.delegate = esphome::matter::get_closure_delegate(1);
     device_config_0.closure_control.feature_flags = esp_matter::cluster::closure_control::feature::positioning::get_id();
     if (esp_matter::endpoint::closure::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type closure");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster FixedLabel create");
     return true;
   });
   matter_mattercomponent_id->register_cover(side_gate, 2);
@@ -25,10 +25,10 @@
     esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(2, "gate", -1)};
     esphome::matter::configure_window_covering(device_config_0.window_covering, 2, "gate");
     if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type window_covering");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster FixedLabel create");
     return true;
   });
   matter_mattercomponent_id->register_cover(garage_compat, 3);
@@ -39,10 +39,10 @@
     esp_matter::endpoint::window_covering::config_t device_config_0{esphome::matter::window_covering_end_product_type(3, "garage", 17)};
     esphome::matter::configure_window_covering(device_config_0.window_covering, 3, "garage");
     if (esp_matter::endpoint::window_covering::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: device type window_covering");
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: cluster FixedLabel create");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x2B7768EE);

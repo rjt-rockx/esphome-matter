@@ -41,6 +41,17 @@ bool MatterEndpointMappingBase::has_server_cluster(uint32_t cluster_id) const {
                                 esp_matter::CLUSTER_FLAG_SERVER);
 }
 
+namespace {
+const char *last_failed_step = nullptr;
+} // namespace
+
+bool record_build_failure(const char *step) {
+  last_failed_step = step;
+  return false;
+}
+
+const char *last_build_failure() { return last_failed_step; }
+
 bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
   if (!this->endpoint_registrations_.empty()) {
     // esp-matter only resumes endpoint IDs below its private
@@ -71,19 +82,19 @@ bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
       endpoint = esp_matter::endpoint::get(node, endpoint_id);
       if (endpoint == nullptr) {
         ESP_LOGE(TAG, "Root node endpoint is missing");
-        return false;
+        return MATTER_BUILD_FAIL("root node endpoint is missing");
       }
     } else {
       if (esp_matter::endpoint::get(node, endpoint_id) != nullptr) {
         ESP_LOGE(TAG, "Matter endpoint id %u is already in use", endpoint_id);
-        return false;
+        return MATTER_BUILD_FAIL("endpoint id already in use");
       }
 
       endpoint = esp_matter::endpoint::resume(
           node, esp_matter::ENDPOINT_FLAG_NONE, endpoint_id, nullptr);
       if (endpoint == nullptr) {
         ESP_LOGE(TAG, "Failed to create endpoint %u", endpoint_id);
-        return false;
+        return MATTER_BUILD_FAIL("esp_matter::endpoint::resume failed");
       }
 
       // Create "empty" descriptor cluster. Connectedhomip fills this internally.
@@ -94,12 +105,19 @@ bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
       if (descriptor_cluster == nullptr) {
         ESP_LOGE(TAG, "Failed to create descriptor cluster for endpoint %u",
                  endpoint_id);
-        return false;
+        return MATTER_BUILD_FAIL("descriptor cluster create failed");
       }
     }
 
+    last_failed_step = nullptr;
     if (registration.build_fn == nullptr || !registration.build_fn(endpoint)) {
-      ESP_LOGE(TAG, "Failed to build endpoint %u", endpoint_id);
+      // The generated callback names the failing step (device type, cluster,
+      // feature or attribute); see MATTER_BUILD_FAIL.
+      ESP_LOGE(TAG, "Failed to build endpoint %u. Failing step: %s",
+               endpoint_id,
+               last_failed_step != nullptr ? last_failed_step : "(unknown)");
+      if (last_failed_step == nullptr)
+        MATTER_BUILD_FAIL("endpoint build callback failed");
       return false;
     }
 
@@ -107,7 +125,7 @@ bool MatterComponent::create_endpoints_(esp_matter::node_t *node) {
   }
 
   if (!this->conformance_.apply(node))
-    return false;
+    return MATTER_BUILD_FAIL("conformance check failed");
 
   register_client_request_callbacks();
 

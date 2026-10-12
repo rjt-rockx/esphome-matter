@@ -284,7 +284,7 @@ def initial_value_lines(attribute_name: str, device_config: dict) -> list[str]:
             "  {",
             f"    esp_matter_attr_val_t transition_val = esp_matter_uint16({deciseconds});",
             "    if (esp_matter::attribute::set_val(created_attribute, &transition_val, false) != ESP_OK)",
-            "      return false;",
+            f'      return MATTER_BUILD_FAIL("attribute {attribute_name} initial value");',
             "  }",
         ]
     return []

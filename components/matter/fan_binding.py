@@ -50,7 +50,7 @@ def feature_lines(cluster_var: str, fan_var):
     """Lines that add the trait based features to the created Fan Control cluster."""
     return [
         f"if (esphome::matter::add_fan_features({cluster_var}, {fan_var}) != ESP_OK)",
-        "  return false;",
+        '  return MATTER_BUILD_FAIL("cluster FanControl trait features");',
     ]
 
 

@@ -63,5 +63,5 @@ def post_create_lines(climate_var, device_type_name: str) -> list[str]:
     return [
         f"if (!esphome::matter::extend_climate_thermostat(endpoint, {climate_var}, "
         f"{str(prefer_cooling(device_type_name)).lower()}))",
-        "  return false;",
+        '  return MATTER_BUILD_FAIL("thermostat extension");',
     ]

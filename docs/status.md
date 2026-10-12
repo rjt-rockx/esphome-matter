@@ -56,7 +56,7 @@ Open work as of the latest plan and repro reports:
 
 - No runtime testing: the test harness scenarios (`tools/harness/scenarios/`) have never run against real firmware, and no QEMU boot run exists. Only the harness self-test (simulated device) runs in CI.
 - Most binding C++ is not compiled in CI (see Verification above).
-- A config can validate and still fail at boot: if an endpoint cannot be built, the log shows "Failed to build endpoint" and the Matter component is marked failed, without saying which cluster or feature caused it.
+- A config can validate and still fail at boot: if an endpoint cannot be built, the Matter component is marked failed. The log and the failure reason now name the failing step ([troubleshooting.md](troubleshooting.md#the-device-boots-but-matter-is-marked-failed)), but there is no static prediction of such failures at config time yet.
 - Echo suppression (a controller write being pushed back to the controller) is implemented in several different ways across domains; wave merges must keep each guard.
 - Sensor updates use one scheduled work item per reading with no coalescing; if the Matter event queue is full an update is dropped and the final value can be lost.
 - Not implemented yet: the `event` entity to Generic Switch binding, `as: doorbell` in `expose:`, the `status_led` and `pairing` behaviours, `matter.remove_fabric` and a controllers sensor, entity-addressed actions, a bridge, and footprint measurement.

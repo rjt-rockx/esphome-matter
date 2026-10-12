@@ -38,8 +38,14 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
 3. **Never block the main loop on the CHIP stack lock.** No
    `ScopedChipStackLock(portMAX_DELAY)` or `LockChipStack()` in `loop()` or
    automations; a busy CHIP task would stall ESPHome and trip the watchdog.
-   Schedule onto the CHIP task instead. (`setup()` and `dump_config` take the lock once at
-   boot; that is the only accepted exception.)
+   Schedule onto the CHIP task instead (`run_on_matter_thread`, or `ScheduleWork`
+   for small payloads) and publish results back with `defer`. The one exception
+   is diagnostic output (`dump_config`), which uses `BoundedChipLock`
+   (`matter_chip_lock.h`): it polls `TryLockChipStack()` for at most 200 ms and the
+   caller skips the CHIP-side part when `locked()` is false. A blocking wait
+   matters most with opt-in blocking delegate decisions, where the CHIP task can
+   wait for the main loop. `tests/unit/test_threads_diag.py` fails on any
+   `LockChipStack`/`ScopedChipStackLock` outside the allowed list.
 4. **Shared containers need a lock.** `MatterComponent::attribute_callbacks_` is
    appended to from the main loop (`register_attribute_callback`, normally from
    a mapping's `initialize()`, which runs after `esp_matter::start()`) and read
@@ -86,11 +92,38 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
   (`handle_event`, `open_window`'s lambda); `state_` and the callback vectors
   belong to the main loop and are filled before `esp_matter::start()`.
 - Matter OTA (`matter_ota.cpp`): the OTA state event handler runs on the CHIP
-  task and defers to the main loop; the requestor driver is configured under
-  the CHIP stack lock once at boot.
-- `MatterComponent::dump_config` and `factory_reset` (`matter_component.cpp`):
-  `dump_config` blocks on `LockChipStack()` once; `factory_reset` erases NVS on
-  the main loop without the chip lock. Both are outside this change.
+  task and defers to the main loop; the requestor driver is configured and the
+  handler registered in a `run_on_matter_thread` work item from `setup()`.
+- `publish_fabric_sensors_` (`matter_text_sensors.cpp`): callable from any
+  thread. It copies the sensor slots, reads the fabric table on the CHIP task and
+  publishes on the main loop with `defer`. No lock on the main loop.
+- `ensure_concentration_cluster` (`matter_sensors.cpp`) still takes
+  `ScopedChipStackLock(portMAX_DELAY)` from `initialize()` on this branch. The
+  w3-migrate-1 branch moves it onto the CHIP task (`run_on_matter_thread`); that
+  change also removes the file from the allowed list in `test_threads_diag.py`.
+- `device_info_apply_post_start` (UniqueID write): `run_on_matter_thread`.
+- `MatterComponent::dump_config` and `MatterCommissioning::dump_config` use
+  `BoundedChipLock`; on timeout they print "unavailable (CHIP stack busy)".
+- `send_event` (`matter_actions.cpp`) still uses `ScopedChipStackLock(portMAX_DELAY)`
+  on this branch. The delegates wave moves it onto the CHIP task; that change
+  also removes the file from the allowed list in `test_threads_diag.py`.
+- `factory_reset` erases NVS on the main loop without the chip lock. Unchanged.
+
+## Thread checks
+
+`matter_thread.h` provides `MATTER_ASSERT_CHIP_THREAD()` and
+`MATTER_ASSERT_MAIN_LOOP()`, active when `USE_MATTER_THREAD_ASSERTS` is defined.
+They are used in the new CHIP-side and main-loop lambdas above. The header and
+`matter_thread.cpp` are the same files as on the binding-core branch.
+
+## Boot diagnostics
+
+The generated endpoint build callback returns `MATTER_BUILD_FAIL("endpoint N:
+<step>")` for each failing step (device type, cluster create, cluster feature,
+attribute create, binding extension). `create_endpoints_` logs
+`Failed to build endpoint N. Failing step: ...` and `MatterComponent::setup`
+passes the step to `mark_failed()`, so the failure reason also appears in the
+component status. Steps are string literals: the pointer is kept as the reason.
 
 ## Prior art
 

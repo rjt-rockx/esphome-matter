@@ -758,7 +758,12 @@ class Endpoint:
             add_call = f"esphome::matter::add_extended_color_light(endpoint, &{config_var}, {bound_light})"
         else:
             add_call = f"esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var})"
-        lines.extend((f"if ({add_call} != ESP_OK)", "  return false;"))
+        lines.extend(
+            (
+                f"if ({add_call} != ESP_OK)",
+                f'  return MATTER_BUILD_FAIL("device type {device_type.name}");',
+            )
+        )
         if device_type.name == "soil_sensor":
             # The code driven Soil Measurement cluster aborts at startup without limits.
             self.global_includes.add(
@@ -957,14 +962,14 @@ class Endpoint:
                 (
                     f"auto *{cluster_var} = {cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER);",
                     f"if ({cluster_var} == nullptr)",
-                    "  return false;",
+                    f'  return MATTER_BUILD_FAIL("cluster {cluster.name} create");',
                 )
             )
             for feature in sorted(features, key=lambda f: f.bit):
                 lines.extend(
                     (
                         f"if (esphome::matter::add_feature({cluster_var}, {cluster_ns}::feature::{feature.namespace}::add) != ESP_OK)",
-                        "  return false;",
+                        f'  return MATTER_BUILD_FAIL("cluster {cluster.name} feature {feature.name}");',
                     )
                 )
             lines.extend(self._standalone_cluster_extra_lines(cluster, cluster_var))
@@ -976,7 +981,7 @@ class Endpoint:
         lines.extend(
             (
                 f"if ({cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)",
-                "  return false;",
+                f'  return MATTER_BUILD_FAIL("cluster {cluster.name} create");',
             )
         )
         return lines
@@ -1044,7 +1049,7 @@ class Endpoint:
                 (
                     f"auto *{cluster_var} = esp_matter::cluster::get(endpoint, {cluster.id});",
                     f"if ({cluster_var} == nullptr)",
-                    "  return false;",
+                    f'  return MATTER_BUILD_FAIL("cluster {cluster.name} missing after device type creation");',
                 )
             )
             if bound_fan is not None:
@@ -1053,7 +1058,7 @@ class Endpoint:
                 lines.extend(
                     (
                         f"if (esphome::matter::add_feature({cluster_var}, esp_matter::cluster::{cluster.espm_namespace}::feature::{feature.namespace}::add) != ESP_OK)",
-                        "  return false;",
+                        f'  return MATTER_BUILD_FAIL("cluster {cluster.name} feature {feature.name}");',
                     )
                 )
 
@@ -1063,7 +1068,10 @@ class Endpoint:
         )
 
         lines.extend(("return true;", "}"))
-        return "\n".join(lines)
+        # Every failing step names its endpoint (the sub generators do not know it).
+        return "\n".join(lines).replace(
+            'MATTER_BUILD_FAIL("', f'MATTER_BUILD_FAIL("endpoint {self._endpoint_id}: '
+        )
 
 
 class EndpointRegistry:

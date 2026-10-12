@@ -10,14 +10,14 @@
     device_config_0.door_lock.actuator_enabled = true;
     device_config_0.door_lock.lock_type = 0;
     if (esp_matter::endpoint::door_lock::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: device type door_lock");
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock missing after device type creation");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature DoorPositionSensor");
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 1: cluster DoorLock feature Unbolt");
     return true;
   });
   matter_mattercomponent_id->register_valve(garden_valve, 2);
@@ -28,12 +28,12 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(2);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: device type water_valve");
     auto *valve_configuration_and_control_cluster = esp_matter::cluster::get(endpoint, 129);
     if (valve_configuration_and_control_cluster == nullptr)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster ValveConfigurationandControl missing after device type creation");
     if (esphome::matter::add_feature(valve_configuration_and_control_cluster, esp_matter::cluster::valve_configuration_and_control::feature::level::add) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 2: cluster ValveConfigurationandControl feature Level");
     return true;
   });
   matter_mattercomponent_id->register_valve(simple_valve, 3);
@@ -44,7 +44,7 @@
     device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(3);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
-      return false;
+      return MATTER_BUILD_FAIL("endpoint 3: device type water_valve");
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x20B17F7B);
