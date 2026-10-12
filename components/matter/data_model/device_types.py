@@ -5,17 +5,13 @@ from pathlib import Path
 
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import light, switch
+from esphome.components import switch
 from esphome.const import CONF_LIGHT_ID
 
 from ..binary_sensors import extra_schema as binary_sensor_schema
-from ..const import (
-    CONF_MAX_LEVEL,
-    CONF_MIN_LEVEL,
-    CONF_SWITCH_ID,
-    CONF_WITH_FEATURES,
-)
+from ..const import CONF_SWITCH_ID, CONF_WITH_FEATURES
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
+from ..light_binding import light_schema_options, validate_light_binding
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
 from ..matter_climate import climate_schema, validate_climate_features
@@ -32,14 +28,12 @@ from . import espmatter_names
 from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
 from .conformance import Conformance
-from .units import percentage
 
 _LOGGER = logging.getLogger(__name__)
 
 
 # Device types that can be bound to an ESPHome switch through switch_id.
 SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_control")
-
 
 # Default for mandatory feature choices of required clusters when the user does
 # not select one. Keys are "<device_type>"/"<Cluster>" tuples or a cluster name.
@@ -65,6 +59,10 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
         ("MomentarySwitchRelease", "ActionSwitch"),
     ),
     "ActionSwitch": (("MomentarySwitch",),),
+    # ColorControl: esp-matter refuses ColorLoop without EnhancedHue and
+    # EnhancedHue without HueAndSaturation (the endpoint build would fail at boot).
+    "ColorLoop": (("EnhancedHue",),),
+    "EnhancedHue": (("HueAndSaturation",),),
 }
 
 # Clusters whose esp-matter create() function evaluates every feature in
@@ -180,13 +178,15 @@ class DeviceType:
     def _validate_feature_name(self, value):
         """Accepts the snake_case key, CamelCase name or spec name; returns the CamelCase name."""
         features = self.get_features()
+        for feature in sorted(features, key=lambda f: f.name):
+            if feature.matches(value):
+                self._check_features_available([feature.name])
+                return feature.name
         by_key = {feature.name: feature for feature in features}
         by_key.update({feature.conf_key: feature for feature in features})
         by_key.update({feature.spec_name: feature for feature in features if feature.spec_name})
-        value = cv.one_of(*by_key)(value)
-        feature = by_key[value]
-        self._check_features_available([feature.name])
-        return feature.name
+        cv.one_of(*by_key)(value)
+        raise cv.Invalid(f"Unknown feature '{value}'")
 
     @property
     def conf_key(self) -> str:
@@ -264,7 +264,7 @@ class DeviceType:
         enabled = list(config.get(CONF_WITH_FEATURES, ()))
 
         # Add the features that other enabled features depend on.
-        for name in list(enabled):
+        for name in enabled:  # also visits the features appended below
             for alternatives in FEATURE_DEPENDENCIES.get(name, ()):
                 if not any(alternative in enabled for alternative in alternatives):
                     enabled.append(alternatives[0])
@@ -333,9 +333,7 @@ class DeviceType:
         if self.has_required_cluster("Switch"):
             schema.update(switch_schema_options())
 
-        # TODO: replace with something better
-        if self.name.endswith("light"):
-            schema[cv.Optional(CONF_LIGHT_ID)] = cv.use_id(light.LightState)
+        schema.update(light_schema_options(self))
 
         if self.name in SWITCH_DEVICE_TYPES:
             schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
@@ -350,14 +348,6 @@ class DeviceType:
 
             schema.update(closure_schema_options())
         schema.update(climate_schema(self.name))
-
-        if self.name.endswith("light") and any(
-            cluster.name == "LevelControl" and cluster.required
-            for cluster in self.server_clusters
-        ):
-            level = cv.All(percentage(), cv.int_range(min=1, max=254))
-            schema[cv.Optional(CONF_MIN_LEVEL, default=1)] = level
-            schema[cv.Optional(CONF_MAX_LEVEL, default=254)] = level
 
         extend_device_type_schema(self.name, schema)
         if self.name == "power_source":
@@ -391,6 +381,7 @@ class DeviceType:
             self._validate_entity_ids,
             validate_fan_features,
             validate_climate_features,
+            validate_light_binding(self),
         )
 
 

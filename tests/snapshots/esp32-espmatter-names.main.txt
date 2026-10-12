@@ -14,13 +14,13 @@
     auto *door_lock_cluster = esp_matter::cluster::get(endpoint, 257);
     if (door_lock_cluster == nullptr)
       return false;
-    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
-      return false;
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::weekday_access_schedules::add) != ESP_OK)
+      return false;
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
       return false;
     if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::credential_over_the_air_access::add) != ESP_OK)
       return false;
-    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::door_position_sensor::add) != ESP_OK)
+    if (esphome::matter::add_feature(door_lock_cluster, esp_matter::cluster::door_lock::feature::unbolting::add) != ESP_OK)
       return false;
     return true;
   });
@@ -49,13 +49,33 @@
     auto light_traits_0 = rgb_light->get_traits();
     device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds());
     device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds());
-    if (esp_matter::endpoint::extended_color_light::add(endpoint, &device_config_0) != ESP_OK)
+    if (esphome::matter::add_extended_color_light(endpoint, &device_config_0, rgb_light) != ESP_OK)
       return false;
     auto *color_control_cluster = esp_matter::cluster::get(endpoint, 768);
     if (color_control_cluster == nullptr)
       return false;
     if (esphome::matter::add_feature(color_control_cluster, esp_matter::cluster::color_control::feature::hue_saturation::add) != ESP_OK)
       return false;
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return false;
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return false;
+    }
     return true;
   });
   matter_mattercomponent_id->set_structure_hash(0x971150E4);

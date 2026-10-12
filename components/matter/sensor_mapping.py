@@ -318,11 +318,15 @@ _CREATE_ARGUMENTS: dict[tuple[str, str], str] = {
 }
 
 
-def optional_attribute_lines(created: list[tuple]) -> list[str]:
+def optional_attribute_lines(
+    created: list[tuple], initial_values: dict[tuple[int, int], list[str]] | None = None
+) -> list[str]:
     """Lines that create optional attributes and set initial values.
 
-    ``created`` holds (Cluster, Attribute) pairs of sensor attributes that esp-matter
-    does not create by itself.
+    ``created`` holds (Cluster, Attribute) pairs of attributes that esp-matter
+    does not create by itself. ``initial_values`` maps (cluster id, attribute id) to
+    extra lines that run right after the attribute is created and can use the
+    ``created_attribute`` variable.
     """
     lines: list[str] = []
     seen = set()
@@ -349,9 +353,14 @@ def optional_attribute_lines(created: list[tuple]) -> list[str]:
                 f"  auto *{cluster_var} = esp_matter::cluster::get(endpoint, {cluster.id});",
                 f"  if ({cluster_var} == nullptr || {create_fn}({cluster_var}, {arguments}) == nullptr)",
                 "    return false;",
-                "}",
             )
         )
+        if extra := (initial_values or {}).get((cluster.id, attribute.id)):
+            lines.append(
+                f"  auto *created_attribute = esp_matter::attribute::get({cluster_var}, {attribute.id});"
+            )
+            lines.extend(extra)
+        lines.append("}")
     return lines
 
 

@@ -37,11 +37,12 @@ matter:
         light_id: rgbww_light
         min_level: 20%
         # Besides XY and color temperature, also support controllers that set the colour using hue and saturation.
-        # ColorLoop is followed through the hue attributes. See docs/lights.md.
+        # A Matter color loop runs the ESPHome effect named below. See docs/lights.md.
         with_features:
           - Hue And Saturation
-          - EnhancedHue
-          - ColorLoop
+          - Enhanced Hue
+          - Color Loop
+        color_loop_effect: Color loop
 
 button:
   - platform: restart
@@ -100,3 +101,16 @@ light:
     color_interlock: True
     constant_brightness: True
     default_transition_length: 250ms
+    effects:
+      - lambda:
+          name: Color loop
+          update_interval: 200ms
+          lambda: |-
+            static int hue = 0;
+            hue = (hue + 10) % 360;
+            float red, green, blue;
+            hsv_to_rgb(hue, 1.0f, 1.0f, red, green, blue);
+            auto call = id(rgbww_light).turn_on();
+            call.set_rgb(red, green, blue);
+            call.set_transition_length(200);
+            call.perform();
