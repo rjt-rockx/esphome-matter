@@ -2,6 +2,8 @@ Almost all device types can be created in esphome-matter, but some need extra co
 
 See the [feature matrix in the README](../README.md#feature-matrix) for a one-page summary per ESPHome domain.
 
+For a generated configuration overview of every supported device type and its optional features, see [generated/device_types.md](generated/device_types.md).
+
 # Lights
 
 The Matter light device types are `on_off_light`, `dimmable_light`, `color_temperature_light`, and `extended_color_light`. Each adds more functionality to the previous one:
@@ -30,6 +32,11 @@ matter:
     4:
       extended_color_light:
         light_id: light_id
+        # Unlike the other lights, the extended_color_light supports additional features;
+        with_features:
+          - hue_and_saturation # Supports color specification via hue/saturation.
+          - enhanced_hue # Enhanced hue is supported.
+          - color_loop # Color loop is supported.
 ```
 
 # Plugs and relays
@@ -81,6 +88,8 @@ binary_sensor:
 ```
 
 For a complete overview of supported actions, see [actions.md](actions.md) and [binding.md](binding.md). Binding works but can occasionally take a few seconds before a command is sent.
+
+The `generic_switch` is different: it does not bind to other devices but emits Matter events (`matter.send_event` or a bound `binary_sensor`). See [generic-switch.md](generic-switch.md) and the generated [event reference](generated/events.md).
 
 # Covers
 

@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstdio>
 #include <cstring>
 #include <esp_matter_client.h>
 #include <nvs.h>
@@ -65,15 +66,24 @@ static void event_callback(const ChipDeviceEvent *event, intptr_t arg) {
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricRemoved:
     ESP_LOGI(TAG_EVENT, "Fabric removed");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricWillBeRemoved:
     ESP_LOGI(TAG_EVENT, "Fabric will be removed");
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricUpdated:
     ESP_LOGI(TAG_EVENT, "Fabric is updated");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kFabricCommitted:
     ESP_LOGI(TAG_EVENT, "Fabric is committed");
+#ifdef USE_TEXT_SENSOR
+    global_matter_component->schedule_fabric_sensor_update();
+#endif
     break;
   case chip::DeviceLayer::DeviceEventType::kDnssdRestartNeeded:
     ESP_LOGD(TAG_EVENT, "DNS-SD restart needed");
@@ -264,6 +274,9 @@ void MatterComponent::setup() {
   esp_matter::client::binding_manager_init();
   replay_attribute_triggers(this);
   this->initialize_endpoint_mappings_();
+#ifdef USE_TEXT_SENSOR
+  this->publish_fabric_sensors_();
+#endif
 }
 
 void MatterComponent::factory_reset() {

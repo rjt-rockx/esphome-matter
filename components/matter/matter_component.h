@@ -4,6 +4,7 @@
 #ifdef USE_MATTER
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
+#include "matter_text_sensors.h"
 
 #include "matter_attributes.h"
 #include "matter_cover.h"
@@ -20,6 +21,7 @@
 #include "matter_valve.h"
 
 #include <functional>
+#include <string>
 #include <vector>
 
 #include <esp_matter.h>
@@ -42,6 +44,16 @@ public:
 
   // Basic Information overrides (node label, serial number, ...)
   DeviceInfoConfig &get_device_info() { return this->device_info_; }
+#ifdef USE_TEXT_SENSOR
+  void set_fabric_compressed_id_sensor(size_t slot,
+                                       text_sensor::TextSensor *sensor);
+  void set_fabric_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_label_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_node_id_sensor(size_t slot, text_sensor::TextSensor *sensor);
+  void set_fabric_vendor_id_sensor(size_t slot,
+                                   text_sensor::TextSensor *sensor);
+  void schedule_fabric_sensor_update();
+#endif
 
   // Register Matter endpoints
   void register_endpoint(uint16_t endpoint_id, MatterEndpointBuildFn build_fn);
@@ -155,6 +167,11 @@ private:
   void initialize_endpoint_mappings_();
 
   DeviceInfoConfig device_info_;
+#ifdef USE_TEXT_SENSOR
+  std::vector<MatterFabricSensorRegistration> fabric_sensors_;
+  MatterFabricSensorRegistration &get_fabric_sensors_(size_t slot);
+  void publish_fabric_sensors_();
+#endif
   std::vector<MatterEndpointRegistration> endpoint_registrations_;
   std::vector<MatterEndpointMappingBase *> mappings_;
   std::vector<MatterAttributeCallbackRegistration> attribute_callbacks_;

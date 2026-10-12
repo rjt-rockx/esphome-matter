@@ -9,11 +9,16 @@ from esphome.components import light, switch
 from esphome.const import CONF_LIGHT_ID
 
 from ..binary_sensors import extra_schema as binary_sensor_schema
-from ..const import CONF_FEATURES, CONF_MAX_LEVEL, CONF_MIN_LEVEL, CONF_SWITCH_ID
+from ..const import (
+    CONF_MAX_LEVEL,
+    CONF_MIN_LEVEL,
+    CONF_SWITCH_ID,
+    CONF_WITH_FEATURES,
+)
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
-from ..matter_climate import climate_schema, validate_climate_features
 from ..generic_switch import apply_switch_defaults, switch_schema_options
 from ..lock_valve import extend_device_type_schema
+from ..matter_climate import climate_schema, validate_climate_features
 from ..sensor_mapping import (
     CONF_CURRENT_TYPE,
     CONF_MEASUREMENT_UNITS,
@@ -21,12 +26,14 @@ from ..sensor_mapping import (
     validate_electrical_current_type,
 )
 from ..util import maybe_empty
-from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from . import espmatter_names
+from .attributes import SENSOR_ATTRIBUTES, SensorAttribute
 from .clusters import CLUSTERS_BY_ID, CLUSTERS_BY_NAME, Cluster, Feature
+from .conformance import Conformance
 from .units import percentage
 
 _LOGGER = logging.getLogger(__name__)
+
 
 # Device types that can be bound to an ESPHome switch through switch_id.
 SWITCH_DEVICE_TYPES = ("on_off_plug_in_unit", "on_off_light", "mounted_on_off_control")
@@ -63,37 +70,35 @@ FEATURE_DEPENDENCIES: dict[str, tuple[tuple[str, ...], ...]] = {
 FLAG_DRIVEN_CLUSTERS = frozenset({"Switch"})
 
 
-def _parse_cluster_include(data: dict) -> Cluster:
-    cluster = CLUSTERS_BY_ID[data["id"]]
-    required = data.get("required", False)
-    enabled_features = data.get("features", ())
 
-    features = []
-    choice_features = []
-    for feature in cluster.features:
-        if feature.code in enabled_features:
-            feature = replace(feature, enabled=True)
-        features.append(feature)
-    for choice in cluster.choice_features:
-        new_choice_features = []
-        for feature in choice.features:
-            if feature.code in enabled_features:
-                feature = replace(feature, enabled=True)
-            new_choice_features.append(feature)
-        # Remove choice features if device type already solves the choice by enabling any of the choice features.
-        if choice.max != 1 or not any(
-            feature.enabled for feature in new_choice_features
-        ):
-            choice_features.append(replace(choice, features=tuple(new_choice_features)))
-        else:
-            features.extend(new_choice_features)
+def _parse_cluster_include(cluster_id: int, data: dict) -> Cluster:
+    cluster = CLUSTERS_BY_ID[cluster_id]
+    include_conformance = {
+        code: Conformance.from_dict(feature_data.get("conformance"))
+        for code, feature_data in data.get("features", {}).items()
+    }
 
-    # TODO: also update attribute and command info
+    def compose(feature: Feature) -> Feature:
+        refinement = include_conformance.get(feature.code)
+        if refinement is None:
+            return feature
+        conformance = (
+            feature.conformance.compose(refinement)
+            if feature.conformance is not None
+            else refinement
+        )
+        return replace(feature, conformance=conformance)
+
+    features = tuple(compose(feature) for feature in cluster.features)
+
+    # TODO: also update attribute, command and event info
     return replace(
         cluster,
-        required=required,
-        features=tuple(features),
-        choice_features=tuple(choice_features),
+        features=features,
+        server=data.get("server", False),
+        client=data.get("client", False),
+        server_locked=data.get("server_locked", False),
+        client_locked=data.get("client_locked", False),
     )
 
 
@@ -101,16 +106,19 @@ def _parse_cluster_include(data: dict) -> Cluster:
 class DeviceType:
     id: int
     name: str  # snake_case
-    server_clusters: tuple[Cluster, ...] = ()
+    clusters: tuple[Cluster, ...] = ()
     sensor_attributes: tuple[SensorAttribute, ...] = ()
 
     @classmethod
-    def from_dict(cls, data: dict):
-        server_clusters = tuple(
-            [_parse_cluster_include(c) for c in data["server_clusters"]]
+    def from_dict(cls, device_type_id: int, data: dict):
+        clusters = tuple(
+            _parse_cluster_include(int(cluster_id), cluster_data)
+            for cluster_id, cluster_data in data["clusters"].items()
         )
         sensor_attributes = []
-        for cluster in server_clusters:
+        for cluster in clusters:
+            if cluster.server_locked and not cluster.server:
+                continue
             for attribute_name, sensor_attribute in SENSOR_ATTRIBUTES.get(
                 cluster.name, {}
             ).items():
@@ -124,8 +132,8 @@ class DeviceType:
 
         return cls(
             name=data["name"],
-            id=data["id"],
-            server_clusters=server_clusters,
+            id=device_type_id,
+            clusters=clusters,
             sensor_attributes=tuple(sensor_attributes),
         )
 
@@ -162,14 +170,19 @@ class DeviceType:
             if candidates and not any(f.espm_available for f in candidates):
                 raise cv.Invalid(
                     f"{self.name}: {candidates[0].unavailable_message()}",
-                    path=[CONF_FEATURES] if path is None else path,
+                    path=[CONF_WITH_FEATURES] if path is None else path,
                 )
 
     def _validate_feature_name(self, value):
-        names = [feature.name for feature in self.get_features()]
-        value = cv.one_of(*names)(value)
-        self._check_features_available([value])
-        return value
+        """Accepts the snake_case key, CamelCase name or spec name; returns the CamelCase name."""
+        features = self.get_features()
+        by_key = {feature.name: feature for feature in features}
+        by_key.update({feature.conf_key: feature for feature in features})
+        by_key.update({feature.spec_name: feature for feature in features if feature.spec_name})
+        value = cv.one_of(*by_key)(value)
+        feature = by_key[value]
+        self._check_features_available([feature.name])
+        return feature.name
 
     @property
     def conf_key(self) -> str:
@@ -177,6 +190,22 @@ class DeviceType:
 
     def has_required_cluster(self, name: str) -> bool:
         return any(c.name == name and c.required for c in self.server_clusters)
+
+    @property
+    def server_clusters(self) -> tuple[Cluster, ...]:
+        return tuple(
+            cluster
+            for cluster in self.clusters
+            if cluster.server or not cluster.server_locked
+        )
+
+    @property
+    def client_clusters(self) -> tuple[Cluster, ...]:
+        return tuple(
+            cluster
+            for cluster in self.clusters
+            if cluster.client or not cluster.client_locked
+        )
 
     def get_features(self) -> set[Feature]:
         """Get all features that the clusters of this device type supports."""
@@ -191,25 +220,6 @@ class DeviceType:
             if config.get(sensor_attribute.conf_key) is not None:
                 clusters.add(CLUSTERS_BY_NAME[sensor_attribute.cluster.name])
         return clusters
-
-    # TODO: fix this mess...
-    # def implicit_features(self, config: dict) -> set[str]:
-    #     features = set()
-    #     configured_cluster_ids = {
-    #         cluster.id for cluster in self.configured_server_clusters(config)
-    #     }
-    #     for cluster in self.server_clusters:
-    #         if cluster.id not in configured_cluster_ids:
-    #             continue
-    #         features.update(
-    #             feature.name
-    #             for feature in cluster.features
-    #             if feature.code in cluster.enabled_features
-    #         )
-    #     for sensor_attribute in self.sensor_attributes:
-    #         if config.get(sensor_attribute.conf_key) is not None:
-    #             features.update(sensor_attribute.features)
-    #     return features
 
     def _has_feature_binding(self, config: dict) -> bool:
         """True if an entity binding in the config selects feature choices later."""
@@ -237,7 +247,7 @@ class DeviceType:
             raise cv.Invalid("end_product_type requires cover_id")
         if self.has_required_cluster("Switch"):
             config = apply_switch_defaults(config)
-        enabled = list(config.get(CONF_FEATURES, ()))
+        enabled = list(config.get(CONF_WITH_FEATURES, ()))
 
         # Add the features that other enabled features depend on.
         for name in list(enabled):
@@ -248,15 +258,15 @@ class DeviceType:
         for cluster in self.server_clusters:
             if not cluster.required:
                 continue
-            for choice in cluster.choice_features:
-                names = [feature.name for feature in choice.features]
+            for choice, choice_features in cluster.choice_groups().items():
+                names = [feature.name for feature in choice_features]
                 selected = [name for name in enabled if name in names]
                 if choice.max is not None and len(set(selected)) > choice.max:
                     raise cv.Invalid(
                         f"{self.name}: cluster {cluster.name} allows at most "
                         f"{choice.max} of these features: {', '.join(names)} "
                         f"(got {', '.join(sorted(set(selected)))})",
-                        path=[CONF_FEATURES],
+                        path=[CONF_WITH_FEATURES],
                     )
                 if len(set(selected)) >= choice.min:
                     continue
@@ -271,9 +281,9 @@ class DeviceType:
                             f"{self.name}: cluster {cluster.name} requires "
                             f"{'exactly' if choice.max == choice.min else 'at least'} "
                             f"{choice.min} of these features to be enabled: "
-                            f"{', '.join(names)}. Select one with `features: [...]` "
+                            f"{', '.join(names)}. Select one with `with_features: [...]` "
                             "or bind an ESPHome entity.",
-                            path=[CONF_FEATURES],
+                            path=[CONF_WITH_FEATURES],
                         )
                     continue
                 enabled.append(default)
@@ -282,7 +292,7 @@ class DeviceType:
         self._check_features_available(enabled)
         if enabled:
             config = dict(config)
-            config[CONF_FEATURES] = list(dict.fromkeys(enabled))
+            config[CONF_WITH_FEATURES] = list(dict.fromkeys(enabled))
         return config
 
     @property
@@ -301,7 +311,7 @@ class DeviceType:
             schema[cv.Optional(CONF_MEASUREMENT_UNITS)] = units_schema
 
         if features := self.get_features():
-            schema[cv.Optional(CONF_FEATURES)] = cv.ensure_list(
+            schema[cv.Optional(CONF_WITH_FEATURES)] = cv.ensure_list(
                 self._validate_feature_name
             )
 
@@ -395,11 +405,13 @@ def _load_device_types(
     with open(device_types_file, "r") as file:
         contents = json.load(file)
 
-    for device_type_data in contents:
+    for device_type_id, device_type_data in contents.items():
         device_type_class = DEVICE_TYPE_OVERRIDES.get(
             device_type_data["name"], DeviceType
         )
-        device_types.append(device_type_class.from_dict(device_type_data))
+        device_types.append(
+            device_type_class.from_dict(int(device_type_id), device_type_data)
+        )
 
     return tuple(device_types)
 

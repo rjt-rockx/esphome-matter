@@ -23,7 +23,7 @@ State is synchronized both ways between the ESPHome fan entity and Matter. If th
 
 ### Feature mapping
 
-The Matter features of the Fan Control cluster are selected from the traits of the ESPHome fan when the endpoint is created. These features can't be set with the `features` option when `fan_id` is used.
+The Matter features of the Fan Control cluster are selected from the traits of the ESPHome fan when the endpoint is created. These features can't be set with the `with_features` option when `fan_id` is used.
 
 | ESPHome fan            | Matter                                                                  |
 |------------------------|-------------------------------------------------------------------------|
@@ -45,7 +45,7 @@ The `PercentCurrent` and `SpeedCurrent` attributes follow the ESPHome fan state 
 ### Limitations
 
 * The `Auto` fan mode has no ESPHome equivalent and is ignored. Do not enable the `Auto` feature unless you handle it yourself.
-* The `Wind` feature is not mapped. It can be enabled with the `features` option and handled with an `on_attribute` automation on `WindSetting`.
+* The `Wind` feature is not mapped. It can be enabled with the `with_features` option and handled with an `on_attribute` automation on `WindSetting`.
 * The `Step` feature is not supported: enabling it exposes the `Step` command, but it is always rejected.
 * ESPHome fan presets are not exposed.
 * Matter persists the fan mode (and so the speed). Use `restore_mode: ALWAYS_OFF` on the ESPHome fan so Matter restores the power-on state. A warning is logged when another restore mode is used.
@@ -53,4 +53,4 @@ The `PercentCurrent` and `SpeedCurrent` attributes follow the ESPHome fan state 
 
 ### Custom behaviour
 
-The fan can also be controlled fully with ESPHome actions and `on_attribute` triggers by omitting `fan_id`, as with other device types. Without `fan_id` the features are configured with the `features` option and the cluster uses the esp-matter defaults.
+The fan can also be controlled fully with ESPHome actions and `on_attribute` triggers by omitting `fan_id`, as with other device types. Without `fan_id` the features are configured with the `with_features` option and the cluster uses the esp-matter defaults.

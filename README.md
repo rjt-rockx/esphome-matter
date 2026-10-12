@@ -102,7 +102,7 @@ Only `ESP32` targets built with the **ESP-IDF** framework are supported. The Ard
 
 `ESP32-C3`, `ESP32-C5`, `ESP32-C6`, `ESP32-S3` and `ESP32-H2` have been reported to work. Classic `ESP32` is Wi-Fi only and not validated. Flash is tight on 4 MB boards, see [troubleshooting](docs/troubleshooting.md#flash-size-especially-on-4-mb-boards).
 
-# Commissioning
+# [Commissioning](docs/commissioning.md)
 
 Once a device has joined a fabric, the commissioning window is not opened on restarts anymore. Use "Share" / "pairing mode" in your first controller to get a temporary code for a second one (multi-admin, up to 5 fabrics by default). The `matter.factory_reset` action wipes all fabrics and reopens the window.
 
@@ -254,7 +254,7 @@ More information about endpoints and a full list of supported device types can b
 - [docs/lights.md](docs/lights.md): lights
 - [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
 - Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
-- [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/commands-full.md](docs/commands-full.md): actions, binding, cluster and command reference
+- [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
 - [docs/faq.md](docs/faq.md): frequently asked questions
 - [docs/ROADMAP.md](docs/ROADMAP.md): community demand, maintainer direction, upstreaming, priorities

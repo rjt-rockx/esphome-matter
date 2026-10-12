@@ -28,14 +28,14 @@ matter:
         lock_id: front_door
         lock_type: DEAD_BOLT
         # Report jams as DoorState "DoorJammed".
-        features:
+        with_features:
           - DoorPositionSensor
     2:
       water_valve:
         valve_id: garden_valve
         # Adds CurrentLevel and TargetLevel. Levels below 100 only have an effect on
         # valves that support position; this template valve is simply opened.
-        features:
+        with_features:
           - Level
 
 output:

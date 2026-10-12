@@ -38,7 +38,7 @@ matter:
         min_level: 20%
         # Besides XY and color temperature, also support controllers that set the colour using hue and saturation.
         # ColorLoop is followed through the hue attributes. See docs/lights.md.
-        features:
+        with_features:
           - Hue And Saturation
           - EnhancedHue
           - ColorLoop

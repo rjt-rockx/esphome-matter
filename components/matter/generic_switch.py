@@ -29,7 +29,7 @@ from esphome.core import CORE, ID
 from esphome.types import ConfigType
 
 from .actions import _resolve_endpoint_id
-from .const import CONF_ENDPOINT, CONF_FEATURES
+from .const import CONF_ENDPOINT, CONF_WITH_FEATURES
 from .types import MatterEndpointRef, matter_ns
 
 CONF_BINARY_SENSOR_ID = "binary_sensor_id"
@@ -91,13 +91,13 @@ def apply_switch_defaults(config: dict) -> dict:
     the endpoint useful out of the box.
     """
     config = dict(config)
-    if CONF_FEATURES not in config:
-        config[CONF_FEATURES] = list(
+    if CONF_WITH_FEATURES not in config:
+        config[CONF_WITH_FEATURES] = list(
             _DEFAULT_BOUND_FEATURES
             if CONF_BINARY_SENSOR_ID in config
             else _DEFAULT_FEATURES
         )
-    features = config[CONF_FEATURES]
+    features = config[CONF_WITH_FEATURES]
     # esp-matter adds the multi press feature to every action switch, as the spec
     # makes it mandatory there.
     if "ActionSwitch" in features:
@@ -121,7 +121,7 @@ def apply_switch_defaults(config: dict) -> dict:
             "long_press_time, multi_press_window and multi_press_max only apply to "
             "momentary switches"
         )
-    if latching and CONF_FEATURES in config:
+    if latching and CONF_WITH_FEATURES in config:
         momentary_only = [
             feature
             for feature in features
@@ -131,19 +131,19 @@ def apply_switch_defaults(config: dict) -> dict:
             raise cv.Invalid(
                 "LatchingSwitch cannot be combined with the momentary switch "
                 f"features: {', '.join(momentary_only)}",
-                path=[CONF_FEATURES],
+                path=[CONF_WITH_FEATURES],
             )
     if "ActionSwitch" in features and "MomentarySwitchRelease" in features:
         raise cv.Invalid(
             "ActionSwitch cannot be combined with MomentarySwitchRelease",
-            path=[CONF_FEATURES],
+            path=[CONF_WITH_FEATURES],
         )
     return config
 
 
 def multi_press_max_line(config_var: str, device_config: dict) -> str | None:
     """C++ line that sets MultiPressMax in the device type config, if configured."""
-    features = device_config.get(CONF_FEATURES, ())
+    features = device_config.get(CONF_WITH_FEATURES, ())
     if "MomentarySwitchMultiPress" not in features and "ActionSwitch" not in features:
         return None
     value = device_config.get(CONF_MULTI_PRESS_MAX, DEFAULT_MULTI_PRESS_MAX)

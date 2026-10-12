@@ -3,6 +3,8 @@
 #if defined(USE_MATTER) && defined(USE_TEXT_SENSOR)
 #include "esphome/core/log.h"
 
+#include "matter_text_sensors.h"
+
 #include <string>
 
 namespace esphome::matter {
@@ -22,7 +24,7 @@ void MatterTextSensor::update_() {
   std::string value;
   switch (this->type_) {
   case MatterTextSensorType::PAIRING_CODE:
-    value = s.manual_code;
+    value = format_manual_pairing_code(s.manual_code);
     break;
   case MatterTextSensorType::QR_CODE:
     value = s.qr_code;

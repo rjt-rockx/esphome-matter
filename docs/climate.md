@@ -23,7 +23,7 @@ See `examples/thermostat.yaml` for a complete heat-only example.
 
 ## Features are derived from the climate
 
-Do not configure `Heating`, `Cooling` or `AutoMode` in `features` when `climate_id` is set (this is a config error). They are derived from the climate traits when the endpoint is built:
+Do not configure `Heating`, `Cooling` or `AutoMode` in `with_features` when `climate_id` is set (this is a config error). They are derived from the climate traits when the endpoint is built:
 
 | Climate traits | Matter |
 |---|---|
@@ -36,7 +36,7 @@ Do not configure `Heating`, `Cooling` or `AutoMode` in `features` when `climate_
 
 If a climate supports neither heating nor cooling, a thermostat exposes Heating and a room air conditioner exposes Cooling (Matter requires at least one).
 
-Without `climate_id` you can still select features by hand, for example `features: [Heating, Cooling, AutoMode]`. Matter requires at least one of Heating and Cooling, and AutoMode needs both.
+Without `climate_id` you can still select features by hand, for example `with_with_features: [Heating, Cooling, AutoMode]`. Matter requires at least one of Heating and Cooling, and AutoMode needs both.
 
 ## Mapping
 

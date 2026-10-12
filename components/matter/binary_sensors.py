@@ -12,7 +12,7 @@ from esphome.components.binary_sensor import BinarySensor
 from esphome.config import Config
 from esphome.const import CONF_DEVICE_CLASS
 
-from .const import CONF_ENDPOINTS, CONF_FEATURES
+from .const import CONF_ENDPOINTS, CONF_WITH_FEATURES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ def resolve_binding(device_type, sensor_attribute, device_config: dict, device_c
 
 def implied_occupancy_feature(device_config: dict, device_class) -> str | None:
     """Occupancy Sensing sensor-type feature to enable, or None if `features:` already contains one."""
-    if OCCUPANCY_CHOICE_FEATURES.intersection(device_config.get(CONF_FEATURES, ())):
+    if OCCUPANCY_CHOICE_FEATURES.intersection(device_config.get(CONF_WITH_FEATURES, ())):
         return None
     return OCCUPANCY_FEATURE_BY_DEVICE_CLASS.get(device_class, DEFAULT_OCCUPANCY_FEATURE)
 

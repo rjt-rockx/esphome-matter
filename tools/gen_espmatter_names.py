@@ -334,7 +334,7 @@ def build_table(headers: Headers) -> dict:
 
     created = {n for n, c in headers.clusters.items() if c["create"]}
     table_clusters: dict[str, dict] = {}
-    for cluster in clusters_json:
+    for cluster in clusters_json.values():
         spec_name = cluster["name"]
         # Key: the CamelCase name used as Cluster.name in clusters.py.
         key = re.sub(r"[/ \-.]", "", spec_name)
@@ -349,7 +349,7 @@ def build_table(headers: Headers) -> dict:
                 else:
                     yield feature
 
-        for feature in walk_features(cluster.get("features", ())):
+        for feature in walk_features(cluster.get("features", {}).values()):
             fname = feature["name"]
             fns = None
             if info:
@@ -362,10 +362,13 @@ def build_table(headers: Headers) -> dict:
                 "namespace": fns,
                 "add_takes_config": bool(fns and info["features"][fns]),
             }
-        for attribute in cluster.get("server_attributes", ()):
-            aname = attribute.get("name")
+        for attribute in cluster.get("attributes", {}).values():
+            if not attribute.get("server"):
+                continue
+            # Same naming as Attribute.from_dict in data_model/attributes.py.
+            aname = attribute.get("name", attribute.get("define"))
             if not aname:
-                continue  # unnamed attributes (test clusters) can't be referenced
+                continue
             suffix = None
             if info:
                 suffix = _match(
@@ -377,7 +380,7 @@ def build_table(headers: Headers) -> dict:
         table_clusters[key] = entry
 
     table_device_types: dict[str, dict] = {}
-    for device_type in device_types_json:
+    for device_type in device_types_json.values():
         name = device_type["name"]
         ns = _match(name, headers.endpoints, DEVICE_TYPE_ALIASES.get(name))
         table_device_types[name] = {

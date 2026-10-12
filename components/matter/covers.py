@@ -6,7 +6,7 @@ from esphome.config import Config
 from esphome.const import CONF_DEVICE_CLASS
 from esphome.core import CORE, ID
 
-from .const import CONF_COVER_ID, CONF_END_PRODUCT_TYPE, CONF_ENDPOINTS, CONF_FEATURES
+from .const import CONF_COVER_ID, CONF_END_PRODUCT_TYPE, CONF_ENDPOINTS, CONF_WITH_FEATURES
 
 WINDOW_COVERING = "window_covering"
 
@@ -68,7 +68,7 @@ def validate_cover_bindings(matter_config: dict, full_config: Config) -> None:
             if CONF_END_PRODUCT_TYPE in device_config:
                 raise cv.Invalid("end_product_type requires cover_id")
             continue
-        if device_config.get(CONF_FEATURES):
+        if device_config.get(CONF_WITH_FEATURES):
             raise cv.Invalid(
                 "window_covering features are selected automatically from the "
                 "cover when cover_id is set; remove 'features'"

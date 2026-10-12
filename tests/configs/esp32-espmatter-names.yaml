@@ -31,7 +31,7 @@ matter:
       door_lock:
         lock_id: front_door
         lock_type: DEAD_BOLT
-        features:
+        with_features:
           - Unbolt
           - WeekDayAccessSchedules
           - CredentialsOverTheAirAccess
@@ -39,12 +39,12 @@ matter:
     2:
       fan:
         fan_id: ceiling_fan
-        features:
+        with_features:
           - Auto
     3:
       extended_color_light:
         light_id: rgb_light
-        features:
+        with_features:
           - Hue And Saturation
 
 output:

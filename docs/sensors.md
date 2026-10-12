@@ -93,7 +93,7 @@ matter:
         battery: battery_id
 ```
 
-`battery` on the endpoint works for every device type and is the recommended way: the battery then belongs to the same endpoint as the sensor, which is where controllers are most likely to look for it (not verified for every controller). Do not use both on the same endpoint. The `power_source` device type requires a `battery` (or `features: [Wired]` for a mains powered source).
+`battery` on the endpoint works for every device type and is the recommended way: the battery then belongs to the same endpoint as the sensor, which is where controllers are most likely to look for it (not verified for every controller). Do not use both on the same endpoint. The `power_source` device type requires a `battery` (or `with_features: [Wired]` for a mains powered source).
 
 The percentage is converted to the half percent resolution of Matter (0 to 200, 0.5 % steps). The cluster's `Status` attribute is set to `Active`. The `BatChargeLevel` attribute stays `OK`.
 
