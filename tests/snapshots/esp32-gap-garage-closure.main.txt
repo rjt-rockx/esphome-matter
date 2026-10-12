@@ -3,22 +3,19 @@
   matter_mattercomponent_id->get_device_info().set_node_label("matter-garage-closure");
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_closure(garage_door, 1);
   matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint_label(1, "Garage door");
   matter_mattercomponent_id->register_endpoint_tag(1, 68, 0, "Covering");
   matter_mattercomponent_id->register_endpoint_tag(1, 70, 0, "Garage");
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::closure::config_t device_config_0{};
+    device_config_0.closure_control.delegate = esphome::matter::get_closure_delegate(1);
     device_config_0.closure_control.feature_flags = esp_matter::cluster::closure_control::feature::positioning::get_id();
     if (esp_matter::endpoint::closure::add(endpoint, &device_config_0) != ESP_OK)
       return false;
     esp_matter::cluster::fixed_label::config_t fixed_label_config{};
     if (esp_matter::cluster::fixed_label::create(endpoint, &fixed_label_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
-      return false;
-    auto *closure_control_cluster = esp_matter::cluster::get(endpoint, 260);
-    if (closure_control_cluster == nullptr)
-      return false;
-    if (esphome::matter::add_feature(closure_control_cluster, esp_matter::cluster::closure_control::feature::speed::add) != ESP_OK)
       return false;
     return true;
   });
@@ -43,4 +40,4 @@
       return false;
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xC6EE2E65);
+  matter_mattercomponent_id->set_structure_hash(0x4370FEB3);
