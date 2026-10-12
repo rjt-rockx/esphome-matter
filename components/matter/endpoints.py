@@ -67,39 +67,13 @@ from .data_model import espmatter_names
 from .data_model.events import Event
 from . import light_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
-from .util import iter_matter_actions, maybe_empty, snake_case
+from .util import iter_matter_actions, maybe_empty, restore_warning, snake_case
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _restore_mode_warning(
-    matter_config: dict, full_config: Config, id_key: str, kind: str
-):
-    for endpoint_config in matter_config.get(CONF_ENDPOINTS, {}).values():
-        for device_config in endpoint_config.values():
-            if not isinstance(device_config, dict):
-                continue
-            entity_id = device_config.get(id_key)
-            if entity_id is None:
-                continue
-            try:
-                entity_path = full_config.get_path_for_id(entity_id)[:-1]
-                entity_config = full_config.get_config_for_path(entity_path)
-            except KeyError:
-                continue
-            restore_mode = entity_config.get(CONF_RESTORE_MODE)
-            if restore_mode is not None and restore_mode != "ALWAYS_OFF":
-                _LOGGER.warning(
-                    "%s '%s' is exposed through Matter with restore mode %s and should use "
-                    "restore_mode: ALWAYS_OFF so Matter can restore its power-on state",
-                    kind,
-                    entity_id,
-                    restore_mode,
-                )
-
-
 def switch_restore_warning(matter_config: dict, full_config: Config):
-    _restore_mode_warning(matter_config, full_config, CONF_SWITCH_ID, "Switch")
+    restore_warning(matter_config, full_config, CONF_SWITCH_ID, "Switch")
 
 
 def _on_attribute_schema():
@@ -678,9 +652,9 @@ class Endpoint:
                     (
                         f"auto {traits_var} = {light}->get_traits();",
                         f"{config_var}.color_control_color_temperature.color_temp_physical_min_mireds = "
-                        f"esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_min_mireds());",
+                        f"{traits_var}.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_min_mireds()) : {light_binding.DEFAULT_MIN_MIREDS};",
                         f"{config_var}.color_control_color_temperature.color_temp_physical_max_mireds = "
-                        f"esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds());",
+                        f"{traits_var}.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds()) : {light_binding.DEFAULT_MAX_MIREDS};",
                     )
                 )
 

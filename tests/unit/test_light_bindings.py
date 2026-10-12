@@ -487,3 +487,84 @@ def test_add_extended_color_light_matches_sdk():
     start = ours.index("{", start)
     our_body = ours[start : ours.index("return ESP_OK;", start)]
     assert _created_elements(our_body) == _created_elements(sdk_body)
+
+
+def test_min_level_above_max_level_is_rejected(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              dimmable_light:
+                light_id: lamp
+                min_level: 200
+                max_level: 100
+        """
+        + LIGHTS
+    )
+    assert not result.ok
+    assert "min_level (200) is higher than max_level (100)" in result.output
+
+
+def test_color_temperature_light_without_range_warns(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              color_temperature_light:
+                light_id: strip
+        """
+        + LIGHTS
+    )
+    assert result.ok, result.output
+    assert "default range of 153 to 500 mireds" in result.output
+
+
+class _FakeConfig:
+    """The part of esphome.config.Config that the entity walk uses."""
+
+    def __init__(self, entities):
+        self.entities = entities
+
+    def get_path_for_id(self, entity_id):
+        if entity_id not in self.entities:
+            raise KeyError(entity_id)
+        return [entity_id, "id"]
+
+    def get_config_for_path(self, path):
+        return self.entities[path[0]]
+
+
+def test_restore_warning_walk(caplog):
+    from components.matter.util import iter_bound_entities, restore_warning
+
+    full = _FakeConfig(
+        {
+            "a": {"restore_mode": "RESTORE_DEFAULT_ON"},
+            "b": {"restore_mode": "ALWAYS_OFF"},
+        }
+    )
+    matter = {
+        "endpoints": {
+            1: {"switch_dev": {"switch_id": "a"}, "fan": {"fan_id": "a"}},
+            2: {"on_off_light": {"switch_id": "b"}},
+            3: {"on_off_light": {"switch_id": "missing"}, "clusters": {}},
+        }
+    }
+    bound = list(iter_bound_entities(matter, full, "switch_id"))
+    assert [(b[0], b[3]) for b in bound] == [(1, "a"), (2, "b")]
+    with caplog.at_level("WARNING"):
+        restore_warning(matter, full, "switch_id", "Switch")
+    assert caplog.text.count("exposed through Matter") == 1
+    assert "Switch 'a'" in caplog.text
+    assert "restore mode RESTORE_DEFAULT_ON" in caplog.text
+
+
+def test_light_restore_warning_describes_restore_state(caplog):
+    full = _FakeConfig({"l": {"restore_state": "restore"}})
+    matter = {"endpoints": {1: {"dimmable_light": {"light_id": "l"}}}}
+    with caplog.at_level("WARNING"):
+        light_binding.light_restore_warning(matter, full)
+    assert "restore_state: restore" in caplog.text
+    assert "StartUpOnOff" in caplog.text

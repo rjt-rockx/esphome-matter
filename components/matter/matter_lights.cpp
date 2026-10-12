@@ -370,19 +370,16 @@ void MatterLightMapping::initialize() {
 MatterLightPendingUpdate MatterLightMapping::read_state_() {
   using namespace chip::app::Clusters;
   MatterLightPendingUpdate update;
-  esp_matter_attr_val_t value;
+  uint16_t eid = this->endpoint_id();
+  uint8_t level;
   if (this->capabilities_.has_level &&
-      esp_matter::attribute::get_val(
-          this->endpoint_id(), LevelControl::Id,
-          LevelControl::Attributes::CurrentLevel::Id, &value) == ESP_OK &&
-      !value.is_null())
-    update.level = value.val.u8;
+      read_u8_attribute(eid, LevelControl::Id,
+                        LevelControl::Attributes::CurrentLevel::Id, level))
+    update.level = level;
   update.color = this->read_color_update_();
-  if (esp_matter::attribute::get_val(this->endpoint_id(), OnOff::Id,
-                                     OnOff::Attributes::OnOff::Id,
-                                     &value) == ESP_OK &&
-      !value.is_null())
-    update.on = value.val.b;
+  bool on;
+  if (read_bool_attribute(eid, OnOff::Id, OnOff::Attributes::OnOff::Id, on))
+    update.on = on;
   return update;
 }
 
@@ -437,22 +434,10 @@ optional<MatterLightColorUpdate> MatterLightMapping::read_color_update_() {
     return nullopt;
 
   auto read_u8 = [eid](uint32_t attribute_id, uint8_t &out) {
-    esp_matter_attr_val_t value;
-    if (esp_matter::attribute::get_val(eid, ColorControl::Id, attribute_id,
-                                       &value) != ESP_OK ||
-        value.is_null())
-      return false;
-    out = value.val.u8;
-    return true;
+    return read_u8_attribute(eid, ColorControl::Id, attribute_id, out);
   };
   auto read_u16 = [eid](uint32_t attribute_id, uint16_t &out) {
-    esp_matter_attr_val_t value;
-    if (esp_matter::attribute::get_val(eid, ColorControl::Id, attribute_id,
-                                       &value) != ESP_OK ||
-        value.is_null())
-      return false;
-    out = value.val.u16;
-    return true;
+    return read_u16_attribute(eid, ColorControl::Id, attribute_id, out);
   };
 
   // EnhancedColorMode: 0 = HS, 1 = XY, 2 = CT, 3 = enhanced HS. ColorMode only
@@ -529,11 +514,12 @@ void MatterLightMapping::on_light_remote_values_update() {
       return;
     this->applied_values_valid_ = false;
   }
-  // A change from the ESPHome side. The effect of the color loop may have
-  // ended with it.
+  // A change from the ESPHome side wins over the windows of Matter commands.
+  // Only then is the end of a color loop checked: that opens a window of its
+  // own, which must stay open to ignore the hue that CHIP restores.
+  this->end_windows_for_local_change_();
   if (this->color_loop_active_)
     this->check_color_loop_();
-  this->end_windows_for_local_change_();
   this->push_state_to_matter();
 }
 
@@ -896,12 +882,16 @@ bool MatterLightMapping::light_group_suppressed_(uint32_t now) const {
          is_before(now, this->light_window_until_ms_);
 }
 
-bool MatterLightMapping::color_group_suppressed_(uint32_t now) const {
-  // The steps of a color loop belong to the effect of the light.
-  if (this->color_loop_active_)
-    return true;
+// A window of a command (or the end of a color loop) is open.
+bool MatterLightMapping::color_window_open_(uint32_t now) const {
   return this->color_window_active_ &&
          is_before(now, this->color_window_until_ms_);
+}
+
+// CHIP's colour attribute writes are ignored: a window is open or the effect
+// of a color loop runs (the steps of the loop belong to the effect).
+bool MatterLightMapping::color_group_suppressed_(uint32_t now) const {
+  return this->color_loop_active_ || this->color_window_open_(now);
 }
 
 // ---- Commands with a transition time --------------------------------------
@@ -1410,6 +1400,7 @@ void MatterLightMapping::apply_command_(const MatterLightCommand &command) {
   }
   if (command.color_group) {
     this->color_window_active_ = true;
+    this->color_window_generation_++;
     this->color_window_until_ms_ = now + window_ms;
     this->pending_.color.reset();
   }
@@ -1432,8 +1423,9 @@ void MatterLightMapping::apply_command_(const MatterLightCommand &command) {
 
 void MatterLightMapping::finish_command_windows_() {
   uint32_t now = millis();
-  // A newer command extended a window; its own timer finishes it.
-  if (this->light_group_suppressed_(now) || this->color_group_suppressed_(now))
+  // A newer command extended a window; its own timer finishes it. A running
+  // color loop doesn't keep the windows open: it has no window.
+  if (this->light_group_suppressed_(now) || this->color_window_open_(now))
     return;
   bool light = this->light_window_active_;
   bool color = this->color_window_active_;
@@ -1464,7 +1456,7 @@ void MatterLightMapping::settle_when_idle_(bool light, bool color) {
     global_matter_component->defer_to_main_loop([this, light, color, busy]() {
       uint32_t now = millis();
       // A newer command has its own timer.
-      if (this->light_group_suppressed_(now) || this->color_group_suppressed_(now))
+      if (this->light_group_suppressed_(now) || this->color_window_open_(now))
         return;
       if (busy && this->settle_retries_ < SETTLE_MAX_RETRIES) {
         this->settle_retries_++;
@@ -1531,12 +1523,15 @@ void MatterLightMapping::check_color_loop_() {
   // color afterwards.
   this->color_window_active_ = true;
   this->color_window_until_ms_ = millis() + COMMAND_MARGIN_MS;
+  uint32_t generation = ++this->color_window_generation_;
   this->reported_color_valid_ = false;
   chip::DeviceLayer::SystemLayer().ScheduleLambda(
       [this]() { this->deactivate_chip_color_loop_(); });
   global_matter_component->run_on_main_loop_after(
-      COMMAND_MARGIN_MS + 50, [this]() {
-        this->color_window_active_ = false;
+      COMMAND_MARGIN_MS + 50, [this, generation]() {
+        // Only the window opened here; a newer Matter command owns its own.
+        if (this->color_window_generation_ == generation)
+          this->color_window_active_ = false;
         this->push_state_to_matter();
       });
 }
