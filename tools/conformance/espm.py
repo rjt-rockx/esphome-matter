@@ -522,6 +522,17 @@ def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
 
 
 # --------------------------------------------------------------------- queries
+# Elements that a feature's add() creates only when another feature is absent. The extractor
+# does not follow such guards, so they are listed here: (cluster namespace, enabled feature) ->
+# {"events": [...]} removed again.
+#   switch_cluster::feature::momentary_switch_multi_press::add (esp_matter_feature.cpp) calls
+#   create_multi_press_ongoing() only when ActionSwitch is not in the feature map, matching the
+#   spec (MultiPressOngoing: MSM & !AS).
+GUARDED_AWAY = {
+    ("switch_cluster", "action_switch"): {"events": ["multi_press_ongoing"]},
+}
+
+
 class Profile:
     def __init__(self, data: dict | None = None):
         if data is None:
@@ -586,6 +597,9 @@ class Profile:
                 attrs |= {norm(a) for a in f["attrs"]}
                 cmds |= {norm(a) for a in f["cmds"]}
                 events |= {norm(a) for a in f["events"]}
+        for (gns, gfeat), gone in GUARDED_AWAY.items():
+            if gns == ns and self._fnorm(gfeat) in enabled:
+                events -= {norm(a) for a in gone.get("events", ())}
         return attrs, cmds, events
 
 

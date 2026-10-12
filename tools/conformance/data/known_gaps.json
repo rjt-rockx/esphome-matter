@@ -1,14 +1,6 @@
 {
  "gaps": [
   {
-   "code": "CL-FEATURE-MISSING",
-   "where": "Switch",
-   "message": "MomentarySwitchMultiPress",
-   "scope": "component",
-   "reason": "component gap: generic_switch with ActionSwitch does not enable MomentarySwitchMultiPress although the spec makes it mandatory in this configuration (see docs/generic-switch.md); remove once fixed",
-   "ref": "components/matter/generic_switch.py"
-  },
-  {
    "code": "DT-CLUSTER-MISSING",
    "where": "Base Device Type",
    "message": "Binding",
