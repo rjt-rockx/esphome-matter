@@ -27,6 +27,7 @@ from .endpoints import (
     light_restore_warning,
     register_endpoints,
 )
+from .fan_binding import fan_restore_warning
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -165,6 +166,7 @@ def _final_validate(config: dict):
         )
 
     light_restore_warning(config, full_config)
+    fan_restore_warning(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
