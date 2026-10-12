@@ -31,6 +31,7 @@ matter:
         lock_type: DEAD_BOLT
         features:
           - DoorPositionSensor
+          - Unbolt
     2:
       water_valve:
         valve_id: garden_valve
