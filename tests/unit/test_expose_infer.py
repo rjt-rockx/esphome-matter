@@ -195,7 +195,7 @@ def test_garage_cover_falls_back_to_plain_window_covering(raw, monkeypatch, capl
     with pytest.raises(NoMapping, match="closure_compat"):
         infer(entity("garage"), Overrides(via_glob=True))
     assert ep_of_unbound(cfg)["window_covering"]["cover_id"].id == "garage"
-    assert "closure_compat" not in ep_of_unbound(cfg)["window_covering"]
+    assert not ep_of_unbound(cfg)["window_covering"].get("closure_compat")  # schema default is False
     assert "plain Window Covering" in caplog.text and "garage" in caplog.text
 
 
