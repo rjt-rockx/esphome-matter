@@ -285,7 +285,7 @@
   matter_mattercomponent_id->register_endpoint_parent(41990, 0);
   matter_mattercomponent_id->register_endpoint(41990, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::water_valve::config_t device_config_0{};
-    device_config_0.valve_configuration_and_control.default_open_duration = esp_matter::nullable<uint32_t>();
+    device_config_0.valve_configuration_and_control.default_open_duration = ::nullable<uint32_t>();
     device_config_0.valve_configuration_and_control.delegate = esphome::matter::get_valve_delegate(41990);
     if (esp_matter::endpoint::water_valve::add(endpoint, &device_config_0) != ESP_OK)
       return MATTER_BUILD_FAIL("endpoint 41990: device type water_valve");
