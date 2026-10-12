@@ -25,7 +25,7 @@ tests/validate.sh .venv/bin/esphome           # tests/configs + examples
 VALIDATE_DIRS=tests/configs tests/validate.sh .venv/bin/esphome   # only tests/configs
 ```
 
-`tests/validate.sh` calls `.github/scripts/ci_prepare.py` for every file. It
+`tests/validate.sh` calls `.github/scripts/ci_prepare.py` for every file (forcing `toolchain: platformio` on ESPHome < 2026.9.0 and `esp-idf` otherwise). It
 writes a temporary `ci_tmp_<name>.yaml` next to the original (removed on exit)
 in which:
 

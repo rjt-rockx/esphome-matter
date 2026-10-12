@@ -6,6 +6,14 @@ set -u
 cd "$(dirname "$0")/.."
 ESPHOME="${1:-${ESPHOME:-esphome}}"
 # VALIDATE_DIRS (space separated) selects directories; default: tests/configs examples
+# The component needs the native ESP-IDF toolchain on ESPHome >= 2026.9.0 (and dev)
+# and `toolchain: platformio` on older releases; configs omit the line.
+toolchain=$("$ESPHOME" version 2>/dev/null | python3 -c '
+import re, sys
+m = re.search(r"(\d+)\.(\d+)", sys.stdin.read())
+print("platformio" if m and (int(m[1]), int(m[2])) < (2026, 9) else "esp-idf")
+')
+echo "Toolchain: $toolchain"
 failed=()
 passed=0
 cleanup() {
@@ -21,7 +29,7 @@ for dir in ${VALIDATE_DIRS:-tests/configs examples}; do
 for f in "$dir"/*.yaml; do
   case "$f" in */ci_tmp_*|*/secrets.yaml) continue ;; esac
   echo "::group::esphome config $f"
-  prepared=$(python3 .github/scripts/ci_prepare.py "$f")
+  prepared=$(python3 .github/scripts/ci_prepare.py "$f" --toolchain "$toolchain")
   if out=$("$ESPHOME" config "$prepared" 2>&1); then
     echo "OK   $f"
     passed=$((passed + 1))

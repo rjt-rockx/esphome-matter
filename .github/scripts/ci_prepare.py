@@ -8,9 +8,11 @@ is written next to it (so relative paths keep working) with:
   ``type: git`` form pointing at an esphome-matter repository rewritten to the
   local ``components/`` directory, so CI exercises the code under test and not
   the upstream default branch.
-* optionally (``--toolchain esp-idf``) ``toolchain: platformio`` replaced by
-  ``toolchain: esp-idf`` so the native ESP-IDF toolchain is used. With
-  ``--toolchain keep`` (default) the toolchain line is left untouched.
+* optionally (``--toolchain esp-idf`` / ``--toolchain platformio``) the
+  ``toolchain:`` option under ``esp32:`` is replaced, or inserted when absent,
+  so the native ESP-IDF toolchain (ESPHome >= 2026.9.0 / dev) or PlatformIO
+  (older ESPHome) is used. With ``--toolchain keep`` (default) the toolchain
+  line is left untouched.
 
 * remote ``packages:`` entries pointing at an esphome-matter repository (the
   ``url:``/``files:`` form, with optional ``vars``, or the
@@ -20,7 +22,7 @@ is written next to it (so relative paths keep working) with:
 A ``secrets.yaml`` with dummy values is created next to the config for every
 ``!secret <key>`` that is not defined yet (never overwrites existing keys).
 
-Usage: ci_prepare.py CONFIG [--toolchain keep|esp-idf] [--no-local-components]
+Usage: ci_prepare.py CONFIG [--toolchain keep|esp-idf|platformio] [--no-local-components]
 """
 
 from __future__ import annotations
@@ -125,6 +127,25 @@ def rewrite_packages(text: str, src_dir: Path) -> str:
     return "\n".join(out)
 
 
+def set_toolchain(text: str, toolchain: str) -> str:
+    """Set ``toolchain:`` under the top-level ``esp32:`` block (insert if absent)."""
+    text, n = re.subn(
+        r"^(\s*toolchain:\s*)[\w\-]+", rf"\g<1>{toolchain}", text, flags=re.MULTILINE
+    )
+    if n:
+        return text
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if re.match(r"^esp32:\s*(#.*)?$", line):
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            ind = " " * (_indent(lines[j]) if j < len(lines) else 2) or "  "
+            lines.insert(i + 1, f"{ind}toolchain: {toolchain}")
+            break
+    return "\n".join(lines)
+
+
 def ensure_secrets(directory: Path, text: str) -> None:
     keys = sorted(set(SECRET_RE.findall(text)))
     if not keys:
@@ -148,7 +169,7 @@ def ensure_secrets(directory: Path, text: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
-    ap.add_argument("--toolchain", choices=("keep", "esp-idf"), default="keep")
+    ap.add_argument("--toolchain", choices=("keep", "esp-idf", "platformio"), default="keep")
     ap.add_argument("--no-local-components", action="store_true")
     args = ap.parse_args()
 
@@ -161,10 +182,8 @@ def main() -> None:
         text = GITHUB_SRC_RE.sub(f"source: {rel}", text)
         text = GIT_SRC_RE.sub(lambda m: f"source: {rel}\n", text)
         text = rewrite_packages(text, src.parent)
-    if args.toolchain == "esp-idf":
-        text = re.sub(
-            r"^(\s*toolchain:\s*)platformio\b", r"\1esp-idf", text, flags=re.MULTILINE
-        )
+    if args.toolchain != "keep":
+        text = set_toolchain(text, args.toolchain)
 
     dst = src.with_name(f"ci_tmp_{src.name}")
     dst.write_text(text)
