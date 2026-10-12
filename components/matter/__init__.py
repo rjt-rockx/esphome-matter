@@ -46,6 +46,7 @@ from .matter_ble import (
     validate_ble_commissioning,
 )
 from .network_config import configure_network
+from .ota import OTA_SCHEMA_KEYS, final_validate_ota, to_code_ota, validate_ota_schema
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -159,6 +160,7 @@ CONFIG_SCHEMA = cv.All(
             ),
             # Log reconnect timing milestones (IP up, DNS-SD, SRP, CASE, subscription)
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+            **OTA_SCHEMA_KEYS,  # ota / ota_requestor / software_version (ota.py)
             # Endpoints
             cv.Optional(CONF_ENDPOINTS, default={}): cv.Schema(
                 {
@@ -172,6 +174,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
+    validate_ota_schema,
     _require_vfs_select,  # TODO: Only needed when openthread is enabled
 )
 
@@ -199,6 +202,7 @@ def _final_validate(config: dict):
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
     validate_cover_bindings(config, full_config)
+    final_validate_ota(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -331,5 +335,6 @@ async def to_code(config: ConfigType):
         await to_code_ble()
 
     configure_network(debug=config[CONF_DEBUG])
+    await to_code_ota(config)
 
     await register_endpoints(var, config)
