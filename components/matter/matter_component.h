@@ -184,7 +184,7 @@ template <typename... Ts>
 class MatterFactoryResetAction : public Action<Ts...>,
                                  public Parented<MatterComponent> {
 public:
-  void play(Ts... x) override { this->parent_->factory_reset(); }
+  void play(const Ts &...x) override { this->parent_->factory_reset(); }
 };
 
 } // namespace esphome::matter
