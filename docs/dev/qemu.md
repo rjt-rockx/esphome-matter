@@ -68,3 +68,8 @@ node src/cli.mjs read --ep 2 --cluster TemperatureMeasurement --attribute Measur
 * `cc1plus: Killed` during `build`: out of memory. Lower `CMAKE_BUILD_PARALLEL_LEVEL` (default 3); the build resumes.
 * QEMU exits early / no output: check `ldd qemu-system-xtensa` for missing libraries.
 * Do not run `pkill -f qemu-system-xtensa` from a shell whose own command line contains that string.
+
+## Automated tests
+
+`tests/runtime` drives this setup from pytest (boot, commission, subscriptions, ESPHome API); see [runtime-tests.md](runtime-tests.md).
+`run.sh cmd` prints the QEMU command line, and `WORK_NAME` / `FLASH_IMAGE` let the tests share one incremental build directory.
