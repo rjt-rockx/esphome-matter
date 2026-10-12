@@ -216,10 +216,10 @@ void configure_climate_thermostat(
   if (spec.auto_mode)
     cooling = spec.clamp_cooling(std::max<int16_t>(
         cooling, static_cast<int16_t>(heating + spec.dead_band * 10)));
+  // Unoccupied setpoints belong to the Occupancy feature (not enabled), so
+  // only the occupied ones are set here.
   config.features.heating.occupied_heating_setpoint = heating;
-  config.features.heating.unoccupied_heating_setpoint = heating;
   config.features.cooling.occupied_cooling_setpoint = cooling;
-  config.features.cooling.unoccupied_cooling_setpoint = cooling;
   config.features.auto_mode.min_setpoint_dead_band = spec.dead_band;
 }
 
