@@ -217,6 +217,26 @@ jobs:
           path: conformance.json
 
   # ---------------------------------------------------------------------------
+  # Node test harness self-test against the simulator (non-blocking)
+  # ---------------------------------------------------------------------------
+  harness:
+    name: Test harness selftest (non-blocking)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Selftest (simulated transport)
+        working-directory: tools/harness
+        run: |
+          npm ci
+          node src/cli.mjs selftest --transport sim
+
+  # ---------------------------------------------------------------------------
   # Validates the data model JSON against the esp-matter sources
   # ---------------------------------------------------------------------------
   integration:
@@ -280,12 +300,16 @@ jobs:
           - h2-thread
           - s3-wifi
           - c3-wifi
+          - c6-closure
+          - c6-power-source
         include:
           # Extra properties per slug (matched on `slug`, applied to every ESPHome version).
           - { slug: c6-wifi, name: C6 wifi, variant: ESP32C6, config: tests/configs/esp32-wifi.yaml }
           - { slug: c6-thread, name: C6 thread, variant: ESP32C6, config: tests/configs/esp32-thread.yaml }
           - { slug: h2-thread, name: H2 thread, variant: ESP32H2, config: tests/configs/esp32-thread.yaml }
           - { slug: s3-wifi, name: S3 wifi, variant: ESP32S3, config: tests/configs/esp32-wifi.yaml }
+          - { slug: c6-power-source, name: C6 power source, variant: ESP32C6, config: tests/configs/esp32-power-source.yaml }
+          - { slug: c6-closure, name: C6 closure, variant: ESP32C6, config: tests/configs/esp32-closure.yaml }
           - { slug: c3-wifi, name: C3 wifi, variant: ESP32C3, config: tests/configs/esp32-wifi.yaml }
     steps:
       - name: Check out repository

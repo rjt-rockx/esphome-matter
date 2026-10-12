@@ -32,6 +32,7 @@ text_sensor:
     entity_category: diagnostic
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   software_version: 1 # increase for every image you offer as an update
   ota:
     on_state:

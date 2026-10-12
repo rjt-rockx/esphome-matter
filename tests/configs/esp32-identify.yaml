@@ -28,6 +28,7 @@ wifi:
   password: ci-test-password
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   node_label: Identify Test Node
   serial_number: "SN-0001"
   software_version_string: "1.2.3"

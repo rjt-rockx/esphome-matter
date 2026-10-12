@@ -1,0 +1,127 @@
+esphome:
+  name: matter-ci-power-source
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    # The root node (endpoint 0) carries the node level battery. Its EndpointList defaults
+    # to every other configured endpoint (1, 2 and 3).
+    0:
+      battery:
+        percent: battery_percent
+        voltage: battery_voltage
+        replacement_needed: battery_replace
+        charging: battery_charging
+        charged: battery_full
+        replaceability: user_replaceable
+        replacement_description: CR123A
+        quantity: 2
+        warning_below: 25
+        critical_below: 8
+        description: Main battery
+        order: 1
+    # A sensor with its own wired source on the same endpoint, only powering itself.
+    1:
+      temperature_sensor: temperature
+      wired:
+        current_type: ac
+        present: mains_present
+        voltage: mains_voltage
+        frequency: mains_frequency
+        current: mains_current
+        powers: [1]
+        order: 0
+    # Battery with binary sensors for the charge level on an application endpoint.
+    2:
+      contact_sensor:
+        boolean_state: door
+      battery:
+        low: battery_low
+        critical: battery_critical
+        description: Door battery
+    # Shorthand: a percent sensor only.
+    3:
+      humidity_sensor: humidity
+      battery: battery_percent_2
+
+sensor:
+  - platform: template
+    id: temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    lambda: return 21.5;
+  - platform: template
+    id: humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+    lambda: return 45.0;
+  - platform: template
+    id: battery_percent
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 87.0;
+  - platform: template
+    id: battery_percent_2
+    unit_of_measurement: "%"
+    device_class: battery
+    lambda: return 42.0;
+  - platform: template
+    id: battery_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 3.12;
+  - platform: template
+    id: mains_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    lambda: return 230.1;
+  - platform: template
+    id: mains_frequency
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    lambda: return 50.0;
+  - platform: template
+    id: mains_current
+    unit_of_measurement: "mA"
+    device_class: current
+    lambda: return 130.0;
+
+binary_sensor:
+  - platform: template
+    id: door
+    device_class: door
+  - platform: template
+    id: battery_replace
+  - platform: template
+    id: battery_charging
+  - platform: template
+    id: battery_full
+  - platform: template
+    id: battery_low
+    device_class: battery
+  - platform: template
+    id: battery_critical
+  - platform: template
+    id: mains_present
+    device_class: power

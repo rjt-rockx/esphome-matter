@@ -1,0 +1,19 @@
+# thermostat bound to an ESPHome climate (heat capable). Temperatures are 0.01 C.
+# SystemMode: 0 Off, 1 Auto, 3 Cool, 4 Heat. SetpointRaiseLowerMode: 0 Heat, 1 Cool, 2 Both.
+name: thermostat heat setpoint
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: Thermostat }]
+steps:
+  - write: { ep: "${ep}", cluster: Thermostat, attribute: SystemMode, value: 4 }
+  - expect: { ep: "${ep}", cluster: Thermostat, attribute: SystemMode, equals: 4, within: 3s }
+  - write: { ep: "${ep}", cluster: Thermostat, attribute: OccupiedHeatingSetpoint, value: 2100 }
+  - expect: { ep: "${ep}", cluster: Thermostat, attribute: OccupiedHeatingSetpoint, equals: 2100, within: 3s }
+  - invoke:
+      ep: "${ep}"
+      cluster: Thermostat
+      command: SetpointRaiseLower
+      args: { mode: 0, amount: 10 }   # amount is in 0.1 C
+  - expect: { ep: "${ep}", cluster: Thermostat, attribute: OccupiedHeatingSetpoint, equals: 2200, within: 3s }
+  - read: { ep: "${ep}", cluster: Thermostat, attribute: LocalTemperature, exists: true }
+cleanup:
+  - write: { ep: "${ep}", cluster: Thermostat, attribute: SystemMode, value: 0 }

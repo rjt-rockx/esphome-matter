@@ -57,7 +57,9 @@ Variables available in the automation:
 | `endpoint_id` | `uint16_t` | the endpoint that is identifying |
 | `active` | `bool` | `true` when identification starts (or an effect is requested), `false` when it stops |
 | `identify_time` | `uint16_t` | seconds the controller requested, 0 on stop and on effect requests |
-| `effect` | `uint8_t` | Identify effect (0 blink, 1 breathe, 2 okay, 3 channel change, 11 finish effect, 255 stop effect), or 255 when this is not an effect request |
+| `effect` | `uint8_t` | Identify effect (`EffectIdentifierEnum`: 0 blink, 1 breathe, 2 okay, 11 channel change, 254 finish effect, 255 stop effect), or 255 when this is not an effect request |
+
+The value 255 is used for both "stop effect" and "not an effect request". A stop effect request arrives with `active` true and `identify_time` 0, which is how to tell it apart from the start of an identification (`identify_time` greater than 0) and from the end (`active` false).
 
 `on_identify` is a list. Add `endpoint:` to a list entry to run it for one endpoint only; without it the entry runs for every endpoint.
 

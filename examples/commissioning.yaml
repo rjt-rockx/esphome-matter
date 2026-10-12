@@ -18,7 +18,10 @@ wifi:
 
 # See docs/commissioning.md
 matter:
-  # persist_passcode: true   # keep the plaintext passcode in flash (not recommended)
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
+  # persist_passcode: until_commissioned  # default: keep the code across reboots until the first commissioning
+  # persist_passcode: true   # keep the plaintext passcode in flash forever
+  # persist_passcode: false  # RAM only: a new code on every boot until commissioned
   on_commissioned:
     - logger.log: "Commissioned"
   on_decommissioned:

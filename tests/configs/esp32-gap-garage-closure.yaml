@@ -1,0 +1,75 @@
+# Real device family: garage door openers. Evidence: ratgdo (esphome-hardware catalog, evidence=inferred: Closure by spec),
+# DCL rows of retail Matter openers (Konnected GDOv2 = Window Covering 514, Smart Garage Door Opener 3RDO01058W = On/Off
+# Light Switch, Sonoff SmartGarageDoorController = On/Off Plug-in Unit); Meross MSG has no cluster dump. The only real
+# Closure device is the HA test mock `mock_closure_covering_lift.json` (dump).
+# The ratgdo ESPHome component is an external component, so a template cover with device_class garage stands in for
+# `cover: platform: ratgdo` here (same entity interface: position, door state, open/close/stop).
+#
+# Variant (c) "power user": the Matter 1.5 Closure device type, mirroring mock_closure_covering_lift
+# (EP1 closure with ClosureControl, EP2 closure_panel child with ClosureDimension PS+TR). EP1 is bound to the
+# garage cover through the experimental native closure binding (Positioning only); the closure_panel stays unbound.
+esphome:
+  name: matter-garage-closure
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password-123
+
+matter:
+  endpoints:
+    1:
+      label: Garage door
+      tags:
+        - {namespace: 68, tag: 0, label: Covering}
+        - {namespace: 70, tag: 0, label: Garage}
+      closure:
+        cover_id: garage_door
+    2:
+      parent: 1
+      tags:
+        - {namespace: 69, tag: 0, label: Lift}
+      closure_panel:
+        with_features: [Positioning, Translation]
+    3:
+      label: Door sensor
+      contact_sensor:
+        boolean_state: door_reed
+
+output:
+  - platform: gpio
+    id: door_relay
+    pin: GPIO10
+
+cover:
+  - platform: template
+    id: garage_door
+    name: Garage door
+    device_class: garage
+    lambda: |-
+      return id(door_reed).state ? COVER_CLOSED : COVER_OPEN;
+    open_action:
+      - output.turn_on: door_relay
+    close_action:
+      - output.turn_on: door_relay
+
+binary_sensor:
+  - platform: gpio
+    id: door_reed
+    name: Garage door closed
+    device_class: garage_door
+    pin: {number: GPIO6, mode: INPUT_PULLUP, inverted: true}

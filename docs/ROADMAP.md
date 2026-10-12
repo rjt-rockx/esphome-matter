@@ -1,13 +1,15 @@
 # Roadmap
 
 This is a synthesis of what the community asks for, the direction of the upstream maintainer (DavidvtWout), the precedent for getting a protocol component into ESPHome, and the engineering gaps found in the code. It is a plan, not a promise: dates are deliberately absent. Facts below come from the project trackers and forums as of October 2026, mostly via summaries; check the linked threads before relying on exact counts or quotes.
+Design direction and principles: [design/DIRECTION.md](design/DIRECTION.md).
+
 
 ## 1. What the community wants
 
 - **Matter without Home Assistant.** The dominant theme in the long-running ESPHome feature requests ([#1430](https://github.com/esphome/feature-requests/issues/1430), about 124 thumbs-up; [#2722](https://github.com/esphome/feature-requests/issues/2722)) and the Home Assistant forum: cross-vendor interoperability, local control, no bridge, no single point of failure.
 - **Matter over Wi-Fi first** to avoid buying new hardware; Thread for low-power devices second.
 - **Entity coverage.** Switches/outlets, lights, fans, window coverings, thermostats, locks, valves and basic sensors; contact and presence sensors first for many.
-- **Power and energy measurement.** The top hobbyist need. Implemented as the `electrical_sensor` device type, see [sensors.md](sensors.md#electrical-measurements), but not yet verified on controllers.
+- **Power and energy measurement.** The top hobbyist need. Implemented as the `electrical_sensor` device type with a selectable Power Topology (node, tree, set), see [sensors.md](sensors.md#electrical-measurements) and [power.md](power.md), but not yet verified on controllers.
 - **Easy pairing in more ecosystems**, especially Google Home, and clear documentation.
 - **Reliability.** Reconnect after restart, binding stability, fewer surprises in the config schema.
 
@@ -51,7 +53,7 @@ Priorities weigh community demand, maintainer direction, effort, and risk. P0 it
 - **Honest documentation.** Keep the docs accurate (device types, README, ecosystems and troubleshooting were refreshed together with this roadmap). Keep a tested/untested matrix.
 - **Verification on hardware.** Run the same test matrix against Home Assistant, Apple Home, Alexa and Google Home for lights, sensors and binary sensors; record results in [ecosystems.md](ecosystems.md).
 - **Reboot persistence test** for attribute values (StartUpOnOff, level, etc.), since correctness depends on NVS persistence.
-- **Pairing UX and secret handling.** The setup code is logged on every boot and the plaintext passcode is stored in NVS (research finding). Move to publishing the code only while the commissioning window is open (diagnostic text sensor, `qr_code` display), and a verifier-only commissionable data provider. Offer both "remove fabrics" and "regenerate identity" resets.
+- **Pairing UX and secret handling.** Done: the passcode is stored in flash only until the first commissioning (`persist_passcode: until_commissioned`, default) and afterwards only the SPAKE2+ verifier is kept; the setup code is logged only while a commissioning window is open (see [commissioning](commissioning.md#passcode-storage)). Remaining: a diagnostic text sensor / `qr_code` display for the code, and offering both "remove fabrics" and "regenerate identity" resets as separate UX.
 - **Reconnect after restart** ([#8](https://github.com/DavidvtWout/esphome-matter/issues/8)/[#31](https://github.com/DavidvtWout/esphome-matter/issues/31)): reproduce, measure, fix with the command queue and startup ordering.
 - **Compatibility with the ESPHome `api` component** and duplicate entities in Home Assistant: document "one path per entity" and measure heap with both.
 
@@ -75,7 +77,7 @@ Priorities weigh community demand, maintainer direction, effort, and risk. P0 it
 ### P3: bigger bets
 
 - **BLE commissioning** (needs coexistence with other networking; currently broken).
-- **Matter OTA** (requestor) for devices that want it; ESPHome OTA remains the recommended update path.
+- **Matter OTA**: an opt-in requestor is implemented ([matter-ota.md](matter-ota.md)); ESPHome OTA remains the recommended update path.
 - **Custom DAC / production credentials** workflow and CSA VID guidance.
 - **Ethernet** transport.
 - **Matter 1.4/1.5 types**: solar, battery storage, heat pump, EVSE, closures, cameras. Mostly untestable by hobbyists today.

@@ -1,0 +1,12 @@
+# on_off_plug_in_unit / mounted_on_off_control bound to an ESPHome switch.
+name: switch (relay / plug)
+vars: { ep: 1 }
+requires: [{ ep: "${ep}", cluster: OnOff }]
+setup:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, within: 3s }
+steps:
+  - invoke: { ep: "${ep}", cluster: OnOff, command: On }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: true, via: report, within: 2s }
+  - invoke: { ep: "${ep}", cluster: OnOff, command: Off }
+  - expect: { ep: "${ep}", cluster: OnOff, attribute: OnOff, equals: false, via: report, within: 2s }

@@ -234,6 +234,10 @@ def _predict_cluster(
     return inst
 
 
+# Component device-type key -> esp-matter profile name.
+DEVICE_TYPE_ALIASES = {"evse": "energy_evse"}
+
+
 def from_layout(
     layout: dict | str | Path, spec: Spec, profile: Profile | None = None
 ) -> NodeModel:
@@ -279,7 +283,9 @@ def from_layout(
             )
         )
         for name in dt_names:
-            info = dts.get(name) or dts.get(_espm_device_type_namespaces().get(name, ""))
+            info = dts.get(DEVICE_TYPE_ALIASES.get(name, name)) or dts.get(
+                _espm_device_type_namespaces().get(name, "")
+            )
             if info is None:
                 notes.append(
                     f"device type '{name}' is not known to the esp-matter profile"

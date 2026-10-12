@@ -5,15 +5,27 @@
 #include "matter_attributes.h"
 #include "matter_component.h"
 
+#include <app/clusters/identify-server/IdentifyCluster.h>
+#include <data_model_provider/esp_matter_data_model_provider.h>
+
 #include <vector>
 
 namespace esphome::matter {
 
 static const char *const TAG = "matter.identify";
 
-// Identify cluster / IdentifyTime attribute ids (Matter spec 1.2.5).
-static constexpr uint32_t IDENTIFY_CLUSTER_ID = 0x0003;
-static constexpr uint32_t IDENTIFY_TIME_ATTRIBUTE_ID = 0x0000;
+// The Identify cluster is code driven in esp-matter 1.6: IdentifyTime lives in
+// the cluster object and the esp-matter attribute store is never updated, so it
+// has to be read from the cluster. Runs on the CHIP task.
+static uint16_t read_identify_time(uint16_t endpoint_id) {
+  auto *server =
+      esp_matter::data_model::provider::get_instance().registry().Get(
+          {endpoint_id, chip::app::Clusters::Identify::Id});
+  if (server == nullptr)
+    return 0;
+  return static_cast<chip::app::Clusters::IdentifyCluster *>(server)
+      ->GetIdentifyTime();
+}
 
 // Filled during setup() on the main loop, before esp_matter::start(); read only afterwards.
 static std::vector<IdentifyTrigger *> &identify_triggers() {
@@ -45,13 +57,7 @@ esp_err_t matter_identification_cb(
 
   switch (type) {
   case esp_matter::identification::START: {
-    esp_matter_attr_val_t val = esp_matter_invalid(nullptr);
-    if (esp_matter::attribute::get_val(endpoint_id, IDENTIFY_CLUSTER_ID,
-                                       IDENTIFY_TIME_ATTRIBUTE_ID,
-                                       &val) == ESP_OK &&
-        val.type == ESP_MATTER_VAL_TYPE_UINT16) {
-      identify_time = val.val.u16;
-    }
+    identify_time = read_identify_time(endpoint_id);
     break;
   }
   case esp_matter::identification::STOP:

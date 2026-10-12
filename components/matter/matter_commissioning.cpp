@@ -174,8 +174,11 @@ bool MatterCommissioning::generate_passcode_(Identity &id) {
   return true;
 }
 
-// Persists the identity. The plaintext passcode is only written when
-// persist_passcode is set; otherwise a legacy "pin-code" key is removed.
+// Persists the identity. The plaintext passcode is written when
+// persist_passcode is true, or until_commissioned and the passcode is still
+// known (it is forgotten on the first commissioning). A passcode fixed in the
+// YAML is never written (it is compiled in). Otherwise a stale "pin-code" key
+// is removed.
 bool MatterCommissioning::store_identity_(const Identity &id) {
   nvs_handle_t handle;
   if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
@@ -188,7 +191,12 @@ bool MatterCommissioning::store_identity_(const Identity &id) {
                 ESP_OK &&
             write_b64(handle, NVS_KEY_SALT, id.salt, id.salt_len) &&
             write_b64(handle, NVS_KEY_VERIFIER, id.verifier, id.verifier_len);
-  if (this->persist_passcode_ && id.passcode_known)
+  const bool keep_passcode =
+      id.passcode_known &&
+      (this->persist_passcode_ == PersistPasscode::ALWAYS ||
+       (this->persist_passcode_ == PersistPasscode::UNTIL_COMMISSIONED &&
+        !this->fixed_passcode_));
+  if (keep_passcode)
     ok = ok && nvs_set_u32(handle, NVS_KEY_PASSCODE, id.passcode) == ESP_OK;
   else
     nvs_erase_key(handle, NVS_KEY_PASSCODE); // ESP_ERR_NVS_NOT_FOUND is fine
@@ -199,8 +207,8 @@ bool MatterCommissioning::store_identity_(const Identity &id) {
   return ok;
 }
 
-bool MatterCommissioning::init(bool persist_passcode) {
-  this->persist_passcode_ = persist_passcode;
+bool MatterCommissioning::init(int persist_passcode_mode) {
+  this->persist_passcode_ = static_cast<PersistPasscode>(persist_passcode_mode);
 #ifdef MATTER_PASSCODE
   this->fixed_passcode_ = true;
 #endif
@@ -246,15 +254,19 @@ bool MatterCommissioning::init(bool persist_passcode) {
     }
 #endif
     if (have_legacy_pin && is_valid_passcode(legacy_pin)) {
-      // Upgrade from firmware that stored the plaintext passcode. It stays
-      // usable from RAM for this boot; store_identity_() erases the flash copy
-      // unless persist_passcode is set.
+      // The plaintext passcode is in flash: either by design (true,
+      // until_commissioned while uncommissioned) or left by older firmware.
+      // It is usable from RAM. For until_commissioned on_server_ready_()
+      // erases it if the device turns out to be commissioned.
       id.passcode = legacy_pin;
       id.passcode_known = true;
-      changed = true;
-      ESP_LOGI(TAG, "Migrating legacy commissioning data (%s)",
-               persist_passcode ? "passcode kept in flash"
-                                : "plaintext passcode removed from flash");
+      if (this->persist_passcode_ == PersistPasscode::NEVER ||
+          this->fixed_passcode_) {
+        // store_identity_() erases the flash copy.
+        changed = true;
+        ESP_LOGI(TAG, "Migrating legacy commissioning data (plaintext "
+                      "passcode removed from flash)");
+      }
     }
 #ifdef MATTER_PASSCODE
     // A passcode in the YAML wins. Re-derive the verifier if it changed.
@@ -367,18 +379,25 @@ void MatterCommissioning::refresh_(bool log_codes, bool publish) {
 void MatterCommissioning::on_server_ready_() {
   auto &server = chip::Server::GetInstance();
   auto &wm = server.GetCommissioningWindowManager();
-  if (server.GetFabricTable().FabricCount() == 0 &&
-      !this->identity_.passcode_known) {
-    // Uncommissioned device that rebooted and (by design) no longer knows its
-    // passcode. Nothing is paired yet, so simply issue a fresh one.
-    Identity fresh = this->identity_;
-    if (this->generate_passcode_(fresh) && this->store_identity_(fresh)) {
-      this->identity_ = fresh;
+  const bool commissioned = server.GetFabricTable().FabricCount() > 0;
+  if (!commissioned && !this->identity_.passcode_known) {
+    // Uncommissioned device that has no passcode (persist_passcode: false, a
+    // factory reset or decommissioning that erased it, or an upgrade). Nothing
+    // is paired yet, so simply issue a fresh one.
+    if (this->regenerate_identity_()) {
       ESP_LOGI(TAG, "Device is not commissioned: generated a new passcode");
       wm.CloseCommissioningWindow();
       if (wm.OpenBasicCommissioningWindow() != CHIP_NO_ERROR)
         ESP_LOGW(TAG, "Failed to re-open the commissioning window");
     }
+  } else if (commissioned &&
+             this->persist_passcode_ == PersistPasscode::UNTIL_COMMISSIONED &&
+             !this->fixed_passcode_) {
+    // Commissioned: a plaintext passcode left in flash (legacy data, or a
+    // commissioning whose cleanup did not run) must not survive.
+    this->identity_.passcode_known = false;
+    this->identity_.passcode = 0;
+    this->erase_passcode_key_();
   }
   this->refresh_(false);
 }
@@ -390,10 +409,12 @@ void MatterCommissioning::on_fabric_removed_() {
   if (server.GetFabricTable().FabricCount() == 0) {
     // Last fabric gone: the device must become commissionable again. (Not when
     // resetting: the reboot follows right away and handles that.)
+    // A removal that leaves the passcode known is a failed commissioning
+    // (fail-safe expiry deleting the half-added fabric): keep the code the user
+    // is typing.
     if (!resetting && !this->identity_.passcode_known) {
-      Identity fresh = this->identity_;
-      if (this->generate_passcode_(fresh) && this->store_identity_(fresh))
-        this->identity_ = fresh;
+      if (this->regenerate_identity_() && wm.IsCommissioningWindowOpen())
+        wm.CloseCommissioningWindow(); // re-opened below with the new identity
     }
     if (!resetting && !wm.IsCommissioningWindowOpen() &&
         wm.OpenBasicCommissioningWindow() != CHIP_NO_ERROR)
@@ -426,10 +447,15 @@ void MatterCommissioning::handle_event(const chip::DeviceLayer::ChipDeviceEvent 
     this->refresh_(false);
     break;
   case chip::DeviceLayer::DeviceEventType::kCommissioningComplete:
-    if (!this->persist_passcode_ && !this->fixed_passcode_) {
-      // Forget the passcode: from now on only the verifier exists.
+    if (this->persist_passcode_ != PersistPasscode::ALWAYS &&
+        !this->fixed_passcode_) {
+      // Forget the passcode: from now on only the verifier exists. This also
+      // erases the flash copy of until_commissioned (CHIP task, the same task
+      // that wrote it).
       this->identity_.passcode_known = false;
       this->identity_.passcode = 0;
+      if (this->persist_passcode_ == PersistPasscode::UNTIL_COMMISSIONED)
+        this->erase_passcode_key_();
     }
     if (global_matter_component != nullptr)
       global_matter_component->defer_to_main_loop([this]() {
@@ -453,8 +479,11 @@ void MatterCommissioning::dump_config() {
   ESP_LOGCONFIG(TAG, "  Discriminator: %u", this->identity_.discriminator);
   ESP_LOGCONFIG(TAG, "  Passcode storage: %s",
                 this->fixed_passcode_    ? "fixed in YAML"
-                : this->persist_passcode_ ? "plaintext in flash"
-                                          : "verifier only");
+                : this->persist_passcode_ == PersistPasscode::ALWAYS
+                    ? "plaintext in flash"
+                : this->persist_passcode_ == PersistPasscode::UNTIL_COMMISSIONED
+                    ? "plaintext in flash until commissioned"
+                    : "verifier only");
   // The codes are only printed while a commissioning window is open (the
   // window-open event prints them too); never on a regular boot.
   chip::DeviceLayer::PlatformMgr().LockChipStack();
@@ -469,12 +498,8 @@ void MatterCommissioning::open_window(uint32_t timeout_s) {
     const auto timeout = chip::System::Clock::Seconds32(timeout_s);
 
     if (server.GetFabricTable().FabricCount() == 0) {
-      if (!this->identity_.passcode_known) {
-        Identity fresh = this->identity_;
-        if (!this->generate_passcode_(fresh) || !this->store_identity_(fresh))
-          return;
-        this->identity_ = fresh;
-      }
+      if (!this->identity_.passcode_known && !this->regenerate_identity_())
+        return;
       wm.CloseCommissioningWindow();
       if (wm.OpenBasicCommissioningWindow(timeout) != CHIP_NO_ERROR)
         ESP_LOGW(TAG, "Failed to open the commissioning window");
@@ -514,6 +539,37 @@ void MatterCommissioning::open_window(uint32_t timeout_s) {
       this->ephemeral_passcode_ = 0;
     }
   });
+}
+
+// New passcode, salt and verifier (plus a new discriminator for
+// until_commissioned, unless fixed in the YAML), persisted according to
+// persist_passcode. CHIP task. Keeps the old identity on failure.
+bool MatterCommissioning::regenerate_identity_() {
+  Identity fresh = this->identity_;
+#ifndef MATTER_DISCRIMINATOR
+  if (this->persist_passcode_ == PersistPasscode::UNTIL_COMMISSIONED)
+    fresh.discriminator = (uint16_t)(esp_random() & 0x0FFFu);
+#endif
+  if (!this->generate_passcode_(fresh) || !this->store_identity_(fresh))
+    return false;
+  this->identity_ = fresh;
+  return true;
+}
+
+void MatterCommissioning::erase_passcode_key_() {
+  nvs_handle_t h;
+  if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to open NVS namespace '%s'", NVS_NAMESPACE);
+    return;
+  }
+  esp_err_t err = nvs_erase_key(h, NVS_KEY_PASSCODE);
+  if (err == ESP_OK)
+    err = nvs_commit(h);
+  else if (err == ESP_ERR_NVS_NOT_FOUND)
+    err = ESP_OK;
+  nvs_close(h);
+  if (err != ESP_OK)
+    ESP_LOGE(TAG, "Failed to erase the stored passcode");
 }
 
 void MatterCommissioning::erase_identity_keys_() {

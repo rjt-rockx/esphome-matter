@@ -1,0 +1,144 @@
+esphome:
+  name: matter-ci-light-bindings
+
+esp32:
+  variant: ESP32S3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+# Lights bound to the plug-in unit and mounted load device types, LevelControl
+# transition attributes and a color loop on an RGB only light.
+matter:
+  endpoints:
+    1:
+      dimmable_plug_in_unit:
+        light_id: plug_dimmer
+        min_level: 5%
+        on_off_transition_time: 500ms
+    2:
+      mounted_dimmable_load_control:
+        light_id: mounted_dimmer
+    3:
+      on_off_plug_in_unit:
+        light_id: plug_relay
+    4:
+      mounted_on_off_control:
+        light_id: mounted_dimmable
+        on_off_transition_time: 1s
+      clusters:
+        level_control:
+          with_features:
+            - OnOff
+            - Lighting
+    5:
+      dimmable_light:
+        light_id: lamp
+        on_off_transition_time: 2s
+    6:
+      # An RGB only light has no color temperature range, so the endpoint
+      # doesn't advertise the ColorTemperature feature.
+      extended_color_light:
+        light_id: rgb_strip
+        with_features:
+          # Deliberately not in dependency order: the code adds them in bit order.
+          - Color Loop
+          - Enhanced Hue
+          - Hue And Saturation
+        color_loop_effect: Color loop
+
+output:
+  - platform: template
+    id: out_plug_dimmer
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: out_mounted_dimmer
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: gpio
+    id: out_plug_relay
+    pin: GPIO10
+  - platform: template
+    id: out_mounted_dimmable
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: out_lamp
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: out_red
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: out_green
+    type: float
+    write_action:
+      - lambda: ""
+  - platform: template
+    id: out_blue
+    type: float
+    write_action:
+      - lambda: ""
+
+light:
+  - platform: monochromatic
+    id: plug_dimmer
+    output: out_plug_dimmer
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: mounted_dimmer
+    output: out_mounted_dimmer
+    restore_mode: ALWAYS_OFF
+  - platform: binary
+    id: plug_relay
+    output: out_plug_relay
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: mounted_dimmable
+    output: out_mounted_dimmable
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    id: lamp
+    output: out_lamp
+    restore_mode: ALWAYS_OFF
+  - platform: rgb
+    id: rgb_strip
+    red: out_red
+    green: out_green
+    blue: out_blue
+    restore_mode: ALWAYS_OFF
+    effects:
+      - lambda:
+          name: Color loop
+          update_interval: 200ms
+          lambda: |-
+            static int hue = 0;
+            hue = (hue + 10) % 360;
+            float r, g, b;
+            hsv_to_rgb(hue, 1.0f, 1.0f, r, g, b);
+            auto call = id(rgb_strip).turn_on();
+            call.set_rgb(r, g, b);
+            call.set_transition_length(0);
+            call.perform();

@@ -13,9 +13,17 @@ The Matter light device types are `on_off_light`, `dimmable_light`, `color_tempe
 | `on_off_light` | On/Off | `light_id` |
 | `dimmable_light` | Level Control (brightness) | `light_id`, `min_level`, `max_level` |
 | `color_temperature_light` | Color Control: color temperature (mireds) | `light_id` |
-| `extended_color_light` | Color Control: XY color | `light_id` |
+| `extended_color_light` | Color Control: XY color | `light_id`, `color_loop_effect` |
 
-Level, color temperature and color are supported, and state is synchronized both ways between the ESPHome light and Matter. Hue/saturation commands from controllers are not implemented; controllers that drive color with XY work. See [lights.md](lights.md) for details, startup behaviour and the FAQ, and [examples/extended-color-light.yaml](../examples/extended-color-light.yaml) for a full example.
+The plug-in unit and mounted load device types can be backed by a light as well, with the same binding:
+
+| Device type | Level | Entity binding |
+|---|---|---|
+| `dimmable_plug_in_unit` | Level Control (brightness) | `light_id`, `min_level`, `max_level`, `on_off_transition_time` |
+| `mounted_dimmable_load_control` | Level Control (brightness) | `light_id`, `min_level`, `max_level`, `on_off_transition_time` |
+| `on_off_plug_in_unit`, `mounted_on_off_control` | On/Off only, or Level Control when added with `clusters: level_control:` | `light_id`, `on_off_transition_time` |
+
+Level, color temperature and color (XY, hue/saturation, enhanced hue) are supported, and state is synchronized both ways between the ESPHome light and Matter. See [lights.md](lights.md) for details, startup behaviour and the FAQ, and [examples/extended-color-light.yaml](../examples/extended-color-light.yaml) for a full example.
 
 ```yaml
 matter:
@@ -36,7 +44,15 @@ matter:
         with_features:
           - hue_and_saturation # Supports color specification via hue/saturation.
           - enhanced_hue # Enhanced hue is supported.
-          - color_loop # Color loop is supported.
+          - color_loop # Color loop is supported. Needs color_loop_effect (see lights.md).
+        color_loop_effect: Color loop
+    5:
+      dimmable_plug_in_unit:
+        light_id: light_id
+        on_off_transition_time: 500ms
+    6:
+      mounted_dimmable_load_control:
+        light_id: light_id
 ```
 
 # Plugs and relays
@@ -204,7 +220,7 @@ matter:
 
 ### electrical_sensor
 
-This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the configuration.
+This device type exposes clusters and attributes for power and energy measurements (voltage, current, power, frequency, power factor and cumulative energy). See [sensors](sensors.md#electrical-measurements) for the sensors and [power.md](power.md) for the `topology` (node, tree or set) and for placing it on the root node or next to another device type.
 
 # generic_switch
 
@@ -252,7 +268,7 @@ The device types below can usually be created (add the key under an endpoint), b
 - chime
 - doorbell
 - window_covering
-- closure
+- closure (experimental, `cover_id` binding, see [cover.md](cover.md#garage-doors-gates-and-doors))
 - closure_panel
 - closure_controller
 - thermostat

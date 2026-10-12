@@ -3,6 +3,7 @@
   "clusters": {
     "Identify": {
       "namespace": "identify",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "IdentifyTime": "create_identify_time",
@@ -11,6 +12,7 @@
     },
     "Groups": {
       "namespace": "groups",
+      "feature_flags": false,
       "features": {
         "GroupNames": {
           "namespace": null,
@@ -23,6 +25,7 @@
     },
     "OnOff": {
       "namespace": "on_off",
+      "feature_flags": false,
       "features": {
         "Lighting": {
           "namespace": "lighting",
@@ -47,6 +50,7 @@
     },
     "LevelControl": {
       "namespace": "level_control",
+      "feature_flags": false,
       "features": {
         "OnOff": {
           "namespace": "on_off",
@@ -80,6 +84,7 @@
     },
     "Descriptor": {
       "namespace": "descriptor",
+      "feature_flags": false,
       "features": {
         "TagList": {
           "namespace": "tag_list",
@@ -97,6 +102,7 @@
     },
     "Binding": {
       "namespace": "binding",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "Binding": "create_binding"
@@ -104,6 +110,7 @@
     },
     "AccessControl": {
       "namespace": "access_control",
+      "feature_flags": false,
       "features": {
         "Extension": {
           "namespace": "extension",
@@ -131,6 +138,7 @@
     },
     "Actions": {
       "namespace": "actions",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "ActionList": "create_action_list",
@@ -140,6 +148,7 @@
     },
     "BasicInformation": {
       "namespace": "basic_information",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "DataModelRevision": "create_data_model_revision",
@@ -171,11 +180,13 @@
     },
     "OTASoftwareUpdateProvider": {
       "namespace": "ota_software_update_provider",
+      "feature_flags": false,
       "features": {},
       "attributes": {}
     },
     "OTASoftwareUpdateRequestor": {
       "namespace": "ota_software_update_requestor",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "DefaultOTAProviders": "create_default_ota_providers",
@@ -186,6 +197,7 @@
     },
     "LocalizationConfiguration": {
       "namespace": "localization_configuration",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "ActiveLocale": "create_active_locale",
@@ -194,6 +206,7 @@
     },
     "TimeFormatLocalization": {
       "namespace": "time_format_localization",
+      "feature_flags": false,
       "features": {
         "CalendarFormat": {
           "namespace": "calendar_format",
@@ -208,6 +221,7 @@
     },
     "UnitLocalization": {
       "namespace": "unit_localization",
+      "feature_flags": false,
       "features": {
         "TemperatureUnit": {
           "namespace": "temperature_unit",
@@ -221,6 +235,7 @@
     },
     "PowerSource": {
       "namespace": "power_source",
+      "feature_flags": true,
       "features": {
         "Wired": {
           "namespace": "wired",
@@ -276,6 +291,7 @@
     },
     "GeneralCommissioning": {
       "namespace": "general_commissioning",
+      "feature_flags": false,
       "features": {
         "TermsAndConditions": {
           "namespace": "terms_and_conditions",
@@ -304,6 +320,7 @@
     },
     "NetworkCommissioning": {
       "namespace": "network_commissioning",
+      "feature_flags": false,
       "features": {
         "WiFiNetworkInterface": {
           "namespace": null,
@@ -334,11 +351,13 @@
     },
     "DiagnosticLogs": {
       "namespace": "diagnostic_logs",
+      "feature_flags": false,
       "features": {},
       "attributes": {}
     },
     "GeneralDiagnostics": {
       "namespace": "general_diagnostics",
+      "feature_flags": false,
       "features": {
         "DataModelTest": {
           "namespace": "data_model_test",
@@ -360,6 +379,7 @@
     },
     "SoftwareDiagnostics": {
       "namespace": "software_diagnostics",
+      "feature_flags": false,
       "features": {
         "Watermarks": {
           "namespace": "watermarks",
@@ -375,6 +395,7 @@
     },
     "ThreadNetworkDiagnostics": {
       "namespace": "thread_network_diagnostics",
+      "feature_flags": false,
       "features": {
         "PacketCounts": {
           "namespace": "packet_counts",
@@ -463,6 +484,7 @@
     },
     "WiFiNetworkDiagnostics": {
       "namespace": "wifi_network_diagnostics",
+      "feature_flags": false,
       "features": {
         "PacketCounts": {
           "namespace": "packet_counts",
@@ -491,6 +513,7 @@
     },
     "EthernetNetworkDiagnostics": {
       "namespace": "ethernet_network_diagnostics",
+      "feature_flags": false,
       "features": {
         "PacketCounts": {
           "namespace": "packet_counts",
@@ -515,6 +538,7 @@
     },
     "TimeSynchronization": {
       "namespace": "time_synchronization",
+      "feature_flags": false,
       "features": {
         "TimeZone": {
           "namespace": "time_zone",
@@ -551,6 +575,7 @@
     },
     "BridgedDeviceBasicInformation": {
       "namespace": "bridged_device_basic_information",
+      "feature_flags": false,
       "features": {
         "BridgedICDSupport": {
           "namespace": "bridged_icd_support",
@@ -581,6 +606,7 @@
     },
     "Switch": {
       "namespace": "switch_cluster",
+      "feature_flags": true,
       "features": {
         "LatchingSwitch": {
           "namespace": "latching_switch",
@@ -615,6 +641,7 @@
     },
     "AdministratorCommissioning": {
       "namespace": "administrator_commissioning",
+      "feature_flags": false,
       "features": {
         "Basic": {
           "namespace": "basic",
@@ -629,6 +656,7 @@
     },
     "OperationalCredentials": {
       "namespace": "operational_credentials",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "NOCs": "create_nocs",
@@ -641,6 +669,7 @@
     },
     "GroupKeyManagement": {
       "namespace": "group_key_management",
+      "feature_flags": false,
       "features": {
         "CacheAndSync": {
           "namespace": null,
@@ -661,6 +690,7 @@
     },
     "FixedLabel": {
       "namespace": "fixed_label",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "LabelList": "create_label_list"
@@ -668,6 +698,7 @@
     },
     "UserLabel": {
       "namespace": "user_label",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "LabelList": "create_label_list"
@@ -675,6 +706,7 @@
     },
     "BooleanState": {
       "namespace": "boolean_state",
+      "feature_flags": false,
       "features": {
         "ChangeEvent": {
           "namespace": null,
@@ -687,6 +719,7 @@
     },
     "ICDManagement": {
       "namespace": "icd_management",
+      "feature_flags": false,
       "features": {
         "CheckInProtocolSupport": {
           "namespace": "check_in_protocol_support",
@@ -728,6 +761,7 @@
     },
     "LaundryDryerControls": {
       "namespace": "laundry_dryer_controls",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedDrynessLevels": "create_supported_dryness_levels",
@@ -736,6 +770,7 @@
     },
     "ModeSelect": {
       "namespace": "mode_select",
+      "feature_flags": false,
       "features": {
         "OnOff": {
           "namespace": "on_off",
@@ -753,6 +788,7 @@
     },
     "LaundryWasherMode": {
       "namespace": "laundry_washer_mode",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedModes": null,
@@ -769,6 +805,7 @@
     },
     "LaundryWasherControls": {
       "namespace": "laundry_washer_controls",
+      "feature_flags": true,
       "features": {
         "Spin": {
           "namespace": "spin",
@@ -788,6 +825,7 @@
     },
     "RVCRunMode": {
       "namespace": "rvc_run_mode",
+      "feature_flags": false,
       "features": {
         "DirectModeChange": {
           "namespace": null,
@@ -801,6 +839,7 @@
     },
     "RVCCleanMode": {
       "namespace": "rvc_clean_mode",
+      "feature_flags": false,
       "features": {
         "DirectModeChange": {
           "namespace": null,
@@ -814,6 +853,7 @@
     },
     "TemperatureControl": {
       "namespace": "temperature_control",
+      "feature_flags": true,
       "features": {
         "TemperatureNumber": {
           "namespace": "temperature_number",
@@ -839,6 +879,7 @@
     },
     "RefrigeratorAlarm": {
       "namespace": "refrigerator_alarm",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "Mask": "create_mask",
@@ -856,6 +897,7 @@
     },
     "AirQuality": {
       "namespace": "air_quality",
+      "feature_flags": false,
       "features": {
         "Fair": {
           "namespace": "fair",
@@ -880,6 +922,7 @@
     },
     "SmokeCOAlarm": {
       "namespace": "smoke_co_alarm",
+      "feature_flags": true,
       "features": {
         "SmokeAlarm": {
           "namespace": "smoke_alarm",
@@ -909,6 +952,7 @@
     },
     "MicrowaveOvenMode": {
       "namespace": "microwave_oven_mode",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedModes": null,
@@ -917,6 +961,7 @@
     },
     "MicrowaveOvenControl": {
       "namespace": "microwave_oven_control",
+      "feature_flags": true,
       "features": {
         "PowerAsNumber": {
           "namespace": "power_as_number",
@@ -945,6 +990,7 @@
     },
     "OperationalState": {
       "namespace": "operational_state",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "PhaseList": "create_phase_list",
@@ -957,6 +1003,7 @@
     },
     "RVCOperationalState": {
       "namespace": "rvc_operational_state",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "PhaseList": null,
@@ -969,6 +1016,7 @@
     },
     "ScenesManagement": {
       "namespace": "scenes_management",
+      "feature_flags": false,
       "features": {
         "SceneNames": {
           "namespace": "scene_names",
@@ -982,6 +1030,7 @@
     },
     "Groupcast": {
       "namespace": "groupcast",
+      "feature_flags": true,
       "features": {
         "Listener": {
           "namespace": "listener",
@@ -1006,6 +1055,7 @@
     },
     "HEPAFilterMonitoring": {
       "namespace": "hepa_filter_monitoring",
+      "feature_flags": false,
       "features": {
         "Condition": {
           "namespace": "condition",
@@ -1031,6 +1081,7 @@
     },
     "ActivatedCarbonFilterMonitoring": {
       "namespace": "activated_carbon_filter_monitoring",
+      "feature_flags": false,
       "features": {
         "Condition": {
           "namespace": "condition",
@@ -1056,6 +1107,7 @@
     },
     "BooleanStateConfiguration": {
       "namespace": "boolean_state_configuration",
+      "feature_flags": false,
       "features": {
         "Visual": {
           "namespace": "visual",
@@ -1091,6 +1143,7 @@
     },
     "ValveConfigurationandControl": {
       "namespace": "valve_configuration_and_control",
+      "feature_flags": false,
       "features": {
         "TimeSync": {
           "namespace": "time_sync",
@@ -1117,6 +1170,7 @@
     },
     "ElectricalPowerMeasurement": {
       "namespace": "electrical_power_measurement",
+      "feature_flags": true,
       "features": {
         "DirectCurrent": {
           "namespace": "direct_current",
@@ -1163,6 +1217,7 @@
     },
     "ElectricalEnergyMeasurement": {
       "namespace": "electrical_energy_measurement",
+      "feature_flags": true,
       "features": {
         "ImportedEnergy": {
           "namespace": "imported_energy",
@@ -1200,6 +1255,7 @@
     },
     "WaterHeaterManagement": {
       "namespace": "water_heater_management",
+      "feature_flags": false,
       "features": {
         "EnergyManagement": {
           "namespace": "energy_management",
@@ -1221,6 +1277,7 @@
     },
     "CommodityPrice": {
       "namespace": "commodity_price",
+      "feature_flags": false,
       "features": {
         "Forecasting": {
           "namespace": "forecasting",
@@ -1236,6 +1293,7 @@
     },
     "DeviceEnergyManagement": {
       "namespace": "device_energy_management",
+      "feature_flags": true,
       "features": {
         "PowerAdjustment": {
           "namespace": "power_adjustment",
@@ -1284,6 +1342,7 @@
     },
     "EnergyEVSE": {
       "namespace": "energy_evse",
+      "feature_flags": false,
       "features": {
         "ChargingPreferences": {
           "namespace": "charging_preferences",
@@ -1334,6 +1393,7 @@
     },
     "EnergyPreference": {
       "namespace": "energy_preference",
+      "feature_flags": true,
       "features": {
         "EnergyBalance": {
           "namespace": "energy_balance",
@@ -1354,6 +1414,7 @@
     },
     "PowerTopology": {
       "namespace": "power_topology",
+      "feature_flags": true,
       "features": {
         "NodeTopology": {
           "namespace": "node_topology",
@@ -1384,6 +1445,7 @@
     },
     "EnergyEVSEMode": {
       "namespace": "energy_evse_mode",
+      "feature_flags": false,
       "features": {
         "OnOff": {
           "namespace": null,
@@ -1397,6 +1459,7 @@
     },
     "WaterHeaterMode": {
       "namespace": "water_heater_mode",
+      "feature_flags": false,
       "features": {
         "OnOff": {
           "namespace": null,
@@ -1410,6 +1473,7 @@
     },
     "DeviceEnergyManagementMode": {
       "namespace": "device_energy_management_mode",
+      "feature_flags": false,
       "features": {
         "OnOff": {
           "namespace": null,
@@ -1423,6 +1487,7 @@
     },
     "ElectricalGridConditions": {
       "namespace": "electrical_grid_conditions",
+      "feature_flags": false,
       "features": {
         "Forecasting": {
           "namespace": "forecasting",
@@ -1437,6 +1502,7 @@
     },
     "DoorLock": {
       "namespace": "door_lock",
+      "feature_flags": false,
       "features": {
         "PIN Credential": {
           "namespace": "pin_credential",
@@ -1549,6 +1615,7 @@
     },
     "WindowCovering": {
       "namespace": "window_covering",
+      "feature_flags": true,
       "features": {
         "Lift": {
           "namespace": "lift",
@@ -1598,6 +1665,7 @@
     },
     "ClosureControl": {
       "namespace": "closure_control",
+      "feature_flags": true,
       "features": {
         "Positioning": {
           "namespace": "positioning",
@@ -1647,6 +1715,7 @@
     },
     "ClosureDimension": {
       "namespace": "closure_dimension",
+      "feature_flags": false,
       "features": {
         "Positioning": {
           "namespace": "positioning",
@@ -1698,6 +1767,7 @@
     },
     "ServiceArea": {
       "namespace": "service_area",
+      "feature_flags": false,
       "features": {
         "SelectWhileRunning": {
           "namespace": "select_while_running",
@@ -1723,6 +1793,7 @@
     },
     "PumpConfigurationandControl": {
       "namespace": "pump_configuration_and_control",
+      "feature_flags": true,
       "features": {
         "ConstantPressure": {
           "namespace": "constant_pressure",
@@ -1781,6 +1852,7 @@
     },
     "Thermostat": {
       "namespace": "thermostat",
+      "feature_flags": true,
       "features": {
         "Heating": {
           "namespace": "heating",
@@ -1896,6 +1968,7 @@
     },
     "FanControl": {
       "namespace": "fan_control",
+      "feature_flags": false,
       "features": {
         "MultiSpeed": {
           "namespace": "multi_speed",
@@ -1939,6 +2012,7 @@
     },
     "ThermostatUserInterfaceConfiguration": {
       "namespace": "thermostat_user_interface_configuration",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "TemperatureDisplayMode": "create_temperature_display_mode",
@@ -1948,6 +2022,7 @@
     },
     "ColorControl": {
       "namespace": "color_control",
+      "feature_flags": false,
       "features": {
         "Hue And Saturation": {
           "namespace": "hue_saturation",
@@ -2027,6 +2102,7 @@
     },
     "IlluminanceMeasurement": {
       "namespace": "illuminance_measurement",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MeasuredValue": "create_measured_value",
@@ -2038,6 +2114,7 @@
     },
     "TemperatureMeasurement": {
       "namespace": "temperature_measurement",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MeasuredValue": "create_measured_value",
@@ -2048,6 +2125,7 @@
     },
     "PressureMeasurement": {
       "namespace": "pressure_measurement",
+      "feature_flags": false,
       "features": {
         "Extended": {
           "namespace": "extended",
@@ -2068,6 +2146,7 @@
     },
     "FlowMeasurement": {
       "namespace": "flow_measurement",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MeasuredValue": "create_measured_value",
@@ -2078,6 +2157,7 @@
     },
     "RelativeHumidityMeasurement": {
       "namespace": "relative_humidity_measurement",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MeasuredValue": "create_measured_value",
@@ -2088,6 +2168,7 @@
     },
     "OccupancySensing": {
       "namespace": "occupancy_sensing",
+      "feature_flags": true,
       "features": {
         "Other": {
           "namespace": "other",
@@ -2150,6 +2231,7 @@
     },
     "CarbonMonoxideConcentrationMeasurement": {
       "namespace": "carbon_monoxide_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2192,6 +2274,7 @@
     },
     "CarbonDioxideConcentrationMeasurement": {
       "namespace": "carbon_dioxide_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2234,6 +2317,7 @@
     },
     "NitrogenDioxideConcentrationMeasurement": {
       "namespace": "nitrogen_dioxide_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2276,6 +2360,7 @@
     },
     "OzoneConcentrationMeasurement": {
       "namespace": "ozone_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2318,6 +2403,7 @@
     },
     "PM25ConcentrationMeasurement": {
       "namespace": "pm25_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2360,6 +2446,7 @@
     },
     "FormaldehydeConcentrationMeasurement": {
       "namespace": "formaldehyde_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2402,6 +2489,7 @@
     },
     "PM1ConcentrationMeasurement": {
       "namespace": "pm1_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2444,6 +2532,7 @@
     },
     "PM10ConcentrationMeasurement": {
       "namespace": "pm10_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2486,6 +2575,7 @@
     },
     "TotalVolatileOrganicCompoundsConcentrationMeasurement": {
       "namespace": "total_volatile_organic_compounds_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2528,6 +2618,7 @@
     },
     "RadonConcentrationMeasurement": {
       "namespace": "radon_concentration_measurement",
+      "feature_flags": true,
       "features": {
         "NumericMeasurement": {
           "namespace": "numeric_measurement",
@@ -2570,6 +2661,7 @@
     },
     "SoilMeasurement": {
       "namespace": "soil_measurement",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SoilMoistureMeasurementLimits": "create_soil_moisture_measurement_limits",
@@ -2578,6 +2670,7 @@
     },
     "WiFiNetworkManagement": {
       "namespace": "wifi_network_management",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SSID": "create_ssid",
@@ -2586,6 +2679,7 @@
     },
     "ThreadBorderRouterManagement": {
       "namespace": "thread_border_router_management",
+      "feature_flags": false,
       "features": {
         "PANChange": {
           "namespace": "pan_change",
@@ -2603,6 +2697,7 @@
     },
     "ThreadNetworkDirectory": {
       "namespace": "thread_network_directory",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "PreferredExtendedPanID": "create_preferred_extended_pan_id",
@@ -2612,6 +2707,7 @@
     },
     "KeypadInput": {
       "namespace": "keypad_input",
+      "feature_flags": false,
       "features": {
         "NavigationKeyCodes": {
           "namespace": "navigation_key_codes",
@@ -2630,6 +2726,7 @@
     },
     "ApplicationBasic": {
       "namespace": "application_basic",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "VendorName": "create_vendor_name",
@@ -2644,6 +2741,7 @@
     },
     "ZoneManagement": {
       "namespace": "zone_management",
+      "feature_flags": false,
       "features": {
         "TwoDimensionalCartesianZone": {
           "namespace": "two_dimensional_cartesian_zone",
@@ -2674,6 +2772,7 @@
     },
     "CameraAVStreamManagement": {
       "namespace": "camera_av_stream_management",
+      "feature_flags": true,
       "features": {
         "Audio": {
           "namespace": "audio",
@@ -2767,6 +2866,7 @@
     },
     "CameraAVSettingsUserLevelManagement": {
       "namespace": "camera_av_settings_user_level_management",
+      "feature_flags": true,
       "features": {
         "DigitalPTZ": {
           "namespace": "digital_ptz",
@@ -2804,6 +2904,7 @@
     },
     "WebRTCTransportProvider": {
       "namespace": "webrtc_transport_provider",
+      "feature_flags": false,
       "features": {
         "Metadata": {
           "namespace": null,
@@ -2816,6 +2917,7 @@
     },
     "WebRTCTransportRequestor": {
       "namespace": "webrtc_transport_requestor",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "CurrentSessions": "create_current_sessions"
@@ -2823,6 +2925,7 @@
     },
     "PushAVStreamTransport": {
       "namespace": "push_av_stream_transport",
+      "feature_flags": false,
       "features": {
         "PerZoneSensitivity": {
           "namespace": "per_zone_sensitivity",
@@ -2840,6 +2943,7 @@
     },
     "Chime": {
       "namespace": "chime",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "InstalledChimeSounds": "create_installed_chime_sounds",
@@ -2849,6 +2953,7 @@
     },
     "CommodityTariff": {
       "namespace": "commodity_tariff",
+      "feature_flags": true,
       "features": {
         "Pricing": {
           "namespace": "pricing",
@@ -2899,6 +3004,7 @@
     },
     "EcosystemInformation": {
       "namespace": "ecosystem_information",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "DeviceDirectory": "create_device_directory",
@@ -2907,6 +3013,7 @@
     },
     "CommissionerControl": {
       "namespace": "commissioner_control",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedDeviceCategories": "create_supported_device_categories"
@@ -2914,6 +3021,7 @@
     },
     "TLSCertificateManagement": {
       "namespace": "tls_certificate_management",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MaxRootCertificates": "create_max_root_certificates",
@@ -2924,6 +3032,7 @@
     },
     "TLSClientManagement": {
       "namespace": "tls_client_management",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MaxProvisioned": "create_max_provisioned",
@@ -2932,6 +3041,7 @@
     },
     "MeterIdentification": {
       "namespace": "meter_identification",
+      "feature_flags": false,
       "features": {
         "PowerThreshold": {
           "namespace": "power_threshold",
@@ -2948,6 +3058,7 @@
     },
     "CommodityMetering": {
       "namespace": "commodity_metering",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "MeteredQuantity": "create_metered_quantity",

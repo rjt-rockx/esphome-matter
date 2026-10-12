@@ -1,0 +1,20 @@
+# window_covering bound to an ESPHome cover. Positions are Percent100ths: 0 = open, 10000 = closed.
+# Travel time of real covers can be long: pass --var travel=60s.
+name: cover go to position and stop
+vars: { ep: 1, travel: 30s }
+requires: [{ ep: "${ep}", cluster: WindowCovering }]
+steps:
+  - invoke: { ep: "${ep}", cluster: WindowCovering, command: UpOrOpen }
+  - expect: { ep: "${ep}", cluster: WindowCovering, attribute: CurrentPositionLiftPercent100ths, equals: 0, within: "${travel}" }
+  - invoke:
+      ep: "${ep}"
+      cluster: WindowCovering
+      command: GoToLiftPercentage
+      args: { liftPercent100thsValue: 5000 }
+  - expect: { ep: "${ep}", cluster: WindowCovering, attribute: CurrentPositionLiftPercent100ths, equals: 5000, within: "${travel}" }
+  - invoke: { ep: "${ep}", cluster: WindowCovering, command: DownOrClose }
+  - sleep: 1s
+  - invoke: { ep: "${ep}", cluster: WindowCovering, command: StopMotion }
+  - read: { ep: "${ep}", cluster: WindowCovering, attribute: CurrentPositionLiftPercent100ths, gt: 5000 }
+cleanup:
+  - invoke: { ep: "${ep}", cluster: WindowCovering, command: StopMotion }

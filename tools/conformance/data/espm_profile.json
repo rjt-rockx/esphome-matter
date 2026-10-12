@@ -947,6 +947,11 @@
    "cls": "ColorControl",
    "features": {
     "color_loop": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "color_loop+enhanced_hue": {
      "attrs": [
       "color_loop_active",
       "color_loop_direction",
@@ -975,6 +980,11 @@
      "events": []
     },
     "enhanced_hue": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "enhanced_hue+hue_saturation": {
      "attrs": [
       "enhanced_current_hue"
      ],
@@ -1661,14 +1671,25 @@
    "cls": "ElectricalEnergyMeasurement",
    "features": {
     "cumulative_energy": {
-     "attrs": [
-      "cumulative_energy_imported",
-      "cumulative_energy_exported"
-     ],
+     "attrs": [],
      "cmds": [],
      "events": [
       "cumulative_energy_measured"
      ]
+    },
+    "cumulative_energy+exported_energy": {
+     "attrs": [
+      "cumulative_energy_exported"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "cumulative_energy+imported_energy": {
+     "attrs": [
+      "cumulative_energy_imported"
+     ],
+     "cmds": [],
+     "events": []
     },
     "exported_energy": {
      "attrs": [],
@@ -1681,14 +1702,25 @@
      "events": []
     },
     "periodic_energy": {
-     "attrs": [
-      "periodic_energy_imported",
-      "periodic_energy_exported"
-     ],
+     "attrs": [],
      "cmds": [],
      "events": [
       "periodic_energy_measured"
      ]
+    },
+    "periodic_energy+exported_energy": {
+     "attrs": [
+      "periodic_energy_exported"
+     ],
+     "cmds": [],
+     "events": []
+    },
+    "periodic_energy+imported_energy": {
+     "attrs": [
+      "periodic_energy_imported"
+     ],
+     "cmds": [],
+     "events": []
     }
    },
    "implies": {
@@ -1755,6 +1787,11 @@
      "events": []
     },
     "harmonics": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "harmonics+alternating_current": {
      "attrs": [
       "harmonic_currents"
      ],
@@ -1767,6 +1804,11 @@
      "events": []
     },
     "power_quality": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "power_quality+alternating_current": {
      "attrs": [
       "harmonic_phases"
      ],
@@ -3359,6 +3401,11 @@
      "events": []
     },
     "rechargeable": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "rechargeable+battery": {
      "attrs": [
       "bat_charge_state",
       "bat_functional_while_charging"
@@ -3367,6 +3414,11 @@
      "events": []
     },
     "replaceable": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "replaceable+battery": {
      "attrs": [
       "bat_replacement_description",
       "bat_quantity"
@@ -3408,6 +3460,11 @@
    "cls": "PowerTopology",
    "features": {
     "dynamic_power_flow": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "dynamic_power_flow+set_topology": {
      "attrs": [
       "active_endpoints"
      ],
@@ -4087,6 +4144,11 @@
      "events": []
     },
     "temperature_step": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "temperature_step+temperature_number": {
      "attrs": [
       "step"
      ],
@@ -4842,6 +4904,11 @@
      "events": []
     },
     "position_aware_lift": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "position_aware_lift+lift": {
      "attrs": [
       "target_position_lift_percent_100ths",
       "current_position_lift_percent_100ths"
@@ -4852,6 +4919,11 @@
      "events": []
     },
     "position_aware_tilt": {
+     "attrs": [],
+     "cmds": [],
+     "events": []
+    },
+    "position_aware_tilt+tilt": {
      "attrs": [
       "target_position_tilt_percent_100ths",
       "current_position_tilt_percent_100ths"

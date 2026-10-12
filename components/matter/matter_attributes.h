@@ -49,6 +49,32 @@ struct MatterAttributeCallbackRegistration {
   }
 };
 
+// Marks esp-matter attribute writes that ESPHome does itself, so that the
+// resulting POST_UPDATE callbacks are not treated as controller changes.
+//
+// esp_matter::attribute::report() skips the callbacks only for attributes that
+// are NOT writable (OnOff, CurrentLevel, the current colour, ...). For writable
+// attributes (Thermostat SystemMode and setpoints, OnOff StartUpOnOff,
+// LevelControl OnLevel, WindowCovering Mode, ...) esp-matter routes the write
+// through the data model provider, which always runs the PRE_UPDATE and
+// POST_UPDATE callbacks. endpoint_attribute_update_cb() drops every callback
+// that arrives while a guard is alive, so an ESPHome -> Matter push can never
+// loop back into ESPHome. Use it around every attribute::report()/update() that
+// mirrors ESPHome state. Only meaningful on the Matter thread, where esp-matter
+// calls the callbacks synchronously from within the write.
+//
+// Code driven clusters must not be written through the attribute store at all,
+// use the cluster object setters of the registry instead.
+class MatterPushGuard {
+public:
+  MatterPushGuard();
+  ~MatterPushGuard();
+  MatterPushGuard(const MatterPushGuard &) = delete;
+  MatterPushGuard &operator=(const MatterPushGuard &) = delete;
+
+  static bool active();
+};
+
 class MatterAttributeDispatchGuard {
 public:
   MatterAttributeDispatchGuard(uint16_t endpoint_id, uint32_t cluster_id,

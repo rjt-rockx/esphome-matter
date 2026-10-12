@@ -112,6 +112,9 @@ _EVENT_RE = re.compile(
     r"(?<![\w:])(?:esp_matter::)?" + _QUALIFIER + r"event::create_(\w+)\s*\("
 )
 _FEAT_ADD_RE = re.compile(r"feature::(\w+)::add\s*\(")
+_FEATURE_ALIAS_RE = re.compile(
+    r"uint32_t\s+(\w+)\s*=\s*feature::(\w+)::get_id\(\)\s*;"
+)
 
 
 def _join_multiline_ifs(body: str) -> list[str]:
@@ -144,6 +147,10 @@ def _scan_function(body: str):
     """
     items = []
     stack: list[tuple[str, object]] = []  # entries: (kind, payload)
+    # ``uint32_t imported_feature_map = feature::imported_energy::get_id();`` followed by
+    # ``if ((get_feature_map_value(cluster) & imported_feature_map) == imported_feature_map)``
+    # is a "hasall" guard: the attribute needs the owning feature and the guard feature.
+    aliases = dict(_FEATURE_ALIAS_RE.findall(body))
     for line in _join_multiline_ifs(body):
         em = _ELSE_RE.match(line)
         if em and stack:
@@ -170,7 +177,18 @@ def _scan_function(body: str):
                 if ks and "feature_map" in cond:
                     # config->feature_map & to_underlying(Cluster::Feature::kX)
                     hs = [("", k) for k in ks]
-                if hs and all(neg == "" for neg, _ in hs):
+                alias_hits = (
+                    [
+                        aliases[v]
+                        for v in re.findall(r"&\s*(\w+)\s*\)\s*==\s*\1\b", cond)
+                        if v in aliases
+                    ]
+                    if not hs and "||" not in cond
+                    else []
+                )
+                if alias_hits:
+                    stack.append(("hasall", alias_hits))
+                elif hs and all(neg == "" for neg, _ in hs):
                     stack.append(("has", [f for _, f in hs]))
                 elif hs and all(neg == "!" for neg, _ in hs):
                     stack.append(("nothas", [f for _, f in hs]))
@@ -194,7 +212,7 @@ def _scan_function(body: str):
             continue
         guard = None
         for k, p in stack:
-            if k in ("has", "nothas"):
+            if k in ("has", "nothas", "hasall"):
                 guard = (k, p)
         m = _ATTR_RE.search(line)
         if m:
@@ -410,7 +428,15 @@ def build_profile(esp_matter: Path = DEFAULT_ESP_MATTER) -> dict:
                         c["implies"]["*"].append(name)
                 continue
             bucket = {"attr": "attrs", "cmd": "cmds", "event": "events"}[kind]
-            if guard and guard[0] == "has":
+            if guard and guard[0] == "hasall":
+                # Created by feature::<owner>::add() only when the guard features are on as
+                # well (CumulativeEnergyImported needs CUME and IMPE): "a+b" keys need every
+                # named feature.
+                names = [owner_feature, *guard[1]] if owner_feature else guard[1]
+                lst = feat(c, "+".join(dict.fromkeys(names)))[bucket]
+                if name not in lst:
+                    lst.append(name)
+            elif guard and guard[0] == "has":
                 for g in guard[1]:
                     lst = feat(c, g)[bucket]
                     if name not in lst:
@@ -551,7 +577,7 @@ class Profile:
         cmds = {norm(a) for a in c["base"]["cmds"]}
         events = {norm(a) for a in c["base"]["events"]}
         for fname, f in c["features"].items():
-            if self._fnorm(fname) in enabled:
+            if all(self._fnorm(part) in enabled for part in fname.split("+")):
                 attrs |= {norm(a) for a in f["attrs"]}
                 cmds |= {norm(a) for a in f["cmds"]}
                 events |= {norm(a) for a in f["events"]}

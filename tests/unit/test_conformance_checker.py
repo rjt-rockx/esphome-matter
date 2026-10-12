@@ -365,3 +365,10 @@ class TestRealConfigs:
         assert rep.count(ERROR) == 0, [
             f.as_dict() for f in rep.findings if f.level == ERROR
         ]
+
+
+def test_evse_alias_resolves_to_energy_evse():
+    from tools.conformance.espm import Profile
+    from tools.conformance.model import DEVICE_TYPE_ALIASES
+
+    assert DEVICE_TYPE_ALIASES["evse"] in Profile().data["device_types"]

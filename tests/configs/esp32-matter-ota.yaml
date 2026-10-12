@@ -33,6 +33,7 @@ text_sensor:
     name: Matter OTA state
 
 matter:
+  expose: [] # root node only; list entity ids to expose them (docs/expose.md)
   software_version: 2
   ota:
     query_interval: 12h

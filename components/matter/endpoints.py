@@ -8,7 +8,6 @@ from esphome import automation
 from esphome.components import light
 from esphome.components.binary_sensor import BinarySensor
 from esphome.components.esp32 import add_idf_sdkconfig_option
-from esphome.components.sensor import Sensor
 from esphome.config import Config
 from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGER_ID
 from esphome.core import CORE, ID, HexInt
@@ -20,6 +19,7 @@ from . import sensor_extras
 from . import delegates
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
+from . import closure
 from .covers import WINDOW_COVERING
 from .covers import config_init as cover_config_init
 from .covers import config_lines as cover_config_lines
@@ -39,6 +39,7 @@ from .data_model.device_types import (
     DEVICE_TYPES,
     DEVICE_TYPES_BY_CONF_KEY,
     DEVICE_TYPES_BY_ID,
+    FEATURE_DEPENDENCIES,
     FLAG_DRIVEN_CLUSTERS,
     DeviceType,
 )
@@ -53,10 +54,9 @@ from .matter_climate import (
 from .lock_valve import device_config_lines, register_entity
 from .generic_switch import multi_press_max_line, register_switch_binding
 from .data_model.units import MEASUREMENT_UNITS
+from . import power_source, power_topology
 from .sensor_mapping import (
-    CONF_BATTERY,
     CONF_MEASUREMENT_UNITS,
-    battery_sensor_attribute,
     configure_electrical_sensor,
     converter_expression,
     electrical_config_lines,
@@ -65,7 +65,9 @@ from .sensor_mapping import (
     sensor_unit_info,
     validate_battery_binding,
 )
+from .data_model import espmatter_names
 from .data_model.events import Event
+from . import light_binding
 from .types import MatterAttributeTrigger, MatterEndpointRef
 from .util import iter_matter_actions, maybe_empty, snake_case
 
@@ -96,10 +98,6 @@ def _restore_mode_warning(
                     entity_id,
                     restore_mode,
                 )
-
-
-def light_restore_warning(matter_config: dict, full_config: Config):
-    _restore_mode_warning(matter_config, full_config, CONF_LIGHT_ID, "Light")
 
 
 def switch_restore_warning(matter_config: dict, full_config: Config):
@@ -164,9 +162,9 @@ ENDPOINT_SCHEMA = cv.All(
             },
             # TODO: move on_attribute to clusters
             cv.Optional(CONF_ON_ATTRIBUTE): _on_attribute_schema(),
-            # Battery level sensor (%) exposed through a Power Source cluster on this endpoint.
-            cv.Optional(CONF_BATTERY): cv.use_id(Sensor),
         }
+        # battery: / wired: expose a Power Source cluster on this endpoint (see power_source.py).
+        | power_source.SCHEMA_OPTIONS
         | conformance.SCHEMA_OPTIONS
         | {device_type.schema_key: device_type.schema() for device_type in DEVICE_TYPES}
     ),
@@ -190,9 +188,14 @@ class Endpoint:
         endpoint_id: int,
         config: dict,
         plan: conformance.EndpointPlan | None = None,
+        all_endpoint_ids: tuple[int, ...] = (),
     ):
         self._endpoint_id = endpoint_id
         self._config = config
+        # Every configured endpoint (for the EndpointList of a root node Power Source).
+        self.all_endpoint_ids = tuple(all_endpoint_ids)
+        # (endpoint, kind, order, present sensor) of every Power Source; set by build_endpoints.
+        self.all_power_sources: list[tuple] = []
         self.usages: list[tuple[Cluster, Attribute | Event]] = []
         self.plan = plan or conformance.EndpointPlan()
 
@@ -207,6 +210,8 @@ class Endpoint:
         self._climate_variables = {}
         # (Cluster, Attribute) of sensor attributes that esp-matter does not create itself.
         self._optional_attributes: list[tuple[Cluster, Attribute]] = []
+        # Extra lines that set the initial value of a created optional attribute.
+        self._initial_values: dict[tuple[int, int], list[str]] = {}
         self._electrical_power_features: list[str] = []
         # Extra C++ for clusters configured by sensor_extras.py (evaluated lazily, see sensor_extras.Extra).
         self.extras: list[sensor_extras.Extra] = []
@@ -220,6 +225,19 @@ class Endpoint:
     @property
     def config(self) -> dict:
         return self._config
+
+    @property
+    def cluster_configs(self):
+        return self._cluster_configs
+
+    @property
+    def optional_attributes(self) -> list[tuple[Cluster, Attribute]]:
+        return self._optional_attributes
+
+    @property
+    def is_root(self) -> bool:
+        """Endpoint 0 is the root node, created by esp-matter itself."""
+        return self._endpoint_id == power_source.ROOT_ENDPOINT
 
     def register_usage(self, cluster: Cluster, usage: Attribute | Event) -> None:
         self.usages.append((cluster, usage))
@@ -285,7 +303,15 @@ class Endpoint:
 
         return cluster_present, enabled_codes, disallowed_codes
 
+    def _device_type_names(self) -> list[str]:
+        return [
+            key
+            for key in self._config
+            if key in DEVICE_TYPES_BY_CONF_KEY
+        ]
+
     def resolve(self) -> None:
+        self._validate_light_options()
         usages_by_cluster = defaultdict(list)
         clusters_by_id = {}
         for cluster, usage in self.usages:
@@ -314,11 +340,28 @@ class Endpoint:
             cluster_present, enabled_codes, disallowed_codes = self._cluster_state(
                 cluster
             )
+            device_types = self._device_type_names()
+            where = f"{cluster.name} cluster on endpoint {self._endpoint_id}" + (
+                f" ({', '.join(device_types)})" if device_types else ""
+            )
             if not cluster_present:
                 usage_names = ", ".join(usage.name for usage in usages)
+                key = snake_case(cluster.name)
+                if usage_names:
+                    reason = f"required by: {usage_names}"
+                else:
+                    features = ", ".join(
+                        f.conf_key
+                        for f in cluster.features
+                        if f.code in enabled_codes
+                    )
+                    reason = f"needed by the selected with_features: {features}"
                 raise cv.Invalid(
                     f"Matter endpoint {self._endpoint_id} does not contain the "
-                    f"{cluster.name} cluster required by: {usage_names}"
+                    f"{cluster.name} cluster ({reason}). The device type"
+                    f"{'s' if len(device_types) != 1 else ''} "
+                    f"{', '.join(device_types) or '(none)'} does not require it; "
+                    f"add it with `clusters: {{{key}: ...}}` on the endpoint"
                 )
 
             feature_conformance = {
@@ -329,12 +372,13 @@ class Endpoint:
                     [usage.conformance for usage in usages],
                     feature_conformance,
                     enabled_codes,
+                    context=where,
                 )
             except ConformanceError as err:
                 usage_names = ", ".join(usage.name for usage in usages)
                 raise cv.Invalid(
-                    f"Cannot resolve features for endpoint {self._endpoint_id} "
-                    f"from {usage_names}: {err}"
+                    f"Cannot resolve features for {err}"
+                    + (f" (from {usage_names})" if usage_names else "")
                 ) from err
 
             invalid_codes = (enabled_codes | inferred_codes) & disallowed_codes
@@ -368,6 +412,30 @@ class Endpoint:
             for code in inferred_codes:
                 cluster_config.enabled_features[cluster.get_feature(code).name] = True
 
+    def _validate_light_options(self) -> None:
+        for config_key, device_config in self._config.items():
+            device_type = DEVICE_TYPES_BY_CONF_KEY.get(config_key)
+            if device_type is None or not isinstance(device_config, dict):
+                continue
+            if light_binding.CONF_ON_OFF_TRANSITION_TIME not in device_config:
+                continue
+            present, enabled_codes, _ = self._cluster_state(
+                CLUSTERS_BY_NAME["LevelControl"]
+            )
+            if not present:
+                raise cv.Invalid(
+                    f"Matter endpoint {self._endpoint_id}: "
+                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the "
+                    f"LevelControl cluster, which {device_type.name} doesn't have. "
+                    "Add it with `clusters: level_control:`"
+                )
+            if "OO" not in enabled_codes:
+                raise cv.Invalid(
+                    f"Matter endpoint {self._endpoint_id}: "
+                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the OnOff "
+                    "feature of the LevelControl cluster"
+                )
+
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
 
@@ -400,10 +468,7 @@ class Endpoint:
             if device_type:
                 await self._configure_device_type(var, device_type, device_config)
 
-        if sensor_id := self._config.get(CONF_BATTERY):
-            battery = battery_sensor_attribute()
-            self.enabled_sdkconfig_options.add(battery.cluster.sdkconfig_option)
-            await self._register_sensor_attribute(var, sensor_id, battery)
+        await power_source.register(self, var)
 
         for cluster_key, config in self._config[CONF_CLUSTERS].items():
             cluster = CLUSTERS_BY_CONF_KEY[cluster_key]
@@ -437,6 +502,8 @@ class Endpoint:
 
     def _register_conformance(self, var):
         """Parent, label and semantic tags are applied by matter_conformance.cpp."""
+        if self.is_root:
+            return  # the root node has no parent, label or tags
         plan = self.plan
         cg.add(var.register_endpoint_parent(self._endpoint_id, plan.parent))
         if plan.label is not None:
@@ -551,7 +618,14 @@ class Endpoint:
         if CONF_LIGHT_ID in device_config:
             light_ = await cg.get_variable(device_config[CONF_LIGHT_ID])
             self._light_variables[device_type.name] = light_
-            cg.add(var.register_light(light_, self._endpoint_id))
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_lights.h"'
+            )
+            register_light_args = [light_, self._endpoint_id]
+            if loop_effect := device_config.get(light_binding.CONF_COLOR_LOOP_EFFECT):
+                register_light_args.append(loop_effect)
+            cg.add(var.register_light(*register_light_args))
+            self._register_light_level_attributes(device_type, device_config)
         if CONF_SWITCH_ID in device_config:
             switch_ = await cg.get_variable(device_config[CONF_SWITCH_ID])
             cg.add(var.register_switch(switch_, self._endpoint_id))
@@ -565,7 +639,8 @@ class Endpoint:
             )
             cg.add(var.register_fan(self._fan_variable, self._endpoint_id))
             self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
-        if CONF_COVER_ID in device_config:
+        await closure.register_entity(var, self._endpoint_id, device_type.name, device_config)
+        if CONF_COVER_ID in device_config and device_type.name == WINDOW_COVERING:
             cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
             cg.add(var.register_cover(cover_, self._endpoint_id))
         if CONF_CLIMATE_ID in device_config:
@@ -592,6 +667,27 @@ class Endpoint:
 
         # Optional cluster features of the sensor and alarm clusters (hold time, alarms, air quality, ...)
         await sensor_extras.register(self, var, device_type, device_config)
+
+    def _register_light_level_attributes(
+        self, device_type: DeviceType, device_config: dict
+    ) -> None:
+        """Create the optional LevelControl attributes of a bound light.
+
+        The transition time attributes only exist with the OnOff feature
+        (OnOffTransitionTime, OnTransitionTime, OffTransitionTime); the light
+        mapping uses them for On, Off, Toggle and MoveToLevel commands.
+        """
+        level_cluster = CLUSTERS_BY_NAME["LevelControl"]
+        present, enabled_codes, _ = self._cluster_state(level_cluster)
+        if not present:
+            return
+        has_on_off = "OO" in enabled_codes
+        for name in light_binding.level_attribute_names(has_on_off):
+            attribute = next(a for a in level_cluster.attributes if a.name == name)
+            if (level_cluster, attribute) not in self._optional_attributes:
+                self._optional_attributes.append((level_cluster, attribute))
+            if extra := light_binding.initial_value_lines(name, device_config):
+                self._initial_values[(level_cluster.id, attribute.id)] = extra
 
     def _make_device_type_lines(self, device_type: DeviceType, index: int):
         config_var = f"device_config_{index}"
@@ -624,6 +720,14 @@ class Endpoint:
                         f"esphome::matter::conversion::to_matter::color_temperature({traits_var}.get_max_mireds());",
                     )
                 )
+
+        if device_type.name == "power_source":
+            lines.extend(
+                power_source.device_type_lines(
+                    f"{config_var}.{device_type.config_member(CLUSTERS_BY_NAME[power_source.POWER_SOURCE_CLUSTER])}",
+                    device_config,
+                )
+            )
 
         if device_type.name == "fan" and self._fan_variable is not None:
             lines.extend(
@@ -660,6 +764,14 @@ class Endpoint:
                     self._config[CONF_CLUSTERS].get("mode_select"),
                 )
             )
+        closure_lines = closure.device_config_lines(
+            device_type.name, config_var, self._endpoint_id, device_config
+        )
+        if closure_lines:
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_closure.h"'
+            )
+            lines.extend(closure_lines)
 
         # Configure cluster features
         for cluster in device_type.server_clusters:
@@ -701,13 +813,23 @@ class Endpoint:
                     self._electrical_power_features,
                 )
             )
-
-        lines.extend(
-            (
-                f"if (esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var}) != ESP_OK)",
-                "  return false;",
+            if power_topology.needs_power_header(device_config):
+                self.global_includes.add(power_topology.POWER_HEADER_INCLUDE)
+            lines.extend(
+                power_topology.delegate_lines(
+                    config_var,
+                    power_topology.power_topology_member(device_type),
+                    device_config,
+                )
             )
-        )
+
+        bound_light = self._light_variables.get(device_type.name)
+        if device_type.name == "extended_color_light" and bound_light is not None:
+            # The ColorTemperature feature follows the traits of the light.
+            add_call = f"esphome::matter::add_extended_color_light(endpoint, &{config_var}, {bound_light})"
+        else:
+            add_call = f"esp_matter::endpoint::{device_type.namespace}::add(endpoint, &{config_var})"
+        lines.extend((f"if ({add_call} != ESP_OK)", "  return false;"))
         if device_type.name == "soil_sensor":
             # The code driven Soil Measurement cluster aborts at startup without limits.
             self.global_includes.add(
@@ -836,6 +958,43 @@ class Endpoint:
             )
             cg.add(register_sensor_attribute)
 
+    @staticmethod
+    def _standalone_cluster_config_lines(cluster: Cluster, cfg, features):
+        """Initial config of clusters that a device type would normally configure."""
+        if cluster.name != "ColorControl":
+            return []
+        codes = {feature.code for feature in features}
+        # ColorMode: 0 hue/saturation, 1 XY, 2 color temperature; the enhanced
+        # mode adds 3 for enhanced hue.
+        if "XY" in codes:
+            mode = 1
+        elif "CT" in codes:
+            mode = 2
+        else:
+            mode = 0
+        enhanced = 3 if "EHUE" in codes and mode == 0 else mode
+        return [
+            f"{cfg}.color_mode = {mode};",
+            f"{cfg}.enhanced_color_mode = {enhanced};",
+        ]
+
+    @staticmethod
+    def _standalone_cluster_extra_lines(cluster: Cluster, cluster_var):
+        """The mandatory elements that device types add after creating the cluster."""
+        if cluster.name == "OnOff":
+            ns = "esp_matter::cluster::on_off::command"
+            return [
+                f"{ns}::create_on({cluster_var});",
+                f"{ns}::create_toggle({cluster_var});",
+            ]
+        if cluster.name == "ColorControl":
+            ns = "esp_matter::cluster::color_control"
+            return [
+                f"{ns}::attribute::create_remaining_time({cluster_var}, 0);",
+                f"{ns}::command::create_stop_move_step({cluster_var});",
+            ]
+        return []
+
     def _make_cluster_lines(self, cluster: Cluster):
         """Build lines for a cluster not created by a device type."""
         for extra in self.extras:
@@ -845,8 +1004,10 @@ class Endpoint:
         cluster_ns = f"esp_matter::cluster::{cluster.espm_namespace}"
 
         config_var = f"{cluster.espm_namespace}_config"
+        cluster_var = f"{cluster.espm_namespace}_cluster"
         lines = [f"{cluster_ns}::config_t {config_var}{{}};"]
         feature_flags = []
+        features = []
         features_by_name = {feature.name: feature for feature in cluster.features}
         cluster_config = self._cluster_configs[cluster.name]
         for feature_name, enabled in cluster_config.enabled_features.items():
@@ -857,11 +1018,36 @@ class Endpoint:
                 raise cv.Invalid(
                     f"Cluster {cluster.name} has no feature {feature_name}"
                 )
+            features.append(feature)
             feature_flags.append(
                 f"{cluster_ns}::feature::{feature.namespace}::get_id()"
             )
+        if not espmatter_names.cluster_has_feature_flags(cluster.name) and (
+            features or cluster.name in ("OnOff", "ColorControl")
+        ):
+            # The config has no feature_flags: the features are added to the
+            # created cluster (in bit order, enhanced features need the base one).
+            lines.extend(self._standalone_cluster_config_lines(cluster, config_var, features))
+            lines.extend(
+                (
+                    f"auto *{cluster_var} = {cluster_ns}::create(endpoint, &{config_var}, esp_matter::CLUSTER_FLAG_SERVER);",
+                    f"if ({cluster_var} == nullptr)",
+                    "  return false;",
+                )
+            )
+            for feature in sorted(features, key=lambda f: f.bit):
+                lines.extend(
+                    (
+                        f"if (esphome::matter::add_feature({cluster_var}, {cluster_ns}::feature::{feature.namespace}::add) != ESP_OK)",
+                        "  return false;",
+                    )
+                )
+            lines.extend(self._standalone_cluster_extra_lines(cluster, cluster_var))
+            return lines
         if feature_flags:
             lines.append(f"{config_var}.feature_flags = {' | '.join(feature_flags)};")
+        if cluster.name == power_source.POWER_SOURCE_CLUSTER:
+            lines.extend(power_source.config_lines(config_var, self._config))
         lines.extend(
             delegates.cluster_config_lines(
                 cluster.name,
@@ -877,12 +1063,30 @@ class Endpoint:
         )
         return lines
 
+    def _expand_feature_dependencies(self) -> None:
+        """Enable the features that enabled features need (all configuration paths)."""
+        for cluster_name, cluster_config in self._cluster_configs.items():
+            enabled = cluster_config.enabled_features
+            changed = True
+            while changed:
+                changed = False
+                for name in [n for n, on in enabled.items() if on]:
+                    for alternatives in FEATURE_DEPENDENCIES.get(name, ()):
+                        if not any(enabled.get(alt) for alt in alternatives):
+                            enabled[alternatives[0]] = True
+                            changed = True
+
     def _make_build_callback(self) -> str:
         """ """
+        self._expand_feature_dependencies()
         lines = ["[](esp_matter::endpoint_t *endpoint) -> bool {"]
 
         for index, device_type in enumerate(self._device_types):
             lines.extend(self._make_device_type_lines(device_type, index))
+
+        if self.is_root and power_source.kind(self._config) is not None:
+            # The root node endpoint exists already; it gets the Power Source device type.
+            lines.extend(power_source.root_device_type_lines())
 
         for cluster_name, cluster_config in self._cluster_configs.items():
             if not cluster_config.created:
@@ -898,16 +1102,21 @@ class Endpoint:
             if cluster_name in FLAG_DRIVEN_CLUSTERS:
                 continue  # All features are already set through feature_flags.
             features_by_name = {feature.name: feature for feature in cluster.features}
-            direct_features = [
-                features_by_name[feature_name]
-                for feature_name, enabled in cluster_config.enabled_features.items()
-                if enabled
-                and feature_name in features_by_name
-                and (
-                    features_by_name[feature_name].conformance is None
-                    or features_by_name[feature_name].conformance.choice is None
-                )
-            ]
+            # In bit order: dependent features (ColorLoop, EnhancedHue) come after
+            # the ones they need.
+            direct_features = sorted(
+                (
+                    features_by_name[feature_name]
+                    for feature_name, enabled in cluster_config.enabled_features.items()
+                    if enabled
+                    and feature_name in features_by_name
+                    and (
+                        features_by_name[feature_name].conformance is None
+                        or features_by_name[feature_name].conformance.choice is None
+                    )
+                ),
+                key=lambda feature: feature.bit,
+            )
             # Features of a bound fan come from its traits instead.
             bound_fan = self._fan_variable if cluster.name == "FanControl" else None
             if not direct_features and bound_fan is None:
@@ -931,7 +1140,9 @@ class Endpoint:
                 )
 
         # Optional attributes can only be created once their cluster exists.
-        lines.extend(optional_attribute_lines(self._optional_attributes))
+        lines.extend(
+            optional_attribute_lines(self._optional_attributes, self._initial_values)
+        )
 
         for extra in self.extras:
             if not extra.creates_cluster:
@@ -967,8 +1178,11 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
     """During validation an endpoint registry is built and stored in CORE.data["matter"]["endpoints"]."""
     endpoints = EndpointRegistry()
     plans = conformance.plan_endpoints(matter_config[CONF_ENDPOINTS])
+    endpoint_ids = tuple(matter_config[CONF_ENDPOINTS])
     for endpoint_id, endpoint_config in matter_config[CONF_ENDPOINTS].items():
-        endpoints.register(Endpoint(endpoint_id, endpoint_config, plans[endpoint_id]))
+        endpoints.register(
+            Endpoint(endpoint_id, endpoint_config, plans[endpoint_id], endpoint_ids)
+        )
 
     # Register matter actions that might require specific features to the endpoints.
     for action_type, action in iter_matter_actions(full_config):
@@ -982,7 +1196,9 @@ def build_endpoints(matter_config: dict, full_config: Config) -> EndpointRegistr
             cluster, attribute = get_attribute_from_config(action)
             endpoint.register_usage(cluster, attribute)
 
+    power_sources = power_source.power_sources(matter_config[CONF_ENDPOINTS])
     for endpoint in endpoints:
+        endpoint.all_power_sources = power_sources
         endpoint.resolve()
 
     CORE.data.setdefault(CONF_MATTER, {})[CONF_ENDPOINTS] = endpoints
@@ -1026,9 +1242,11 @@ async def register_endpoints(var, config: ConfigType):
         )
     )
     # Exact limits: esp-matter sizes per-endpoint and per-device-type tables from them.
-    # The root node endpoint counts as a dynamic endpoint.
+    # The root node endpoint counts as a dynamic endpoint (it is configured as endpoint 0
+    # when it gets a Power Source or Electrical Sensor).
     add_idf_sdkconfig_option(
-        "CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT", len(config[CONF_ENDPOINTS]) + 1
+        "CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT",
+        len(set(config[CONF_ENDPOINTS]) - {power_source.ROOT_ENDPOINT}) + 1,
     )
     add_idf_sdkconfig_option(
         "CONFIG_ESP_MATTER_MAX_DEVICE_TYPE_COUNT",

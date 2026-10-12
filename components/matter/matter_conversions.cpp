@@ -105,6 +105,43 @@ esp_matter_attr_val_t battery_percent(float value) {
   return esp_matter_nullable_uint8(converted);
 }
 
+esp_matter_attr_val_t battery_charge_level(float percent, float warning_below,
+                                           float critical_below) {
+  // BatChargeLevel has no "unknown" value: no reading means no update.
+  if (!std::isfinite(percent))
+    return esp_matter_invalid(nullptr);
+  uint8_t level = 0; // OK
+  if (percent < critical_below)
+    level = 2; // Critical
+  else if (percent < warning_below)
+    level = 1; // Warning
+  return esp_matter_enum8(level);
+}
+
+esp_matter_attr_val_t millivolts(float value) {
+  nullable<uint32_t> converted;
+  double scaled = static_cast<double>(value) * 1000.0;
+  // 0xFFFFFFFF is the null value of a nullable uint32.
+  if (std::isfinite(scaled) && scaled >= 0.0 && scaled < 4294967295.0)
+    converted = static_cast<uint32_t>(std::llround(scaled));
+  return esp_matter_nullable_uint32(converted);
+}
+
+esp_matter_attr_val_t milliamps(float value) {
+  nullable<uint32_t> converted;
+  double scaled = static_cast<double>(value) * 1000.0;
+  if (std::isfinite(scaled) && scaled >= 0.0 && scaled < 4294967295.0)
+    converted = static_cast<uint32_t>(std::llround(scaled));
+  return esp_matter_nullable_uint32(converted);
+}
+
+esp_matter_attr_val_t hertz(float value) {
+  nullable<uint16_t> converted;
+  if (std::isfinite(value) && value >= 0.0f && value < 65535.0f)
+    converted = static_cast<uint16_t>(std::lround(value));
+  return esp_matter_nullable_uint16(converted);
+}
+
 esp_matter_attr_val_t boolean_state(bool value) {
   return esp_matter_bool(value);
 }

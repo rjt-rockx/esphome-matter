@@ -12,6 +12,8 @@ import os
 
 from esphome.core import CORE
 
+from . import power_source
+
 ENV_VAR = "MATTER_LAYOUT_JSON"
 
 # Clusters whose feature set is derived from the traits of the bound ESPHome
@@ -107,11 +109,24 @@ def _endpoint_layout(endpoint) -> dict:
         for cluster_name, key in _TRAIT_DRIVEN.items():
             if isinstance(device_config, dict) and device_config.get(key) is not None:
                 dynamic.append(cluster_name)
+        if (
+            device_type.name == "extended_color_light"
+            and isinstance(device_config, dict)
+            and device_config.get("light_id") is not None
+        ):
+            # ColorTemperature is only added when the light can show it.
+            dynamic.append("ColorControl")
+    device_types = [
+        {"name": device_type.name, "id": device_type.id}
+        for device_type in endpoint._device_types
+    ]
+    if endpoint.is_root:
+        # The root node endpoint exists before the component adds anything to it.
+        device_types.insert(0, {"name": "root_node", "id": 0x16})
+        if power_source.kind(endpoint.config) is not None:
+            device_types.insert(1, {"name": "power_source", "id": 0x11})
     return {
-        "device_types": [
-            {"name": device_type.name, "id": device_type.id}
-            for device_type in endpoint._device_types
-        ],
+        "device_types": device_types,
         "clusters": clusters,
         "dynamic_features": sorted(set(dynamic)),
         # composition (conformance.EndpointPlan): parent 0 = child of the root node

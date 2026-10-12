@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import textwrap
 
-from conftest import COMPONENTS, CONFIGS, prepare_config, run_esphome
+from conftest import COMPONENTS, config_files, prepare_config, run_esphome
 import pytest
 
 SWITCH = """
@@ -45,7 +45,7 @@ def bound_code(*names: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("config", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("config", config_files(), ids=lambda p: p.stem)
 def test_shipped_configs_validate(config, tmp_path):
     prepared = prepare_config(config, tmp_path)
     result = run_esphome("config", str(prepared), cwd=tmp_path)
@@ -295,7 +295,20 @@ def test_climate_id_binding(run_config):
 # --------------------------------------------------------------------------
 
 
-def test_garage_cover_rejected(run_config):
+GARAGE_COVER = """
+        cover:
+          - platform: template
+            id: garage
+            name: Garage
+            device_class: garage
+            optimistic: true
+            open_action: []
+            close_action: []
+            stop_action: []
+"""
+
+
+def test_garage_cover_window_covering_is_allowed_with_warning(run_config):
     result = run_config(
         """
         matter:
@@ -303,10 +316,43 @@ def test_garage_cover_rejected(run_config):
             1:
               window_covering:
                 cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+    assert "closure_compat" in result.output  # note explains the compat path
+
+
+def test_garage_cover_closure_compat_is_silent(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+    assert "acknowledge" not in result.output
+
+
+def test_closure_compat_requires_closure_class(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: shade
+                closure_compat: true
         cover:
           - platform: template
-            id: garage
-            device_class: garage
+            id: shade
+            name: Shade
+            device_class: shade
             optimistic: true
             open_action: []
             close_action: []
@@ -314,7 +360,60 @@ def test_garage_cover_rejected(run_config):
         """
     )
     assert not result.ok
-    assert "Garage" in result.output or "garage" in result.output
+    assert "closure_compat" in result.output  # note explains the compat path
+
+
+def test_closure_bound_to_garage_cover(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert result.ok, result.output
+
+
+def test_closure_rejects_window_covering_class(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: shade
+        cover:
+          - platform: template
+            id: shade
+            name: Shade
+            device_class: shade
+            optimistic: true
+            open_action: []
+            close_action: []
+            stop_action: []
+        """
+    )
+    assert not result.ok
+    assert "window_covering" in result.output
+
+
+def test_closure_bound_rejects_unsupported_feature(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                cover_id: garage
+                with_features: [Positioning, MotionLatching]
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "Positioning" in result.output
 
 
 def test_cover_end_product_type_requires_cover_id(run_config):
@@ -480,3 +579,71 @@ def test_unbound_choice_feature_device_types_rejected(run_config, device_type):
     )
     assert not result.ok
     assert "features" in result.output.lower()
+
+
+def test_closure_requires_cover_id(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              closure:
+                with_features: [Positioning]
+        """
+    )
+    assert not result.ok
+    assert "cover_id" in result.output
+    assert "set_attribute" not in result.output
+
+
+def test_closure_compat_requires_cover_id(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                closure_compat: true
+        """
+    )
+    assert not result.ok
+    assert "closure_compat requires cover_id" in result.output
+
+
+def test_cover_bound_to_two_endpoints_rejected(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+            2:
+              closure:
+                cover_id: garage
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "bound to" in result.output
+
+
+def test_cover_bound_to_two_window_coverings_rejected(run_config):
+    result = run_config(
+        """
+        matter:
+          endpoints:
+            1:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+            2:
+              window_covering:
+                cover_id: garage
+                closure_compat: true
+        """
+        + GARAGE_COVER
+    )
+    assert not result.ok
+    assert "bound to" in result.output

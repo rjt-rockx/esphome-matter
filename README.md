@@ -67,13 +67,13 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 
 | ESPHome domain | Matter device type(s) | Status | Docs |
 |---|---|---|---|
-| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (untested on hardware) | [lights.md](docs/lights.md) |
+| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light, Dimmable Plug-In Unit, Mounted Dimmable Load Control (and the on/off plug-in unit and mounted control) | Supported (untested on hardware) | [lights.md](docs/lights.md) |
 | `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
 | `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (unit conversion implemented, untested on controllers) | [sensors.md](docs/sensors.md#units) |
 | `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor (incl. the AirQuality level) | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |
 | `sensor`: soil moisture | Soil Sensor | Partial (untested) | [device-types.md](docs/device-types.md#sensors) |
-| `sensor`: power, energy, voltage, current | Electrical Sensor | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements) |
-| `sensor`: battery | Power Source | Partial (battery level only, untested on controllers) | [sensors.md](docs/sensors.md#battery) |
+| `sensor`: power, energy, voltage, current | Electrical Sensor (node, tree or set topology) | Partial (untested on controllers) | [sensors.md](docs/sensors.md#electrical-measurements), [power.md](docs/power.md) |
+| `battery:` / `wired:` | Power Source (root node or endpoint) | Partial (level, voltage, charge state, replacement; untested on controllers) | [power.md](docs/power.md) |
 | `binary_sensor`: contact, rain | Contact Sensor, Rain Sensor | Supported | [binary-sensors.md](docs/binary-sensors.md) |
 | `binary_sensor`: occupancy | Occupancy Sensor (HoldTime) | Supported (hold time untested on controllers) | [binary-sensors.md](docs/binary-sensors.md#hold-time) |
 | `binary_sensor`: water leak, freeze | Water Leak / Freeze Detector (alarms, sensitivity) | Partial (untested) | [binary-sensors.md](docs/binary-sensors.md#alarms-and-sensitivity-boolean-state-configuration) |
@@ -254,10 +254,11 @@ More information about endpoints and a full list of supported device types can b
 - [docs/endpoints.md](docs/endpoints.md): endpoints and clusters
 - [docs/lights.md](docs/lights.md): lights
 - [docs/matter-ota.md](docs/matter-ota.md): Matter OTA requestor and `.ota` image tool
-- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md)
+- Per domain (being written): [switch](docs/switch.md), [cover](docs/cover.md), [fan](docs/fan.md), [lock and valve](docs/lock-valve.md), [binary sensors](docs/binary-sensors.md), [sensors](docs/sensors.md), [power sources and topology](docs/power.md)
 - [docs/delegates.md](docs/delegates.md): delegate-driven clusters: mode clusters, Mode Select, Operational State (appliances)
 - [docs/actions.md](docs/actions.md), [docs/binding.md](docs/binding.md), [docs/clusters.md](docs/clusters.md), [docs/generated/commands.md](docs/generated/commands.md): actions, binding, cluster and command reference
 - [docs/troubleshooting.md](docs/troubleshooting.md): IPv6/mDNS, reconnect, build size, Thread
+- [docs/design/DIRECTION.md](docs/design/DIRECTION.md): design direction and principles
 - [docs/faq.md](docs/faq.md): frequently asked questions
 - [docs/ROADMAP.md](docs/ROADMAP.md): community demand, maintainer direction, upstreaming, priorities
 - [docs/dev/thread-debugging.md](docs/dev/thread-debugging.md): debugging Thread
