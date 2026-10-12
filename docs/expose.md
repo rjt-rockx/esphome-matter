@@ -87,8 +87,8 @@ Every row can be overridden with `as:`. Nothing is guessed from a missing `devic
 | `sensor` carbon_dioxide, carbon_monoxide, pm1, pm25, pm10, volatile_organic_compounds, nitrogen_dioxide, ozone | `air_quality_sensor`, all merged into one endpoint `group:air_quality`. Attach a temperature or humidity sensor to it with `attach_to: group:air_quality`. |
 | `sensor` power, energy, voltage, current, apparent_power, reactive_power, frequency, power_factor | `electrical_sensor` (see Metering) |
 | `sensor` battery | Power Source (see Battery) |
-| `event` | `generic_switch` without a binding. Send the events with `matter.send_switch_event` from `on_event:`. |
-| `button` | The same, but only when listed by id; globs and `all` skip buttons. |
+| `event` | `generic_switch` bound to the entity's events (`event_id`, see [generic-switch.md](generic-switch.md#binding-an-event-entity)): the event types `single`, `double`, `hold`, ... become presses. `device_class: doorbell` gives the `doorbell` device type instead. |
+| `button` | `generic_switch` without a binding, only when listed by id; globs and `all` skip buttons. Send the events with `matter.send_switch_event` from `on_press:`. |
 
 Sub-sensors nested one or two levels deep (`scd4x: co2: {id: ...}`, `pmsx003: pm_2_5: {id: ...}`) are found,
 and their key is used as the device class hint (`co2`, `pm_2_5`, `voc`, ... are understood). Only entities with
@@ -134,6 +134,15 @@ is not verified here.
 `as: electrical_sensor`, `as: air_quality_sensor` and `as: smoke_co_alarm` pick the attribute from the
 entity's `device_class`, with the same tables as the rules. Without a usable class the error lists the
 classes. Such an item is never merged: it gets its own endpoint.
+
+### Doorbells and switches
+
+`as: generic_switch` and `as: doorbell` accept a `binary_sensor` (bound as `binary_sensor_id`), an `event`
+(bound as `event_id`) or a `button` (no binding, send events from `on_press:`). An `event` with
+`device_class: doorbell` is a `doorbell` without `as:`. `features:` replaces the default Switch features
+(release, long press and multi press), so `features: [MomentarySwitchRelease]` gives a doorbell that only
+sends press events. `as: audio_doorbell` and `as: video_doorbell` are refused: they need the camera clusters,
+which are not implemented. See [generic-switch.md](generic-switch.md#binding-an-event-entity).
 
 ### Tags and labels
 

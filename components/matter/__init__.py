@@ -32,6 +32,7 @@ from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .closure import validate_closure_bindings, validate_unique_cover_bindings
 from .covers import validate_cover_bindings
+from .event_binding import validate_event_bindings
 from .device_info import (
     DEVICE_INFO_SCHEMA,
     setup_device_info,
@@ -229,6 +230,7 @@ def _final_validate(config: dict):
     warn_missing_color_temperature(config, full_config)
     switch_restore_warning(config, full_config)
     check_binary_sensors(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
+    validate_event_bindings(config, full_config, DEVICE_TYPES_BY_CONF_KEY)
     fan_restore_warning(config, full_config)
     validate_cover_bindings(config, full_config)
     validate_closure_bindings(config, full_config)

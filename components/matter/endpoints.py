@@ -596,7 +596,9 @@ class Endpoint:
             )
 
         # Register Switch cluster event bindings
-        await register_switch_binding(var, self._endpoint_id, device_config)
+        await register_switch_binding(
+            var, self._endpoint_id, device_config, device_type.name
+        )
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_WITH_FEATURES, ()):

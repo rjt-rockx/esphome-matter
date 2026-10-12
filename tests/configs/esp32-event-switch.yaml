@@ -1,0 +1,73 @@
+esphome:
+  name: matter-ci-event-switch
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+# ESPHome `event` entities bound to the Switch cluster: each event type is one finished gesture.
+matter:
+  endpoints:
+    # Event types are recognised by name: single, double, triple and hold.
+    1:
+      generic_switch:
+        event_id: remote_event
+        multi_press_max: 3
+    # Explicit mapping. The device sends "hold" and "release" separately, so the long press
+    # stays open until the release.
+    2:
+      generic_switch:
+        event_id: held_event
+        event_map:
+          tap: 1
+          tap_twice: 2
+          hold: long_press
+          release: press_end
+    # A doorbell: one press and its release (no long press, no multi press).
+    3:
+      doorbell:
+        event_id: bell_event
+        with_features: [MomentarySwitchRelease]
+    # A doorbell on a binary sensor (a wired push button).
+    4:
+      doorbell:
+        binary_sensor_id: bell_button
+
+event:
+  - platform: template
+    id: remote_event
+    name: Remote
+    device_class: button
+    event_types: [single, double, triple, hold]
+  - platform: template
+    id: held_event
+    name: Held
+    event_types: [tap, tap_twice, hold, release]
+  - platform: template
+    id: bell_event
+    name: Bell
+    device_class: doorbell
+    event_types: [ring]
+
+binary_sensor:
+  - platform: gpio
+    id: bell_button
+    pin: GPIO4

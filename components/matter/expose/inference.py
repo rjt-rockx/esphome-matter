@@ -144,10 +144,24 @@ DOMAIN_ID_KEYS = {
 # Device types whose binding key differs from the domain's.
 TYPE_ID_KEYS = {
     ("generic_switch", "binary_sensor"): "binary_sensor_id",
+    ("generic_switch", "event"): "event_id",
+    ("doorbell", "binary_sensor"): "binary_sensor_id",
+    ("doorbell", "event"): "event_id",
 }
 # Domains that become a Generic Switch without a binding: the user sends the events with
-# `matter.send_switch_event` (event: on_event, button: on_press).
-UNBOUND_SWITCH_DOMAINS = frozenset({"event", "button"})
+# `matter.send_switch_event` (button: on_press).
+UNBOUND_SWITCH_DOMAINS = frozenset({"button"})
+# Device types that cannot be built from an ESPHome entity, with the reason.
+UNSUPPORTED_TYPES = {
+    "audio_doorbell": (
+        "`audio_doorbell` requires Camera AV Stream Management and WebRTC Transport Provider "
+        "clusters, which this component does not implement; use `as: doorbell`"
+    ),
+    "video_doorbell": (
+        "`video_doorbell` is a composed camera device that this component does not implement; "
+        "use `as: doorbell`"
+    ),
+}
 
 # What to try when no rule applies, per domain. Replaces the plain "use `as:`".
 NO_RULE_HINTS = {
@@ -183,7 +197,9 @@ def bind(device_type: str, entity: Entity) -> dict:
     names the offending id and type at the lowered path.
     """
     dt = DEVICE_TYPES_BY_CONF_KEY[device_type]
-    if device_type == "generic_switch" and entity.domain in UNBOUND_SWITCH_DOMAINS:
+    if device_type in UNSUPPORTED_TYPES:
+        raise NoMapping(UNSUPPORTED_TYPES[device_type])
+    if dt.has_required_cluster("Switch") and entity.domain in UNBOUND_SWITCH_DOMAINS:
         return {}
     if (device_type, entity.domain) in TYPE_ID_KEYS:
         return {TYPE_ID_KEYS[(device_type, entity.domain)]: entity.id}
@@ -419,7 +435,10 @@ def _binary_sensor(entity: Entity, overrides: Overrides) -> LoweredEndpoint | No
 
 @rule("event")
 def _event(entity: Entity, overrides: Overrides) -> LoweredEndpoint:
-    return LoweredEndpoint({"generic_switch": {}})
+    # The events of the entity drive the Switch cluster (event_binding.py). A doorbell class is
+    # the Matter Doorbell device type; every other class is a Generic Switch.
+    name = "doorbell" if (entity.device_class or "").lower() == "doorbell" else "generic_switch"
+    return LoweredEndpoint({name: bind(name, entity)})
 
 
 @rule("button")
