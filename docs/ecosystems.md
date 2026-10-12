@@ -56,7 +56,7 @@ Notes:
 - python-matter-server accepted the dev DAC without extra steps, but it is discontinued and archived. Migrate to matterjs-server.
 - Matter-over-Thread devices need a Thread border router that Home Assistant can reach (for example the OpenThread Border Router app). See [troubleshooting.md](troubleshooting.md#thread).
 - The same device can also be added through the ESPHome integration via the native API (if `api:` is configured). Home Assistant will then show it twice. Pick one path per entity to avoid duplicates, unless you intentionally want both. Running both at once is untested for duplicate entity behaviour.
-- Home Assistant shows update entities only for devices that support Matter OTA, which esphome-matter does not. Update the firmware over ESPHome's own OTA.
+- Home Assistant shows update entities only for devices that support Matter OTA. esphome-matter has an opt-in OTA requestor, see [matter-ota.md](matter-ota.md); without it, update the firmware over ESPHome's own OTA.
 
 ## Apple Home
 

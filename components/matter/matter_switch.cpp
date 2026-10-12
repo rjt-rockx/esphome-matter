@@ -60,6 +60,7 @@ void MatterSwitchMapping::push_state_to_matter(bool on) {
   uint16_t eid = this->endpoint_id();
   chip::DeviceLayer::SystemLayer().ScheduleLambda([eid, on]() {
     using namespace chip::app::Clusters;
+    MatterPushGuard push_guard;  // see MatterPushGuard
     esp_matter_attr_val_t on_val = esp_matter_bool(on);
     esp_matter::attribute::report(eid, OnOff::Id, OnOff::Attributes::OnOff::Id,
                                   &on_val);

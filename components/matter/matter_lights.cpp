@@ -521,6 +521,8 @@ void MatterLightMapping::push_state_to_matter() {
 
   chip::DeviceLayer::SystemLayer().ScheduleLambda([eid, report]() {
     using namespace chip::app::Clusters;
+    // Reported state comes from ESPHome, never back into it (see MatterPushGuard).
+    MatterPushGuard push_guard;
     esp_matter_attr_val_t on_val = esp_matter_bool(report.on);
     esp_matter::attribute::report(eid, OnOff::Id, OnOff::Attributes::OnOff::Id,
                                   &on_val);
