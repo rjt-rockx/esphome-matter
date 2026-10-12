@@ -27,6 +27,7 @@ from .endpoints import (
     light_restore_warning,
     register_endpoints,
 )
+from .sensor_mapping import validate_sensor_bindings
 from .types import MatterComponent
 
 _LOGGER = logging.getLogger(__name__)
@@ -165,6 +166,7 @@ def _final_validate(config: dict):
         )
 
     light_restore_warning(config, full_config)
+    validate_sensor_bindings(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -214,7 +216,9 @@ async def to_code(config: ConfigType):
         from esphome.components.esp32 import require_mbedtls_tls_extras
 
         # CHIP needs AES-CCM and deterministic ECDSA, trimmed by default since esphome#19088
-        require_mbedtls_tls_extras(("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC"))
+        require_mbedtls_tls_extras(
+            ("CONFIG_MBEDTLS_CCM_C", "CONFIG_MBEDTLS_ECDSA_DETERMINISTIC")
+        )
     except ImportError:
         pass
     try:
