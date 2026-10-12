@@ -54,20 +54,26 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
 7. State used by both contexts must be an atomic or mutex-guarded value, or be
    passed by value through the hand-off.
 
-8. **The one case where the CHIP task waits for the main loop**: commands whose
-   answer depends on a user automation (`ChangeToMode`, Operational State
-   `Start`/`Stop`/`Pause`/`Resume`/`GoHome`, see [../delegates.md](../delegates.md)).
-   The SDK delegate must return the response synchronously, so
-   `run_on_main_loop_and_wait` (`matter_delegates.h`) defers the work and blocks the
-   CHIP task on a condition variable for at most `MATTER_DELEGATE_TIMEOUT_MS`
-   (750 ms). It is only used when an automation is configured; otherwise the
-   command is accepted without a hop. The request state is shared through a
-   `shared_ptr`, a request the CHIP task gave up on is dropped if it did not start,
-   and the active outcome pointer (`active_command_outcome`) is only set and read on
-   the main loop. Main-loop code that waits for the CHIP stack lock (`dump_config`,
-   `setup`) can make such a command time out; it never deadlocks because the wait
-   is bounded. Do not use this pattern for anything that has a non-blocking
-   alternative.
+8. **The CHIP task does not wait for the main loop by default.** Delegate commands
+   (`ChangeToMode`, Operational State `Start`/`Stop`/`Pause`/`Resume`/`GoHome`, see
+   [../delegates.md](../delegates.md)) are decided on the CHIP task from state the
+   main loop keeps in atomics (`current_state_`) and from constant lists, answered at
+   once, and the automations are posted with `defer`. Only with the explicit
+   `decide_in_automation: true` does `run_on_main_loop_and_wait`
+   (`matter_delegates.h`) block the CHIP task on a condition variable, for at most
+   `decide_timeout` (default `MATTER_DELEGATE_TIMEOUT_MS` = 250 ms). The request
+   state is shared through a `shared_ptr`; a request the CHIP task gave up on is
+   dropped if it did not start, and if it was already running the `late` callback
+   (main loop) reconciles it (mode: push the result to Matter when not rejected).
+   The active outcome pointer (`active_command_outcome`) is only set and read on the
+   main loop. While the CHIP task waits, everything else on it waits too, and
+   main-loop code that waits for the CHIP stack lock (`dump_config`, `setup`) can
+   make the wait time out; it never deadlocks because the wait is bounded.
+9. **Actions never take the CHIP lock on the main loop.** `matter.send_event` is
+   scheduled with `PlatformMgr().ScheduleWork` (the event is logged on the CHIP task,
+   which already holds the lock) like `send_client_command` and
+   `set_attribute_value`. Remaining one-time lock users (`setup`, `dump_config`,
+   commissioning window and OTA setup, text sensor refresh) are listed in the audit.
 
 ## Audit (current state)
 
@@ -100,7 +106,7 @@ callbacks, so code on the CHIP task can use CHIP APIs without locking again.
 - Delegate layer (`matter_modes.cpp`, `matter_operational_state.cpp`,
   `matter_laundry_controls.cpp`): delegate callbacks read lists (`modes_`,
   `states_`, `phases_`, ...) that are filled before `esp_matter::start()` and never
-  change; the countdown value is an atomic; the mode, state and phase pushes use
+  change; the countdown value and the current operational state are atomics; the mode, state and phase pushes use
   `run_on_matter_thread` and the SDK `Instance` is only touched there. Echo loops
   between a bound select and a Matter attribute are cut with `last_*_` values that
   are only used on the main loop (attribute callbacks defer first). See rule 8 for

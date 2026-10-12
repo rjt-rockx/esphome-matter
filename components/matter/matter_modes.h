@@ -15,6 +15,7 @@
 #include <esp_matter.h>
 
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -40,8 +41,9 @@ class MatterChangeToModeTrigger : public Trigger<uint8_t> {};
 
 // Mode list, ESPHome select binding and change trigger shared by the Mode Base derived clusters and Mode Select.
 //
-// Matter -> ESPHome: an accepted ChangeToMode runs `on_change_to_mode` and then sets the bound select.
+// Matter -> ESPHome: an accepted ChangeToMode sets the bound select and runs `on_change_to_mode` on the main loop.
 // ESPHome -> Matter: the bound select (and `matter.mode.set`) updates CurrentMode.
+// Boot: the select wins when it has a (restored) state; otherwise the stored CurrentMode is replayed into the select.
 class MatterModeList : public MatterEndpointMappingBase {
 public:
   MatterModeList(uint16_t endpoint_id, uint32_t cluster_id);
@@ -54,6 +56,13 @@ public:
   void add_change_trigger(MatterChangeToModeTrigger *trigger) {
     this->triggers_.push_back(trigger);
   }
+  // decide_in_automation: the CHIP task waits up to `timeout_ms` for the automation and honours matter.mode.reject.
+  void set_decision(bool decide_in_automation, uint32_t timeout_ms) {
+    this->decide_in_automation_ = decide_in_automation;
+    this->decide_timeout_ms_ = timeout_ms;
+  }
+  // accept: when_idle: ChangeToMode is refused while the operational state of the endpoint is not idle.
+  void set_accept_when_idle(bool value) { this->accept_when_idle_ = value; }
 #ifdef USE_SELECT
   void set_select(select::Select *select) { this->select_ = select; }
 #endif
@@ -67,8 +76,12 @@ public:
   void set_current_mode(uint8_t mode);
 
 protected:
-  // Main loop: user automation and select update for an accepted mode change.
+  // Main loop: select update and user automation for an accepted mode change.
   void apply_change_(uint8_t mode, MatterCommandOutcome &outcome);
+  // Main loop: shows a mode that Matter already has in the bound select (no automation).
+  void show_matter_mode_(uint8_t mode);
+  // Main loop: reads the stored CurrentMode and calls show_matter_mode_.
+  virtual void replay_matter_mode_() = 0;
   // Main loop: the bound select changed.
   void on_select_state_();
   // Main loop: updates CurrentMode in the Matter data model (hops to the Matter thread when needed).
@@ -77,6 +90,9 @@ protected:
   uint32_t cluster_id_;
   std::vector<MatterModeEntry> modes_;
   std::vector<MatterChangeToModeTrigger *> triggers_;
+  bool decide_in_automation_{false};
+  uint32_t decide_timeout_ms_{MATTER_DELEGATE_TIMEOUT_MS};
+  bool accept_when_idle_{false};
 #ifdef USE_SELECT
   select::Select *select_{nullptr};
 #endif
@@ -115,6 +131,7 @@ public:
 
 protected:
   void push_mode_to_matter_(uint8_t mode) override;
+  void replay_matter_mode_() override;
   chip::app::Clusters::ModeBase::Instance *instance_();
 
   // Kept alive until the CHIP task has encoded the response.
@@ -122,8 +139,8 @@ protected:
 };
 
 // Mode Select cluster. All Mode Select endpoints share one SupportedModesManager (a connectedhomeip singleton).
-// The SDK handles ChangeToMode itself (only UnsupportedMode can be answered); accepted changes arrive through the
-// CurrentMode attribute update, so `matter.mode.reject` has no effect here.
+// The SDK handles ChangeToMode itself (only UnsupportedMode can be answered); accepted changes (and scene recalls)
+// arrive through the CurrentMode attribute update, so `matter.mode.reject` has no effect here.
 class MatterModeSelectMapping : public MatterModeList {
 public:
   MatterModeSelectMapping(uint16_t endpoint_id);
@@ -138,8 +155,15 @@ public:
 
 protected:
   void push_mode_to_matter_(uint8_t mode) override;
+  void replay_matter_mode_() override;
   void on_matter_mode_(uint8_t mode);
 
+  // CurrentMode as the main loop believes Matter holds it (-1 unknown), and the writes pushed by the main loop whose
+  // attribute update callback has not been seen yet (sequence number, value). A callback that matches the oldest
+  // entry is our own echo and is dropped; anything else is a change from a controller or a scene recall.
+  int matter_mode_{-1};
+  uint32_t push_sequence_{0};
+  std::deque<std::pair<uint32_t, uint8_t>> pending_echoes_;
   std::vector<chip::app::Clusters::ModeSelect::Structs::ModeOptionStruct::Type>
       options_;
   std::vector<

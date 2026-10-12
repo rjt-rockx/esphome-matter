@@ -26,6 +26,7 @@ struct SharedRequest {
   bool started{false};
   bool done{false};
   bool abandoned{false};
+  bool timed_out{false};
   MatterCommandOutcome outcome;
 };
 
@@ -35,26 +36,37 @@ MatterCommandOutcome *active_command_outcome() { return g_active_outcome; }
 
 bool run_on_main_loop_and_wait(
     std::function<void(MatterCommandOutcome &)> work,
-    MatterCommandOutcome &outcome, uint32_t timeout_ms) {
+    MatterCommandOutcome &outcome, uint32_t timeout_ms,
+    std::function<void(const MatterCommandOutcome &)> late) {
   if (global_matter_component == nullptr)
     return false;
 
   auto request = std::make_shared<SharedRequest>();
-  defer_to_main_loop(global_matter_component, [request, work]() {
+  defer_to_main_loop(global_matter_component, [request, work, late]() {
     {
       std::lock_guard<std::mutex> guard(request->mutex);
       if (request->abandoned)
-        return; // The CHIP task gave up; the controller was told it failed.
+        return; // The CHIP task gave up before this started; nothing was applied.
       request->started = true;
     }
     MatterCommandOutcome local;
     g_active_outcome = &local;
     work(local);
     g_active_outcome = nullptr;
+    bool was_late = false;
     {
       std::lock_guard<std::mutex> guard(request->mutex);
-      request->outcome = std::move(local);
-      request->done = true;
+      was_late = request->timed_out;
+      if (!was_late) {
+        request->outcome = std::move(local);
+        request->done = true;
+      }
+    }
+    if (was_late) {
+      // The controller already got a failure; let the caller reconcile.
+      if (late)
+        late(local);
+      return;
     }
     request->condition.notify_all();
   });
@@ -64,7 +76,7 @@ bool run_on_main_loop_and_wait(
       lock, std::chrono::milliseconds(timeout_ms),
       [&request]() { return request->done; });
   if (!finished) {
-    // If the work has started, it is allowed to finish; the controller gets a failure anyway.
+    request->timed_out = true;
     request->abandoned = !request->started;
     ESP_LOGW(TAG, "Main loop did not answer within %u ms",
              static_cast<unsigned>(timeout_ms));

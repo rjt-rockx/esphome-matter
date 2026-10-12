@@ -49,6 +49,11 @@ CONF_TAGS = "tags"
 CONF_OPTION = "option"
 CONF_SELECT = "select"
 CONF_ON_CHANGE_TO_MODE = "on_change_to_mode"
+CONF_ACCEPT = "accept"
+CONF_DECIDE_IN_AUTOMATION = "decide_in_automation"
+CONF_DECIDE_TIMEOUT = "decide_timeout"
+CONF_ALLOWED_STATES = "allowed_states"
+CONF_IDLE_STATES = "idle_states"
 CONF_DESCRIPTION = "description"
 CONF_VALUE = "value"
 CONF_MFG_CODE = "mfg_code"
@@ -165,6 +170,10 @@ CONFLICTING_TAGS = {
 
 MFG_TAG_RANGE = (0x8000, 0xBFFF)
 MAX_LABEL_BYTES = 64
+DEFAULT_DECIDE_TIMEOUT = "250ms"
+# Matter manufacturer specific range of status codes and error ids
+MANUFACTURER_CODE_RANGE = (0x80, 0xBF)
+COMMAND_NAMES = ("pause", "resume", "start", "stop", "go_home")
 MAX_MODE_TAGS = 8
 MAX_SELECT_TAGS = 64
 MANUFACTURER_STATE_RANGE = (0x80, 0xBF)
@@ -341,16 +350,24 @@ def _mode_cluster_schema(cluster_name: str) -> dict:
         ),
         cv.Required(CONF_MODES): cv.All(
             cv.ensure_list(_mode_entry_schema(cluster_name)),
-            cv.Length(min=2, max=255),
+            # Mode Select may have a single mode; the Mode Base clusters need two or more.
+            cv.Length(min=1 if is_select else 2, max=255),
             _validate_modes(cluster_name),
         ),
         cv.Optional(CONF_SELECT): cv.use_id(select.Select),
         cv.Optional(CONF_ON_CHANGE_TO_MODE): _change_trigger_schema(),
     }
     if is_select:
-        schema[cv.Required(CONF_DESCRIPTION)] = cv.All(
-            cv.string_strict, cv.Length(min=1, max=64)
+        schema[cv.Required(CONF_DESCRIPTION)] = _utf8_label
+    else:
+        # The SDK answers ChangeToMode of Mode Select itself, so these only exist on the Mode Base clusters.
+        schema[cv.Optional(CONF_ACCEPT, default="always")] = cv.one_of(
+            "always", "when_idle", lower=True
         )
+        schema[cv.Optional(CONF_DECIDE_IN_AUTOMATION, default=False)] = cv.boolean
+        schema[
+            cv.Optional(CONF_DECIDE_TIMEOUT, default=DEFAULT_DECIDE_TIMEOUT)
+        ] = cv.positive_time_period_milliseconds
     return schema
 
 
@@ -473,6 +490,19 @@ def _operational_cluster_dict(cluster_name: str) -> dict:
         cv.Optional(CONF_ON_PAUSE): _command_trigger_schema(),
         cv.Optional(CONF_ON_RESUME): _command_trigger_schema(),
         cv.Optional(CONF_ON_GO_HOME): _command_trigger_schema(),
+        cv.Optional(CONF_DECIDE_IN_AUTOMATION, default=False): cv.boolean,
+        cv.Optional(
+            CONF_DECIDE_TIMEOUT, default=DEFAULT_DECIDE_TIMEOUT
+        ): cv.positive_time_period_milliseconds,
+        # command -> states in which it is accepted; decided on the CHIP task, no automation involved
+        cv.Optional(CONF_ALLOWED_STATES, default={}): cv.Schema(
+            {
+                cv.Optional(command): cv.ensure_list(cv.string_strict)
+                for command in COMMAND_NAMES
+            }
+        ),
+        # states that count as "idle" for `accept: when_idle` of the mode clusters of the endpoint
+        cv.Optional(CONF_IDLE_STATES): cv.ensure_list(cv.string_strict),
     }
 
 
@@ -491,6 +521,33 @@ def _validate_operational_state_map(cluster_name: str):
                     f"state_map maps '{source_value}' to '{state}', which is not a state of this "
                     f"cluster. Available: {', '.join(states['names'])}"
                 )
+        for command, wanted in config[CONF_ALLOWED_STATES].items():
+            if command == "go_home" and cluster_name != RVC_OPERATIONAL_STATE:
+                raise cv.Invalid("allowed_states: go_home exists only on rvc_operational_state")
+            if command in ("start", "stop") and cluster_name == RVC_OPERATIONAL_STATE:
+                raise cv.Invalid(f"allowed_states: {command} does not exist on rvc_operational_state")
+            for state in wanted:
+                if _normalize(state) not in available:
+                    raise cv.Invalid(
+                        f"allowed_states {command}: '{state}' is not a state of this cluster. "
+                        f"Available: {', '.join(states['names'])}"
+                    )
+        for state in config.get(CONF_IDLE_STATES, []):
+            if _normalize(state) not in available:
+                raise cv.Invalid(
+                    f"idle_states: '{state}' is not a state of this cluster. Available: {', '.join(states['names'])}"
+                )
+        has_reject = any(
+            action_type == "matter.operational_state.reject"
+            for action_type, _ in iter_matter_actions(
+                {key: value for key, value in config.items() if key.startswith("on_")}
+            )
+        )
+        if has_reject and not config[CONF_DECIDE_IN_AUTOMATION]:
+            raise cv.Invalid(
+                "matter.operational_state.reject only works with `decide_in_automation: true` (otherwise the "
+                "command is answered before the automation runs); use `allowed_states:` for a fixed rule"
+            )
         return config
 
     return validate
@@ -611,7 +668,14 @@ def validate_delegate_clusters(matter_config: dict, full_config) -> None:
                     f"{where}: esp-matter 1.6 has no {cluster._name} cluster, so it can not be created"
                 )
             if is_mode_cluster(cluster.name):
-                _validate_mode_cluster(where, cluster.name, cluster_config, full_config)
+                _validate_mode_cluster(
+                    where,
+                    cluster.name,
+                    cluster_config,
+                    full_config,
+                    sibling_state="operational_state" in clusters
+                    or "rvc_operational_state" in clusters,
+                )
             elif cluster.name == LAUNDRY_WASHER_CONTROLS:
                 _validate_laundry_selects(where, cluster_config, full_config)
             else:
@@ -642,7 +706,35 @@ def validate_delegate_clusters(matter_config: dict, full_config) -> None:
                     )
 
 
-def _validate_mode_cluster(where, cluster_name, config, full_config):
+def _validate_mode_cluster(where, cluster_name, config, full_config, sibling_state=False):
+    if cluster_name != MODE_SELECT:
+        if config[CONF_ACCEPT] == "when_idle" and not sibling_state:
+            raise cv.Invalid(
+                f"{where}: `accept: when_idle` needs an operational_state or rvc_operational_state cluster on the "
+                "same endpoint (its state tells whether the appliance is idle)"
+            )
+        has_reject = any(
+            action_type == "matter.mode.reject"
+            for action_type, _ in iter_matter_actions(
+                {CONF_ON_CHANGE_TO_MODE: config.get(CONF_ON_CHANGE_TO_MODE, [])}
+            )
+        )
+        if has_reject and not config[CONF_DECIDE_IN_AUTOMATION]:
+            raise cv.Invalid(
+                f"{where}: matter.mode.reject only works with `decide_in_automation: true` (otherwise ChangeToMode "
+                "is answered before the automation runs); use `accept: when_idle` for a fixed rule"
+            )
+    else:
+        has_reject = any(
+            action_type == "matter.mode.reject"
+            for action_type, _ in iter_matter_actions(
+                {CONF_ON_CHANGE_TO_MODE: config.get(CONF_ON_CHANGE_TO_MODE, [])}
+            )
+        )
+        if has_reject:
+            raise cv.Invalid(
+                f"{where}: the SDK answers ChangeToMode of Mode Select itself, matter.mode.reject has no effect"
+            )
     if CONF_SELECT in config:
         platform, entity = _entity_platform(full_config, config[CONF_SELECT])
         options = (entity or {}).get("options")
@@ -794,6 +886,14 @@ async def _register_modes(var, endpoint_id, cluster, config):
     if CONF_SELECT in config:
         select_ = await cg.get_variable(config[CONF_SELECT])
         cg.add(mapping.set_select(select_))
+    if cluster.name != MODE_SELECT:
+        cg.add(
+            mapping.set_decision(
+                config[CONF_DECIDE_IN_AUTOMATION],
+                config[CONF_DECIDE_TIMEOUT].total_milliseconds,
+            )
+        )
+        cg.add(mapping.set_accept_when_idle(config[CONF_ACCEPT] == "when_idle"))
     for conf in config.get(CONF_ON_CHANGE_TO_MODE, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
         cg.add(mapping.add_change_trigger(trigger))
@@ -827,6 +927,25 @@ async def _register_operational_state(var, endpoint_id, cluster, config):
         cg.add(mapping.add_error_name(name, error_id))
     for phase in config[CONF_PHASES]:
         cg.add(mapping.add_phase(phase))
+    cg.add(
+        mapping.set_decision(
+            config[CONF_DECIDE_IN_AUTOMATION],
+            config[CONF_DECIDE_TIMEOUT].total_milliseconds,
+        )
+    )
+    for command, wanted in config[CONF_ALLOWED_STATES].items():
+        for state in wanted:
+            cg.add(
+                mapping.add_allowed_state(
+                    getattr(MatterOperationalCommand, command.upper()),
+                    states["names"][_find_name(states["names"], state)],
+                )
+            )
+    idle = config.get(CONF_IDLE_STATES)
+    if idle is None:
+        idle = ["stopped", "docked", "charging"] if cluster.name == RVC_OPERATIONAL_STATE else ["stopped"]
+    for state in idle:
+        cg.add(mapping.add_idle_state(states["names"][_find_name(states["names"], state)]))
     for key, attr in (
         (CONF_STATE, "state"),
         (CONF_PHASE, "phase"),
@@ -904,7 +1023,7 @@ def layout_extras(cluster, config: dict) -> dict:
     if commands:
         commands.append("OperationalCommandResponse")
     return {
-        "attrs": [],
+        "attrs": ["CountdownTime"] if config.get(CONF_COUNTDOWN_TIME) is not None else [],
         "cmds": commands,
         "events": ["OperationalError", "OperationCompletion"],
     }
@@ -973,8 +1092,12 @@ def _status_code(value):
     names.pop("unsupported_mode", None)  # the SDK answers UnsupportedMode itself
     if isinstance(value, int) and not isinstance(value, bool):
         number = cv.uint8_t(value)
-        if number == 0:
-            raise cv.Invalid("Success (0) can not be a rejection")
+        # Numbers are only for manufacturer specific statuses; the standard ones are used by name.
+        if not (MANUFACTURER_CODE_RANGE[0] <= number <= MANUFACTURER_CODE_RANGE[1]):
+            raise cv.Invalid(
+                f"Status {number} is outside the manufacturer range 0x80-0xBF; use a status name "
+                f"({', '.join(names)})"
+            )
         return number
     name = _snake(cv.string_strict(value))
     if name not in names:

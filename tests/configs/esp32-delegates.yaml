@@ -37,6 +37,8 @@ matter:
             - {label: Cleaning, mode: 1, tags: [cleaning]}
             - {label: Mapping, mode: 2, tags: [mapping]}
           select: vacuum_run_mode
+          # The automation decides (matter.mode.reject); the CHIP task waits at most 250 ms for it
+          decide_in_automation: true
           on_change_to_mode:
             - if:
                 condition:
@@ -57,6 +59,8 @@ matter:
         rvc_operational_state:
           phases: [Cleaning, Returning]
           state: vacuum_state
+          decide_in_automation: true
+          decide_timeout: 300ms
           phase: vacuum_phase
           countdown_time: vacuum_eta
           on_pause:
@@ -76,6 +80,7 @@ matter:
             - {label: Delicate, tags: [delicate, quiet]}
             - {label: Heavy, mode: 10, tags: [heavy, max]}
           select: washer_program
+          accept: when_idle                # refused while the washer runs
         laundry_washer_controls:
           spin_speeds: ["Off", "400", "800", "1200"]
           spin_speed: washer_spin
@@ -86,6 +91,10 @@ matter:
           states:
             - {id: 0x80, label: Soaking}
           state: washer_state
+          idle_states: [stopped, paused]
+          allowed_states:                  # decided on the CHIP task
+            start: [stopped]
+            stop: [running, paused]
           state_map:
             Idle: stopped
             Washing: running

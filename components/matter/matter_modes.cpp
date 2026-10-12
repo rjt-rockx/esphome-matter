@@ -136,12 +136,23 @@ void MatterModeList::initialize() {
     return;
   this->select_->add_on_state_callback(
       [this](auto &&...) { this->on_select_state_(); });
-  // The select is the source of truth for the mode: push its restored state to Matter.
-  // Done from the main loop so the select can be read safely.
+  // Boot rule: the select wins when it has a (restored) state and is pushed to Matter; otherwise the stored
+  // CurrentMode is replayed into the select. Done from the main loop so the select can be read safely.
   global_matter_component->defer_to_main_loop([this]() {
     if (this->select_->has_state())
       this->on_select_state_();
+    else
+      this->replay_matter_mode_();
   });
+#endif
+}
+
+void MatterModeList::show_matter_mode_(uint8_t mode) {
+  this->last_mode_ = mode;
+#ifdef USE_SELECT
+  const MatterModeEntry *entry = this->find_mode(mode);
+  if (this->select_ != nullptr && entry != nullptr)
+    this->select_->make_call().set_option(entry->option).perform();
 #endif
 }
 
@@ -266,13 +277,30 @@ void MatterModeMapping::HandleChangeToMode(
 #ifdef USE_SELECT
   has_handler = has_handler || this->select_ != nullptr;
 #endif
-  if (has_handler) {
+
+  // Declarative rule, decided here without waiting for the main loop.
+#ifdef USE_MATTER_OPERATIONAL_STATE
+  if (this->accept_when_idle_ && !endpoint_is_idle(this->endpoint_id())) {
+    response.status =
+        chip::to_underlying(mode_base_ns::StatusCode::kInvalidInMode);
+    this->status_text_ = "Busy";
+  } else
+#endif
+      if (has_handler && this->decide_in_automation_) {
+    // Opt-in: the automation decides (matter.mode.reject), the CHIP task waits for it.
     MatterCommandOutcome outcome;
     bool answered = run_on_main_loop_and_wait(
         [this, new_mode](MatterCommandOutcome &result) {
           this->apply_change_(new_mode, result);
         },
-        outcome);
+        outcome, this->decide_timeout_ms_,
+        // Finished after the controller got a failure: if nothing vetoed it, bring Matter in line with the select.
+        [this, new_mode](const MatterCommandOutcome &late) {
+          if (!late.rejected) {
+            ESP_LOGW(TAG, "ChangeToMode(%u) finished late; applying it to Matter", new_mode);
+            this->push_mode_to_matter_(new_mode);
+          }
+        });
     if (!answered) {
       response.status =
           chip::to_underlying(mode_base_ns::StatusCode::kGenericFailure);
@@ -281,14 +309,24 @@ void MatterModeMapping::HandleChangeToMode(
       response.status = outcome.status;
       this->status_text_ = outcome.text;
     }
+  } else if (has_handler) {
+    // Default: accept and let the automation/select follow asynchronously on the main loop.
+    defer_to_main_loop(global_matter_component, [this, new_mode]() {
+      MatterCommandOutcome unused;
+      this->apply_change_(new_mode, unused);
+    });
   }
 
   ESP_LOGD(TAG, "ChangeToMode(%u) on endpoint %u cluster 0x%04x: status %u",
            new_mode, this->endpoint_id(), static_cast<unsigned>(this->cluster_id_),
            response.status);
-  if (!this->status_text_.empty()) {
-    if (this->status_text_.size() > MODE_STATUS_TEXT_MAX)
-      this->status_text_.resize(MODE_STATUS_TEXT_MAX);
+  if (response.status !=
+      chip::to_underlying(mode_base_ns::StatusCode::kSuccess)) {
+    // StatusText is always present on a failure.
+    if (this->status_text_.empty())
+      this->status_text_ = "Rejected";
+    this->status_text_.resize(
+        utf8_prefix_length(this->status_text_, MODE_STATUS_TEXT_MAX));
     response.statusText.SetValue(
         chip::CharSpan::fromCharString(this->status_text_.c_str()));
   }
@@ -315,6 +353,17 @@ void MatterModeMapping::push_mode_to_matter_(uint8_t mode) {
     if (status != InteractionStatus::Success)
       ESP_LOGW(TAG, "Cannot set mode %u on endpoint %u cluster 0x%04x", mode,
                this->endpoint_id(), static_cast<unsigned>(this->cluster_id_));
+  });
+}
+
+void MatterModeMapping::replay_matter_mode_() {
+  run_on_matter_thread([this]() {
+    auto *instance = this->instance_();
+    if (instance == nullptr)
+      return;
+    uint8_t mode = instance->GetCurrentMode();
+    defer_to_main_loop(global_matter_component,
+                       [this, mode]() { this->show_matter_mode_(mode); });
   });
 }
 
@@ -378,17 +427,48 @@ void MatterModeSelectMapping::initialize() {
 // Called on the CHIP task after the SDK handled ChangeToMode (or a scene recall).
 void MatterModeSelectMapping::on_matter_mode_(uint8_t mode) {
   defer_to_main_loop(global_matter_component, [this, mode]() {
+    if (!this->pending_echoes_.empty() &&
+        this->pending_echoes_.front().second == mode) {
+      // The update caused by our own push (sequence number in the front entry).
+      this->pending_echoes_.pop_front();
+      this->matter_mode_ = mode;
+      return;
+    }
+    this->matter_mode_ = mode;
     if (static_cast<int>(mode) == this->last_mode_)
       return;
-    MatterCommandOutcome outcome;
-    this->apply_change_(mode, outcome);
+    // A controller (ChangeToMode) or a scene recall: select and automation follow.
+    MatterCommandOutcome unused;
+    this->apply_change_(mode, unused);
   });
 }
 
 void MatterModeSelectMapping::push_mode_to_matter_(uint8_t mode) {
+  if (this->matter_mode_ == mode)
+    return; // Matter already has it: no write, so no echo to expect
+  this->matter_mode_ = mode;
+  this->push_sequence_++;
+  this->pending_echoes_.emplace_back(this->push_sequence_, mode);
+  while (this->pending_echoes_.size() > 8)
+    this->pending_echoes_.pop_front();
   set_attribute_value(this->endpoint_id(), MODE_SELECT_ID,
                       mode_select_ns::Attributes::CurrentMode::Id,
                       static_cast<uint64_t>(mode));
+}
+
+void MatterModeSelectMapping::replay_matter_mode_() {
+  run_on_matter_thread([this]() {
+    esp_matter_attr_val_t value;
+    if (esp_matter::attribute::get_val(this->endpoint_id(), MODE_SELECT_ID,
+                                       mode_select_ns::Attributes::CurrentMode::Id,
+                                       &value) != ESP_OK)
+      return;
+    uint8_t mode = value.val.u8;
+    defer_to_main_loop(global_matter_component, [this, mode]() {
+      this->matter_mode_ = mode;
+      this->show_matter_mode_(mode);
+    });
+  });
 }
 
 // --------------------------------------------------------------------- actions
@@ -410,9 +490,9 @@ void matter_mode_set(uint16_t endpoint_id, uint32_t cluster_id, uint8_t mode) {
 void matter_mode_reject(uint8_t status, const std::string &text) {
   MatterCommandOutcome *outcome = active_command_outcome();
   if (outcome == nullptr) {
-    ESP_LOGW(TAG, "matter.mode.reject ignored: no ChangeToMode is being "
-                  "handled (use it directly in on_change_to_mode, before any "
-                  "delay)");
+    ESP_LOGW(TAG, "matter.mode.reject ignored: it only works in "
+                  "on_change_to_mode of a cluster with decide_in_automation: "
+                  "true, before any delay");
     return;
   }
   outcome->rejected = true;
@@ -474,8 +554,18 @@ DelegateAttach attach_mode_delegate(esp_matter::endpoint_t *endpoint,
                    COMMAND_FLAG_GENERATED) == nullptr)
     cluster::mode_base::command::create_change_to_mode_response(cluster);
 
+  // On a microwave oven the Microwave Oven Control cluster creates (and Init()s) the mode instance itself once it
+  // has a delegate; installing our own init callback as well would Init the instance twice. Only hand over the
+  // delegate pointer then.
+  esp_matter::cluster::delegate_init_callback_t init_callback = info->init_callback;
+  if (cluster_id == 0x005E) {
+    esp_matter::cluster_t *control = esp_matter::cluster::get(endpoint, 0x005F);
+    if (control != nullptr &&
+        esp_matter::cluster::get_delegate_impl(control) != nullptr)
+      init_callback = nullptr;
+  }
   if (cluster::set_delegate_and_init_callback(
-          cluster, info->init_callback,
+          cluster, init_callback,
           static_cast<mode_base_ns::Delegate *>(mapping)) != ESP_OK)
     return DelegateAttach::FAILED;
   return DelegateAttach::OK;

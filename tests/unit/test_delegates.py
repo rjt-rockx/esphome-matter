@@ -437,6 +437,7 @@ def test_operational_actions(run_config):
     result = run_config(
         washer_state(
             "state: wash_state\n"
+            "decide_in_automation: true\n"
             "on_start:\n  - matter.operational_state.reject:\n      error: unable_to_start_or_resume\n      label: Door open\n"
         )
         + "\ninterval:\n  - interval: 1h\n    then:\n"
@@ -451,6 +452,7 @@ def test_operational_actions(run_config):
 def test_reject_status_validation(run_config):
     template = """\
     laundry_washer_mode:
+      decide_in_automation: true
       on_change_to_mode:
         - matter.mode.reject:
             status: STATUS
@@ -461,8 +463,10 @@ def test_reject_status_validation(run_config):
     assert run_config(washer(template.replace("STATUS", "invalid_in_mode"))).ok
     bad = run_config(washer(template.replace("STATUS", "nonsense")))
     assert not bad.ok and "Unknown status" in bad.output
-    success = run_config(washer(template.replace("STATUS", "0")))
-    assert not success.ok and "Success" in success.output
+    # numbers are only for manufacturer specific statuses
+    number = run_config(washer(template.replace("STATUS", "0x43")))
+    assert not number.ok and "outside the manufacturer range" in number.output
+    assert run_config(washer(template.replace("STATUS", "0x80"))).ok
 
 
 # --------------------------------------------------------------------------
@@ -533,6 +537,13 @@ def test_codegen_operational_state(generated_main):
     assert "MatterOperationalStateRejectAction" in code
     assert "MatterModeRejectAction<uint8_t>" in code
     assert "set_status([](uint8_t mode) -> uint8_t {\n      return 67;" in code  # dust_bin_full
+    # the blocking mode is opt-in per cluster, with its timeout in ms
+    assert "mattermodemapping_id->set_decision(true, 250);" in code
+    assert "mattermodemapping_id_2->set_decision(false, 250);" in code
+    assert "mattermodemapping_id_3->set_accept_when_idle(true);" in code
+    assert "matteroperationalstatemapping_id->set_decision(true, 300);" in code
+    assert "add_allowed_state(matter::MatterOperationalCommand::START, 0);" in code
+    assert "add_idle_state(2);" in code  # paused of the washer
 
 
 # --------------------------------------------------------------------------
@@ -675,3 +686,175 @@ def test_conformance_checker_flags_missing_delegate():
     assert any("ChangeToMode" in m for m in messages), messages
     with_delegate = check_node(from_layout(layout(True), spec), spec)
     assert not [f for f in with_delegate.findings if f.code.startswith("CL-")], with_delegate.findings
+
+
+# --------------------------------------------------------------------------
+# Command decision modes (async default, opt-in blocking)
+# --------------------------------------------------------------------------
+
+
+def test_reject_needs_decide_in_automation(run_config):
+    clusters = """\
+    laundry_washer_mode:
+      on_change_to_mode:
+        - matter.mode.reject: invalid_in_mode
+      modes:
+        - {label: Normal, tags: [normal]}
+        - {label: Delicate, tags: [delicate]}
+    """
+    result = run_config(washer(clusters))
+    assert not result.ok and "only works with `decide_in_automation: true`" in result.output
+    assert run_config(washer(clusters.replace("      modes:", "      decide_in_automation: true\n      modes:", 1))).ok
+
+
+def test_reject_in_operational_state_needs_decide(run_config):
+    result = run_config(
+        washer_state(
+            "state: wash_state\non_start:\n  - matter.operational_state.reject: unable_to_start_or_resume\n"
+        )
+    )
+    assert not result.ok and "only works with `decide_in_automation: true`" in result.output
+
+
+def test_accept_when_idle_needs_operational_state(run_config):
+    clusters = """\
+    laundry_washer_mode:
+      accept: when_idle
+      modes:
+        - {label: Normal, tags: [normal]}
+        - {label: Delicate, tags: [delicate]}
+    """
+    result = run_config(washer(clusters))
+    assert not result.ok and "operational_state or rvc_operational_state" in result.output
+    with_state = textwrap.dedent(clusters) + "operational_state:\n  state: wash_state\n"
+    assert run_config(washer(with_state)).ok
+
+
+def test_decide_timeout_is_configurable(run_config):
+    clusters = """\
+    laundry_washer_mode:
+      decide_in_automation: true
+      decide_timeout: 5s
+      modes:
+        - {label: Normal, tags: [normal]}
+        - {label: Delicate, tags: [delicate]}
+    """
+    assert run_config(washer(clusters)).ok
+    bad = run_config(washer(clusters.replace("5s", "soon")))
+    assert not bad.ok
+
+
+@pytest.mark.parametrize(
+    ("opstate", "message"),
+    [
+        ("allowed_states: {go_home: [stopped]}\n", "go_home exists only on rvc_operational_state"),
+        ("allowed_states: {start: [warp]}\n", "'warp' is not a state of this cluster"),
+        ("idle_states: [warp]\n", "idle_states: 'warp'"),
+    ],
+)
+def test_allowed_and_idle_states_errors(run_config, opstate, message):
+    result = run_config(washer_state(opstate))
+    assert not result.ok and message in result.output, result.output[-1500:]
+
+
+def test_allowed_states_ok(run_config):
+    result = run_config(
+        washer_state(
+            "state: wash_state\nallowed_states: {start: [stopped], pause: [running]}\nidle_states: [stopped, paused]\n"
+            "on_start:\n  - logger.log: x\n"
+        )
+    )
+    assert result.ok, result.output[-2000:]
+
+
+def test_mode_select_accepts_one_mode_and_byte_limited_description(run_config):
+    body = """
+        matter:
+          endpoints:
+            1:
+              mode_select: {}
+              clusters:
+                mode_select:
+                  description: DESC
+                  modes:
+                    - {label: Only}
+    """
+    assert run_config(body.replace("DESC", "Speed")).ok
+    # 33 two-byte characters are 66 bytes, over the 64 byte limit although they are fewer than 64 characters
+    too_long = run_config(body.replace("DESC", "\u00e9" * 33))
+    assert not too_long.ok and "maximum is 64" in too_long.output
+
+
+def test_mode_cluster_still_needs_two_modes(run_config):
+    result = run_config(
+        washer("laundry_washer_mode:\n  modes:\n    - {label: Normal, tags: [normal]}\n")
+    )
+    assert not result.ok and "at least 2" in result.output
+
+
+def test_utf8_prefix_length_is_in_the_header():
+    """The C++ helper that truncates StatusText / labels on a character boundary."""
+    text = (COMPONENTS / "matter" / "matter_delegates.h").read_text()
+    assert "utf8_prefix_length" in text and "& 0xC0) == 0x80" in text
+    # the same algorithm in Python, to document the expected results
+    def prefix(value: bytes, limit: int) -> int:
+        if len(value) <= limit:
+            return len(value)
+        n = limit
+        while n > 0 and (value[n] & 0xC0) == 0x80:
+            n -= 1
+        return n
+
+    data = ("a" + "\u00e9" * 40).encode()
+    assert prefix(data, 64) == 63  # not 64: that would cut an é in half
+    assert prefix(b"short", 64) == 5
+
+
+def test_layout_extras_match_attach_code():
+    """conformance `layout_extras` and the C++ attach code create the same things."""
+    from esphome.core import CORE
+
+    CORE.name = "unit"
+    from components.matter import delegates
+    from components.matter.data_model.clusters import CLUSTERS_BY_NAME
+    from components.matter.util import snake_case
+
+    modes = (COMPONENTS / "matter" / "matter_modes.cpp").read_text()
+    ops = (COMPONENTS / "matter" / "matter_operational_state.cpp").read_text()
+    mode_extras = delegates.layout_extras(CLUSTERS_BY_NAME["RVCRunMode"], {})
+    for name in mode_extras["cmds"]:
+        assert f"create_{snake_case(name)}(cluster)" in modes, name
+    for name in mode_extras["attrs"]:
+        if name == "SupportedModes":
+            assert "create_supported_modes(" in modes
+    select_extras = delegates.layout_extras(CLUSTERS_BY_NAME["ModeSelect"], {})
+    assert "ChangeToModeResponse" not in select_extras["cmds"]
+    config = {
+        delegates.CONF_ON_PAUSE: [1],
+        delegates.CONF_ON_RESUME: [1],
+        delegates.CONF_ON_START: [1],
+        delegates.CONF_ON_STOP: [1],
+        delegates.CONF_COUNTDOWN_TIME: "sensor_id",
+    }
+    extras = delegates.layout_extras(CLUSTERS_BY_NAME["OperationalState"], config)
+    assert set(extras["cmds"]) == {"Pause", "Resume", "Start", "Stop", "OperationalCommandResponse"}
+    assert extras["attrs"] == ["CountdownTime"]
+    for name in extras["cmds"]:
+        assert f"create_{snake_case(name)}(cluster)" in ops, name
+    for name in extras["events"]:
+        assert f"create_{snake_case(name)}(cluster)" in ops, name
+    assert "create_countdown_time(" in ops
+    rvc = delegates.layout_extras(CLUSTERS_BY_NAME["RVCOperationalState"], {delegates.CONF_ON_GO_HOME: [1]})
+    assert rvc["cmds"] == ["GoHome", "OperationalCommandResponse"]
+    assert "GoHome::Id" in ops
+
+
+@pytest.mark.slow
+def test_codegen_countdown_clamp_and_send_event(generated_main):
+    """CountdownTime is limited to 3 days and send_event no longer takes the CHIP lock on the main loop."""
+    ops = (COMPONENTS / "matter" / "matter_operational_state.cpp").read_text()
+    assert "259200" in ops
+    actions = (COMPONENTS / "matter" / "matter_actions.cpp").read_text()
+    start = actions.index("void send_event(")
+    assert "ScopedChipStackLock" not in actions[start:]
+    assert "ScheduleWork" in actions[start:]

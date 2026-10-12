@@ -33,6 +33,9 @@ matter:
             - {label: Idle, tags: [idle]}
             - {label: Cleaning, tags: [cleaning]}
           select: vacuum_run_mode
+          # Let the automation below decide (matter.mode.reject). The Matter stack waits at most 250 ms for it.
+          # Without this the change is accepted at once and the automation only follows.
+          decide_in_automation: true
           on_change_to_mode:
             - if:
                 condition:
@@ -50,6 +53,9 @@ matter:
           select: vacuum_clean_mode
         rvc_operational_state:
           state: vacuum_state
+          # Commands are accepted at once; the robot follows through the automations. Refuse GoHome when docked:
+          allowed_states:
+            go_home: [running, paused, error]
           on_pause:
             - logger.log: pause the robot
           on_resume:

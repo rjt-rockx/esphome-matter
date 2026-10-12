@@ -33,6 +33,7 @@ matter:
             - {label: Delicate, mode: 1, tags: [delicate, quiet]}
             - {label: Heavy, mode: 2, tags: [heavy, max]}
           select: washer_program          # kept in sync with Matter
+          accept: when_idle               # no program change while the machine runs
         laundry_washer_controls:
           spin_speeds: ["Off", "400", "800", "1200"]
           spin_speed: washer_spin
@@ -41,6 +42,7 @@ matter:
         operational_state:
           phases: [Pre-wash, Wash, Rinse, Spin]
           state: washer_state              # text sensor, see below
+          decide_in_automation: true       # lets on_start refuse (matter.operational_state.reject)
           phase: washer_phase
           countdown_time: washer_remaining
           on_start:

@@ -82,11 +82,22 @@ With `select:` the ESPHome select and `CurrentMode` are kept in sync in both dir
 * a controller's `ChangeToMode` is accepted, the select is set to the `option` of the mode (default: the label), and `on_change_to_mode` runs;
 * changing the select (a button, an automation, a Home Assistant user) updates `CurrentMode`.
 
-Every mode needs an option in the select. If the options of the select are known when the config is validated (template and most other selects), a missing option is an error. The select is the source of truth after a restart: its restored state replaces the stored `CurrentMode`.
+Every mode needs an option in the select. If the options of the select are known when the config is validated (template and most other selects), a missing option is an error.
 
-## on_change_to_mode and ChangeToModeResponse
+**Boot rule.** After the Matter stack started, the select wins when it has a state (for example restored with `restore_value`): that state is pushed to `CurrentMode`. When the select has no state yet, the stored `CurrentMode` (the SDK keeps it in non-volatile storage) is shown in the select instead, without running `on_change_to_mode`. The same rule applies to Mode Select. (Laundry Washer Controls follows the "select wins" half only.)
 
-A `ChangeToMode` command is answered *synchronously* by the CHIP task, but ESPHome automations run on the main loop. The component runs `on_change_to_mode` on the main loop and waits (at most 750 ms) until the automation's synchronous part has finished. If it called `matter.mode.reject`, the controller receives that status, otherwise `Success`:
+## How a ChangeToMode is answered
+
+The SDK calls the delegate on the CHIP task, which must answer `ChangeToModeResponse` at once, while ESPHome automations run on the main loop. There are two ways to resolve that, per cluster.
+
+### Default: decided on the CHIP task, automations follow (non-blocking)
+
+The CHIP task answers from information it already has, without waiting for anything:
+
+* the mode must be one of `modes` (the SDK answers `UnsupportedMode` itself);
+* `accept: always` (default) or `accept: when_idle`. With `when_idle` the change is refused with `invalid_in_mode` ("Busy") while the operational state of the same endpoint is not idle. The endpoint needs an `operational_state` or `rvc_operational_state` cluster; the idle states are its `idle_states:` (default `stopped`, and for the RVC also `docked` and `charging`).
+
+An accepted change is applied to Matter at once. The select is set and `on_change_to_mode` fires afterwards on the main loop, with no waiting. In this mode `matter.mode.reject` cannot work (the controller has been answered already) and is rejected during validation. If the appliance can not follow, correct the state afterwards with `matter.mode.set`, which updates `CurrentMode` and the select again:
 
 ```yaml
 on_change_to_mode:
@@ -94,14 +105,38 @@ on_change_to_mode:
       condition:
         lambda: 'return mode == 1 && id(dust_bin_full).state;'
       then:
-        - matter.mode.reject:
-            status: dust_bin_full        # a status name of the cluster, or a number
-            text: Empty the dust bin first
+        - matter.mode.set: {endpoint: 1, cluster: rvc_run_mode, mode: 0}   # back to Idle
 ```
 
-`status` is `generic_failure` by default; `invalid_in_mode` is the other generic one. The clusters add their own: `stuck`, `dust_bin_missing`, `dust_bin_full`, `water_tank_empty`, `battery_low`, ... for the RVC run mode, `cleaning_in_progress` for the RVC clean mode (see `delegate_data.json`). Actions after a `delay:` are not part of the decision. The SDK answers `UnsupportedMode` itself for unknown mode numbers, and `Success` without calling the automation if the controller asks for the current mode. If the main loop does not answer within 750 ms the response is `GenericFailure` ("Timed out").
+(The controller then sees a successful response followed by an attribute change back.)
 
-**Mode Select** is different: the SDK handles `ChangeToMode` itself (the only possible answers are success and a constraint error), and `on_change_to_mode` is a notification, `matter.mode.reject` has no effect. Mode Select also needs a `description`, and its semantic tags are `{mfg_code, value}` pairs:
+### Opt-in: the automation decides
+
+```yaml
+rvc_run_mode:
+  decide_in_automation: true     # default false
+  decide_timeout: 250ms          # default 250ms, how long the Matter stack may wait
+  on_change_to_mode:
+    - if:
+        condition:
+          lambda: 'return mode == 1 && id(dust_bin_full).state;'
+        then:
+          - matter.mode.reject:
+              status: dust_bin_full        # a status name of the cluster, or a manufacturer number 0x80-0xBF
+              text: Empty the dust bin first
+```
+
+The CHIP task waits for the synchronous part of the automation (actions after a `delay:` do not count). If it called `matter.mode.reject`, the controller receives that status and text; otherwise `Success`. `status` is `generic_failure` by default; `invalid_in_mode` is the other generic one, and each cluster adds its own (`stuck`, `dust_bin_missing`, `dust_bin_full`, `water_tank_empty`, `battery_low`, ... for the RVC run mode, `cleaning_in_progress` for the RVC clean mode, see `delegate_data.json`). Numbers are only accepted in the manufacturer range 0x80-0xBF.
+
+**While it waits, the whole Matter stack waits** (all sessions, subscriptions, mDNS handling of the CHIP task). Keep the timeout short and the decision cheap (read state that is already known). On a timeout the controller gets `GenericFailure` ("Timed out"). The work is then reconciled so that Matter and ESPHome never stay apart: if it had not started it is dropped; if it finished late and was not rejected, the resulting mode is pushed to Matter (and the select already shows it); if it finished late and was rejected nothing was applied.
+
+`StatusText` is always set on a failure (the automation's `text`, otherwise "Rejected", "Busy" or "Timed out") and is cut on a UTF-8 character boundary at 64 bytes.
+
+### Scene recall and other attribute writes
+
+A Scenes recall (and anything else that changes `CurrentMode` without a `ChangeToMode` command) is not a command: it can not be refused. For Mode Select it fires `on_change_to_mode` and sets the select like a command does, because Mode Select changes arrive through the attribute update. On the Mode Base clusters a scene can not change `CurrentMode`.
+
+**Mode Select** is different: the SDK handles `ChangeToMode` itself (the only possible answers are success and a constraint error), and `on_change_to_mode` is a notification; `accept`, `decide_in_automation` and `matter.mode.reject` do not exist for it. It may have a single mode, needs a `description` (1-64 bytes), and its semantic tags are `{mfg_code, value}` pairs. Echoes of values the main loop pushed itself are recognised by a sequence of pending writes and do not fire the automation again:
 
 ```yaml
 matter:
@@ -110,7 +145,7 @@ matter:
       mode_select: {}
       clusters:
         mode_select:
-          description: Fan preset        # required, 1-64 characters
+          description: Fan preset        # required, 1-64 bytes
           modes:
             - {label: Low, tags: [{mfg_code: 0xFFF1, value: 1}]}
             - {label: High}
@@ -153,22 +188,37 @@ clusters:
 
 A command only exists in the data model, and is only advertised to controllers, when its trigger is configured: `Pause` and `Resume` come together (the specification makes one mandatory when the other exists), `Start` and `Stop` exist only on `operational_state`, `GoHome` only on `rvc_operational_state` (the RVC cluster has no Start/Stop; use the RVC run mode to start and stop cleaning). The SDK already refuses commands that do not fit the state (for example `Pause` while stopped, answered with `CommandInvalidInState`) and does not call the automation when nothing has to change (`Pause` while paused).
 
-The command is answered with `OperationalCommandResponse`. `NoError` is the default; reject in the automation to return an error state:
+The command is answered with `OperationalCommandResponse`, by default **at once** on the CHIP task, and the automations run afterwards on the main loop. `NoError` is the answer unless a declarative rule refuses it:
 
 ```yaml
-on_start:
-  - if:
-      condition:
-        binary_sensor.is_on: washer_door_open
-      then:
-        - matter.operational_state.reject:
-            error: unable_to_start_or_resume     # name or a manufacturer number 0x80-0xBF
-            label: Door open
-            details: Close the door first
-  - switch.turn_on: washer_start
+operational_state:
+  allowed_states:           # command -> states in which it is accepted (others: CommandInvalidInState)
+    start: [stopped]
+    stop: [running, paused]
+  on_start:
+    - switch.turn_on: washer_start
 ```
 
-The same 750 ms rule as for the modes applies (`unable_to_start_or_resume` for `Start`/`Resume`, `unable_to_complete_operation` for `Stop` and `command_invalid_in_state` for the others on timeout).
+The state the rule looks at is the one reported through `state:` / `matter.operational_state.set`. Without `allowed_states` every command is accepted and the automation has to cope.
+
+With `decide_in_automation: true` (and optionally `decide_timeout:`, default 250 ms) the automation decides instead and can reject:
+
+```yaml
+operational_state:
+  decide_in_automation: true
+  on_start:
+    - if:
+        condition:
+          binary_sensor.is_on: washer_door_open
+        then:
+          - matter.operational_state.reject:
+              error: unable_to_start_or_resume     # name or a manufacturer number 0x80-0xBF
+              label: Door open
+              details: Close the door first
+    - switch.turn_on: washer_start
+```
+
+The same rules as for the modes apply: the Matter stack waits while it runs, only the synchronous part counts, and a timeout answers `unable_to_start_or_resume` for `Start`/`Resume`, `unable_to_complete_operation` for `Stop` and `command_invalid_in_state` for the others. A command whose automation finishes late is not undone; the state follows the state source. `matter.operational_state.reject` without `decide_in_automation` is a validation error.
 
 The state does not change by itself after an accepted command: the appliance reports it through `state:` or `matter.operational_state.set`.
 
@@ -200,13 +250,17 @@ Actions:
     total_operational_time: 3600       # seconds, optional
     paused_time: 120
 
-- matter.operational_state.reject:     # only inside on_start/on_stop/on_pause/on_resume/on_go_home
+- matter.operational_state.reject:     # only inside on_start/on_stop/... of a cluster with decide_in_automation: true
     error: command_invalid_in_state
 ```
 
 Error names: `no_error`, `unable_to_start_or_resume`, `unable_to_complete_operation`, `command_invalid_in_state`, plus on the RVC `failed_to_find_charging_dock`, `stuck`, `dust_bin_missing`, `dust_bin_full`, `water_tank_empty`, `water_tank_missing`, `water_tank_lid_open`, `mop_cleaning_pad_missing`, `low_battery`, `cannot_reach_target_area`, `dirty_water_tank_full`, `dirty_water_tank_missing`, `wheels_jammed`, `brush_jammed`, `navigation_sensor_obscured`.
 
-`countdown_time` feeds `CountdownTime` (null while the sensor has no value). Changes are reported by the SDK with the quieter reporting rules of the cluster.
+`countdown_time` creates the optional `CountdownTime` attribute and feeds it (null while the sensor has no value, limited to 259200 s = 3 days). Changes are reported by the SDK with the quieter reporting rules of the cluster.
+
+`state:`/`phase:` are one way (select or text sensor to Matter): a Matter controller can not change an operational state directly, only through the commands, so the select is never written back. If the source reports `error`, one `OperationalError` event is sent; a later `matter.operational_state.error` with the same error id is not sent again, a different id is.
+
+`OperationCompletion` is optional in the cluster XML, but the washer, dishwasher and RVC device types list it, so the event is always created.
 
 # Laundry Washer Controls
 
@@ -229,13 +283,16 @@ SDK callbacks run on the CHIP task, ESPHome on the main loop:
 
 | Direction | Mechanism |
 |---|---|
-| Matter command -> ESPHome | The CHIP task posts the automation to the main loop and waits at most 750 ms for its synchronous part. Nothing is posted when there is no automation or select (the command is then accepted at once). |
-| ESPHome -> Matter | `run_on_matter_thread` (modes: `Instance::UpdateCurrentMode`; operational state: `SetOperationalState`, `SetCurrentPhase`, the event functions). Mode Select uses a normal attribute write. |
+| Matter command -> ESPHome (default) | The CHIP task decides from the mode list, `accept` / `allowed_states` and state kept in atomics, answers, and posts the select update and automations to the main loop without waiting. |
+| Matter command -> ESPHome (`decide_in_automation`) | The CHIP task posts the automation and waits up to `decide_timeout` (250 ms) for its synchronous part; late completions are reconciled. |
+| ESPHome -> Matter | `run_on_matter_thread` (modes: `Instance::UpdateCurrentMode`; operational state: `SetOperationalState`, `SetCurrentPhase`, the event functions). Mode Select uses a normal attribute write. `matter.send_event` is also scheduled onto the CHIP task and never takes the stack lock on the main loop. |
 
-An automation that is slow (waits for hardware) should answer from a state it already knows and do the slow work after a `delay:`/`script`.
+An automation that is slow (waits for hardware) should not run in the deciding path: leave `decide_in_automation` off, or answer from a state it already knows and do the slow work after a `delay:`/`script`.
 
 # Conformance
 
-`python -m tools.conformance <config.yaml>` knows what the delegate layer adds: `SupportedModes`, `CurrentMode`, `ChangeToMode`, `ChangeToModeResponse` for the mode clusters, the configured commands plus `OperationalCommandResponse` and the `OperationalError`/`OperationCompletion` events for the operational state clusters. A delegate-driven cluster without a configuration is reported (`CL-CMD-MISSING`, `CL-ATTR-MISSING`), exactly like the endpoint behaves.
+`python -m tools.conformance <config.yaml>` knows what the delegate layer adds: `SupportedModes`, `CurrentMode`, `ChangeToMode`, `ChangeToModeResponse` for the mode clusters, the configured commands plus `OperationalCommandResponse` and the `OperationalError`/`OperationCompletion` events for the operational state clusters. A delegate-driven cluster without a configuration is reported (`CL-CMD-MISSING`, `CL-ATTR-MISSING`), exactly like the endpoint behaves. The profile of what esp-matter creates is generated from the SDK sources (`python -m tools.conformance.espm`); it used to miss attributes and commands that the creators of the mode clusters make through `mode_base::...` and `operational_state::...` calls (RVC run/clean mode, Water Heater, EVSE and DEM mode, Refrigerator mode, the RVC attributes). Laundry Washer Mode, Dishwasher Mode and Microwave Oven Mode genuinely create no `ChangeToMode`, which is what the delegate layer adds. A unit test keeps `layout_extras` (what the checker assumes) in line with the C++ attach code.
+
+`OperationCompletion` is optional in the cluster XML but listed by the washer, dishwasher and RVC device types, so it is part of the assumed events. `CountdownTime` is added when `countdown_time` is set.
 
 Not covered yet: Energy EVSE, Device Energy Management, Service Area, Laundry Dryer Controls, Dishwasher Alarm, Temperature Control (delegate) and Oven Mode / Oven Cavity Operational State (not available in esp-matter 1.6). The `oven_mode` cluster is listed in the data model but rejected because esp-matter has no such cluster.

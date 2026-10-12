@@ -6,6 +6,7 @@
 #include "matter_component.h"
 #include "matter_operational_state.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <esp_matter_cluster.h>
@@ -35,7 +36,7 @@ std::vector<MatterOperationalStateMapping *> &opstate_mappings() {
 }
 
 chip::CharSpan span_of(const std::string &text) {
-  return chip::CharSpan(text.c_str(), std::min(text.size(), LABEL_MAX));
+  return chip::CharSpan(text.c_str(), utf8_prefix_length(text, LABEL_MAX));
 }
 
 } // namespace
@@ -137,12 +138,53 @@ CHIP_ERROR MatterOperationalStateMapping::GetOperationalPhaseAtIndex(
                                              phase);
 }
 
+bool MatterOperationalStateMapping::is_idle() const {
+  if (this->idle_states_.empty())
+    return true;
+  int state = this->current_state_.load();
+  for (uint8_t idle : this->idle_states_) {
+    if (idle == state)
+      return true;
+  }
+  return false;
+}
+
+bool endpoint_is_idle(uint16_t endpoint_id) {
+  for (auto *mapping : opstate_mappings()) {
+    if (mapping->endpoint_id() == endpoint_id)
+      return mapping->is_idle();
+  }
+  return true;
+}
+
 void MatterOperationalStateMapping::run_command_(
     MatterOperationalCommand command, opstate_ns::GenericOperationalError &err,
     uint8_t default_error) {
-  const auto &triggers = this->triggers_[static_cast<size_t>(command)];
+  const size_t index = static_cast<size_t>(command);
+  // Declarative rule, decided here without waiting for the main loop.
+  const auto &allowed = this->allowed_states_[index];
+  if (!allowed.empty()) {
+    int state = this->current_state_.load();
+    bool ok = false;
+    for (uint8_t value : allowed)
+      ok = ok || value == state;
+    if (!ok) {
+      err.Set(chip::to_underlying(opstate_ns::ErrorStateEnum::kCommandInvalidInState),
+              chip::MakeOptional(chip::CharSpan::fromCharString("Not allowed in the current state")));
+      return;
+    }
+  }
+  const auto &triggers = this->triggers_[index];
   if (triggers.empty()) {
     err.Set(default_error);
+    return;
+  }
+  if (!this->decide_in_automation_) {
+    // Default: accept and run the automations asynchronously.
+    defer_to_main_loop(global_matter_component, [&triggers]() {
+      for (auto *trigger : triggers)
+        trigger->trigger();
+    });
     return;
   }
   MatterCommandOutcome outcome;
@@ -151,12 +193,18 @@ void MatterOperationalStateMapping::run_command_(
         for (auto *trigger : triggers)
           trigger->trigger();
       },
-      outcome);
+      outcome, this->decide_timeout_ms_,
+      [](const MatterCommandOutcome &late) {
+        // The state follows the state source; the controller was told the command failed.
+        ESP_LOGW(TAG, "Command finished late%s; the state source decides the state",
+                 late.rejected ? " and was rejected" : "");
+      });
   if (!answered) {
-    err.Set(default_error, chip::MakeOptional(chip::CharSpan::fromCharString("Timed out")));
+    err.Set(default_error,
+            chip::MakeOptional(chip::CharSpan::fromCharString("Timed out")));
   } else if (outcome.rejected) {
     err.Set(outcome.status,
-            outcome.text.empty() ? chip::NullOptional
+            outcome.text.empty() ? chip::MakeOptional(chip::CharSpan::fromCharString("Rejected"))
                                  : chip::MakeOptional(span_of(outcome.text)),
             outcome.details.empty() ? chip::NullOptional
                                     : chip::MakeOptional(span_of(outcome.details)));
@@ -210,8 +258,9 @@ void MatterOperationalStateMapping::initialize() {
 #ifdef USE_SENSOR
   if (this->countdown_sensor_ != nullptr) {
     auto update = [this](float value) {
+      // CountdownTime is at most 259200 s (3 days).
       int64_t seconds = std::isfinite(value) && value >= 0
-                            ? static_cast<int64_t>(std::lround(value))
+                            ? std::min<int64_t>(static_cast<int64_t>(std::lround(value)), 259200)
                             : -1;
       if (seconds == this->countdown_.exchange(seconds))
         return;
@@ -302,6 +351,7 @@ void MatterOperationalStateMapping::set_state(const std::string &state_name) {
              static_cast<unsigned>(this->cluster_id_));
     return;
   }
+  this->current_state_.store(id);
   run_on_matter_thread([this, id]() {
     auto *instance = this->instance_();
     if (instance == nullptr) {
@@ -357,9 +407,19 @@ void MatterOperationalStateMapping::set_phase(const std::string &phase_name) {
 void MatterOperationalStateMapping::raise_error(uint8_t error_id,
                                                 const std::string &label,
                                                 const std::string &details) {
+  this->current_state_.store(
+      chip::to_underlying(opstate_ns::OperationalStateEnum::kError));
   run_on_matter_thread([this, error_id, label, details]() {
     auto *instance = this->instance_();
     if (instance == nullptr)
+      return;
+    // Already in this error (a state source reported "error" first, or this action ran twice): the
+    // OperationalError event was sent for it, do not send a duplicate.
+    opstate_ns::GenericOperationalError current(0);
+    instance->GetCurrentOperationalError(current);
+    if (instance->GetCurrentOperationalState() ==
+            chip::to_underlying(opstate_ns::OperationalStateEnum::kError) &&
+        current.errorStateID == error_id)
       return;
     opstate_ns::Structs::ErrorStateStruct::Type error;
     error.errorStateID = error_id;
@@ -491,8 +551,15 @@ DelegateAttach attach_operational_state_delegate(esp_matter::endpoint_t *endpoin
                    COMMAND_FLAG_GENERATED) == nullptr)
     cluster::operational_state::command::create_operational_command_response(cluster);
 
-  // Events: OperationalError (mandatory) and OperationCompletion (mandatory) for both clusters. The plain Operational
-  // State creator already makes OperationalError.
+  // CountdownTime is optional; the SDK serves it from the delegate once the attribute exists.
+  if (mapping->has_countdown() &&
+      attribute::get(cluster, opstate_ns::Attributes::CountdownTime::Id) == nullptr)
+    cluster::operational_state::attribute::create_countdown_time(
+        cluster, nullable<uint32_t>());
+
+  // Events: OperationalError is mandatory, OperationCompletion is optional in the XML but required by the washer,
+  // dishwasher and RVC device types, so both are created. The plain Operational State creator already makes
+  // OperationalError.
   if (event::get(cluster, opstate_ns::Events::OperationalError::Id) == nullptr)
     cluster::operational_state::event::create_operational_error(cluster);
   if (event::get(cluster, opstate_ns::Events::OperationCompletion::Id) == nullptr)
@@ -502,6 +569,14 @@ DelegateAttach attach_operational_state_delegate(esp_matter::endpoint_t *endpoin
       cluster_id == RVC_OPERATIONAL_STATE_ID
           ? esp_matter::cluster::delegate_cb::RvcOperationalStateDelegateInitCB
           : esp_matter::cluster::delegate_cb::OperationalStateDelegateInitCB;
+  // On a microwave oven the Microwave Oven Control cluster creates (and Init()s) the operational state instance itself
+  // once it has a delegate; only hand over the delegate pointer then, to avoid a second Init().
+  if (cluster_id == OPERATIONAL_STATE_ID) {
+    esp_matter::cluster_t *control = esp_matter::cluster::get(endpoint, 0x005F);
+    if (control != nullptr &&
+        esp_matter::cluster::get_delegate_impl(control) != nullptr)
+      init_callback = nullptr;
+  }
   if (cluster::set_delegate_and_init_callback(cluster, init_callback,
                                               mapping->esp_matter_delegate()) != ESP_OK)
     return DelegateAttach::FAILED;

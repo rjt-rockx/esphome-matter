@@ -43,6 +43,8 @@
   automation_id_11->add_action(matter_matteroperationalstatecompletedaction_id);
   automation_id_11->add_action(matter_mattermodesetaction_id);
   matter_mattermodemapping_id->set_select(vacuum_run_mode);
+  matter_mattermodemapping_id->set_decision(true, 250);
+  matter_mattermodemapping_id->set_accept_when_idle(false);
   new(matter_matterchangetomodetrigger_id) matter::MatterChangeToModeTrigger();
   matter_mattermodemapping_id->add_change_trigger(matter_matterchangetomodetrigger_id);
   new(automation_id) Automation<uint8_t>(matter_matterchangetomodetrigger_id);
@@ -61,6 +63,8 @@
   matter_mattermodemapping_id_2->add_tag(2, 0, false);
   matter_mattermodemapping_id_2->add_mode("Vacuum then mop", 5, "Vacuum then mop");
   matter_mattermodemapping_id_2->add_tag(16387, 0, false);
+  matter_mattermodemapping_id_2->set_decision(false, 250);
+  matter_mattermodemapping_id_2->set_accept_when_idle(false);
   new(matter_matterchangetomodetrigger_id_2) matter::MatterChangeToModeTrigger();
   matter_mattermodemapping_id_2->add_change_trigger(matter_matterchangetomodetrigger_id_2);
   new(automation_id_2) Automation<uint8_t>(matter_matterchangetomodetrigger_id_2);
@@ -101,6 +105,10 @@
   matter_matteroperationalstatemapping_id->add_error_name("navigation_sensor_obscured", 78);
   matter_matteroperationalstatemapping_id->add_phase("Cleaning");
   matter_matteroperationalstatemapping_id->add_phase("Returning");
+  matter_matteroperationalstatemapping_id->set_decision(true, 300);
+  matter_matteroperationalstatemapping_id->add_idle_state(0);
+  matter_matteroperationalstatemapping_id->add_idle_state(66);
+  matter_matteroperationalstatemapping_id->add_idle_state(65);
   matter_matteroperationalstatemapping_id->set_state_select(vacuum_state);
   matter_matteroperationalstatemapping_id->set_phase_text_sensor(vacuum_phase);
   matter_matteroperationalstatemapping_id->set_countdown_sensor(vacuum_eta);
@@ -145,6 +153,8 @@
   matter_mattermodemapping_id_3->add_tag(16386, 0, false);
   matter_mattermodemapping_id_3->add_tag(7, 0, false);
   matter_mattermodemapping_id_3->set_select(washer_program);
+  matter_mattermodemapping_id_3->set_decision(false, 250);
+  matter_mattermodemapping_id_3->set_accept_when_idle(true);
   new(matter_matterlaundrycontrolsmapping_id) matter::MatterLaundryControlsMapping(2);
   matter_mattercomponent_id->register_mapping(matter_matterlaundrycontrolsmapping_id);
   matter_matterlaundrycontrolsmapping_id->add_spin_speed("Off");
@@ -178,6 +188,12 @@
   matter_matteroperationalstatemapping_id_2->add_phase("Wash");
   matter_matteroperationalstatemapping_id_2->add_phase("Rinse");
   matter_matteroperationalstatemapping_id_2->add_phase("Spin");
+  matter_matteroperationalstatemapping_id_2->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::START, 0);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 1);
+  matter_matteroperationalstatemapping_id_2->add_allowed_state(matter::MatterOperationalCommand::STOP, 2);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(0);
+  matter_matteroperationalstatemapping_id_2->add_idle_state(2);
   matter_matteroperationalstatemapping_id_2->set_state_select(washer_state);
   matter_matteroperationalstatemapping_id_2->set_countdown_sensor(washer_remaining);
   new(matter_matteroperationalcommandtrigger_id_6) matter::MatterOperationalCommandTrigger();
@@ -242,6 +258,8 @@
   matter_mattermodemapping_id_4->add_mode("Timed", 2, "Timed");
   matter_mattermodemapping_id_4->add_tag(16386, 0, false);
   matter_mattermodemapping_id_4->add_tag(5, 0, false);
+  matter_mattermodemapping_id_4->set_decision(false, 250);
+  matter_mattermodemapping_id_4->set_accept_when_idle(false);
   matter_mattercomponent_id->register_endpoint_parent(4, 0);
   matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::water_heater::config_t device_config_0{};
@@ -261,6 +279,8 @@
   matter_mattermodemapping_id_5->add_mode("Light", 2, "Light");
   matter_mattermodemapping_id_5->add_tag(16386, 0, false);
   matter_mattermodemapping_id_5->add_tag(1, 0, false);
+  matter_mattermodemapping_id_5->set_decision(false, 250);
+  matter_mattermodemapping_id_5->set_accept_when_idle(false);
   new(matter_matteroperationalstatemapping_id_3) matter::MatterOperationalStateMapping(5, 96);
   matter_mattercomponent_id->register_mapping(matter_matteroperationalstatemapping_id_3);
   matter_matteroperationalstatemapping_id_3->add_state(0, "");
@@ -275,6 +295,8 @@
   matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_start_or_resume", 1);
   matter_matteroperationalstatemapping_id_3->add_error_name("unable_to_complete_operation", 2);
   matter_matteroperationalstatemapping_id_3->add_error_name("command_invalid_in_state", 3);
+  matter_matteroperationalstatemapping_id_3->set_decision(false, 250);
+  matter_matteroperationalstatemapping_id_3->add_idle_state(0);
   matter_matteroperationalstatemapping_id_3->set_state_select(dishwasher_state);
   matter_mattercomponent_id->register_endpoint_parent(5, 0);
   matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
@@ -298,6 +320,8 @@
   matter_mattermodemapping_id_6->add_tag(16384, 0, false);
   matter_mattermodemapping_id_6->add_mode("Rapid freeze", 2, "Rapid freeze");
   matter_mattermodemapping_id_6->add_tag(16385, 0, false);
+  matter_mattermodemapping_id_6->set_decision(false, 250);
+  matter_mattermodemapping_id_6->set_accept_when_idle(false);
   matter_mattercomponent_id->register_endpoint_parent(6, 0);
   matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
     esp_matter::endpoint::refrigerator::config_t device_config_0{};

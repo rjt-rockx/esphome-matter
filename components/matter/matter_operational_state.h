@@ -39,11 +39,11 @@ class MatterOperationalCommandTrigger : public Trigger<> {};
 
 // Delegate of the Operational State (0x0060) and RVC Operational State (0x0061) clusters.
 //
-// Matter -> ESPHome: Pause/Resume/Start/Stop/GoHome run on the CHIP task. Each runs its trigger on the main loop and
-// answers with OperationalCommandResponse; `matter.operational_state.reject` in the trigger turns the response into an
-// error (default is NoError). Commands without a trigger are not created in the data model at all.
-//
-// ESPHome -> Matter: the bound select/text sensor (or `matter.operational_state.set`) updates OperationalState and
+// Matter -> ESPHome: Pause/Resume/Start/Stop/GoHome run on the CHIP task. By default the CHIP task decides at once
+// (NoError, or CommandInvalidInState from `allowed_states`) and the trigger runs asynchronously on the main loop. With
+// `decide_in_automation` the trigger runs first and `matter.operational_state.reject` turns the response into an error.
+// Commands without a trigger are not created in the data model at all.
+// ESPHome -> Matter: the bound select/text sensor (or `matter.operational_state.set`; one way, there is no write back to the select) updates OperationalState and
 // CurrentPhase through the OperationalState::Instance; the countdown sensor feeds CountdownTime. Errors and operation
 // completion are events raised by `matter.operational_state.error` / `.completed`.
 class MatterOperationalStateMapping
@@ -82,6 +82,28 @@ public:
     this->countdown_sensor_ = sensor;
   }
 #endif
+
+  // Declarative rules decided on the CHIP task: a command is refused with CommandInvalidInState unless the current
+  // operational state is in its `allowed_states` (no entries: always allowed). `idle_states` feed
+  // `accept: when_idle` of the mode clusters on the same endpoint.
+  void add_allowed_state(MatterOperationalCommand command, uint8_t state_id) {
+    this->allowed_states_[static_cast<size_t>(command)].push_back(state_id);
+  }
+  void add_idle_state(uint8_t state_id) { this->idle_states_.push_back(state_id); }
+  bool is_idle() const;
+  // decide_in_automation: the CHIP task waits up to `timeout_ms` for the command's automation and honours
+  // matter.operational_state.reject. Default: accept at once, run the automation asynchronously.
+  void set_decision(bool decide_in_automation, uint32_t timeout_ms) {
+    this->decide_in_automation_ = decide_in_automation;
+    this->decide_timeout_ms_ = timeout_ms;
+  }
+  bool has_countdown() const {
+#ifdef USE_SENSOR
+    return this->countdown_sensor_ != nullptr;
+#else
+    return false;
+#endif
+  }
 
   bool has_command(MatterOperationalCommand command) const {
     return !this->triggers_[static_cast<size_t>(command)].empty();
@@ -151,6 +173,12 @@ protected:
   std::vector<NameEntry> error_names_;
   std::vector<std::string> phases_;
   std::vector<MatterOperationalCommandTrigger *> triggers_[5];
+  std::vector<uint8_t> allowed_states_[5];
+  std::vector<uint8_t> idle_states_;
+  bool decide_in_automation_{false};
+  uint32_t decide_timeout_ms_{MATTER_DELEGATE_TIMEOUT_MS};
+  // Operational state as set through this mapping (main loop writes, CHIP task reads).
+  std::atomic<int> current_state_{0};
 #ifdef USE_SELECT
   select::Select *state_select_{nullptr};
   select::Select *phase_select_{nullptr};
