@@ -226,8 +226,11 @@ class Matter:
         if self.proc:
             return
         self._stderr = open(ARTIFACTS / "harness.log", "wb")
+        env = dict(os.environ, HARNESS_OPERATIONAL_IP="127.0.0.1", HARNESS_OPERATIONAL_PORT=str(MATTER_PORT))
+        verbose = os.environ.get("RUNTIME_HARNESS_VERBOSE", "info" if os.environ.get("CI") else "")
         self.proc = subprocess.Popen(
-            self._cli("serve", "--node", str(self.node_id)),
+            self._cli("serve", "--node", str(self.node_id), *(["--verbose", verbose] if verbose else []), "--operational-port", str(MATTER_PORT)),
+            env=env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=self._stderr,
@@ -241,6 +244,7 @@ class Matter:
                 raise MatterError("harness serve did not become ready")
 
     _ready = False
+    _warm = False
 
     def _read_loop(self) -> None:
         assert self.proc and self.proc.stdout
@@ -284,6 +288,10 @@ class Matter:
     # -- requests ----------------------------------------------------------------------------------------------
     def request(self, op: str, timeout: float = 90, **fields: Any) -> Any:
         assert self.proc and self.proc.stdin, "call start() first"
+        if not self._warm and op != "ping":
+            # The first operation sets up the CASE session, which can take minutes on a slow runner.
+            timeout = max(timeout, float(os.environ.get("RUNTIME_FIRST_REQUEST_TIMEOUT", "300")))
+            self._warm = True
         with self._cond:
             rid = self._next_id
             self._next_id += 1
