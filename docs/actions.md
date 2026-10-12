@@ -46,22 +46,22 @@ Light levels are divided into 254 steps and a percentage value is rounded to the
 
 Some fields have a distinct set of accepted values. For example the `step_mode` of the `level_control.step` can be 0 or 1 meaning `up` or `down`. In the commands below, the supported string values are shown in the comment behind the field name. These strings are automatically converted to the correct integer value.
 
-So for example the following two commands are equivalent:
+So for example the following two actions are equivalent:
 
 ```yaml
-matter.send_command:
-  path: some_endpoint.level_control.step
-  arguments:
-    step_mode: down
-    step_size: 50%
-    transition_time: 1.5s
+- matter.send_command:
+    path: some_endpoint.level_control.step
+    arguments:
+      step_mode: down
+      step_size: 50%
+      transition_time: 1.5s
 
-matter.send_command:
-  path: some_endpoint.level_control.step
-  arguments:
-    step_mode: 1
-    step_size: 127
-    transition_time: 15
+- matter.send_command:
+    path: some_endpoint.level_control.step
+    arguments:
+      step_mode: 1
+      step_size: 127
+      transition_time: 15
 ```
 
 ### enums
@@ -122,9 +122,18 @@ matter:
 
 The value is a raw matter value, usually some kind of integer. More complicated values such as structs aren't supported yet, but support for that is planned. Converter functions to more conveniently map Matter values to esphome values are also a planned feature.
 
+# Other actions
+
+- `matter.send_event` emits a Matter event from a local cluster (`path: endpoint.cluster.event`, or `endpoint`/`cluster`/`event`, plus `fields`). For switch events see [generic-switch.md](generic-switch.md), which has the dedicated `matter.send_switch_event`. The available events are listed in [generated/events](generated/events.md).
+- `matter.factory_reset` wipes the fabrics and reopens commissioning. See [troubleshooting.md](troubleshooting.md).
+- `matter.open_commissioning_window` and `matter.reset_identity` are described in [commissioning.md](commissioning.md).
+- `matter._send_command` is an unstable escape hatch for commands that the data model does not know about (`endpoint_id`, `cluster_id`, `command_id` and a raw esp-matter JSON `data` string). The older per-command actions named `matter.<cluster>.<command>` still exist but are deprecated and log a warning; use `matter.send_command` instead.
+
 # Cluster commands
 
-For an extensive list of commands, see [generated/commands](generated/commands.md)
+For an extensive list of commands, see [generated/commands](generated/commands.md).
+
+The examples below are templates: they show every command, its arguments and the accepted enum names, and empty values (`level: # %`) must be filled in. Each `matter.send_command` shown stands alone; in a real config put each one in its own list item (`- matter.send_command: ...`) inside a `then:` or `on_...:` block.
 
 ### Identify cluster
 
@@ -151,7 +160,7 @@ OnOff commands are used for simple binary devices such as lights, plugs and rela
 
 ```yaml
 # Turn off, turn on, or toggle a bound device. These have no arguments so the shorthand notation is possible.
-matter.send_command: some_endpoint.on_off.on
+matter.send_command: some_endpoint.on_off.off
 matter.send_command: some_endpoint.on_off.on
 matter.send_command: some_endpoint.on_off.toggle
 

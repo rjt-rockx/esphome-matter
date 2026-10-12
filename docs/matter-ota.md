@@ -22,6 +22,7 @@ matter:
       - logger.log:          #         download_failed, download_aborted, apply_in_progress,
           format: "Matter OTA: %s"   #  apply_complete, apply_failed
           args: ['state.c_str()']
+    # In the triggers below `[ ... ]` stands for your list of actions.
     on_download_started: [ ... ]
     on_download_complete: [ ... ]
     on_download_failed: [ ... ]    # failed or aborted

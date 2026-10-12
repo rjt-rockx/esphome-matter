@@ -116,7 +116,7 @@ matter:
     30:
       electrical_sensor:
         topology: set
-        available_endpoints: [11, 12]
+        available_endpoints: [10, 11]
         active_endpoints: [11]
         active_power: set_power
 ```

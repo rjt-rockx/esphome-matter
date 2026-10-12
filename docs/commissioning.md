@@ -40,7 +40,7 @@ text_sensor:
         name: "Matter fabric 1 vendor ID"
 ```
 
-Both accept the standard [text sensor options](https://esphome.io/components/text_sensor/)
+Each of these accepts the standard [text sensor options](https://esphome.io/components/text_sensor/)
 and default to the diagnostic entity category. Values remain available when
 Home Assistant reconnects. A code value does not indicate whether the
 commissioning window is open; see [Persistence](#persistence) below.

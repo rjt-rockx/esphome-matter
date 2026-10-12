@@ -130,4 +130,4 @@ Controller support for these clusters differs and has not been verified for ever
 
 * `soil_sensor` exposes the Soil Measurement cluster (`soil_moisture`, a sensor in `%`, reported in 1 % steps). The measurement limits are fixed to 0 to 100 %. This mapping is untested on real hardware.
 * Periodic energy, harmonics, power quality and the cumulative energy reset are not supported.
-* The `BatVoltage`, `BatTimeRemaining` and charging attributes of the Power Source cluster are not supported.
+* `BatTimeRemaining`, `BatPresent`, `BatCapacity` and `BatChargingCurrent` of the Power Source cluster are not supported. `BatVoltage`, the charging state and the replacement attributes are, see [power.md](power.md#battery-options).

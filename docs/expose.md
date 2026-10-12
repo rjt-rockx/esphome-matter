@@ -112,9 +112,10 @@ that are not attached share one standalone endpoint `group:electrical`. A second
 group already has (two power sensors) gets an endpoint of its own instead of an error. To force a standalone
 endpoint use `as: electrical_sensor`, and `options: {current_type: dc}` for DC.
 
-TODO (wave-power owns Power Topology): every `electrical_sensor` endpoint is created with NodeTopology, so
-several metered endpoints on one node each advertise it. Revisit when wave-power decides how a node with
-several meters declares its topology.
+Every `electrical_sensor` endpoint that `expose` creates uses the default `topology: node`, so several metered
+endpoints on one node each advertise NodeTopology (a build warning). `expose` has no `topology` key; for tree or
+set topologies write the `electrical_sensor` by hand under `endpoints:` or add it with `options:`
+(`options: {topology: tree}`), see [power.md](power.md#power-topology).
 
 ### Battery
 
@@ -122,7 +123,7 @@ A battery sensor puts a Power Source on an application endpoint (`battery:` of t
 devices. It goes to the endpoint named with `attach_to:`, or to the one it is related to by id or name
 (same rules as meters, without the number rule and the lone-candidate shortcut). Otherwise it gets its own
 `power_source` endpoint. An endpoint that already has a battery is not a candidate: a second battery gets its
-own endpoint. (Power Source on endpoint 0 is not available yet.)
+own endpoint. (`expose` never puts a Power Source on the root node; write `0: {battery: ...}` under `endpoints:` for that, see [power.md](power.md).)
 
 A Smoke CO Alarm without any Power Source in the plan logs a warning that suggests exposing the battery with
 `attach_to:`. The esp-matter device type does not require one; whether the Matter device library text does

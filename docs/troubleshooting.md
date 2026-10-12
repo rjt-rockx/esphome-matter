@@ -28,7 +28,7 @@ Matter discovers devices with mDNS/DNS-SD and talks to them over IPv6 (the Matte
 - **Firewall.** Allow UDP 5540 (Matter) between controllers and the device, and mDNS (UDP 5353).
 - **Home Assistant in a container or VM.** The Matter server needs host networking (or equivalent mDNS and IPv6 access to the LAN), otherwise commissioning "existing device" fails to find the node.
 - **Test with a tool.** `avahi-browse -r _matter._tcp` and `avahi-browse -r _matterc._udp` (or `mdns-scanner`) from a machine on the same network will show whether the device advertises. `_matterc._udp` appears for an uncommissioned device; `_matter._tcp` for a commissioned one.
-- **Ethernet.** Matter over Ethernet is not supported yet.
+- **Ethernet.** Matter over Ethernet is experimental and not validated on hardware here, see [ethernet.md](ethernet.md).
 - **ESPHome network components.** Thread and Wi-Fi coexistence is not implemented in ESPHome's OpenThread component.
 
 ## Slow reconnect after restart
@@ -68,7 +68,7 @@ Matter-over-Thread requires the `openthread` component, ESPHome 2026.6.0 or newe
 
 - **A Thread border router is required** for the controller to reach the device (for example the Home Assistant OpenThread Border Router app with a Connect ZBT-1/ZBT-2, an Apple HomePod mini/Apple TV, a Google Nest hub, or an Espressif ZeroCode). The device must be on the same Thread network as the border router: set the same dataset in `openthread:` (`tlv:`).
 - **Thread is not Matter.** ESPHome's own Thread support alone uses the ESPHome native protocol over Thread. You need the `matter:` block (and a Matter controller) for Matter over Thread. A board that "joins my Thread mesh" with only `openthread:` is not proof that Matter works.
-- **Border router and fabrics.** Apple border routers can block mDNS traffic needed for Thread OTA; this does not matter for esphome-matter because OTA is done over ESPHome.
+- **Border router and fabrics.** Apple border routers can block mDNS traffic needed for Thread OTA; this does not matter if you update through ESPHome OTA, but it does for controller-driven [Matter OTA](matter-ota.md).
 - **Known issue.** Because ESPHome initializes the OpenThread stack, the Matter network name can show up wrong (garbage) in some controllers. The real fix needs support in connectedhomeip for an externally managed OpenThread stack.
 - **Debugging.** See [dev/thread-debugging.md](dev/thread-debugging.md) for `ot-ctl` and mDNS commands.
 - **Sleepy end devices.** Not supported in ESPHome's OpenThread component at the time of writing. Do not assume battery-friendly Thread behaviour.
@@ -82,9 +82,9 @@ Matter-over-Thread requires the `openthread` component, ESPHome 2026.6.0 or newe
 
 ## Other known issues
 
-- **BLE commissioning is currently broken**, and `esp32_ble*` components cannot be used in the same YAML.
+- **BLE commissioning** (a build without `wifi`/`openthread`/`ethernet`) is implemented but not verified on hardware, and `esp32_ble*` components cannot be used in the same YAML. See [ble-commissioning.md](ble-commissioning.md).
 - **Config schema may still change** and break existing configurations between versions.
-- **Device shows `TEST_VERSION` / test vendor** in your app: set `vendor_name`, `product_name`, `hardware_version_string` in `matter:`.
+- **Device shows `TEST_VERSION` / test vendor** in your app: set `vendor_name`, `product_name`, `hardware_version_string` in `matter:` (see [device-info.md](device-info.md)).
 - **Controller shows the wrong unit** for an air-quality or pressure sensor: see [device-types.md](device-types.md#sensors).
 
 ## Reporting a problem

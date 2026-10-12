@@ -17,7 +17,7 @@ python -m tools.conformance layout.json
 ```
 
 Options: `--strict` (warnings fail too), `-v` (show info findings), `--no-compat`
-(skip Home Assistant / Apple hints), `--no-baseline` (known SDK gaps count as errors),
+(skip Home Assistant / Apple hints), `--baseline FILE` (use another known-gaps file), `--no-baseline` (known SDK gaps count as errors),
 `--spec-version 1.4|1.4.2|1.5|1.5.1|1.6`, `--spec-dir DIR`, `--keep-layout FILE`,
 `--emit-dump FILE`. Exit status is 1 when any error was found.
 
@@ -215,7 +215,7 @@ for this; older layouts lack them and are compared without composition.
 
 ## CI
 
-The `conformance` job in `.github/workflows/ci.yml` (blocking) is:
+The `conformance` job in `.github/workflows/ci.yml` (blocking) is, abridged (this is a GitHub Actions workflow, not an ESPHome config; action versions in the file are newer):
 
 ```yaml
   conformance:
