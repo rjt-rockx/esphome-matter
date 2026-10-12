@@ -1,0 +1,87 @@
+esphome:
+  name: matter-ci-identify
+  friendly_name: Identify Test
+  project:
+    name: example.matter-identify
+    version: "1.2.3"
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  node_label: Identify Test Node
+  serial_number: "SN-0001"
+  software_version_string: "1.2.3"
+  hardware_version_string: "rev-b"
+  unique_id: "identify-test-0001"
+  max_fabrics: 8
+  on_identify:
+    # Any endpoint
+    - then:
+        - logger.log:
+            format: "identify ep=%u active=%d time=%us effect=%u"
+            args: [endpoint_id, active, identify_time, effect]
+    # One endpoint only
+    - endpoint: 1
+      then:
+        - if:
+            condition:
+              lambda: "return active;"
+            then:
+              - light.turn_on:
+                  id: status_led
+                  effect: Identify
+            else:
+              - light.turn_off: status_led
+  endpoints:
+    1:
+      on_off_plug_in_unit:
+        switch_id: relay
+
+switch:
+  - platform: template
+    id: relay
+    name: Relay
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+output:
+  - platform: template
+    id: led_out
+    type: binary
+    write_action:
+      - logger.log: "led"
+
+light:
+  - platform: binary
+    id: status_led
+    name: Status LED
+    output: led_out
+    internal: true
+    effects:
+      - strobe:
+          name: Identify
+          colors:
+            - state: true
+              duration: 250ms
+            - state: false
+              duration: 250ms

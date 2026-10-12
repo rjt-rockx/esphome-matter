@@ -26,6 +26,11 @@ from .binary_sensors import check_binary_sensors
 from .const import *
 from .data_model.device_types import DEVICE_TYPES_BY_CONF_KEY
 from .covers import validate_cover_bindings
+from .device_info import (
+    DEVICE_INFO_SCHEMA,
+    setup_device_info,
+    setup_identify_triggers,
+)
 from .endpoints import (
     ENDPOINT_SCHEMA,
     light_restore_warning,
@@ -156,7 +161,9 @@ CONFIG_SCHEMA = cv.All(
                 }
             ),
         }
-    ).extend(cv.COMPONENT_SCHEMA),
+    )
+    .extend(DEVICE_INFO_SCHEMA)  # node_label, serial_number, on_identify, ...
+    .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
     cv.only_with_framework(Framework.ESP_IDF),
     _require_vfs_select,  # TODO: Only needed when openthread is enabled
@@ -252,6 +259,8 @@ async def to_code(config: ConfigType):
     if CONF_PASSCODE in config:
         cg.add_define("MATTER_PASSCODE", config[CONF_PASSCODE])
     _configure_basic_information(config)
+    await setup_device_info(var, config)
+    await setup_identify_triggers(var, config)
 
     use_openthread = "openthread" in CORE.loaded_integrations
     use_wifi = "wifi" in CORE.loaded_integrations

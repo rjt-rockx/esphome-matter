@@ -8,6 +8,7 @@
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"
 #include "matter_component.h"
+#include "matter_identify.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -313,8 +314,9 @@ void MatterComponent::setup() {
   }
 
   esp_matter::node::config_t node_config;
+  device_info_fill_root_config(this->device_info_, node_config);
   esp_matter::node_t *node = esp_matter::node::create(
-      &node_config, endpoint_attribute_update_cb, nullptr);
+      &node_config, endpoint_attribute_update_cb, matter_identification_cb);
   if (node == nullptr) {
     ESP_LOGE(TAG, "Failed to create Matter node");
     this->mark_failed();
@@ -340,6 +342,7 @@ void MatterComponent::setup() {
 #endif // USE_OPENTHREAD
 
   /* Matter start */
+  device_info_install_provider(this->device_info_);
   esp_err_t err = esp_matter::start(event_callback);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to start Matter: %s", esp_err_to_name(err));
@@ -349,6 +352,7 @@ void MatterComponent::setup() {
     ESP_LOGD(TAG, "Matter started successfully");
   }
 
+  device_info_apply_post_start(this->device_info_);
   esp_matter::client::binding_manager_init();
   replay_attribute_triggers(this);
   this->initialize_endpoint_mappings_();
@@ -373,6 +377,7 @@ void MatterComponent::dump_config() {
     ESP_LOGE(TAG, "  Failed to initialize!");
     return;
   }
+  device_info_dump_config(this->device_info_);
 
   chip::SetupPayload payload;
   payload.version = 0;

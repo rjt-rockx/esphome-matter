@@ -8,6 +8,7 @@
 #include "matter_attributes.h"
 #include "matter_cover.h"
 #include "matter_climate.h"
+#include "matter_device_info.h"
 #include "matter_endpoints.h"
 #include "matter_fan.h"
 #include "matter_lights.h"
@@ -34,6 +35,9 @@ public:
   }
 
   void factory_reset();
+
+  // Basic Information overrides (node label, serial number, ...)
+  DeviceInfoConfig &get_device_info() { return this->device_info_; }
 
   // Register Matter endpoints
   void register_endpoint(uint16_t endpoint_id, MatterEndpointBuildFn build_fn);
@@ -112,6 +116,7 @@ private:
   bool create_endpoints_(esp_matter::node_t *node);
   void initialize_endpoint_mappings_();
 
+  DeviceInfoConfig device_info_;
   uint16_t discriminator_{0};
   uint32_t passcode_{0};
 

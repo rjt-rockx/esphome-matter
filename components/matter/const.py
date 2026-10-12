@@ -10,6 +10,16 @@ CONF_PRODUCT_ID = "product_id"
 CONF_PRODUCT_NAME = "product_name"
 CONF_VENDOR_ID = "vendor_id"
 CONF_VENDOR_NAME = "vendor_name"
+CONF_NODE_LABEL = "node_label"
+CONF_SERIAL_NUMBER = "serial_number"
+CONF_SOFTWARE_VERSION_STRING = "software_version_string"
+CONF_UNIQUE_ID = "unique_id"
+
+# Fabric limit (CONFIG_MAX_FABRICS)
+CONF_MAX_FABRICS = "max_fabrics"
+
+# Identify cluster automation
+CONF_ON_IDENTIFY = "on_identify"
 
 # Endpoint config options. The device type names are all derived from
 # device_types.json and don't have a CONF key configured here.
