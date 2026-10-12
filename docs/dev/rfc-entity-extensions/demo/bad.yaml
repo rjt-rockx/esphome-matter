@@ -1,0 +1,22 @@
+# Expected: errors on the entity path, together with the entity's own errors.
+esphome:
+  name: entity-ext-demo
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+matter_entity_demo:
+
+switch:
+  - platform: template
+    id: relay
+    name: Relay
+    optimistic: maybe                         # entity error
+    matter_entity_demo: {endpoint: 0, colour: red}   # two extension errors
