@@ -192,8 +192,6 @@ DEFAULT_SELF_TEST_DURATION = "5s"
 BSC_ALARM_VISUAL = 0x01
 BSC_ALARM_AUDIBLE = 0x02
 MIN_SENSITIVITY_LEVELS = 2
-# Features of the cluster that the component can create (FaultEvents is not available in esp-matter).
-_BSC_FEATURES = frozenset({"Visual", "Audible", "AlarmSuppress", "SensitivityLevel"})
 
 # ESPHome binary sensor attributes of the device types that carry the Boolean State Configuration cluster.
 _BSC_PRIMARY_KEYS = ("boolean_state", "occupancy")
@@ -402,6 +400,13 @@ def extend_schema(device_type, schema: dict) -> None:
         schema[cv.Optional(CONF_AIR_QUALITY)] = _air_quality_schema()
     if device_type.name == REFRIGERATOR:
         schema[cv.Optional(CONF_DOOR_OPEN)] = cv.use_id(binary_sensor.BinarySensor)
+
+
+def creates_cluster(cluster_name: str, device_config: dict) -> bool:
+    """True if options of the device type create the optional cluster on its own."""
+    return cluster_name == CLUSTER_NAME_BSC and bool(
+        CONF_ALARMS in device_config or CONF_SENSITIVITY in device_config
+    )
 
 
 def _add_features(config: dict, *features: str) -> dict:
@@ -640,8 +645,8 @@ async def register(endpoint, var, device_type, device_config: dict) -> None:
         await _register_hold_time(endpoint, var, device_config)
     if device_type.name == DEVICE_TYPE_SMOKE_CO_ALARM:
         await _register_smoke_co(endpoint, var, device_config)
-    if _has_server_cluster(device_type, CLUSTER_NAME_BSC) and _BSC_FEATURES & set(
-        device_config.get(CONF_WITH_FEATURES, ())
+    if _has_server_cluster(device_type, CLUSTER_NAME_BSC) and creates_cluster(
+        CLUSTER_NAME_BSC, device_config
     ):
         await _register_boolean_state_configuration(
             endpoint, var, device_type, device_config

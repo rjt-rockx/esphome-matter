@@ -226,10 +226,9 @@ matter:
   threshold is up to your automations: trigger on the number with `on_value`.
 * The sensor-fault attributes (SensorFault, FaultEvents) are not supported.
 
-`with_features: [Visual, Audible, AlarmSuppress, SensitivityLevel]` also creates the cluster (it used to fail with
-"does not contain the BooleanStateConfiguration cluster required by:"), advertising the alarms of the enabled features and
-two sensitivity levels. Without the `alarms`/`sensitivity` options there is no `on_active`, no sensitivity `number`, and the
-AlarmsActive attribute does not follow the sensor, so prefer the options. `FaultEvents` is not available in esp-matter.
+`with_features: [Visual, ...]` alone is rejected, because the leak detector does not require the cluster: use the
+`alarms`/`sensitivity` options, which create it. (`FaultEvents` and the SensorFault attribute are not available in
+esp-matter.)
 
 ## Smoke and CO alarm
 

@@ -269,12 +269,10 @@ class Endpoint:
                 feature = cluster.get_feature(feature_name)
                 if feature is not None:
                     enabled_codes.add(feature.code)
-                    # Selecting a feature of one of the device type's optional
-                    # server clusters (e.g. Boolean State Configuration on a leak
-                    # detector) creates that cluster.
-                    cluster_present |= any(
-                        device_cluster.name == cluster.name
-                        for device_cluster in device_type.server_clusters
+                    # The `alarms`/`sensitivity` options create the optional
+                    # Boolean State Configuration cluster (sensor_extras.py).
+                    cluster_present |= sensor_extras.creates_cluster(
+                        cluster.name, device_config
                     )
 
         # A mandatory feature can make another conditional feature mandatory, so

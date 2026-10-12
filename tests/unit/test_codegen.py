@@ -18,7 +18,7 @@ EXPECTED = {
     "esp32-fan": ["register_fan", "add_fan_features"],
     "esp32-cover": ["register_cover", "configure_window_covering"],
     "esp32-binary-sensors": ["register_binary_sensor_attribute", "MatterSmokeCoAlarmMapping"],
-    "esp32-sensor-extras": ["MatterOccupancyHoldTimeMapping", "MatterCabinetModeMapping"],
+    "esp32-sensor-extras": ["MatterOccupancyHoldTimeMapping", "MatterRefrigeratorAlarmMapping"],
     "esp32-all-endpoints": ["register_endpoint"],
     "esp32-ble-commissioning": ["register_endpoint"],
     "esp32-power-source": [

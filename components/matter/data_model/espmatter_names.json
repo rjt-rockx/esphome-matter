@@ -753,6 +753,7 @@
     },
     "OvenMode": {
       "namespace": null,
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedModes": null,
@@ -797,6 +798,7 @@
     },
     "RefrigeratorAndTemperatureControlledCabinetMode": {
       "namespace": "refrigerator_and_tcc_mode",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedModes": null,
@@ -889,6 +891,7 @@
     },
     "DishwasherMode": {
       "namespace": "dish_washer_mode",
+      "feature_flags": false,
       "features": {},
       "attributes": {
         "SupportedModes": null,

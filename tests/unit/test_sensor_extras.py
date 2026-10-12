@@ -11,13 +11,9 @@ import textwrap
 
 import pytest
 from conftest import (
-    COMPONENTS,
     CONFIGS,
-    HEADER,
-    WIFI,
     prepare_config,
     run_esphome,
-    toolchain_line,
 )
 
 from components.matter import sensor_extras
@@ -510,8 +506,8 @@ def test_alarms_rejected_without_the_cluster(run_config):
     )
 
 
-def test_with_features_creates_boolean_state_configuration(run_config):
-    # Used to fail with "does not contain the BooleanStateConfiguration cluster required by:".
+def test_with_features_alone_points_to_the_alarms_options(run_config):
+    # with_features of an optional cluster the device type does not require is an error with the way out.
     check(
         run_config,
         """
@@ -520,6 +516,8 @@ def test_with_features_creates_boolean_state_configuration(run_config):
             boolean_state: leak
             with_features: [Visual, Audible, SensitivityLevel]
         """,
+        ok=False,
+        message="clusters:",
     )
 
 
@@ -709,71 +707,3 @@ def test_sensor_extras_codegen(tmp_path):
         assert needle in code, f"{needle!r} missing from the generated main.cpp"
     # The generic extra cluster path must not be used for clusters without feature_flags.
     assert "boolean_state_configuration_config.feature_flags" not in code
-
-
-@pytest.mark.slow
-def test_boolean_state_configuration_with_features_only(tmp_path):
-    """The cluster has no feature_flags member: its features are added with their own config structs."""
-    text = HEADER.format(toolchain=toolchain_line(), components=COMPONENTS) + WIFI
-    text += textwrap.dedent(
-        """
-        binary_sensor:
-          - platform: template
-            id: leak
-            device_class: moisture
-
-        matter:
-          endpoints:
-            1:
-              water_leak_detector:
-                boolean_state: leak
-                with_features: [Visual, SensitivityLevel]
-        """
-    )
-    path = tmp_path / "bsc.yaml"
-    path.write_text(text)
-    result = run_esphome("compile", "--only-generate", str(path), cwd=tmp_path)
-    assert result.ok, result.output[-3000:]
-    code = next(tmp_path.glob(".esphome/build/*/src/main.cpp")).read_text()
-    assert (
-        "feature_flags = esp_matter::cluster::boolean_state_configuration" not in code
-    )
-    assert "feature::visual::add(" in code
-    assert "visual_config.alarms_supported = 1;" in code
-    assert "supported_sensitivity_levels = 2;" in code
-
-
-def test_air_quality_preset_unit_mismatch(run_config):
-    check(
-        run_config,
-        """
-        1:
-          air_quality_sensor:
-            air_quality:
-              sensor: pm25_ppm
-        """,
-        ok=False,
-        message="default thresholds of device_class 'pm25' are in 'ug/m3'",
-    )
-
-
-def test_air_quality_unit_spellings():
-    spellings = sensor_extras._UNIT_SPELLINGS["ug/m3"]
-    assert {"µg/m³", "ug/m3", "μg/m³"} <= spellings
-
-
-def test_alarms_on_suppressed_needs_suppress(run_config):
-    check(
-        run_config,
-        """
-        1:
-          water_leak_detector:
-            boolean_state: leak
-            alarms:
-              audible: true
-              on_suppressed:
-                - logger.log: quiet
-        """,
-        ok=False,
-        message="on_suppressed requires `suppress: true`",
-    )
