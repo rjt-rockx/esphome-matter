@@ -67,7 +67,7 @@ How each ESPHome domain maps to a Matter device type. Status: **Supported** (bou
 
 | ESPHome domain | Matter device type(s) | Status | Docs |
 |---|---|---|---|
-| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light | Supported (untested on hardware) | [lights.md](docs/lights.md) |
+| `light` | On/Off, Dimmable, Color Temperature, Extended Color Light, Dimmable Plug-In Unit, Mounted Dimmable Load Control (and the on/off plug-in unit and mounted control) | Supported (untested on hardware) | [lights.md](docs/lights.md) |
 | `sensor`: temperature, humidity, illuminance | Temperature, Humidity, Light Sensor | Supported | [device-types.md](docs/device-types.md#sensors) |
 | `sensor`: pressure, flow | Pressure, Flow Sensor | Partial (unit conversion implemented, untested on controllers) | [sensors.md](docs/sensors.md#units) |
 | `sensor`: CO, CO2, NO2, ozone, PM, VOC, formaldehyde, radon | Air Quality Sensor | Partial (MeasurementUnit follows the sensor unit, untested on controllers) | [sensors.md](docs/sensors.md#air-quality-concentration) |

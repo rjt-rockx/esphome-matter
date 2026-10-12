@@ -269,6 +269,7 @@ class Endpoint:
         return cluster_present, enabled_codes, disallowed_codes
 
     def resolve(self) -> None:
+        self._validate_light_options()
         usages_by_cluster = defaultdict(list)
         clusters_by_id = {}
         for cluster, usage in self.usages:
@@ -350,6 +351,30 @@ class Endpoint:
             cluster_config = self._cluster_configs[cluster.name]
             for code in inferred_codes:
                 cluster_config.enabled_features[cluster.get_feature(code).name] = True
+
+    def _validate_light_options(self) -> None:
+        for config_key, device_config in self._config.items():
+            device_type = DEVICE_TYPES_BY_CONF_KEY.get(config_key)
+            if device_type is None or not isinstance(device_config, dict):
+                continue
+            if light_binding.CONF_ON_OFF_TRANSITION_TIME not in device_config:
+                continue
+            present, enabled_codes, _ = self._cluster_state(
+                CLUSTERS_BY_NAME["LevelControl"]
+            )
+            if not present:
+                raise cv.Invalid(
+                    f"Matter endpoint {self._endpoint_id}: "
+                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the "
+                    f"LevelControl cluster, which {device_type.name} doesn't have. "
+                    "Add it with `clusters: level_control:`"
+                )
+            if "OO" not in enabled_codes:
+                raise cv.Invalid(
+                    f"Matter endpoint {self._endpoint_id}: "
+                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the OnOff "
+                    "feature of the LevelControl cluster"
+                )
 
     async def register(self, var):
         """Registers an endpoint using the register_endpoint function in matter_component.h.
@@ -573,22 +598,9 @@ class Endpoint:
         """
         level_cluster = CLUSTERS_BY_NAME["LevelControl"]
         present, enabled_codes, _ = self._cluster_state(level_cluster)
-        has_on_off = "OO" in enabled_codes
         if not present:
-            if light_binding.CONF_ON_OFF_TRANSITION_TIME in device_config:
-                raise cv.Invalid(
-                    f"Matter endpoint {self._endpoint_id}: "
-                    f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the "
-                    f"LevelControl cluster, which {device_type.name} doesn't have. "
-                    "Add it with `clusters: level_control:`"
-                )
             return
-        if light_binding.CONF_ON_OFF_TRANSITION_TIME in device_config and not has_on_off:
-            raise cv.Invalid(
-                f"Matter endpoint {self._endpoint_id}: "
-                f"{light_binding.CONF_ON_OFF_TRANSITION_TIME} needs the OnOff feature "
-                "of the LevelControl cluster"
-            )
+        has_on_off = "OO" in enabled_codes
         for name in light_binding.level_attribute_names(has_on_off):
             attribute = next(a for a in level_cluster.attributes if a.name == name)
             if (level_cluster, attribute) not in self._optional_attributes:
