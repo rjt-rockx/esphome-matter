@@ -176,6 +176,9 @@ jobs:
         run: .venv/bin/python -m pytest tests/unit -m "not slow"
       - name: pytest (slow, code generation)
         run: .venv/bin/python -m pytest tests/unit -m slow
+      - name: Golden codegen snapshots (dev only)
+        if: matrix.esphome-version == 'dev'
+        run: .venv/bin/python -m pytest -m slow tests/unit/test_snapshots.py
 
   # ---------------------------------------------------------------------------
   # Compile matrix (native ESP-IDF toolchain)

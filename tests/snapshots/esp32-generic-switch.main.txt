@@ -1,0 +1,99 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-generic-switch");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  new(matter_mattersendswitcheventaction_id) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id->set_endpoint_id(2);
+  matter_mattersendswitcheventaction_id->set_event(matter::MatterSwitchEvent::INITIAL_PRESS);
+  matter_mattersendswitcheventaction_id->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id->add_actions({matter_mattersendswitcheventaction_id});
+  new(matter_mattersendswitcheventaction_id_2) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id_2->set_endpoint_id(2);
+  matter_mattersendswitcheventaction_id_2->set_event(matter::MatterSwitchEvent::SHORT_RELEASE);
+  matter_mattersendswitcheventaction_id_2->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id_2->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_2->add_actions({matter_mattersendswitcheventaction_id_2});
+  new(matter_mattersendswitcheventaction_id_3) matter::MatterSendSwitchEventAction<>();
+  matter_mattersendswitcheventaction_id_3->set_endpoint_id(2);
+  matter_mattersendswitcheventaction_id_3->set_event(matter::MatterSwitchEvent::LONG_PRESS);
+  matter_mattersendswitcheventaction_id_3->set_position([]() -> uint8_t {
+      return 1;
+  });
+  matter_mattersendswitcheventaction_id_3->set_count([]() -> uint8_t {
+      return 1;
+  });
+  automation_id_3->add_actions({matter_mattersendswitcheventaction_id_3});
+  new(matter_generic_switch_mapping_1) matter::MatterGenericSwitchMapping(button, 1, 600, 350);
+  App.register_component_(matter_generic_switch_mapping_1, 10);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_1);
+  matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 3;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_multi_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint(2, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  new(matter_generic_switch_mapping_3) matter::MatterGenericSwitchMapping(toggle, 3, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_3, 10);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_3);
+  matter_mattercomponent_id->register_endpoint(3, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::latching_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint(4, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  new(matter_generic_switch_mapping_5) matter::MatterGenericSwitchMapping(action_button, 5, 500, 300);
+  App.register_component_(matter_generic_switch_mapping_5, 10);
+  matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_5);
+  matter_mattercomponent_id->register_endpoint(5, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::generic_switch::config_t device_config_0{};
+    device_config_0.switch_cluster.features.momentary_switch_multi_press.multi_press_max = 4;
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::action_switch::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch_long_press::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::generic_switch::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::doorbell::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch_release::get_id() | esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    if (esp_matter::endpoint::doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    esp_matter::cluster::binding::config_t binding_config{};
+    if (esp_matter::cluster::binding::create(endpoint, &binding_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint(7, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::audio_doorbell::config_t device_config_0{};
+    device_config_0.switch_cluster.feature_flags = esp_matter::cluster::switch_cluster::feature::momentary_switch::get_id();
+    device_config_0.camera_av_stream_management.feature_flags = esp_matter::cluster::camera_av_stream_management::feature::audio::get_id();
+    if (esp_matter::endpoint::audio_doorbell::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
