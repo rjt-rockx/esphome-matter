@@ -32,6 +32,8 @@ network:
   enable_ipv6: true
 
 wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 matter:
   endpoints:

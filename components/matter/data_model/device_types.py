@@ -188,6 +188,10 @@ class DeviceType:
             schema[cv.Optional(CONF_SWITCH_ID)] = cv.use_id(switch.Switch)
         if self.name == "fan":
             schema[cv.Optional(CONF_FAN_ID)] = fan_id_schema()
+        if self.name == "window_covering":
+            from ..covers import schema_options
+
+            schema.update(schema_options())
 
         if self.name.endswith("light") and any(
             cluster.name == "LevelControl" and cluster.required

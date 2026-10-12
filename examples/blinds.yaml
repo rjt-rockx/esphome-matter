@@ -1,0 +1,83 @@
+# Two covers exposed to Matter as Window Covering devices. The same
+# configuration works with any ESPHome cover that supports position.
+# See docs/cover.md.
+
+esphome:
+  name: matter-blinds
+  friendly_name: Matter Blinds
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://DavidvtWout/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+matter:
+  endpoints:
+    1:
+      window_covering:
+        cover_id: living_room_shade
+    2:
+      window_covering:
+        cover_id: bedroom_blind
+        # Optional. Defaults to interior_venetian_blind for covers with tilt.
+        end_product_type: interior_venetian_blind
+
+switch:
+  - platform: gpio
+    id: shade_up_relay
+    pin: GPIO4
+    interlock: &shade_interlock [shade_up_relay, shade_down_relay]
+  - platform: gpio
+    id: shade_down_relay
+    pin: GPIO5
+    interlock: *shade_interlock
+
+cover:
+  # A time based cover estimates its position from the travel time.
+  - platform: time_based
+    id: living_room_shade
+    name: Living Room Shade
+    device_class: shade
+    open_action:
+      - switch.turn_on: shade_up_relay
+    open_duration: 25s
+    close_action:
+      - switch.turn_on: shade_down_relay
+    close_duration: 23s
+    stop_action:
+      - switch.turn_off: shade_up_relay
+      - switch.turn_off: shade_down_relay
+
+  # A template cover with lift and tilt. The actions drive an external blind
+  # controller, for example over UART or a pair of numbers.
+  - platform: template
+    id: bedroom_blind
+    name: Bedroom Blind
+    device_class: blind
+    has_position: true
+    optimistic: true
+    position_action:
+      - logger.log:
+          format: "Move to %.2f"
+          args: ["pos"]
+    tilt_action:
+      - logger.log:
+          format: "Tilt to %.2f"
+          args: ["tilt"]
+    stop_action:
+      - logger.log: "Stop"

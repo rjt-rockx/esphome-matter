@@ -16,6 +16,8 @@ from esphome.types import ConfigType
 
 from . import binary_sensors
 from .const import *
+from .covers import WINDOW_COVERING
+from .covers import config_lines as cover_config_lines
 from .data_model.attributes import SensorAttribute, attribute_value_type
 from .data_model.clusters import CLUSTERS, CLUSTERS_BY_NAME, Cluster
 from .data_model.device_types import (
@@ -266,6 +268,9 @@ class Endpoint:
             )
             cg.add(var.register_fan(self._fan_variable, self._endpoint_id))
             self.global_includes.add('#include "esphome/components/matter/matter_fan.h"')
+        if CONF_COVER_ID in device_config:
+            cover_ = await cg.get_variable(device_config[CONF_COVER_ID])
+            cg.add(var.register_cover(cover_, self._endpoint_id))
 
         # Register extra features
         for enabled_feature in device_config.get(CONF_FEATURES, ()):
@@ -312,6 +317,16 @@ class Endpoint:
                 )
             )
 
+        cover_lines = []
+        if device_type.name == WINDOW_COVERING and CONF_COVER_ID in device_config:
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_cover.h"'
+            )
+            # Emitted after the feature_flags assignment below.
+            cover_lines = cover_config_lines(
+                config_var, self._endpoint_id, device_config
+            )
+
         # Configure cluster features
         for cluster in device_type.server_clusters:
             if not cluster.required:
@@ -331,6 +346,8 @@ class Endpoint:
                 lines.append(
                     f"{config_var}.{cluster.espm_namespace}.feature_flags = {' | '.join(feature_flags)};"
                 )
+
+        lines.extend(cover_lines)
 
         lines.extend(
             (

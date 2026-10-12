@@ -1,0 +1,88 @@
+esphome:
+  name: matter-ci-cover
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      window_covering:
+        cover_id: living_room_shade
+    2:
+      window_covering:
+        cover_id: bedroom_blind
+        end_product_type: exterior_venetian_blind
+    3:
+      window_covering:
+        cover_id: open_close_awning
+
+output:
+  - platform: template
+    id: motor_open
+    type: binary
+    write_action:
+      - logger.log: motor open
+  - platform: template
+    id: motor_close
+    type: binary
+    write_action:
+      - logger.log: motor close
+
+cover:
+  - platform: time_based
+    id: living_room_shade
+    name: Living Room Shade
+    device_class: shade
+    open_action:
+      - output.turn_on: motor_open
+    open_duration: 30s
+    close_action:
+      - output.turn_on: motor_close
+    close_duration: 30s
+    stop_action:
+      - output.turn_off: motor_open
+      - output.turn_off: motor_close
+  - platform: template
+    id: bedroom_blind
+    name: Bedroom Blind
+    device_class: blind
+    has_position: true
+    optimistic: true
+    tilt_action:
+      - logger.log: tilt
+    position_action:
+      - logger.log: position
+    stop_action:
+      - logger.log: stop
+  - platform: template
+    id: open_close_awning
+    name: Awning
+    device_class: awning
+    assumed_state: true
+    optimistic: true
+    open_action:
+      - logger.log: open
+    close_action:
+      - logger.log: close
+    stop_action:
+      - logger.log: stop
