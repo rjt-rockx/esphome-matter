@@ -6,6 +6,7 @@
 #include "esphome/core/component.h"
 
 #include "matter_attributes.h"
+#include "matter_cover.h"
 #include "matter_endpoints.h"
 #include "matter_lights.h"
 #include "matter_sensors.h"
@@ -57,6 +58,9 @@ public:
 #ifdef USE_LIGHT
   void register_light(light::LightState *light, uint16_t endpoint_id);
 #endif // USE_LIGHT
+#ifdef USE_COVER
+  void register_cover(cover::Cover *cover, uint16_t endpoint_id);
+#endif // USE_COVER
 #ifdef USE_SENSOR
   void register_sensor_attribute(sensor::Sensor *sensor, uint16_t endpoint_id,
                                  uint32_t cluster_id, uint32_t attribute_id,

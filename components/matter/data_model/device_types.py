@@ -177,6 +177,11 @@ class DeviceType:
         if self.name.endswith("light"):
             schema[cv.Optional(CONF_LIGHT_ID)] = cv.use_id(light.LightState)
 
+        if self.name == "window_covering":
+            from ..covers import schema_options
+
+            schema.update(schema_options())
+
         if self.name.endswith("light") and any(
             cluster.name == "LevelControl" and cluster.required
             for cluster in self.server_clusters

@@ -22,6 +22,7 @@ from esphome.types import ConfigType
 
 from .actions import register_bound_command_actions
 from .const import *
+from .covers import validate_cover_bindings
 from .endpoints import (
     ENDPOINT_SCHEMA,
     light_restore_warning,
@@ -165,6 +166,7 @@ def _final_validate(config: dict):
         )
 
     light_restore_warning(config, full_config)
+    validate_cover_bindings(config, full_config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
