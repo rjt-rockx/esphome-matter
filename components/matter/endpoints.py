@@ -13,7 +13,7 @@ from esphome.const import CONF_ID, CONF_LIGHT_ID, CONF_RESTORE_MODE, CONF_TRIGGE
 from esphome.core import CORE, ID, HexInt
 from esphome.types import ConfigType
 
-from . import binary_sensors
+from . import binary_sensors, bridge
 from . import conformance
 from .actions import get_attribute_from_config, get_event_from_config
 from .const import *
@@ -421,10 +421,17 @@ class Endpoint:
         """
 
         # Collect the complete endpoint structure before emitting its build callback.
-        for conf_key, device_config in self._config.items():
+        # The Bridged Node device type goes first in the DeviceTypeList (the primary one), like esp-matter's bridge does.
+        for conf_key, device_config in sorted(
+            self._config.items(),
+            key=lambda item: item[0] != bridge.DEVICE_TYPE_BRIDGED_NODE,
+        ):
             device_type = DEVICE_TYPES_BY_CONF_KEY.get(conf_key)
             if device_type:
                 await self._configure_device_type(var, device_type, device_config)
+
+        if bridged_node := self._config.get(bridge.DEVICE_TYPE_BRIDGED_NODE):
+            await self._register_bridged_node(var, bridged_node)
 
         await power_source.register(self, var)
 
@@ -450,6 +457,23 @@ class Endpoint:
 
         build_fn = cg.RawExpression(self._make_build_callback())
         cg.add(var.register_endpoint(self._endpoint_id, build_fn))
+
+    async def _register_bridged_node(self, var, bridged_node: dict):
+        """Bind BDBI Reachable to a binary sensor. The parent link is part of the conformance plan."""
+        if reachable_id := bridged_node.get(bridge.CONF_REACHABLE):
+            sensor = await cg.get_variable(reachable_id)
+            self.global_includes.add(
+                '#include "esphome/components/matter/matter_conversions.h"'
+            )
+            cg.add(
+                var.register_binary_sensor_attribute(
+                    sensor,
+                    self._endpoint_id,
+                    bridge.BDBI_CLUSTER_ID,
+                    bridge.BDBI_REACHABLE_ATTRIBUTE_ID,
+                    cg.RawExpression("esphome::matter::conversion::boolean_state"),
+                )
+            )
 
     def _register_conformance(self, var):
         """Parent, label and semantic tags are applied by matter_conformance.cpp."""
@@ -635,6 +659,10 @@ class Endpoint:
         lines = [
             f"esp_matter::endpoint::{device_type.namespace}::config_t {config_var}{{{config_init}}};"
         ]
+        if device_type.name == bridge.DEVICE_TYPE_BRIDGED_NODE:
+            lines.extend(
+                bridge.config_lines(config_var, self._endpoint_id, device_config)
+            )
 
         if min_level := device_config.get(CONF_MIN_LEVEL):
             lines.append(f"{config_var}.level_control.min_level = {min_level};")
@@ -769,6 +797,8 @@ class Endpoint:
             )
         if climate_ is not None:
             lines.extend(climate_post_create_lines(climate_, device_type.name))
+        if device_type.name == bridge.DEVICE_TYPE_BRIDGED_NODE:
+            lines.extend(bridge.post_create_lines(device_config))
         return lines
 
     async def _register_sensor_attribute(

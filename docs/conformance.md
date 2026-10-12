@@ -96,6 +96,7 @@ against matter.js or chip-tool output easy if wanted.
 | `CL-REVISION`, `CL-GLOBAL-MISSING`, `CL-ATTRLIST-*` | (dump) ClusterRevision, global attributes, AttributeList consistency |
 | `EP-SINGLETON`, `EP-ELECTRICAL` | Root-only (singleton) clusters on other endpoints; Electrical Sensor needs a measurement cluster |
 | `EP-PARTS`, `EP-SERVERLIST` | (dump) PartsList reachability/cycles, Descriptor ServerList matches the clusters read |
+| `BR-AGG-*`, `BR-NODE-*`, `BR-UNIQUEID`, `BR-NODELABEL`, `BR-PARTS` | Bridges ([bridge.md](bridge.md)): Aggregator is a direct child of the root and has no application device type, Bridged Nodes are direct children of an Aggregator and have a UniqueID/NodeLabel that is unique and fits 32 bytes, an Aggregator PartsList lists all descendants (dump) |
 
 Severity: `error` = non-conformant; `warning` = likely problem (not-applicable
 element present, provisional feature, controller hint); `info` = tool limits and
@@ -144,9 +145,10 @@ when moving to the generated data model.
   reported once as `CL-ATTR-UNVERIFIED` and only their features are checked.
 * Attribute *values* and constraints (ranges, nullability) are not evaluated; only
   presence, conformance and the value-dependent conformance terms.
-* Cross-endpoint rules cover the flat endpoint layout esphome-matter uses
-  (everything under the root). Tree/composed layouts are checked only through the
-  dump-mode PartsList rules.
+* Layout mode knows the configured `parent:` of every endpoint: the Duplicate
+  condition compares siblings under the same parent and the bridge rules (`BR-*`)
+  follow the parent chain. A dump only has PartsLists; the parent is the holder with
+  the shortest list.
 
 ## Runtime dumps
 

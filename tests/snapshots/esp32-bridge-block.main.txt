@@ -1,0 +1,139 @@
+  new(matter_mattercomponent_id) matter::MatterComponent();
+  App.register_component_(matter_mattercomponent_id, 3);
+  matter_mattercomponent_id->get_device_info().set_node_label("matter-ci-bridge-block");
+  matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
+  matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
+  matter_mattercomponent_id->register_switch(relay_a, 100);
+  matter_mattercomponent_id->register_endpoint_parent(100, 60585);
+  matter_mattercomponent_id->register_endpoint_tag(100, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(100, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "matter-ci-bridge-block-relay_a", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay A"), 7) == nullptr)
+        return false;
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_binary_sensor_attribute(kitchen_seen, 19275, 57, 17, esphome::matter::conversion::boolean_state);
+  matter_mattercomponent_id->register_sensor_attribute(kitchen_battery, 19275, 47, 12, esphome::matter::conversion::battery_percent);
+  matter_mattercomponent_id->register_sensor_attribute(kitchen_battery, 19275, 47, 14, [](float v) { return esphome::matter::conversion::battery_charge_level(v, 20.0f, 10.0f); });
+  matter_mattercomponent_id->register_mapping(new esphome::matter::MatterPowerSourceEndpointList(19275, {19275, 52632, 45897}));
+  matter_mattercomponent_id->register_endpoint_parent(19275, 60585);
+  matter_mattercomponent_id->register_endpoint(19275, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = false;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "aca6007ee6faf82dadc8ad8322575d9b", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Kitchen Thermometer"), 19) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_vendor_name(bdbi_cluster, const_cast<char *>("Xiaomi"), 6) == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_product_name(bdbi_cluster, const_cast<char *>("LYWSD03MMC"), 10) == nullptr)
+        return false;
+    }
+    esp_matter::cluster::power_source::config_t power_source_config{};
+    power_source_config.feature_flags = esp_matter::cluster::power_source::feature::battery::get_id();
+    power_source_config.status = 1;
+    power_source_config.order = 0;
+    snprintf(power_source_config.description, sizeof(power_source_config.description), "%s", "Battery");
+    if (esp_matter::cluster::power_source::create(endpoint, &power_source_config, esp_matter::CLUSTER_FLAG_SERVER) == nullptr)
+      return false;
+    {
+      auto *power_source_cluster = esp_matter::cluster::get(endpoint, 47);
+      if (power_source_cluster == nullptr || esp_matter::cluster::power_source::attribute::create_bat_percent_remaining(power_source_cluster, {}, 0, 200) == nullptr)
+        return false;
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay_b, 35938);
+  matter_mattercomponent_id->register_endpoint_parent(35938, 55030);
+  matter_mattercomponent_id->register_endpoint(35938, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_0{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::RelativeHumidityMeasurementCluster, uint16_t, &chip::app::Clusters::RelativeHumidityMeasurementCluster::SetMeasuredValue>(kitchen_humidity, 45897, 1029, 0, esphome::matter::conversion::percentage);
+  matter_mattercomponent_id->register_endpoint_parent(45897, 19275);
+  matter_mattercomponent_id->register_endpoint(45897, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::humidity_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::humidity_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(heater_temp, 46177, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(46177, 51983);
+  matter_mattercomponent_id->register_endpoint(46177, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_switch(relay_c, 51983);
+  matter_mattercomponent_id->register_endpoint_parent(51983, 60585);
+  matter_mattercomponent_id->register_endpoint_tag(51983, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(51983, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "matter-ci-bridge-block-heater", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Heater"), 6) == nullptr)
+        return false;
+    }
+    esp_matter::endpoint::on_off_plug_in_unit::config_t device_config_1{};
+    if (esp_matter::endpoint::on_off_plug_in_unit::add(endpoint, &device_config_1) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(kitchen_temp, 52632, 1026, 0, esphome::matter::conversion::temperature);
+  matter_mattercomponent_id->register_endpoint_parent(52632, 19275);
+  matter_mattercomponent_id->register_endpoint(52632, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::temperature_sensor::config_t device_config_0{};
+    if (esp_matter::endpoint::temperature_sensor::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(55030, 60585);
+  matter_mattercomponent_id->register_endpoint(55030, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::bridged_node::config_t device_config_0{};
+    device_config_0.bridged_device_basic_information.reachable = true;
+    strncpy(device_config_0.bridged_device_basic_information.unique_id, "matter-ci-bridge-block-relay_b", sizeof(device_config_0.bridged_device_basic_information.unique_id) - 1);
+    if (esp_matter::endpoint::bridged_node::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    {
+      auto *bdbi_cluster = esp_matter::cluster::get(endpoint, 57);
+      if (bdbi_cluster == nullptr)
+        return false;
+      if (esp_matter::cluster::bridged_device_basic_information::attribute::create_node_label(bdbi_cluster, const_cast<char *>("Relay B"), 7) == nullptr)
+        return false;
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_endpoint_parent(60585, 0);
+  matter_mattercomponent_id->register_endpoint(60585, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::aggregator::config_t device_config_0{};
+    if (esp_matter::endpoint::aggregator::add(endpoint, &device_config_0) != ESP_OK)
+      return false;
+    return true;
+  });
+  matter_mattercomponent_id->set_structure_hash(0x1214E4D5);

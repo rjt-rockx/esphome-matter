@@ -38,6 +38,7 @@ from .model import (
     ClusterInst,
     EndpointInst,
     NodeModel,
+    parent_map,
 )
 from .spec import GLOBAL_ATTRIBUTES, DEFAULT_VERSION, Spec
 
@@ -189,22 +190,7 @@ def _is_vendor(kind: str, key: tuple) -> bool:
 
 def parents(model: NodeModel) -> dict[int, int]:
     """Endpoint -> parent endpoint (0 = child of the root node)."""
-    out: dict[int, int] = {}
-    if any(e.declared_parent is not None for e in model.endpoints.values()):
-        for ep in model.endpoints.values():
-            if ep.id != 0:
-                out[ep.id] = ep.declared_parent or 0
-        return out
-    for ep in model.endpoints.values():
-        if ep.id == 0:
-            continue
-        holders = [
-            (len(o.parts), o.id)
-            for o in model.endpoints.values()
-            if o.id not in (0, ep.id) and o.parts and ep.id in o.parts
-        ]
-        out[ep.id] = min(holders)[1] if holders else 0
-    return out
+    return parent_map(model)
 
 
 def _cluster_label(spec: Spec, cid: int) -> str:

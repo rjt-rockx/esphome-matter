@@ -861,7 +861,10 @@ def validate_power_configuration(matter_config: dict) -> None:
     validate_powers(matter_config)
     sources = power_sources(matter_config.get(CONF_ENDPOINTS, {}))
     by_order: dict[int, list[int]] = {}
+    endpoints = matter_config.get(CONF_ENDPOINTS, {})
     for endpoint_id, _kind, order, _present in sources:
+        if "bridged_node" in endpoints.get(endpoint_id, {}):
+            continue  # the Power Source of a bridged device does not compete with the node's own sources
         by_order.setdefault(order, []).append(endpoint_id)
     for order, endpoint_ids in by_order.items():
         if len(endpoint_ids) > 1:

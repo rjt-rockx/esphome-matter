@@ -1,0 +1,95 @@
+# Bridge two Bluetooth thermometers (Xiaomi LYWSD03MMC) to Matter. ESPHome reads their advertisements with
+# esp32_ble_tracker; the Matter bridge publishes each thermometer as its own Bridged Node, so controllers show two
+# accessories (own name, own room) instead of sensors inside the ESP32. Each node has temperature and humidity
+# endpoints, a battery Power Source and a Reachable flag that goes false when no advertisement was heard for 15 minutes.
+# See docs/bridge.md.
+#
+# Matter is commissioned over Wi-Fi (an on-network commissioning window, not BLE), because BLE commissioning and the
+# ESPHome BLE tracker cannot share the Bluetooth stack. Not run on hardware yet.
+
+esphome:
+  name: matter-ble-bridge
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+
+external_components:
+  - source: github://rjt-rockx/esphome-matter@main
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+
+matter:
+  bridge:
+    devices:
+      # The key (bedroom_thermometer) feeds the endpoint numbers and the default UniqueID. Keep it when you rename
+      # the device, and Matter controllers keep seeing the same accessory.
+      bedroom_thermometer:
+        name: Bedroom Thermometer
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        serial_number: A4C1384E1678
+        reachable: bedroom_seen
+        battery: bedroom_battery
+        temperature_sensor: bedroom_temperature
+        humidity_sensor: bedroom_humidity
+      nursery_thermometer:
+        name: Nursery Thermometer
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        serial_number: A4C1384E4321
+        reachable: nursery_seen
+        battery: nursery_battery
+        temperature_sensor: nursery_temperature
+        humidity_sensor: nursery_humidity
+
+sensor:
+  - platform: xiaomi_lywsd03mmc
+    mac_address: A4:C1:38:4E:16:78
+    bindkey: e9efaa6873f9f9c87a5e75a5f814801c
+    temperature:
+      id: bedroom_temperature
+      name: Bedroom temperature
+    humidity:
+      id: bedroom_humidity
+      name: Bedroom humidity
+    battery_level:
+      id: bedroom_battery
+      name: Bedroom thermometer battery
+  - platform: xiaomi_lywsd03mmc
+    mac_address: A4:C1:38:4E:43:21
+    bindkey: 0f5d1e9b1c3a4d6b8a7c2e4f60718293
+    temperature:
+      id: nursery_temperature
+      name: Nursery temperature
+    humidity:
+      id: nursery_humidity
+      name: Nursery humidity
+    battery_level:
+      id: nursery_battery
+      name: Nursery thermometer battery
+
+binary_sensor:
+  # Reachable: ON while advertisements keep arriving. Without it a thermometer with a dead battery would show its last
+  # value forever. The sensors are internal: only Matter uses them.
+  - platform: ble_presence
+    mac_address: A4:C1:38:4E:16:78
+    id: bedroom_seen
+    timeout: 15min
+    internal: true
+  - platform: ble_presence
+    mac_address: A4:C1:38:4E:43:21
+    id: nursery_seen
+    timeout: 15min
+    internal: true

@@ -1,0 +1,98 @@
+# Hand-written bridge: one Aggregator, Bridged Nodes below it get their parent automatically.
+esphome:
+  name: matter-ci-bridge
+
+substitutions:
+  esp32_variant: ESP32C6
+
+esp32:
+  variant: ${esp32_variant}
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ../../components
+
+logger:
+
+api:
+
+network:
+  enable_ipv6: true
+
+wifi:
+  ssid: ci-test-network
+  password: ci-test-password
+
+matter:
+  endpoints:
+    1:
+      aggregator: {}
+    2:
+      bridged_node: Relay 1 # shorthand for {name: Relay 1}
+      on_off_plug_in_unit:
+        switch_id: relay1
+    3:
+      bridged_node:
+        name: Relay 2
+        unique_id: relay-two
+        vendor_name: ACME
+        product_name: Relay board
+        serial_number: R2-0001
+      on_off_light:
+        switch_id: relay2
+    4:
+      # Composed bridged device: the Bridged Node endpoint (with the Power Source) and one child endpoint per sensor.
+      bridged_node:
+        name: Garage Sensor
+        reachable: garage_online
+        vendor_name: Xiaomi
+        product_name: LYWSD03MMC
+        hardware_version: 1
+        software_version: 2
+        software_version_string: "1.0.0_0130"
+        manufacturing_date: "20250131"
+        product_url: https://example.com/sensor
+      battery:
+        percent: garage_battery
+        powers: [4, 5, 6]
+    5:
+      parent: 4
+      temperature_sensor: garage_temp
+    6:
+      parent: 4
+      humidity_sensor: garage_humidity
+
+switch:
+  - platform: template
+    id: relay1
+    name: Relay 1
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: relay2
+    name: Relay 2
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: template
+    id: garage_temp
+    name: Garage Temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+  - platform: template
+    id: garage_humidity
+    name: Garage Humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+  - platform: template
+    id: garage_battery
+    name: Garage Battery
+    unit_of_measurement: "%"
+    device_class: battery
+
+binary_sensor:
+  - platform: template
+    id: garage_online
+    name: Garage sensor online

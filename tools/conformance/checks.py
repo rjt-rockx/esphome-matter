@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .bridge import check_bridge
 from .conformance import Context, Outcome, evaluate, norm
 from .model import (
     ATTR_ACCEPTED,
@@ -16,6 +17,7 @@ from .model import (
     ClusterInst,
     EndpointInst,
     NodeModel,
+    parent_map,
 )
 from .spec import GLOBAL_ATTRIBUTES, ClusterSpec, DeviceTypeSpec, Spec
 
@@ -90,6 +92,15 @@ def cluster_context(cspec: ClusterSpec, inst: ClusterInst, conditions: dict) -> 
     )
 
 
+def _parents(model: NodeModel) -> dict[int, int]:
+    """Endpoint -> parent endpoint, computed once per model (siblings share a parent)."""
+    cached = getattr(model, "_parent_cache", None)
+    if cached is None:
+        cached = parent_map(model)
+        model._parent_cache = cached
+    return cached
+
+
 def endpoint_conditions(
     ep: EndpointInst, model: NodeModel, spec: Spec
 ) -> dict[str, bool]:
@@ -108,6 +119,7 @@ def endpoint_conditions(
         spec.clusters[c].role == "application" for c in ep.clients if c in spec.clusters
     )
     siblings_overlap = False
+    parents = _parents(model)
     mine = {
         d
         for d, _ in ep.device_types
@@ -119,7 +131,7 @@ def endpoint_conditions(
             other.id == ep.id
             or other.id == 0
             or ep.id == 0
-            or other.parent != ep.parent
+            or parents.get(other.id, 0) != parents.get(ep.id, 0)
         ):
             continue
         if mine & {d for d, _ in other.device_types}:
@@ -700,6 +712,7 @@ def check_tree(rep: Report, model: NodeModel):
 def check_node(model: NodeModel, spec: Spec) -> Report:
     rep = Report()
     check_tree(rep, model)
+    check_bridge(rep, model, spec)
     for ep in model.endpoints.values():
         check_endpoint(rep, spec, model, ep)
     for n in model.notes:

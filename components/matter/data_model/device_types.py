@@ -6,8 +6,9 @@ from pathlib import Path
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import switch
-from esphome.const import CONF_LIGHT_ID
+from esphome.const import CONF_LIGHT_ID, CONF_NAME
 
+from .. import bridge
 from ..binary_sensors import extra_schema as binary_sensor_schema
 from ..const import CONF_SWITCH_ID, CONF_WITH_FEATURES
 from ..fan_binding import CONF_FAN_ID, fan_id_schema, validate_fan_features
@@ -354,6 +355,10 @@ class DeviceType:
             from ..power_source import device_type_schema_options
 
             schema.update(device_type_schema_options())
+        schema = bridge.extend_schema(self.name, schema)
+        if self.name == bridge.DEVICE_TYPE_BRIDGED_NODE:
+            # bridged_node: Relay 1
+            return automation.maybe_conf(CONF_NAME, schema)
 
         # If a device type is a simple sensor with only a single sensor attribute the config may be simplified from;
         #   temperature_sensor:
