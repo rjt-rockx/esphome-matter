@@ -10,7 +10,7 @@
   new(matter_matterotastatetrigger_id) matter::MatterOtaStateTrigger(matter_matterota_id);
   new(automation_id) Automation<std::string>(matter_matterotastatetrigger_id);
   new(matter_ota_state) template_::TemplateTextSensor();
-  App.register_text_sensor(matter_ota_state, "Matter OTA state", 1067051259, 0);
+  App.register_text_sensor(matter_ota_state, ESPHOME_PSTR("Matter OTA state"), 1067051259, 0);
   matter_ota_state->set_update_interval(60000);
   App.register_component_(matter_ota_state, 11);
   new(matter_matterotaeventtrigger_id) matter::MatterOtaEventTrigger(matter_matterota_id, matter::MatterOtaEvent::DOWNLOAD_STARTED);

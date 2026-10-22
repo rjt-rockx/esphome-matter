@@ -18,6 +18,11 @@ from esphome.core import CORE, HexInt
 from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
+try:
+    from esphome.components.network import require_ipv4
+except ImportError:  # ESPHome < 2026.11 has no IP family requests; IPv4 stays on
+    require_ipv4 = None
+
 from . import bridge, ethernet, sensor_extras
 from .actions import register_bound_command_actions
 from .behaviours import BEHAVIOURS_SCHEMA, behaviours_to_code
@@ -214,6 +219,9 @@ CONFIG_SCHEMA = cv.All(
     cv.only_with_framework(Framework.ESP_IDF),
     validate_ota_schema,
     _require_vfs_select,  # TODO: Only needed when openthread is enabled
+    # The CHIP stack is built with IPv4 (inet/IPAddress.h needs ip4_addr_t), so keep
+    # lwIP IPv4 on even where openthread asks for it to default to off.
+    *([require_ipv4("matter")] if require_ipv4 else []),
 )
 
 

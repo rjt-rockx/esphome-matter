@@ -40,27 +40,27 @@
   });
   automation_id_96->add_action(matter_matterremovefabricaction_id);
   new(matter_ota_state) template_::TemplateTextSensor();
-  App.register_text_sensor(matter_ota_state, "Matter OTA state", 1067051259, 0);
+  App.register_text_sensor(matter_ota_state, ESPHOME_PSTR("Matter OTA state"), 1067051259, 0);
   matter_ota_state->set_update_interval(60000);
   App.register_component_(matter_ota_state, 23);
   new(matter_mattertextsensor_id_4) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_4, "Matter pairing code", 3176657465UL, 167837696);  // disabled_by_default, category:diagnostic, icon:mdi:key
+  App.register_text_sensor(matter_mattertextsensor_id_4, ESPHOME_PSTR("Matter pairing code"), 3176657465UL, 167837696);  // disabled_by_default, category:diagnostic, icon:mdi:key
   App.register_component_(matter_mattertextsensor_id_4, 24);
   matter_mattertextsensor_id_4->set_type(matter::MatterTextSensorType::PAIRING_CODE);
   new(matter_mattertextsensor_id_5) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_5, "Matter QR code", 1535156712, 167903232);  // disabled_by_default, category:diagnostic, icon:mdi:qrcode
+  App.register_text_sensor(matter_mattertextsensor_id_5, ESPHOME_PSTR("Matter QR code"), 1535156712, 167903232);  // disabled_by_default, category:diagnostic, icon:mdi:qrcode
   App.register_component_(matter_mattertextsensor_id_5, 24);
   matter_mattertextsensor_id_5->set_type(matter::MatterTextSensorType::QR_CODE);
   new(matter_mattertextsensor_id) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id, "Matter state", 3615238436UL, 134414336);  // category:diagnostic, icon:mdi:state-machine
+  App.register_text_sensor(matter_mattertextsensor_id, ESPHOME_PSTR("Matter state"), 3615238436UL, 134414336);  // category:diagnostic, icon:mdi:state-machine
   App.register_component_(matter_mattertextsensor_id, 24);
   matter_mattertextsensor_id->set_type(matter::MatterTextSensorType::COMMISSIONING_STATE);
   new(matter_mattertextsensor_id_3) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_3, "Matter fabrics", 2522131001UL, 134479872);  // category:diagnostic, icon:mdi:counter
+  App.register_text_sensor(matter_mattertextsensor_id_3, ESPHOME_PSTR("Matter fabrics"), 2522131001UL, 134479872);  // category:diagnostic, icon:mdi:counter
   App.register_component_(matter_mattertextsensor_id_3, 24);
   matter_mattertextsensor_id_3->set_type(matter::MatterTextSensorType::FABRIC_COUNT);
   new(matter_mattertextsensor_id_2) matter::MatterTextSensor();
-  App.register_text_sensor(matter_mattertextsensor_id_2, "Matter controllers", 866795476, 134545408);  // category:diagnostic, icon:mdi:account-network
+  App.register_text_sensor(matter_mattertextsensor_id_2, ESPHOME_PSTR("Matter controllers"), 866795476, 134545408);  // category:diagnostic, icon:mdi:account-network
   App.register_component_(matter_mattertextsensor_id_2, 24);
   matter_mattertextsensor_id_2->set_type(matter::MatterTextSensorType::CONTROLLERS);
   matter_mattercomponent_id->set_fabric_label_sensor(0, text_sensor_textsensor_id);
