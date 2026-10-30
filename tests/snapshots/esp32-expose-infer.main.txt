@@ -4,7 +4,7 @@
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   new(matter_generic_switch_mapping_1946) matter::MatterGenericSwitchEventMapping(knob_event, 1946, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_1946, 17);
+  App.register_component_(matter_generic_switch_mapping_1946, 16);
   matter_generic_switch_mapping_1946->add_event("press", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_1946);
   matter_mattercomponent_id->register_endpoint_parent(1946, 0);
@@ -152,7 +152,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_20526) matter::MatterGenericSwitchMapping(wall_button_2, 20526, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_20526, 17);
+  App.register_component_(matter_generic_switch_mapping_20526, 16);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_20526);
   matter_mattercomponent_id->register_endpoint_parent(20526, 0);
   matter_mattercomponent_id->register_endpoint_label(20526, "Button right");
@@ -238,7 +238,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_32894) matter::MatterGenericSwitchMapping(wall_button, 32894, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_32894, 17);
+  App.register_component_(matter_generic_switch_mapping_32894, 16);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_32894);
   matter_mattercomponent_id->register_endpoint_parent(32894, 0);
   matter_mattercomponent_id->register_endpoint_label(32894, "Button left");

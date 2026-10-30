@@ -4,7 +4,7 @@
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   new(matter_generic_switch_mapping_1) matter::MatterGenericSwitchEventMapping(remote_event, 1, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_1, 10);
+  App.register_component_(matter_generic_switch_mapping_1, 9);
   matter_generic_switch_mapping_1->add_event("single", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_generic_switch_mapping_1->add_event("double", esphome::matter::MatterEventGesture::PRESS, 2, true);
   matter_generic_switch_mapping_1->add_event("triple", esphome::matter::MatterEventGesture::PRESS, 3, true);
@@ -21,7 +21,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_2) matter::MatterGenericSwitchEventMapping(held_event, 2, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_2, 10);
+  App.register_component_(matter_generic_switch_mapping_2, 9);
   matter_generic_switch_mapping_2->add_event("tap", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_generic_switch_mapping_2->add_event("tap_twice", esphome::matter::MatterEventGesture::PRESS, 2, true);
   matter_generic_switch_mapping_2->add_event("hold", esphome::matter::MatterEventGesture::LONG_PRESS, 1, false);
@@ -38,7 +38,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_3) matter::MatterGenericSwitchEventMapping(bell_event, 3, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_3, 10);
+  App.register_component_(matter_generic_switch_mapping_3, 9);
   matter_generic_switch_mapping_3->add_event("ring", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_3);
   matter_mattercomponent_id->register_endpoint_parent(3, 0);
@@ -54,7 +54,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_4) matter::MatterGenericSwitchMapping(bell_button, 4, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_4, 10);
+  App.register_component_(matter_generic_switch_mapping_4, 9);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_4);
   matter_mattercomponent_id->register_endpoint_parent(4, 0);
   matter_mattercomponent_id->register_endpoint_tag(4, 7, 2, "");
