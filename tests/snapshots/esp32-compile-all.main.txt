@@ -11,7 +11,6 @@
   new(automation_id_4) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id);
   new(matter_identifytrigger_id_2) matter::IdentifyTrigger(matter_mattercomponent_id, 1);
   matter::register_identify_trigger(matter_identifytrigger_id_2);
-  new(automation_id_5) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id_2);
   new(matter_mattersetattributeaction_id) matter::MatterSetAttributeAction<bool>();
   matter_mattersetattributeaction_id->set_endpoint_id(3);
   matter_mattersetattributeaction_id->set_cluster_id(6);
@@ -197,6 +196,7 @@
       return 2;
   });
   automation_id_111->add_action(matter_matterremovefabricaction_id_2);
+  new(automation_id_5) Automation<uint16_t, bool, uint16_t, uint8_t>(matter_identifytrigger_id_2);
   new(matter_mattercommissionedtrigger_id) matter::MatterCommissionedTrigger();
   new(automation_id_2) Automation<>(matter_mattercommissionedtrigger_id);
   new(matter_matterdecommissionedtrigger_id) matter::MatterDecommissionedTrigger();
@@ -1676,13 +1676,13 @@
   matter_mattermodemapping_id->set_accept_when_idle(false);
   new(matter_matterchangetomodetrigger_id) matter::MatterChangeToModeTrigger();
   matter_mattermodemapping_id->add_change_trigger(matter_matterchangetomodetrigger_id);
-  new(automation_id_18) Automation<uint8_t>(matter_matterchangetomodetrigger_id);
   new(matter_mattermoderejectaction_id) matter::MatterModeRejectAction<uint8_t>();
   matter_mattermoderejectaction_id->set_status([](uint8_t mode) -> uint8_t {
       return 67;
   });
   matter_mattermoderejectaction_id->set_text(ESPHOME_F("Empty the dust bin first"));
   ifaction_id_2->add_then_action(matter_mattermoderejectaction_id);
+  new(automation_id_18) Automation<uint8_t>(matter_matterchangetomodetrigger_id);
   new(matter_mattermodemapping_id_2) matter::MatterModeMapping(120, 85);
   matter_mattercomponent_id->register_mapping(matter_mattermodemapping_id_2);
   matter_mattermodemapping_id_2->add_mode("Vacuum", 0, "Vacuum");
@@ -1749,11 +1749,11 @@
   new(automation_id_21) Automation<>(matter_matteroperationalcommandtrigger_id_2);
   new(matter_matteroperationalcommandtrigger_id_3) matter::MatterOperationalCommandTrigger();
   matter_matteroperationalstatemapping_id->add_command_trigger(matter::MatterOperationalCommand::GO_HOME, matter_matteroperationalcommandtrigger_id_3);
-  new(automation_id_22) Automation<>(matter_matteroperationalcommandtrigger_id_3);
   new(matter_matteroperationalstaterejectaction_id) matter::MatterOperationalStateRejectAction<>();
   matter_matteroperationalstaterejectaction_id->set_error([]() -> uint8_t {
       return 3;
   });
+  new(automation_id_22) Automation<>(matter_matteroperationalcommandtrigger_id_3);
   automation_id_22->add_action(matter_matteroperationalstaterejectaction_id);
   matter_mattercomponent_id->register_endpoint_parent(120, 0);
   matter_mattercomponent_id->register_endpoint(120, [](esp_matter::endpoint_t *endpoint) -> bool {
