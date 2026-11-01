@@ -4,11 +4,11 @@
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32H2");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   new(matter_mattericdactivetrigger_id) matter::MatterIcdActiveTrigger();
-  new(automation_id) Automation<>(matter_mattericdactivetrigger_id);
   new(matter_mattericdtriggeractiveaction_id) matter::MatterIcdTriggerActiveAction<>();
   automation_id_2->add_action(matter_mattericdtriggeractiveaction_id);
   new(matter_mattericdtriggeractiveaction_id_2) matter::MatterIcdTriggerActiveAction<>();
   automation_id_3->add_action(matter_mattericdtriggeractiveaction_id_2);
+  new(automation_id) Automation<>(matter_mattericdactivetrigger_id);
   matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 1, 1026, 0, esphome::matter::conversion::temperature);
   matter_mattercomponent_id->register_endpoint_parent(1, 0);
   matter_mattercomponent_id->register_endpoint(1, [](esp_matter::endpoint_t *endpoint) -> bool {
