@@ -4,7 +4,7 @@
   matter_mattercomponent_id->get_device_info().set_hardware_version_string("ESP32C6");
   matter_mattercomponent_id->get_device_info().set_software_version_string("<ESPHOME_VERSION>");
   new(matter_generic_switch_mapping_26197) matter::MatterGenericSwitchEventMapping(remote_event, 26197, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_26197, 10);
+  App.register_component_(matter_generic_switch_mapping_26197, 9);
   matter_generic_switch_mapping_26197->add_event("single", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_generic_switch_mapping_26197->add_event("double", esphome::matter::MatterEventGesture::PRESS, 2, true);
   matter_generic_switch_mapping_26197->add_event("hold", esphome::matter::MatterEventGesture::LONG_PRESS, 1, true);
@@ -24,7 +24,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_46671) matter::MatterGenericSwitchEventMapping(bell_event, 46671, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_46671, 10);
+  App.register_component_(matter_generic_switch_mapping_46671, 9);
   matter_generic_switch_mapping_46671->add_event("ring", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_46671);
   matter_mattercomponent_id->register_endpoint_parent(46671, 0);
@@ -45,7 +45,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_48830) matter::MatterGenericSwitchMapping(wired_bell, 48830, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_48830, 10);
+  App.register_component_(matter_generic_switch_mapping_48830, 9);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_48830);
   matter_mattercomponent_id->register_endpoint_parent(48830, 0);
   matter_mattercomponent_id->register_endpoint_label(48830, "Wired bell");
@@ -65,7 +65,7 @@
     return true;
   });
   new(matter_generic_switch_mapping_49915) matter::MatterGenericSwitchEventMapping(held_event, 49915, 500, 300);
-  App.register_component_(matter_generic_switch_mapping_49915, 10);
+  App.register_component_(matter_generic_switch_mapping_49915, 9);
   matter_generic_switch_mapping_49915->add_event("single", esphome::matter::MatterEventGesture::PRESS, 1, true);
   matter_generic_switch_mapping_49915->add_event("hold", esphome::matter::MatterEventGesture::LONG_PRESS, 1, true);
   matter_mattercomponent_id->register_mapping(matter_generic_switch_mapping_49915);
