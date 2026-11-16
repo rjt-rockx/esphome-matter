@@ -6,6 +6,8 @@ checks for the expected Matter registration calls.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from conftest import config_files, prepare_config, run_esphome
 
@@ -82,6 +84,17 @@ def test_generate(config, tmp_path):
         assert needle in code, (
             f"{needle!r} missing from generated main.cpp of {config.name}"
         )
+    # CHIP is built with IPv4; openthread asks ESPHome dev to default it off.
+    sdkconfigs = list(tmp_path.glob(".esphome/build/*/sdkconfig.*"))
+    if sdkconfigs and "CONFIG_LWIP_IPV4=" in sdkconfigs[0].read_text():
+        assert "CONFIG_LWIP_IPV4=y" in sdkconfigs[0].read_text(), (
+            f"lwIP IPv4 disabled in {config.name}; CHIP needs ip4_addr_t"
+        )
+    # String defines must reach the compiler whole, spaces included.
+    for cmake in tmp_path.glob(".esphome/build/*/CMakeLists.txt"):
+        for line in cmake.read_text().splitlines():
+            if "CHIP_DEVICE_CONFIG_DEVICE_" in line and "_NAME" in line:
+                assert re.search(r'_NAME=\\"[^"]*\\""', line), line
 
 
 def test_all_expected_configs_exist():

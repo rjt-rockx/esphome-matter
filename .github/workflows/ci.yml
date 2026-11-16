@@ -99,6 +99,7 @@ jobs:
         esphome-version:
           - 2026.6.0
           - 2026.7.4
+          - 2026.10.2
           - dev
 
     steps:
@@ -153,6 +154,7 @@ jobs:
         esphome-version:
           - 2026.6.0
           - 2026.7.4
+          - 2026.10.2
           - dev
 
     steps:

@@ -1,4 +1,5 @@
 import logging
+import shlex
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -17,6 +18,18 @@ from esphome.const import (
 from esphome.core import CORE, HexInt
 from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
+
+try:
+    from esphome.components.network import require_ipv4
+except ImportError:  # ESPHome < 2026.11 has no IP family requests; IPv4 stays on
+    require_ipv4 = None
+
+try:
+    from esphome.framework_helpers import lex_cmake_build_flags
+except (
+    ImportError
+):  # ESPHome < 2026.11 passes native ESP-IDF build flags through unlexed
+    lex_cmake_build_flags = None
 
 from . import bridge, ethernet, sensor_extras
 from .actions import register_bound_command_actions
@@ -109,6 +122,14 @@ def _validate_passcode(value):
     return value
 
 
+def _string_define_flag(define: str, value: str) -> str:
+    """Build flag defining ``define`` as the C string literal ``value``."""
+    if lex_cmake_build_flags is not None or CORE.using_toolchain_platformio:
+        # Build flags are shell-lexed, so quote the whole flag to keep spaces in it
+        return shlex.quote(f'-D{define}="{value}"')
+    return f'-D{define}=\\"{value}\\"'
+
+
 def _configure_basic_information(config):
     for config_option, define in (
         (CONF_VENDOR_NAME, "CHIP_DEVICE_CONFIG_DEVICE_VENDOR_NAME"),
@@ -119,7 +140,7 @@ def _configure_basic_information(config):
         ),
     ):
         if value := config.get(config_option):
-            cg.add_build_flag(f'-D{define}=\\"{value}\\"')
+            cg.add_build_flag(_string_define_flag(define, value))
 
     for config_option, sdk_option in (
         (CONF_VENDOR_ID, "CONFIG_DEVICE_VENDOR_ID"),
@@ -214,6 +235,9 @@ CONFIG_SCHEMA = cv.All(
     cv.only_with_framework(Framework.ESP_IDF),
     validate_ota_schema,
     _require_vfs_select,  # TODO: Only needed when openthread is enabled
+    # The CHIP stack is built with IPv4 (inet/IPAddress.h needs ip4_addr_t), so keep
+    # lwIP IPv4 on even where openthread asks for it to default to off.
+    *([require_ipv4("matter")] if require_ipv4 else []),
 )
 
 

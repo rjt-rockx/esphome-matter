@@ -91,6 +91,74 @@
       return MATTER_BUILD_FAIL("endpoint 5: device type generic_switch");
     return true;
   });
+  matter_mattercomponent_id->register_light(rgb_status_light, 6);
+  matter_mattercomponent_id->register_endpoint_parent(6, 0);
+  matter_mattercomponent_id->register_endpoint_tag(6, 7, 1, "");
+  matter_mattercomponent_id->register_endpoint(6, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extended_color_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    auto light_traits_0 = rgb_status_light->get_traits();
+    device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = light_traits_0.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds()) : 153;
+    device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = light_traits_0.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds()) : 500;
+    if (esphome::matter::add_extended_color_light(endpoint, &device_config_0, rgb_status_light) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 6: device type extended_color_light");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 6: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
+  matter_mattercomponent_id->register_light(rgbww_status_light, 7);
+  matter_mattercomponent_id->register_endpoint_parent(7, 0);
+  matter_mattercomponent_id->register_endpoint_tag(7, 7, 2, "");
+  matter_mattercomponent_id->register_endpoint(7, [](esp_matter::endpoint_t *endpoint) -> bool {
+    esp_matter::endpoint::extended_color_light::config_t device_config_0{};
+    device_config_0.level_control.min_level = 1;
+    device_config_0.level_control.max_level = 254;
+    auto light_traits_0 = rgbww_status_light->get_traits();
+    device_config_0.color_control_color_temperature.color_temp_physical_min_mireds = light_traits_0.get_min_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_min_mireds()) : 153;
+    device_config_0.color_control_color_temperature.color_temp_physical_max_mireds = light_traits_0.get_max_mireds() > 0 ? esphome::matter::conversion::to_matter::color_temperature(light_traits_0.get_max_mireds()) : 500;
+    if (esphome::matter::add_extended_color_light(endpoint, &device_config_0, rgbww_status_light) != ESP_OK)
+      return MATTER_BUILD_FAIL("endpoint 7: device type extended_color_light");
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OnOffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_on_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OnTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_off_transition_time(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.OffTransitionTime create");
+    }
+    {
+      auto *level_control_cluster = esp_matter::cluster::get(endpoint, 8);
+      if (level_control_cluster == nullptr || esp_matter::cluster::level_control::attribute::create_default_move_rate(level_control_cluster, {}) == nullptr)
+        return MATTER_BUILD_FAIL("endpoint 7: attribute LevelControl.DefaultMoveRate create");
+    }
+    return true;
+  });
   matter_mattercomponent_id->register_code_driven_sensor_attribute<chip::app::Clusters::TemperatureMeasurementCluster, int16_t, &chip::app::Clusters::TemperatureMeasurementCluster::SetMeasuredValue>(internal_temp, 100, 1026, 0, esphome::matter::conversion::temperature);
   matter_mattercomponent_id->register_endpoint_parent(100, 0);
   matter_mattercomponent_id->register_endpoint_tag(100, 7, 1, "");
@@ -109,4 +177,4 @@
       return MATTER_BUILD_FAIL("endpoint 101: device type temperature_sensor");
     return true;
   });
-  matter_mattercomponent_id->set_structure_hash(0xDFD4B6AB);
+  matter_mattercomponent_id->set_structure_hash(0x6F21E84A);

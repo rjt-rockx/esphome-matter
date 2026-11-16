@@ -279,6 +279,9 @@ display:
 
 (`matter_state` is a `commissioning_state` text sensor with `internal: true` and `id: matter_state`.) Without a display, open the logged QR URL, or paste the payload into a QR generator.
 
+Keep the NVS partition and endpoint IDs stable across updates. For discovery
+problems after a Thread reboot, see [Thread debugging](dev/thread-debugging.md#commissioned-devices-after-reboot).
+
 # Multiple fabrics
 
 Up to 5 fabrics are supported by default. To raise the limit use the `max_fabrics` option (5 to 254), see [device-info.md](device-info.md#fabric-limit):
